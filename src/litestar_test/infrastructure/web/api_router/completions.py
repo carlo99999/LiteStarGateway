@@ -20,9 +20,18 @@ from uuid import UUID
 from litestar import Request, Response, post
 from litestar.di import NamedDependency
 from litestar.response import ServerSentEvent
+from litestar.response.sse import ServerSentEventMessage
 from litestar.status_codes import HTTP_200_OK
 
 from litestar_test.application.completion_service import CompletionService
+
+
+async def _sse_response_events(
+    events: AsyncIterator[dict[str, Any]],
+) -> AsyncIterator[ServerSentEventMessage]:
+    """Responses-API wire format: typed SSE events (`event:` + `data:`), no [DONE]."""
+    async for event in events:
+        yield ServerSentEventMessage(data=json.dumps(event), event=event.get("type"))
 
 
 async def _sse_events(chunks: AsyncIterator[dict[str, Any]]) -> AsyncIterator[str]:
@@ -68,8 +77,12 @@ async def responses(
     request: Request,
     data: dict[str, Any],
     completion_service: NamedDependency[CompletionService],
-) -> dict[str, Any]:
-    return await completion_service.responses(UUID(request.user), data)
+) -> Response[Any]:
+    team_id = UUID(request.user)
+    if data.get("stream"):
+        events = await completion_service.open_responses_stream(team_id, data)
+        return ServerSentEvent(_sse_response_events(events))
+    return Response(await completion_service.responses(team_id, data))
 
 
 @post(

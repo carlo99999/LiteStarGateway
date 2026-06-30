@@ -71,6 +71,14 @@ class CompletionService:
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
         return await self._gateway.astream_chat_completion(request, model, values)
 
+    async def open_responses_stream(
+        self, team_id: UUID, request: dict[str, Any]
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Resolve (may raise → HTTP error) and return an async iterator of
+        Responses-API stream events. Awaited before streaming starts."""
+        model, values = await self._prepare(team_id, request, ModelType.CHAT)
+        return await self._gateway.astream_responses(request, model, values)
+
     async def embeddings(self, team_id: UUID, request: dict[str, Any]) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.EMBEDDINGS)
         return await self._gateway.aembeddings(request, model, values)

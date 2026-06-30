@@ -86,6 +86,13 @@ class LLMGateway(Protocol):
         `chat.completion.chunk` dicts. Resolution errors surface before streaming."""
         ...
 
+    async def astream_responses(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Resolve eagerly and return an async iterator of Responses-API stream
+        event dicts (each carries a `type`)."""
+        ...
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]: ...
