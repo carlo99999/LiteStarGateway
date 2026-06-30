@@ -53,13 +53,6 @@ Tracked items not yet implemented (see also the code review notes):
   `JWT_SECRET` is unset, so a misconfigured production deploy could use a known
   signing key (forgeable tokens). Consider failing fast when unset in production,
   as is already done for `SALT_KEY`.
-- **Non-atomic multi-write operations** — repositories commit per call, so a
-  multi-step service operation (`create_team` = team + admin membership;
-  `register` = consume invite + create user) can leave partial state if a later
-  step fails. The proper fix is a unit-of-work (single transaction per request);
-  the Advanced Alchemy autocommit handler needs more setup to wire reliably here
-  and should be revisited (ideally validated on Postgres too). `register` already
-  consumes the invite atomically (conditional UPDATE).
 - **Cross-team credential usage (by design)** — credentials are platform-global,
   so any team admin can reference any credential in a model and consume it (they
   cannot read its secret). This is intentional for now; tie credentials to a
@@ -82,3 +75,9 @@ Tracked items not yet implemented (see also the code review notes):
   persists `last_used_at` at most once per minute per key.
 - **No token revocation / logout** — `POST /logout` bumps the user's
   `token_version` (embedded in the JWT), invalidating all previously issued tokens.
+- **Non-atomic multi-write operations** — the multi-step flows now run as a unit
+  of work: their repositories only stage (`flush`) and the service commits once,
+  so the operation persists fully or not at all. `register` consumes the invite +
+  creates the user atomically; `create_team` creates the team and both admin
+  memberships in a single transaction (the platform admin is the team's first
+  admin, plus the named lead). Single-write repositories still commit per call.

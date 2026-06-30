@@ -110,6 +110,16 @@ class FakeUserRepo:
         return None
 
 
+class FakeTransaction:
+    """No-op unit-of-work boundary; the in-memory fakes persist on write."""
+
+    async def commit(self) -> None:
+        return None
+
+    async def rollback(self) -> None:  # pragma: no cover - no failing path exercised
+        return None
+
+
 @pytest.fixture
 def repos() -> tuple[FakeOrgRepo, FakeTeamRepo, FakeMembershipRepo, FakeUserRepo]:
     return FakeOrgRepo(), FakeTeamRepo(), FakeMembershipRepo(), FakeUserRepo()
@@ -118,7 +128,7 @@ def repos() -> tuple[FakeOrgRepo, FakeTeamRepo, FakeMembershipRepo, FakeUserRepo
 @pytest.fixture
 def service(repos) -> TeamService:  # noqa: ANN001
     orgs, teams, memberships, users = repos
-    return TeamService(orgs, teams, memberships, users)
+    return TeamService(orgs, teams, memberships, users, FakeTransaction())
 
 
 async def test_create_team_requires_platform_admin(service, repos) -> None:  # noqa: ANN001
@@ -144,6 +154,36 @@ async def test_create_team_unknown_admin_email(service, repos) -> None:  # noqa:
     org = await orgs.add(Organization(id=uuid4(), name="O", created_at=_now()))
     with pytest.raises(UserNotFound):
         await service.create_team(admin, org.id, "T", "ghost@b.com")
+
+
+async def test_create_team_makes_platform_admin_and_lead_admins(service, repos) -> None:  # noqa: ANN001, E501
+    orgs, _, memberships, users = repos
+    admin = _user("admin@b.com", is_admin=True)
+    lead = _user("lead@b.com")
+    for u in (admin, lead):
+        users.add_user(u)
+    org = await orgs.add(Organization(id=uuid4(), name="O", created_at=_now()))
+
+    team = await service.create_team(admin, org.id, "T", "lead@b.com")
+
+    members = await memberships.list_by_team(team.id)
+    assert len(members) == 2
+    assert {m.user_id for m in members} == {admin.id, lead.id}
+    assert all(m.role is TeamRole.ADMIN for m in members)
+
+
+async def test_create_team_dedups_when_lead_is_platform_admin(service, repos) -> None:  # noqa: ANN001, E501
+    orgs, _, memberships, users = repos
+    admin = _user("admin@b.com", is_admin=True)
+    users.add_user(admin)
+    org = await orgs.add(Organization(id=uuid4(), name="O", created_at=_now()))
+
+    team = await service.create_team(admin, org.id, "T", "admin@b.com")
+
+    members = await memberships.list_by_team(team.id)
+    assert len(members) == 1
+    assert members[0].user_id == admin.id
+    assert members[0].role is TeamRole.ADMIN
 
 
 async def test_team_admin_can_manage_but_member_cannot(service, repos) -> None:  # noqa: ANN001

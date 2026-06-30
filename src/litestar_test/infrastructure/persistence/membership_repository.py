@@ -16,6 +16,7 @@ class SQLAlchemyTeamMembershipRepository:
         self._session = session
 
     async def add(self, membership: TeamMembership) -> TeamMembership:
+        # Stage only (flush, no commit); the service owns the transaction boundary.
         model = TeamMembershipModel(
             id=membership.id,
             team_id=membership.team_id,
@@ -23,7 +24,7 @@ class SQLAlchemyTeamMembershipRepository:
             role=membership.role.value,
         )
         self._session.add(model)
-        await self._session.commit()
+        await self._session.flush()
         await self._session.refresh(model)
         return model.to_entity()
 
@@ -49,7 +50,7 @@ class SQLAlchemyTeamMembershipRepository:
         if model is None:  # pragma: no cover - guarded by callers
             raise LookupError(f"Membership {membership.id} disappeared")
         model.role = membership.role.value
-        await self._session.commit()
+        await self._session.flush()
         await self._session.refresh(model)
         return model.to_entity()
 
@@ -60,4 +61,3 @@ class SQLAlchemyTeamMembershipRepository:
                 TeamMembershipModel.user_id == user_id,
             )
         )
-        await self._session.commit()

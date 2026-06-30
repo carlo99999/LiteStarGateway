@@ -16,9 +16,10 @@ class SQLAlchemyTeamRepository:
         self._session = session
 
     async def add(self, team: Team) -> Team:
+        # Stage only (flush, no commit); the service owns the transaction boundary.
         model = TeamModel(id=team.id, organization_id=team.organization_id, name=team.name)
         self._session.add(model)
-        await self._session.commit()
+        await self._session.flush()
         await self._session.refresh(model)
         return model.to_entity()
 

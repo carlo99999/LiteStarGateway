@@ -96,8 +96,9 @@ async def test_create_team_assigns_first_admin(client: AsyncTestClient) -> None:
     lead = await _login(client, "lead@b.com", "Passw0rd!")
     members = await client.get(f"/teams/{team_id}/members", headers=_bearer(lead))
     assert members.status_code == HTTP_200_OK
-    assert len(members.json()) == 1
-    assert members.json()[0]["role"] == "admin"
+    # Both the platform admin (first admin) and the named lead are team admins.
+    assert len(members.json()) == 2
+    assert all(m["role"] == "admin" for m in members.json())
 
 
 async def test_create_team_unknown_admin_email_404(client: AsyncTestClient) -> None:
@@ -138,7 +139,7 @@ async def test_team_admin_manages_members(client: AsyncTestClient) -> None:
     remove = await client.delete(f"/teams/{team_id}/members/{user_id}", headers=_bearer(lead))
     assert remove.status_code in (200, 204)
     members = await client.get(f"/teams/{team_id}/members", headers=_bearer(lead))
-    assert len(members.json()) == 1  # only the lead remains
+    assert len(members.json()) == 2  # the platform admin and the lead remain
 
 
 async def test_plain_member_cannot_manage(client: AsyncTestClient) -> None:
@@ -170,7 +171,7 @@ async def test_platform_admin_manages_any_team(client: AsyncTestClient) -> None:
     await _register(client, admin, "newbie@b.com")
     org_id = await _org(client, admin)
     team_id = await _team(client, admin, org_id, "lead@b.com")
-    # Platform admin is NOT a member but can still add members.
+    # The platform admin is a team admin by default and can add members.
     resp = await client.post(
         f"/teams/{team_id}/members",
         json={"email": "newbie@b.com", "role": "member"},

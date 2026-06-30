@@ -28,9 +28,12 @@ def provide_organization_service(
 
 
 def provide_team_service(db_session: NamedDependency[AsyncSession]) -> TeamService:
+    # The repositories and the unit-of-work share one request-scoped session, so
+    # the service's single commit covers every staged write.
     return TeamService(
         organizations=SQLAlchemyOrganizationRepository(db_session),
         teams=SQLAlchemyTeamRepository(db_session),
         memberships=SQLAlchemyTeamMembershipRepository(db_session),
         users=SQLAlchemyUserRepository(db_session),
+        transaction=db_session,
     )
