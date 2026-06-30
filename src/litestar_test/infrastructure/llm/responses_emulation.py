@@ -130,6 +130,16 @@ class ChatToResponsesAdapter:
     ) -> dict[str, Any]:
         return await self._inner.aembeddings(request, model, credentials)
 
+    def images(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        return self._inner.images(request, model, credentials)
+
+    async def aimages(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        return await self._inner.aimages(request, model, credentials)
+
     def responses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
