@@ -83,6 +83,7 @@ class FakeClient:
         self.chat = SimpleNamespace(completions=self)
         self.responses = self
         self.embeddings = SimpleNamespace(create=self._embed)
+        self.images = SimpleNamespace(generate=self._image)
 
     async def _embed(self, **kwargs):
         FakeClient.last_kwargs = kwargs
@@ -94,6 +95,10 @@ class FakeClient:
                 "usage": {"prompt_tokens": 1, "total_tokens": 1},
             }
         )
+
+    async def _image(self, **kwargs):
+        FakeClient.last_kwargs = kwargs
+        return _Result({"created": 0, "data": [{"url": "https://img/cat.png"}]})
 
     async def create(self, **kwargs):
         FakeClient.last_kwargs = kwargs
@@ -620,6 +625,53 @@ async def test_embeddings_unsupported_provider_501(
     resp = await client.post(
         "/v1/embeddings",
         json={"model": "m", "input": "hello"},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_501_NOT_IMPLEMENTED
+
+
+async def test_images_openai(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(client, provider_model_id="dall-e-3", model_type="image")
+    resp = await client.post(
+        "/v1/images/generations",
+        json={"model": "m", "prompt": "a cat", "size": "1024x1024"},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeClient.last_kwargs["model"] == "dall-e-3"
+    assert FakeClient.last_kwargs["prompt"] == "a cat"
+    assert resp.json()["data"][0]["url"] == "https://img/cat.png"
+
+
+async def test_images_wrong_model_type_400(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(client, model_type="chat")
+    resp = await client.post(
+        "/v1/images/generations",
+        json={"model": "m", "prompt": "a cat"},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_400_BAD_REQUEST
+
+
+async def test_images_unsupported_provider_501(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Databricks has no image generation → 501 (model type is correct).
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="databricks",
+        values=DATABRICKS_VALUES,
+        provider_model_id="x",
+        model_type="image",
+    )
+    resp = await client.post(
+        "/v1/images/generations",
+        json={"model": "m", "prompt": "a cat"},
         headers=_bearer(api_key),
     )
     assert resp.status_code == HTTP_501_NOT_IMPLEMENTED

@@ -84,3 +84,17 @@ async def embeddings(
     completion_service: NamedDependency[CompletionService],
 ) -> dict[str, Any]:
     return await completion_service.embeddings(UUID(request.user), data)
+
+
+@post(
+    "/v1/images/generations",
+    summary="OpenAI-compatible image generation",
+    description="Requires a model of type `image`. Supported on OpenAI and Azure.",
+    status_code=HTTP_200_OK,
+)
+async def images(
+    request: Request,
+    data: dict[str, Any],
+    completion_service: NamedDependency[CompletionService],
+) -> dict[str, Any]:
+    return await completion_service.images(UUID(request.user), data)
