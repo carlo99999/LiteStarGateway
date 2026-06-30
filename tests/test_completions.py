@@ -51,6 +51,26 @@ class _Result:
         return self._data
 
 
+class _FakeStream:
+    """Async-iterable of chunk objects, like the OpenAI SDK's AsyncStream."""
+
+    def __init__(self, chunks: list[dict]) -> None:
+        self._chunks = chunks
+
+    async def __aiter__(self):
+        for chunk in self._chunks:
+            yield _Result(chunk)
+
+
+def _stream_chunks(model: str | None) -> list[dict]:
+    base = {"id": "chatcmpl-s", "object": "chat.completion.chunk", "model": model}
+    return [
+        {**base, "choices": [{"index": 0, "delta": {"role": "assistant"}}]},
+        {**base, "choices": [{"index": 0, "delta": {"content": "Hi"}}]},
+        {**base, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+    ]
+
+
 class FakeClient:
     """Captures construction + call kwargs; echoes an OpenAI-shaped response."""
 
@@ -64,6 +84,8 @@ class FakeClient:
 
     async def create(self, **kwargs):
         FakeClient.last_kwargs = kwargs
+        if kwargs.get("stream"):
+            return _FakeStream(_stream_chunks(kwargs.get("model")))
         return _Result(
             {
                 "id": "cmpl-x",
@@ -409,8 +431,10 @@ async def test_vertex_responses_emulated(
     assert resp.json()["output_text"] == "ciao"
 
 
-async def test_streaming_chat_sse(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    # Adapter streaming is mocked on this branch → deterministic SSE chunks.
+async def test_streaming_openai_sse(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Real OpenAI streaming via the SDK (mocked): stream=True passed, chunks relayed.
     _patch(monkeypatch)
     api_key = await _setup(client)
     resp = await client.post(
@@ -420,11 +444,30 @@ async def test_streaming_chat_sse(client: AsyncTestClient, monkeypatch: pytest.M
     )
     assert resp.status_code == HTTP_200_OK
     assert "text/event-stream" in resp.headers["content-type"]
+    assert FakeClient.last_kwargs["stream"] is True
+    assert FakeClient.last_kwargs["model"] == "gpt-4o"
     body = resp.text
     assert "chat.completion.chunk" in body
-    # Mock pieces and the terminator are present.
-    assert "Hello" in body and "stream" in body
+    assert "Hi" in body
     assert "data: [DONE]" in body
+
+
+async def test_streaming_databricks_sse(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Databricks shares the OpenAI client surface → streaming works via delegation.
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client, provider="databricks", values=DATABRICKS_VALUES, provider_model_id="my-endpoint"
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [], "stream": True},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeClient.last_kwargs["stream"] is True
+    assert "data: [DONE]" in resp.text
 
 
 async def test_streaming_unknown_model_404_before_stream(

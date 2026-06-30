@@ -14,7 +14,6 @@ from typing import Any
 from openai import AsyncOpenAI, OpenAI
 
 from litestar_test.domain.entities import Model
-from litestar_test.infrastructure.llm.streaming import mock_chat_stream
 
 # Operation shapes the plain OpenAI provider supports.
 SUPPORTED = frozenset({"chat.completions", "responses"})
@@ -69,9 +68,14 @@ class OpenAICompatibleAdapter:
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        # TODO(streaming): real SDK streaming — mocked on the protocol branch.
-        async for chunk in mock_chat_stream(model):
-            yield chunk
+        client = self._async_client(model, credentials)
+        kwargs = _kwargs(request, model)
+        kwargs["stream"] = True
+        # Any: with stream=True the SDK returns AsyncStream (no model_dump itself);
+        # each yielded chunk is a ChatCompletionChunk that does have model_dump.
+        stream: Any = await client.chat.completions.create(**kwargs)
+        async for chunk in stream:
+            yield chunk.model_dump()
 
 
 class OpenAIAdapter(OpenAICompatibleAdapter):
