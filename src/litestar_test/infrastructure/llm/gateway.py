@@ -20,6 +20,7 @@ from litestar_test.infrastructure.llm.vertex_adapter import VertexAdapter
 
 _CHAT = "chat.completions"
 _RESPONSES = "responses"
+_EMBEDDINGS = "embeddings"
 
 
 class LLMGatewayImpl:
@@ -27,19 +28,22 @@ class LLMGatewayImpl:
         openai_adapter = OpenAIAdapter()  # OpenAI + Databricks share the client surface
         # provider -> (adapter, supported operation shapes)
         self._registry = {
-            Provider.OPENAI: (openai_adapter, frozenset({_CHAT, _RESPONSES})),
-            Provider.AZURE_OPENAI: (AzureOpenAIAdapter(), frozenset({_CHAT, _RESPONSES})),
-            # Databricks has no native Responses API; emulate it over chat.completions.
+            Provider.OPENAI: (openai_adapter, frozenset({_CHAT, _RESPONSES, _EMBEDDINGS})),
+            Provider.AZURE_OPENAI: (
+                AzureOpenAIAdapter(),
+                frozenset({_CHAT, _RESPONSES, _EMBEDDINGS}),
+            ),
+            # Databricks: no native Responses API (emulated); embeddings are OpenAI-compatible.
             Provider.DATABRICKS: (
                 ChatToResponsesAdapter(openai_adapter),
-                frozenset({_CHAT, _RESPONSES}),
+                frozenset({_CHAT, _RESPONSES, _EMBEDDINGS}),
             ),
-            # Anthropic: native chat translation; Responses emulated over it.
+            # Anthropic: chat + emulated Responses. No embeddings API.
             Provider.ANTHROPIC: (
                 ChatToResponsesAdapter(AnthropicAdapter()),
                 frozenset({_CHAT, _RESPONSES}),
             ),
-            # Vertex/Gemini: native chat translation; Responses emulated over it.
+            # Vertex/Gemini: chat + emulated Responses. (Embeddings: TODO via embed_content.)
             Provider.VERTEX_AI: (
                 ChatToResponsesAdapter(VertexAdapter()),
                 frozenset({_CHAT, _RESPONSES}),
@@ -85,3 +89,15 @@ class LLMGatewayImpl:
         # Resolve eagerly (await) so capability errors surface before streaming.
         adapter = self._resolve(model.provider, "chat.completions")
         return adapter.astream_chat_completion(request, model, credentials)
+
+    def embeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        adapter = self._resolve(model.provider, "embeddings")
+        return adapter.embeddings(request, model, credentials)
+
+    async def aembeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        adapter = self._resolve(model.provider, "embeddings")
+        return await adapter.aembeddings(request, model, credentials)

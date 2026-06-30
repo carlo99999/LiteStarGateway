@@ -77,6 +77,19 @@ class OpenAICompatibleAdapter:
         async for chunk in stream:
             yield chunk.model_dump()
 
+    def embeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        client = self._sync_client(model, credentials)
+        return client.embeddings.create(**_kwargs(request, model)).model_dump()
+
+    async def aembeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        client = self._async_client(model, credentials)
+        result = await client.embeddings.create(**_kwargs(request, model))
+        return result.model_dump()
+
 
 class OpenAIAdapter(OpenAICompatibleAdapter):
     """Plain OpenAI, and OpenAI-compatible endpoints (e.g. Databricks via base_url)."""

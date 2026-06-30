@@ -70,3 +70,17 @@ async def responses(
     completion_service: NamedDependency[CompletionService],
 ) -> dict[str, Any]:
     return await completion_service.responses(UUID(request.user), data)
+
+
+@post(
+    "/v1/embeddings",
+    summary="OpenAI-compatible embeddings",
+    description="Requires a model of type `embeddings`. Supported on OpenAI, Azure and Databricks.",
+    status_code=HTTP_200_OK,
+)
+async def embeddings(
+    request: Request,
+    data: dict[str, Any],
+    completion_service: NamedDependency[CompletionService],
+) -> dict[str, Any]:
+    return await completion_service.embeddings(UUID(request.user), data)

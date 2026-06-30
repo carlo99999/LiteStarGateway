@@ -120,6 +120,16 @@ class ChatToResponsesAdapter:
     ) -> AsyncIterator[dict[str, Any]]:
         return self._inner.astream_chat_completion(request, model, credentials)
 
+    def embeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        return self._inner.embeddings(request, model, credentials)
+
+    async def aembeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        return await self._inner.aembeddings(request, model, credentials)
+
     def responses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:

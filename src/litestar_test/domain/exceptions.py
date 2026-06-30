@@ -92,3 +92,7 @@ class ModelDisabled(DomainError):
 
 class UnsupportedOperation(DomainError):
     """This provider does not support the requested operation (e.g. /responses)."""
+
+
+class ModelTypeMismatch(DomainError):
+    """The model's type does not match the requested operation (e.g. chat vs embeddings)."""
