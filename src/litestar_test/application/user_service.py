@@ -8,7 +8,6 @@ Use cases:
 
 from __future__ import annotations
 
-import dataclasses
 import secrets
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -95,7 +94,12 @@ class UserService:
         except ValueError as e:
             raise WeakPassword(str(e)) from e
 
-        user = await self._users.add(
+        # Consume the invite atomically *before* creating the user, so two
+        # concurrent signups can never reuse the same single-use invite.
+        if not await self._invites.mark_used(invite.id, _now()):
+            raise InvalidInvite("Invite token is invalid or already used")
+
+        return await self._users.add(
             User(
                 id=uuid4(),
                 email=email,
@@ -104,8 +108,6 @@ class UserService:
                 created_at=_now(),
             )
         )
-        await self._invites.update(dataclasses.replace(invite, used_at=_now()))
-        return user
 
     async def authenticate(self, email: str, password: str) -> User:
         """Verify login credentials. Raises InvalidCredentials on any mismatch."""

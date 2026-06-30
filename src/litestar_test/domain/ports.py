@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
@@ -179,4 +180,4 @@ class InviteRepository(Protocol):
 
     async def get_by_token_hash(self, token_hash: str) -> Invite | None: ...
 
-    async def update(self, invite: Invite) -> Invite: ...
+    async def mark_used(self, invite_id: UUID, used_at: datetime) -> bool: ...

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.domain.entities import Invite
@@ -30,11 +34,15 @@ class SQLAlchemyInviteRepository:
         )
         return model.to_entity() if model else None
 
-    async def update(self, invite: Invite) -> Invite:
-        model = await self._session.get(InviteModel, invite.id)
-        if model is None:  # pragma: no cover - guarded by callers
-            raise LookupError(f"Invite {invite.id} disappeared")
-        model.used_at = invite.used_at
+    async def mark_used(self, invite_id: UUID, used_at: datetime) -> bool:
+        """Atomically consume the invite. Returns False if it was already used
+        (conditional UPDATE), so concurrent signups can't reuse one invite."""
+        # Any: the async execute() is typed Result, but at runtime it is a
+        # CursorResult exposing rowcount.
+        result: Any = await self._session.execute(
+            update(InviteModel)
+            .where(InviteModel.id == invite_id, InviteModel.used_at.is_(None))
+            .values(used_at=used_at)
+        )
         await self._session.commit()
-        await self._session.refresh(model)
-        return model.to_entity()
+        return result.rowcount == 1
