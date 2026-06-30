@@ -12,27 +12,45 @@ can point the stock OpenAI client at our base URL:
 
 from __future__ import annotations
 
+import json
+from collections.abc import AsyncIterator
 from typing import Any
 from uuid import UUID
 
-from litestar import Request, post
+from litestar import Request, Response, post
 from litestar.di import NamedDependency
+from litestar.response import ServerSentEvent
 from litestar.status_codes import HTTP_200_OK
 
 from litestar_test.application.completion_service import CompletionService
 
 
+async def _sse_events(chunks: AsyncIterator[dict[str, Any]]) -> AsyncIterator[str]:
+    """OpenAI streaming wire format: each chunk as a `data:` event, then `[DONE]`."""
+    async for chunk in chunks:
+        yield json.dumps(chunk)
+    yield "[DONE]"
+
+
 @post(
     "/v1/chat/completions",
     summary="OpenAI-compatible chat completions",
+    description="Set `stream: true` to receive Server-Sent Events (OpenAI chunk format).",
     status_code=HTTP_200_OK,
 )
 async def chat_completions(
     request: Request,
     data: dict[str, Any],
     completion_service: NamedDependency[CompletionService],
-) -> dict[str, Any]:
-    return await completion_service.chat_completion(UUID(request.user), data)
+) -> Response[Any]:
+    # Return Response (not a union) so the SSE branch keeps its text/event-stream
+    # content type — a union return makes Litestar force application/json.
+    team_id = UUID(request.user)
+    if data.get("stream"):
+        # Resolve eagerly so errors become a proper HTTP status before the SSE starts.
+        chunks = await completion_service.open_chat_stream(team_id, data)
+        return ServerSentEvent(_sse_events(chunks))
+    return Response(await completion_service.chat_completion(team_id, data))
 
 
 @post(

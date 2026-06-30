@@ -17,6 +17,7 @@ Natively-supported providers (OpenAI, Azure) get the full Responses feature set.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any
 
 from litestar_test.domain.entities import Model
@@ -113,6 +114,11 @@ class ChatToResponsesAdapter:
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         return await self._inner.achat_completion(request, model, credentials)
+
+    def astream_chat_completion(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        return self._inner.astream_chat_completion(request, model, credentials)
 
     def responses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
