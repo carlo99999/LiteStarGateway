@@ -87,7 +87,7 @@ def from_anthropic_response(message: dict[str, Any]) -> dict[str, Any]:
             {
                 "index": 0,
                 "message": {"role": "assistant", "content": text},
-                "finish_reason": _FINISH_REASON.get(message.get("stop_reason"), "stop"),
+                "finish_reason": _FINISH_REASON.get(message.get("stop_reason", ""), "stop"),
             }
         ],
         "usage": {
@@ -107,7 +107,7 @@ class AnthropicAdapter:
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         client = Anthropic(api_key=credentials["api_key"], base_url=_base_url(model, credentials))
-        message = client.messages.create(**to_anthropic_request(request, model))
+        message: Any = client.messages.create(**to_anthropic_request(request, model))
         return from_anthropic_response(message.model_dump())
 
     async def achat_completion(
@@ -116,5 +116,5 @@ class AnthropicAdapter:
         client = AsyncAnthropic(
             api_key=credentials["api_key"], base_url=_base_url(model, credentials)
         )
-        message = await client.messages.create(**to_anthropic_request(request, model))
+        message: Any = await client.messages.create(**to_anthropic_request(request, model))
         return from_anthropic_response(message.model_dump())
