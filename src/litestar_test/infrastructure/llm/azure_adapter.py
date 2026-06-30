@@ -11,13 +11,17 @@ from typing import Any
 from openai import AsyncAzureOpenAI, AzureOpenAI
 
 from litestar_test.domain.entities import Model
-from litestar_test.infrastructure.llm.openai_adapter import OpenAICompatibleAdapter
+from litestar_test.infrastructure.llm.openai_adapter import (
+    OpenAICompatibleAdapter,
+    require_api_key,
+)
 
 
 def _client_kwargs(model: Model, credentials: dict[str, str]) -> dict[str, Any]:
+    # Endpoint from the credential only (not the team-controlled model).
     return {
-        "api_key": credentials["api_key"],
-        "azure_endpoint": credentials.get("api_base") or model.api_base,
+        "api_key": require_api_key(credentials),
+        "azure_endpoint": credentials.get("api_base"),
         "api_version": credentials.get("api_version") or model.api_version,
     }
 

@@ -55,7 +55,8 @@ class Model:
     type: ModelType
     provider_model_id: str  # upstream model name, e.g. "gpt-4o"
     params: dict[str, Any]  # default LLM params (temperature, max_tokens, ...)
-    api_base: str | None
+    # Note: no api_base here — the endpoint comes from the (admin-managed)
+    # credential, so a team admin cannot redirect the credential's secret.
     api_version: str | None
     input_cost_per_token: float | None
     output_cost_per_token: float | None

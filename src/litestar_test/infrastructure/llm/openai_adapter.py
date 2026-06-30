@@ -14,6 +14,15 @@ from typing import Any
 from openai import AsyncOpenAI, OpenAI
 
 from litestar_test.domain.entities import Model
+from litestar_test.domain.exceptions import CredentialMisconfigured
+
+
+def require_api_key(credentials: dict[str, str]) -> str:
+    api_key = credentials.get("api_key")
+    if not api_key:
+        raise CredentialMisconfigured("credential is missing 'api_key'")
+    return api_key
+
 
 # Operation shapes the plain OpenAI provider supports.
 SUPPORTED = frozenset({"chat.completions", "responses"})
@@ -26,8 +35,11 @@ def _kwargs(request: dict[str, Any], model: Model) -> dict[str, Any]:
     return merged
 
 
-def _base_url(model: Model, credentials: dict[str, str]) -> str | None:
-    return model.api_base or credentials.get("api_base")
+def _base_url(credentials: dict[str, str]) -> str | None:
+    # Endpoint comes only from the (admin-managed) credential, never from the
+    # team-controlled model — otherwise a team admin could point the base URL at
+    # an arbitrary host and exfiltrate the credential's secret.
+    return credentials.get("api_base")
 
 
 class OpenAICompatibleAdapter:
@@ -118,7 +130,7 @@ class OpenAIAdapter(OpenAICompatibleAdapter):
     """Plain OpenAI, and OpenAI-compatible endpoints (e.g. Databricks via base_url)."""
 
     def _sync_client(self, model: Model, credentials: dict[str, str]) -> OpenAI:
-        return OpenAI(api_key=credentials["api_key"], base_url=_base_url(model, credentials))
+        return OpenAI(api_key=require_api_key(credentials), base_url=_base_url(credentials))
 
     def _async_client(self, model: Model, credentials: dict[str, str]) -> AsyncOpenAI:
-        return AsyncOpenAI(api_key=credentials["api_key"], base_url=_base_url(model, credentials))
+        return AsyncOpenAI(api_key=require_api_key(credentials), base_url=_base_url(credentials))

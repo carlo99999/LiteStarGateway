@@ -274,7 +274,11 @@ async def _setup(
     cred = (
         await client.post(
             "/credentials",
-            json={"name": f"c-{provider}", "provider": provider, "values": values or OPENAI_VALUES},
+            json={
+                "name": f"c-{provider}",
+                "provider": provider,
+                "values": values if values is not None else OPENAI_VALUES,
+            },
             headers=_bearer(admin),
         )
     ).json()["id"]
@@ -786,6 +790,20 @@ async def test_images_unsupported_provider_501(
         headers=_bearer(api_key),
     )
     assert resp.status_code == HTTP_501_NOT_IMPLEMENTED
+
+
+async def test_missing_api_key_in_credential_400(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A credential without api_key yields a clean 400, not a 500.
+    _patch(monkeypatch)
+    api_key = await _setup(client, values={})  # credential with no api_key
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": []},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_400_BAD_REQUEST
 
 
 async def test_unknown_model_alias_404(

@@ -25,7 +25,6 @@ class SQLAlchemyModelRepository:
             type=model.type.value,
             provider_model_id=model.provider_model_id,
             params=model.params,
-            api_base=model.api_base,
             api_version=model.api_version,
             input_cost_per_token=model.input_cost_per_token,
             output_cost_per_token=model.output_cost_per_token,
@@ -62,7 +61,6 @@ class SQLAlchemyModelRepository:
         record.type = model.type.value
         record.provider_model_id = model.provider_model_id
         record.params = model.params
-        record.api_base = model.api_base
         record.api_version = model.api_version
         record.input_cost_per_token = model.input_cost_per_token
         record.output_cost_per_token = model.output_cost_per_token

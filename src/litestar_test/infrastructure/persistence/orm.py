@@ -128,7 +128,6 @@ class ModelRecord(base.UUIDAuditBase):
     type: Mapped[str] = mapped_column()
     provider_model_id: Mapped[str] = mapped_column()
     params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    api_base: Mapped[str | None] = mapped_column(default=None)
     api_version: Mapped[str | None] = mapped_column(default=None)
     input_cost_per_token: Mapped[float | None] = mapped_column(default=None)
     output_cost_per_token: Mapped[float | None] = mapped_column(default=None)
@@ -144,7 +143,6 @@ class ModelRecord(base.UUIDAuditBase):
             type=ModelType(self.type),
             provider_model_id=self.provider_model_id,
             params=self.params or {},
-            api_base=self.api_base,
             api_version=self.api_version,
             input_cost_per_token=self.input_cost_per_token,
             output_cost_per_token=self.output_cost_per_token,
