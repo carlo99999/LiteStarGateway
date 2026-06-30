@@ -163,6 +163,22 @@ class _FakeGeminiModels:
             }
         )
 
+    async def generate_content_stream(self, **kwargs):
+        FakeGenaiClient.last_kwargs = kwargs
+        return _FakeStream(
+            [
+                {"candidates": [{"content": {"role": "model", "parts": [{"text": "ci"}]}}]},
+                {
+                    "candidates": [
+                        {
+                            "content": {"role": "model", "parts": [{"text": "ao"}]},
+                            "finish_reason": "STOP",
+                        }
+                    ]
+                },
+            ]
+        )
+
 
 class FakeGenaiClient:
     last_init: dict = {}
@@ -504,6 +520,28 @@ async def test_streaming_anthropic_sse(
     body = resp.text
     assert "chat.completion.chunk" in body
     assert "Hi" in body and "there" in body
+    assert '"finish_reason": "stop"' in body
+    assert "data: [DONE]" in body
+
+
+async def test_streaming_vertex_sse(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Gemini stream chunks translated to OpenAI chunks.
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client, provider="vertex_ai", values=VERTEX_VALUES, provider_model_id="gemini-1.5-pro"
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}], "stream": True},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeGenaiClient.last_kwargs["model"] == "gemini-1.5-pro"
+    body = resp.text
+    assert "chat.completion.chunk" in body
+    assert "ci" in body and "ao" in body
     assert '"finish_reason": "stop"' in body
     assert "data: [DONE]" in body
 

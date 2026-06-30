@@ -23,7 +23,6 @@ from google import genai
 from google.oauth2 import service_account
 
 from litestar_test.domain.entities import Model
-from litestar_test.infrastructure.llm.streaming import mock_chat_stream
 
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 
@@ -101,6 +100,19 @@ def from_gemini_response(response: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def gemini_chunk_to_delta(chunk: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    """Map one Gemini stream chunk to an OpenAI chunk (delta, finish_reason)."""
+    candidate = (chunk.get("candidates") or [{}])[0]
+    parts = (candidate.get("content") or {}).get("parts") or []
+    text = "".join(
+        p.get("text", "") for p in parts if isinstance(p, dict) and isinstance(p.get("text"), str)
+    )
+    finish_raw = candidate.get("finish_reason")
+    finish = _FINISH_REASON.get(finish_raw, "stop") if finish_raw else None
+    delta = {"content": text} if text else None
+    return delta, finish
+
+
 def _client(credentials: dict[str, str]) -> genai.Client:
     creds = None
     if raw := credentials.get("vertex_credentials"):
@@ -133,6 +145,26 @@ class VertexAdapter:
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        # TODO(streaming): real Gemini streaming — mocked on the protocol branch.
-        async for chunk in mock_chat_stream(model):
-            yield chunk
+        client = _client(credentials)
+        base = {
+            "id": "chatcmpl-gemini",
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": model.provider_model_id,
+        }
+        # Gemini has no separate "start" event; emit the role delta ourselves.
+        yield {
+            **base,
+            "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
+        }
+        stream: Any = await client.aio.models.generate_content_stream(
+            **to_gemini_request(request, model)
+        )
+        async for chunk in stream:
+            delta, finish = gemini_chunk_to_delta(chunk.model_dump())
+            if delta is None and finish is None:
+                continue
+            yield {
+                **base,
+                "choices": [{"index": 0, "delta": delta or {}, "finish_reason": finish}],
+            }
