@@ -12,7 +12,6 @@ from litestar.status_codes import (
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
-    HTTP_409_CONFLICT,
 )
 from litestar.testing import AsyncTestClient
 
@@ -163,7 +162,7 @@ async def test_signup_with_invite_then_token_is_single_use(
     assert second.status_code == HTTP_400_BAD_REQUEST
 
 
-async def test_signup_duplicate_email_conflicts(client: AsyncTestClient) -> None:
+async def test_signup_duplicate_email_is_non_revealing(client: AsyncTestClient) -> None:
     token1 = await _new_invite(client)
     token2 = await _new_invite(client)
     ok = await client.post(
@@ -175,7 +174,10 @@ async def test_signup_duplicate_email_conflicts(client: AsyncTestClient) -> None
         "/signup",
         json={"invite_token": token2, "email": "dup@b.com", "password": "Passw0rd!"},
     )
-    assert dup.status_code == HTTP_409_CONFLICT
+    # A duplicate email must not be distinguishable from a generic failure: same
+    # 400 as other client errors, and the email is never echoed back.
+    assert dup.status_code == HTTP_400_BAD_REQUEST
+    assert "dup@b.com" not in dup.text
 
 
 async def test_signup_normalizes_email(client: AsyncTestClient) -> None:

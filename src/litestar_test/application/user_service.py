@@ -85,19 +85,23 @@ class UserService:
         if invite is None or not invite.is_usable:
             raise InvalidInvite("Invite token is invalid or already used")
 
-        email = _normalize_email(email)
-        if await self._users.get_by_email(email) is not None:
-            raise EmailAlreadyRegistered(email)
-
+        # Validate the password before consuming the invite, so a legitimate
+        # typo does not burn the invite (and it leaks nothing about the email).
         try:
             self.__check_if_password_has_some_complexity(password)
         except ValueError as e:
             raise WeakPassword(str(e)) from e
 
-        # Consume the invite atomically *before* creating the user, so two
-        # concurrent signups can never reuse the same single-use invite.
+        # Consume the invite atomically *before* the email check, so two
+        # concurrent signups can never reuse one invite AND so probing whether an
+        # email exists costs a single-use, admin-issued invite per attempt
+        # (account-enumeration is bounded by invite scarcity).
         if not await self._invites.mark_used(invite.id, _now()):
             raise InvalidInvite("Invite token is invalid or already used")
+
+        email = _normalize_email(email)
+        if await self._users.get_by_email(email) is not None:
+            raise EmailAlreadyRegistered(email)
 
         return await self._users.add(
             User(

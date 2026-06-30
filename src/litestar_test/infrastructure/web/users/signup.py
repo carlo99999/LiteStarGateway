@@ -5,7 +5,6 @@ from __future__ import annotations
 from litestar import post
 from litestar.di import NamedDependency
 from litestar.exceptions import ClientException
-from litestar.status_codes import HTTP_409_CONFLICT
 
 from litestar_test.application.user_service import UserService
 from litestar_test.domain.exceptions import (
@@ -28,5 +27,8 @@ async def signup(data: SignupRequest, user_service: NamedDependency[UserService]
     except (InvalidInvite, WeakPassword) as exc:
         raise ClientException(str(exc)) from exc
     except EmailAlreadyRegistered as exc:
-        raise ClientException(str(exc), status_code=HTTP_409_CONFLICT) from exc
+        # Non-revealing response: do not disclose that the email already exists
+        # (avoids account enumeration). The detailed reason is kept server-side
+        # via the chained exception.
+        raise ClientException("Unable to complete sign up.") from exc
     return UserResponse.from_entity(user)
