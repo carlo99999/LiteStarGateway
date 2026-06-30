@@ -14,6 +14,7 @@ structured outputs.
 
 from __future__ import annotations
 
+import base64
 import json
 import time
 from collections.abc import AsyncIterator
@@ -136,6 +137,24 @@ def from_gemini_embeddings(response: dict[str, Any], model_id: str) -> dict[str,
     }
 
 
+def to_imagen_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
+    effective = {**model.params, **request}
+    return {"model": model.provider_model_id, "prompt": effective.get("prompt")}
+
+
+def from_imagen_response(response: dict[str, Any]) -> dict[str, Any]:
+    data = []
+    for generated in response.get("generated_images") or []:
+        image = (generated.get("image") or {}) if isinstance(generated, dict) else {}
+        raw = image.get("image_bytes")
+        if raw is not None:
+            b64 = raw if isinstance(raw, str) else base64.b64encode(raw).decode("ascii")
+            data.append({"b64_json": b64})
+        elif image.get("gcs_uri"):
+            data.append({"url": image["gcs_uri"]})
+    return {"created": int(time.time()), "data": data}
+
+
 def _client(credentials: dict[str, str]) -> genai.Client:
     creds = None
     if raw := credentials.get("vertex_credentials"):
@@ -205,3 +224,17 @@ class VertexAdapter:
         client = _client(credentials)
         response = await client.aio.models.embed_content(**to_gemini_embed_request(request, model))
         return from_gemini_embeddings(response.model_dump(), model.provider_model_id)
+
+    def images(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        client = _client(credentials)
+        response = client.models.generate_images(**to_imagen_request(request, model))
+        return from_imagen_response(response.model_dump())
+
+    async def aimages(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        client = _client(credentials)
+        response = await client.aio.models.generate_images(**to_imagen_request(request, model))
+        return from_imagen_response(response.model_dump())

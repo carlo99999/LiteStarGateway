@@ -185,6 +185,10 @@ class _FakeGeminiModels:
         FakeGenaiClient.last_kwargs = kwargs
         return _Result({"embeddings": [{"values": [0.4, 0.5, 0.6]}]})
 
+    async def generate_images(self, **kwargs):
+        FakeGenaiClient.last_kwargs = kwargs
+        return _Result({"generated_images": [{"image": {"image_bytes": b"PNGBYTES"}}]})
+
     async def generate_content_stream(self, **kwargs):
         FakeGenaiClient.last_kwargs = kwargs
         return _FakeStream(
@@ -668,6 +672,29 @@ async def test_images_openai(client: AsyncTestClient, monkeypatch: pytest.Monkey
     assert FakeClient.last_kwargs["model"] == "dall-e-3"
     assert FakeClient.last_kwargs["prompt"] == "a cat"
     assert resp.json()["data"][0]["url"] == "https://img/cat.png"
+
+
+async def test_images_vertex(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    import base64
+
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="vertex_ai",
+        values=VERTEX_VALUES,
+        provider_model_id="imagen-3.0",
+        model_type="image",
+    )
+    resp = await client.post(
+        "/v1/images/generations",
+        json={"model": "m", "prompt": "a cat"},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeGenaiClient.last_kwargs["model"] == "imagen-3.0"
+    assert FakeGenaiClient.last_kwargs["prompt"] == "a cat"
+    # Imagen bytes are base64-encoded into OpenAI's b64_json field.
+    assert resp.json()["data"][0]["b64_json"] == base64.b64encode(b"PNGBYTES").decode("ascii")
 
 
 async def test_images_wrong_model_type_400(
