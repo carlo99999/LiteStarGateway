@@ -80,9 +80,35 @@ class FakeClient:
         )
 
 
+class FakeAnthropic:
+    """Captures Messages-API kwargs; echoes an Anthropic message."""
+
+    last_init: dict = {}
+    last_kwargs: dict = {}
+
+    def __init__(self, **kwargs) -> None:
+        FakeAnthropic.last_init = kwargs
+        self.messages = self
+
+    async def create(self, **kwargs):
+        FakeAnthropic.last_kwargs = kwargs
+        return _Result(
+            {
+                "id": "msg-x",
+                "type": "message",
+                "role": "assistant",
+                "model": kwargs.get("model"),
+                "content": [{"type": "text", "text": "hi there"}],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 3, "output_tokens": 5},
+            }
+        )
+
+
 def _patch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(openai_adapter, "AsyncOpenAI", FakeClient)
     monkeypatch.setattr(azure_adapter, "AsyncAzureOpenAI", FakeClient)
+    monkeypatch.setattr(anthropic_adapter, "AsyncAnthropic", FakeAnthropic)
 
 
 @pytest.fixture
@@ -241,6 +267,61 @@ async def test_databricks_responses_emulated_over_chat(
     ]
 
 
+async def test_anthropic_chat_translation(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-3-5-sonnet",
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [
+                {"role": "system", "content": "be brief"},
+                {"role": "user", "content": "hi"},
+            ],
+        },
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    # Request: system extracted, only user/assistant in messages, max_tokens defaulted.
+    assert FakeAnthropic.last_kwargs["system"] == "be brief"
+    assert FakeAnthropic.last_kwargs["messages"] == [{"role": "user", "content": "hi"}]
+    assert FakeAnthropic.last_kwargs["model"] == "claude-3-5-sonnet"
+    assert FakeAnthropic.last_kwargs["max_tokens"] == 1024
+    # Response: translated back to OpenAI chat shape.
+    body = resp.json()
+    assert body["object"] == "chat.completion"
+    assert body["choices"][0]["message"]["content"] == "hi there"
+    assert body["choices"][0]["finish_reason"] == "stop"
+    assert body["usage"]["prompt_tokens"] == 3
+    assert body["usage"]["completion_tokens"] == 5
+
+
+async def test_anthropic_responses_emulated(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-3-5-sonnet",
+    )
+    resp = await client.post(
+        "/v1/responses", json={"model": "m", "input": "hi"}, headers=_bearer(api_key)
+    )
+    assert resp.status_code == HTTP_200_OK
+    body = resp.json()
+    assert body["object"] == "response"
+    assert body["output_text"] == "hi there"
+
+
 async def test_unknown_model_alias_404(
     client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -269,8 +350,8 @@ async def test_unsupported_provider_501(
     client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch(monkeypatch)
-    # 'anthropic' has no adapter in the gateway yet → 501.
-    api_key = await _setup(client, provider="anthropic")
+    # 'bedrock' has no adapter in the gateway yet → 501.
+    api_key = await _setup(client, provider="bedrock")
     resp = await client.post(
         "/v1/chat/completions",
         json={"model": "m", "messages": []},

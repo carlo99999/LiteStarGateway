@@ -33,9 +33,7 @@ def _text(content: Any) -> str:
         return content
     if isinstance(content, list):
         return "".join(
-            c["text"]
-            for c in content
-            if isinstance(c, dict) and isinstance(c.get("text"), str)
+            c["text"] for c in content if isinstance(c, dict) and isinstance(c.get("text"), str)
         )
     return ""
 
@@ -108,9 +106,7 @@ class AnthropicAdapter:
     def chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = Anthropic(
-            api_key=credentials["api_key"], base_url=_base_url(model, credentials)
-        )
+        client = Anthropic(api_key=credentials["api_key"], base_url=_base_url(model, credentials))
         message = client.messages.create(**to_anthropic_request(request, model))
         return from_anthropic_response(message.model_dump())
 
