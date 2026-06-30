@@ -15,6 +15,7 @@ from litestar_test.infrastructure.llm.anthropic_adapter import AnthropicAdapter
 from litestar_test.infrastructure.llm.azure_adapter import AzureOpenAIAdapter
 from litestar_test.infrastructure.llm.openai_adapter import OpenAIAdapter
 from litestar_test.infrastructure.llm.responses_emulation import ChatToResponsesAdapter
+from litestar_test.infrastructure.llm.vertex_adapter import VertexAdapter
 
 _CHAT = "chat.completions"
 _RESPONSES = "responses"
@@ -35,6 +36,11 @@ class LLMGatewayImpl:
             # Anthropic: native chat translation; Responses emulated over it.
             Provider.ANTHROPIC: (
                 ChatToResponsesAdapter(AnthropicAdapter()),
+                frozenset({_CHAT, _RESPONSES}),
+            ),
+            # Vertex/Gemini: native chat translation; Responses emulated over it.
+            Provider.VERTEX_AI: (
+                ChatToResponsesAdapter(VertexAdapter()),
                 frozenset({_CHAT, _RESPONSES}),
             ),
         }

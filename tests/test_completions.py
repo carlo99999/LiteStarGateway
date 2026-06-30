@@ -24,6 +24,7 @@ from litestar_test.infrastructure.llm import (
     anthropic_adapter,
     azure_adapter,
     openai_adapter,
+    vertex_adapter,
 )
 
 MASTER_KEY = "master-secret"
@@ -39,6 +40,7 @@ AZURE_VALUES = {
 }
 DATABRICKS_VALUES = {"api_key": "dapi-x", "api_base": "https://w.databricks.com/serving-endpoints"}
 ANTHROPIC_VALUES = {"api_key": "sk-ant-x"}
+VERTEX_VALUES = {"vertex_project": "p", "vertex_location": "us-central1"}
 
 
 class _Result:
@@ -105,10 +107,43 @@ class FakeAnthropic:
         )
 
 
+class _FakeGeminiModels:
+    async def generate_content(self, **kwargs):
+        FakeGenaiClient.last_kwargs = kwargs
+        return _Result(
+            {
+                "candidates": [
+                    {
+                        "content": {"role": "model", "parts": [{"text": "ciao"}]},
+                        "finish_reason": "STOP",
+                    }
+                ],
+                "usage_metadata": {
+                    "prompt_token_count": 4,
+                    "candidates_token_count": 2,
+                    "total_token_count": 6,
+                },
+                "model_version": "gemini-1.5-pro-002",
+                "response_id": "resp-g",
+            }
+        )
+
+
+class FakeGenaiClient:
+    last_init: dict = {}
+    last_kwargs: dict = {}
+
+    def __init__(self, **kwargs) -> None:
+        FakeGenaiClient.last_init = kwargs
+        self.aio = SimpleNamespace(models=_FakeGeminiModels())
+        self.models = _FakeGeminiModels()
+
+
 def _patch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(openai_adapter, "AsyncOpenAI", FakeClient)
     monkeypatch.setattr(azure_adapter, "AsyncAzureOpenAI", FakeClient)
     monkeypatch.setattr(anthropic_adapter, "AsyncAnthropic", FakeAnthropic)
+    monkeypatch.setattr(vertex_adapter.genai, "Client", FakeGenaiClient)
 
 
 @pytest.fixture
@@ -320,6 +355,58 @@ async def test_anthropic_responses_emulated(
     body = resp.json()
     assert body["object"] == "response"
     assert body["output_text"] == "hi there"
+
+
+async def test_vertex_chat_translation(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="vertex_ai",
+        values=VERTEX_VALUES,
+        provider_model_id="gemini-1.5-pro",
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [
+                {"role": "system", "content": "be brief"},
+                {"role": "user", "content": "hi"},
+            ],
+        },
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    # Client built for Vertex with project/location from the credential.
+    assert FakeGenaiClient.last_init["vertexai"] is True
+    assert FakeGenaiClient.last_init["project"] == "p"
+    assert FakeGenaiClient.last_init["location"] == "us-central1"
+    # Request: system -> system_instruction, assistant role would map to "model".
+    assert FakeGenaiClient.last_kwargs["model"] == "gemini-1.5-pro"
+    assert FakeGenaiClient.last_kwargs["config"]["system_instruction"] == "be brief"
+    assert FakeGenaiClient.last_kwargs["contents"] == [{"role": "user", "parts": [{"text": "hi"}]}]
+    # Response: translated back to OpenAI chat shape.
+    body = resp.json()
+    assert body["choices"][0]["message"]["content"] == "ciao"
+    assert body["choices"][0]["finish_reason"] == "stop"
+    assert body["usage"]["prompt_tokens"] == 4
+    assert body["usage"]["completion_tokens"] == 2
+
+
+async def test_vertex_responses_emulated(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client, provider="vertex_ai", values=VERTEX_VALUES, provider_model_id="gemini-1.5-pro"
+    )
+    resp = await client.post(
+        "/v1/responses", json={"model": "m", "input": "hi"}, headers=_bearer(api_key)
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert resp.json()["output_text"] == "ciao"
 
 
 async def test_unknown_model_alias_404(
