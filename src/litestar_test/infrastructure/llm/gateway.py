@@ -94,6 +94,12 @@ class LLMGatewayImpl:
         adapter = self._resolve(model.provider, "chat.completions")
         return adapter.astream_chat_completion(request, model, credentials)
 
+    async def astream_responses(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        adapter = self._resolve(model.provider, "responses")
+        return adapter.astream_responses(request, model, credentials)
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:

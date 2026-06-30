@@ -77,6 +77,16 @@ class OpenAICompatibleAdapter:
         async for chunk in stream:
             yield chunk.model_dump()
 
+    async def astream_responses(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        client = self._async_client(model, credentials)
+        kwargs = _kwargs(request, model)
+        kwargs["stream"] = True
+        stream: Any = await client.responses.create(**kwargs)
+        async for event in stream:
+            yield event.model_dump()
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:

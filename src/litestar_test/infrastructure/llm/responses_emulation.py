@@ -120,6 +120,44 @@ class ChatToResponsesAdapter:
     ) -> AsyncIterator[dict[str, Any]]:
         return self._inner.astream_chat_completion(request, model, credentials)
 
+    async def astream_responses(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Emulate Responses streaming over the chat stream: created → text
+        deltas → completed. A subset of the native event protocol."""
+        chat_request = to_chat_completions(request)
+        response_id = "resp-emulated"
+        meta = {"id": response_id, "object": "response", "model": model.provider_model_id}
+        yield {
+            "type": "response.created",
+            "response": {**meta, "status": "in_progress", "output": []},
+        }
+
+        parts: list[str] = []
+        async for chunk in self._inner.astream_chat_completion(chat_request, model, credentials):
+            content = (chunk.get("choices") or [{}])[0].get("delta", {}).get("content")
+            if content:
+                parts.append(content)
+                yield {"type": "response.output_text.delta", "delta": content}
+
+        text = "".join(parts)
+        yield {
+            "type": "response.completed",
+            "response": {
+                **meta,
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "status": "completed",
+                        "content": [{"type": "output_text", "text": text, "annotations": []}],
+                    }
+                ],
+                "output_text": text,
+            },
+        }
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:

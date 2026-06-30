@@ -81,9 +81,24 @@ class FakeClient:
     def __init__(self, **kwargs) -> None:
         FakeClient.last_init = kwargs
         self.chat = SimpleNamespace(completions=self)
-        self.responses = self
+        self.responses = SimpleNamespace(create=self._responses_create)
         self.embeddings = SimpleNamespace(create=self._embed)
         self.images = SimpleNamespace(generate=self._image)
+
+    async def _responses_create(self, **kwargs):
+        FakeClient.last_kwargs = kwargs
+        if kwargs.get("stream"):
+            return _FakeStream(
+                [
+                    {"type": "response.created", "response": {"id": "r", "status": "in_progress"}},
+                    {"type": "response.output_text.delta", "delta": "Hi"},
+                    {
+                        "type": "response.completed",
+                        "response": {"id": "r", "status": "completed", "output_text": "Hi"},
+                    },
+                ]
+            )
+        return _Result({"id": "r", "object": "response", "model": kwargs.get("model")})
 
     async def _embed(self, **kwargs):
         FakeClient.last_kwargs = kwargs
@@ -571,6 +586,49 @@ async def test_streaming_vertex_sse(
     assert "ci" in body and "ao" in body
     assert '"finish_reason": "stop"' in body
     assert "data: [DONE]" in body
+
+
+async def test_streaming_responses_native_openai(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # OpenAI native Responses streaming: events passed through as typed SSE.
+    _patch(monkeypatch)
+    api_key = await _setup(client)
+    resp = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "hi", "stream": True},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert "text/event-stream" in resp.headers["content-type"]
+    assert FakeClient.last_kwargs["stream"] is True
+    body = resp.text
+    assert "event: response.output_text.delta" in body
+    assert "event: response.completed" in body
+    assert "Hi" in body
+
+
+async def test_streaming_responses_emulated_anthropic(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Anthropic has no native Responses → emulated over its chat stream.
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-3-5-sonnet",
+    )
+    resp = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "hi", "stream": True},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    body = resp.text
+    assert "event: response.output_text.delta" in body
+    assert "event: response.completed" in body
+    assert "Hi" in body and "there" in body
 
 
 async def test_streaming_unknown_model_404_before_stream(
