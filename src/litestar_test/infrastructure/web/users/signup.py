@@ -13,10 +13,11 @@ from litestar_test.domain.exceptions import (
     InvalidInvite,
     WeakPassword,
 )
+from litestar_test.infrastructure.web.rate_limit import build_auth_rate_limit
 from litestar_test.infrastructure.web.users.schemas import SignupRequest, UserResponse
 
 
-@post("/signup")
+@post("/signup", middleware=[build_auth_rate_limit().middleware])
 async def signup(data: SignupRequest, user_service: NamedDependency[UserService]) -> UserResponse:
     try:
         user = await user_service.register(
