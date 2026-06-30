@@ -8,6 +8,7 @@ the caller already holds the model and credentials.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any
 from uuid import UUID
 
@@ -56,3 +57,11 @@ class CompletionService:
     async def responses(self, team_id: UUID, request: dict[str, Any]) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request)
         return await self._gateway.aresponses(request, model, values)
+
+    async def open_chat_stream(
+        self, team_id: UUID, request: dict[str, Any]
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Resolve the model + credentials (may raise → HTTP error) and return an
+        async iterator of OpenAI chunk dicts. Awaited before streaming starts."""
+        model, values = await self._prepare(team_id, request)
+        return await self._gateway.astream_chat_completion(request, model, values)

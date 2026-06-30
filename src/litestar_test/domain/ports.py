@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
@@ -77,6 +78,13 @@ class LLMGateway(Protocol):
     async def aresponses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]: ...
+
+    async def astream_chat_completion(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Resolve eagerly (await) and return an async iterator of OpenAI
+        `chat.completion.chunk` dicts. Resolution errors surface before streaming."""
+        ...
 
 
 class ModelRepository(Protocol):

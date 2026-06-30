@@ -11,11 +11,13 @@ multimodal content, structured outputs.
 from __future__ import annotations
 
 import time
+from collections.abc import AsyncIterator
 from typing import Any
 
 from anthropic import Anthropic, AsyncAnthropic
 
 from litestar_test.domain.entities import Model
+from litestar_test.infrastructure.llm.streaming import mock_chat_stream
 
 # Anthropic requires max_tokens; use this when the request omits it.
 DEFAULT_MAX_TOKENS = 1024
@@ -118,3 +120,10 @@ class AnthropicAdapter:
         )
         message: Any = await client.messages.create(**to_anthropic_request(request, model))
         return from_anthropic_response(message.model_dump())
+
+    async def astream_chat_completion(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        # TODO(streaming): real Messages streaming — mocked on the protocol branch.
+        async for chunk in mock_chat_stream(model):
+            yield chunk

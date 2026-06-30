@@ -409,6 +409,38 @@ async def test_vertex_responses_emulated(
     assert resp.json()["output_text"] == "ciao"
 
 
+async def test_streaming_chat_sse(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Adapter streaming is mocked on this branch → deterministic SSE chunks.
+    _patch(monkeypatch)
+    api_key = await _setup(client)
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [], "stream": True},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert "text/event-stream" in resp.headers["content-type"]
+    body = resp.text
+    assert "chat.completion.chunk" in body
+    # Mock pieces and the terminator are present.
+    assert "Hello" in body and "stream" in body
+    assert "data: [DONE]" in body
+
+
+async def test_streaming_unknown_model_404_before_stream(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Resolution happens before the SSE starts → a clean 404, not a broken stream.
+    _patch(monkeypatch)
+    api_key = await _setup(client)
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={"model": "nope", "messages": [], "stream": True},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_404_NOT_FOUND
+
+
 async def test_unknown_model_alias_404(
     client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

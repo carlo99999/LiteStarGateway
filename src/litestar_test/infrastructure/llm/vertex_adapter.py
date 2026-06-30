@@ -16,12 +16,14 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import AsyncIterator
 from typing import Any
 
 from google import genai
 from google.oauth2 import service_account
 
 from litestar_test.domain.entities import Model
+from litestar_test.infrastructure.llm.streaming import mock_chat_stream
 
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 
@@ -127,3 +129,10 @@ class VertexAdapter:
         client = _client(credentials)
         response = await client.aio.models.generate_content(**to_gemini_request(request, model))
         return from_gemini_response(response.model_dump())
+
+    async def astream_chat_completion(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        # TODO(streaming): real Gemini streaming — mocked on the protocol branch.
+        async for chunk in mock_chat_stream(model):
+            yield chunk

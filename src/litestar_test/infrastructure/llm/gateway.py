@@ -7,6 +7,7 @@ a provider error.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any
 
 from litestar_test.domain.entities import Model, Provider
@@ -77,3 +78,10 @@ class LLMGatewayImpl:
     ) -> dict[str, Any]:
         adapter = self._resolve(model.provider, "responses")
         return await adapter.aresponses(request, model, credentials)
+
+    async def astream_chat_completion(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        # Resolve eagerly (await) so capability errors surface before streaming.
+        adapter = self._resolve(model.provider, "chat.completions")
+        return adapter.astream_chat_completion(request, model, credentials)
