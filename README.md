@@ -50,9 +50,6 @@ uv run pytest
 
 Tracked items not yet implemented (see also the code review notes):
 
-- **Email enumeration on signup** — `POST /signup` returns `409` with the email
-  when it already exists, revealing which emails are registered. Login is already
-  generic; signup should be made non-revealing.
 - **Unvalidated request passthrough** — chat/responses requests are forwarded to
   the provider SDKs largely as-is (`{**model.params, **request}`). `model` is
   overridden, but other fields (e.g. `extra_headers`, large `n`) pass through.
@@ -79,6 +76,12 @@ Tracked items not yet implemented (see also the code review notes):
   persists `last_used_at` at most once per minute per key.
 - **No token revocation / logout** — `POST /logout` bumps the user's
   `token_version` (embedded in the JWT), invalidating all previously issued tokens.
+- **Email enumeration on signup** — a duplicate email now returns the same
+  generic `400` as other client errors (the email is never echoed), so the
+  response no longer reveals whether an address is registered. Because signup is
+  invite-gated and the invite is consumed *before* the email check, probing an
+  address costs one single-use, admin-issued invite per attempt — so enumeration
+  is bounded by invite scarcity, not just by the (now generic) response.
 - **Rate limiting** — `/v1/*` is throttled **per API key** (hashed, never the
   plaintext; falls back to per-IP for anonymous/invalid tokens) to bound provider
   spend, and `/login` + `/signup` are throttled **per IP** to bound brute force
