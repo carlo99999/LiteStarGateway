@@ -1,0 +1,75 @@
+"""OpenAI-compatible adapters (OpenAI, Databricks; Azure subclasses the base).
+
+The request is already OpenAI-shaped, so this is mostly a passthrough: we merge
+the model's default `params`, point `model` at the upstream id, build the SDK
+client from the credential, and return the response as a dict. Subclasses only
+provide the client constructor; the four operations are shared.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from openai import AsyncOpenAI, OpenAI
+
+from litestar_test.domain.entities import Model
+
+# Operation shapes the plain OpenAI provider supports.
+SUPPORTED = frozenset({"chat.completions", "responses"})
+
+
+def _kwargs(request: dict[str, Any], model: Model) -> dict[str, Any]:
+    # Model params are defaults; the incoming request overrides them.
+    merged = {**model.params, **request}
+    merged["model"] = model.provider_model_id  # alias -> upstream model id (or deployment)
+    return merged
+
+
+def _base_url(model: Model, credentials: dict[str, str]) -> str | None:
+    return model.api_base or credentials.get("api_base")
+
+
+class OpenAICompatibleAdapter:
+    """Shared operations for any client exposing the OpenAI SDK surface."""
+
+    def _sync_client(self, model: Model, credentials: dict[str, str]) -> Any:
+        raise NotImplementedError
+
+    def _async_client(self, model: Model, credentials: dict[str, str]) -> Any:
+        raise NotImplementedError
+
+    def chat_completion(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        client = self._sync_client(model, credentials)
+        return client.chat.completions.create(**_kwargs(request, model)).model_dump()
+
+    async def achat_completion(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        client = self._async_client(model, credentials)
+        result = await client.chat.completions.create(**_kwargs(request, model))
+        return result.model_dump()
+
+    def responses(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        client = self._sync_client(model, credentials)
+        return client.responses.create(**_kwargs(request, model)).model_dump()
+
+    async def aresponses(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        client = self._async_client(model, credentials)
+        result = await client.responses.create(**_kwargs(request, model))
+        return result.model_dump()
+
+
+class OpenAIAdapter(OpenAICompatibleAdapter):
+    """Plain OpenAI, and OpenAI-compatible endpoints (e.g. Databricks via base_url)."""
+
+    def _sync_client(self, model: Model, credentials: dict[str, str]) -> OpenAI:
+        return OpenAI(api_key=credentials["api_key"], base_url=_base_url(model, credentials))
+
+    def _async_client(self, model: Model, credentials: dict[str, str]) -> AsyncOpenAI:
+        return AsyncOpenAI(api_key=credentials["api_key"], base_url=_base_url(model, credentials))

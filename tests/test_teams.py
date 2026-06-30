@@ -1,0 +1,179 @@
+"""Integration tests for organizations, teams and memberships."""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from pathlib import Path
+
+import pytest
+from litestar.status_codes import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
+)
+from litestar.testing import AsyncTestClient
+
+from litestar_test.app import create_app
+from litestar_test.config import Settings
+
+MASTER_KEY = "master-secret"
+ADMIN_EMAIL = "admin@example.com"
+JWT_SECRET = "test-secret-key-0123456789-abcdefghij"
+
+
+@pytest.fixture
+async def client(tmp_path: Path) -> AsyncIterator[AsyncTestClient]:
+    settings = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'teams.db'}",
+        admin_email=ADMIN_EMAIL,
+        master_key=MASTER_KEY,
+        jwt_secret=JWT_SECRET,
+        salt_key="test-salt-key",
+    )
+    async with AsyncTestClient(app=create_app(settings)) as test_client:
+        yield test_client
+
+
+def _bearer(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def _login(client: AsyncTestClient, email: str, password: str) -> str:
+    return (await client.post("/login", json={"email": email, "password": password})).json()[
+        "access_token"
+    ]
+
+
+async def _register(client: AsyncTestClient, admin_token: str, email: str) -> None:
+    invite = (await client.post("/invites", headers=_bearer(admin_token))).json()["token"]
+    await client.post(
+        "/signup",
+        json={"invite_token": invite, "email": email, "password": "Passw0rd!"},
+    )
+
+
+async def _org(client: AsyncTestClient, token: str) -> str:
+    return (
+        await client.post("/organizations", json={"name": "Acme"}, headers=_bearer(token))
+    ).json()["id"]
+
+
+async def _team(client: AsyncTestClient, token: str, org_id: str, admin_email: str) -> str:
+    return (
+        await client.post(
+            f"/organizations/{org_id}/teams",
+            json={"name": "Core", "admin_email": admin_email},
+            headers=_bearer(token),
+        )
+    ).json()["id"]
+
+
+async def test_only_platform_admin_creates_org(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    await _register(client, admin, "bob@b.com")
+    bob = await _login(client, "bob@b.com", "Passw0rd!")
+    assert (
+        await client.post("/organizations", json={"name": "X"}, headers=_bearer(bob))
+    ).status_code == HTTP_403_FORBIDDEN
+    assert (
+        await client.post("/organizations", json={"name": "X"}, headers=_bearer(admin))
+    ).status_code == HTTP_201_CREATED
+
+
+async def test_create_team_assigns_first_admin(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    await _register(client, admin, "lead@b.com")
+    org_id = await _org(client, admin)
+    resp = await client.post(
+        f"/organizations/{org_id}/teams",
+        json={"name": "Core", "admin_email": "lead@b.com"},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_201_CREATED
+    team_id = resp.json()["id"]
+    # 'lead' is team admin → can list members.
+    lead = await _login(client, "lead@b.com", "Passw0rd!")
+    members = await client.get(f"/teams/{team_id}/members", headers=_bearer(lead))
+    assert members.status_code == HTTP_200_OK
+    assert len(members.json()) == 1
+    assert members.json()[0]["role"] == "admin"
+
+
+async def test_create_team_unknown_admin_email_404(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    resp = await client.post(
+        f"/organizations/{org_id}/teams",
+        json={"name": "Core", "admin_email": "ghost@b.com"},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_404_NOT_FOUND
+
+
+async def test_team_admin_manages_members(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    await _register(client, admin, "lead@b.com")
+    await _register(client, admin, "member@b.com")
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, "lead@b.com")
+    lead = await _login(client, "lead@b.com", "Passw0rd!")
+
+    add = await client.post(
+        f"/teams/{team_id}/members",
+        json={"email": "member@b.com", "role": "member"},
+        headers=_bearer(lead),
+    )
+    assert add.status_code == HTTP_201_CREATED
+    user_id = add.json()["user_id"]
+
+    promote = await client.patch(
+        f"/teams/{team_id}/members/{user_id}",
+        json={"role": "admin"},
+        headers=_bearer(lead),
+    )
+    assert promote.status_code == HTTP_200_OK
+    assert promote.json()["role"] == "admin"
+
+    remove = await client.delete(f"/teams/{team_id}/members/{user_id}", headers=_bearer(lead))
+    assert remove.status_code in (200, 204)
+    members = await client.get(f"/teams/{team_id}/members", headers=_bearer(lead))
+    assert len(members.json()) == 1  # only the lead remains
+
+
+async def test_plain_member_cannot_manage(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    await _register(client, admin, "lead@b.com")
+    await _register(client, admin, "member@b.com")
+    await _register(client, admin, "stranger@b.com")
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, "lead@b.com")
+    lead = await _login(client, "lead@b.com", "Passw0rd!")
+    await client.post(
+        f"/teams/{team_id}/members",
+        json={"email": "member@b.com", "role": "member"},
+        headers=_bearer(lead),
+    )
+    member = await _login(client, "member@b.com", "Passw0rd!")
+    # A plain member cannot add others.
+    resp = await client.post(
+        f"/teams/{team_id}/members",
+        json={"email": "stranger@b.com", "role": "member"},
+        headers=_bearer(member),
+    )
+    assert resp.status_code == HTTP_403_FORBIDDEN
+
+
+async def test_platform_admin_manages_any_team(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    await _register(client, admin, "lead@b.com")
+    await _register(client, admin, "newbie@b.com")
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, "lead@b.com")
+    # Platform admin is NOT a member but can still add members.
+    resp = await client.post(
+        f"/teams/{team_id}/members",
+        json={"email": "newbie@b.com", "role": "member"},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_201_CREATED
