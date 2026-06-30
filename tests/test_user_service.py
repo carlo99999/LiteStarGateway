@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+from datetime import datetime
 from uuid import UUID
 
 import pytest
@@ -45,9 +47,12 @@ class FakeInviteRepository:
     async def get_by_token_hash(self, token_hash: str) -> Invite | None:
         return next((i for i in self._by_id.values() if i.token_hash == token_hash), None)
 
-    async def update(self, invite: Invite) -> Invite:
-        self._by_id[invite.id] = invite
-        return invite
+    async def mark_used(self, invite_id: UUID, used_at: datetime) -> bool:
+        invite = self._by_id.get(invite_id)
+        if invite is None or not invite.is_usable:
+            return False
+        self._by_id[invite_id] = dataclasses.replace(invite, used_at=used_at)
+        return True
 
 
 @pytest.fixture
