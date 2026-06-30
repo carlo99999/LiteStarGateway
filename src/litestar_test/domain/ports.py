@@ -183,3 +183,16 @@ class InviteRepository(Protocol):
     async def get_by_token_hash(self, token_hash: str) -> Invite | None: ...
 
     async def mark_used(self, invite_id: UUID, used_at: datetime) -> bool: ...
+
+
+class Transaction(Protocol):
+    """Unit-of-work boundary for a single use-case.
+
+    Repositories participating in a transactional flow only *stage* writes
+    (flush, no commit); the service commits once via this port, so a multi-step
+    operation either persists fully or not at all. `AsyncSession` satisfies it.
+    """
+
+    async def commit(self) -> None: ...
+
+    async def rollback(self) -> None: ...
