@@ -37,6 +37,15 @@ uv run litestar --app litestar_test.app:app run
 uv run pytest
 ```
 
+## Roadmap
+
+- **Observability via MLflow** _(planned)_ — a `TraceSink` port + MLflow adapter
+  (OSS or Databricks) to log usage, cost, latency and optional payloads off the
+  request hot path, with a general firehose experiment plus optional per-team
+  experiments. Design doc and parked work live on the
+  [`adding-observability-via-mlflow`](https://github.com/carlo99999/LiteStarGateway/blob/adding-observability-via-mlflow/docs/observability.md)
+  branch; we'll resume it from there.
+
 ## Security — known issues & follow-ups
 
 Tracked items not yet implemented (see also the code review notes):
