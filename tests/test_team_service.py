@@ -106,6 +106,9 @@ class FakeUserRepo:
     async def count(self) -> int:
         return len(self.by_email)
 
+    async def increment_token_version(self, user_id: UUID) -> None:  # pragma: no cover
+        return None
+
 
 @pytest.fixture
 def repos() -> tuple[FakeOrgRepo, FakeTeamRepo, FakeMembershipRepo, FakeUserRepo]:

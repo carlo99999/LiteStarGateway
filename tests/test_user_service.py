@@ -32,6 +32,13 @@ class FakeUserRepository:
     async def count(self) -> int:
         return len(self._by_email)
 
+    async def increment_token_version(self, user_id: UUID) -> None:
+        for email, user in self._by_email.items():
+            if user.id == user_id:
+                self._by_email[email] = dataclasses.replace(
+                    user, token_version=user.token_version + 1
+                )
+
     async def get(self, user_id: UUID) -> User | None:
         return next((u for u in self._by_email.values() if u.id == user_id), None)
 

@@ -10,7 +10,7 @@ from litestar.exceptions import NotAuthorizedException, PermissionDeniedExceptio
 
 from litestar_test.application.user_service import UserService
 from litestar_test.domain.entities import User
-from litestar_test.infrastructure.web.session.jwt import decode_subject
+from litestar_test.infrastructure.web.session.jwt import decode_token
 
 
 async def provide_current_user(
@@ -26,7 +26,7 @@ async def provide_current_user(
     if scheme.lower() != "bearer" or not token:
         raise NotAuthorizedException("Invalid Authorization header")
 
-    subject = decode_subject(token, jwt_secret)  # raises on invalid/expired
+    subject, token_version = decode_token(token, jwt_secret)  # raises on invalid/expired
     try:
         user_id = UUID(subject)
     except ValueError as exc:
@@ -35,6 +35,9 @@ async def provide_current_user(
     user = await user_service.get_by_id(user_id)
     if user is None:
         raise NotAuthorizedException("User no longer exists")
+    # Reject tokens issued before a logout (token_version bump).
+    if token_version != user.token_version:
+        raise NotAuthorizedException("Token has been revoked")
     return user
 
 

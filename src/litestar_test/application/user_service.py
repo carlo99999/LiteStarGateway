@@ -118,3 +118,7 @@ class UserService:
 
     async def get_by_id(self, user_id: UUID) -> User | None:
         return await self._users.get(user_id)
+
+    async def logout(self, user: User) -> None:
+        """Invalidate all of the user's existing JWTs by bumping token_version."""
+        await self._users.increment_token_version(user.id)
