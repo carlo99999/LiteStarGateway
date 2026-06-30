@@ -16,6 +16,7 @@ from litestar.status_codes import (
 from litestar_test.domain.exceptions import (
     AlreadyMember,
     APIKeyNotFound,
+    CredentialMisconfigured,
     CredentialNameExists,
     CredentialNotFound,
     DomainError,
@@ -59,6 +60,7 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     (WeakPassword, HTTP_400_BAD_REQUEST),
     (ProviderMismatch, HTTP_400_BAD_REQUEST),
     (ModelTypeMismatch, HTTP_400_BAD_REQUEST),
+    (CredentialMisconfigured, HTTP_400_BAD_REQUEST),
     (UnsupportedOperation, HTTP_501_NOT_IMPLEMENTED),
     (SaltKeyMissing, HTTP_503_SERVICE_UNAVAILABLE),
 ]

@@ -74,6 +74,10 @@ class SaltKeyMissing(DomainError):
     """SALT_KEY is not configured; credential encryption is unavailable."""
 
 
+class CredentialMisconfigured(DomainError):
+    """The credential is missing a value required to call the provider (e.g. api_key)."""
+
+
 class ModelNotFound(DomainError):
     """No model exists for the given id (within the team)."""
 

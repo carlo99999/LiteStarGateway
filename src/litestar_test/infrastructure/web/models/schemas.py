@@ -18,7 +18,6 @@ class CreateModelRequest:
     type: ModelType
     provider_model_id: str  # upstream model name, e.g. "gpt-4o"
     params: dict[str, Any] = field(default_factory=dict)
-    api_base: str | None = None
     api_version: str | None = None
     input_cost_per_token: float | None = None
     output_cost_per_token: float | None = None
@@ -32,7 +31,6 @@ class UpdateModelRequest:
 
     provider_model_id: str | None = None
     params: dict[str, Any] | None = None
-    api_base: str | None = None
     api_version: str | None = None
     input_cost_per_token: float | None = None
     output_cost_per_token: float | None = None
@@ -49,7 +47,6 @@ class ModelResponse:
     type: ModelType
     provider_model_id: str
     params: dict[str, Any]
-    api_base: str | None
     api_version: str | None
     input_cost_per_token: float | None
     output_cost_per_token: float | None
@@ -67,7 +64,6 @@ class ModelResponse:
             type=model.type,
             provider_model_id=model.provider_model_id,
             params=model.params,
-            api_base=model.api_base,
             api_version=model.api_version,
             input_cost_per_token=model.input_cost_per_token,
             output_cost_per_token=model.output_cost_per_token,
