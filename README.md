@@ -28,7 +28,9 @@ API keys, and encrypted provider credentials (admin-managed).
 ## Configuration
 
 See `.env.sample`. Key env vars: `DATABASE_URL`, `MASTER_KEY` (bootstrap admin),
-`JWT_SECRET` (login token signing), `SALT_KEY` (credential encryption at rest).
+`JWT_SECRET` (login token signing), `SALT_KEY` (credential encryption at rest),
+and `ENVIRONMENT` (`development` default; `production` enables startup config
+checks — a missing/default `JWT_SECRET` then aborts startup).
 
 ```bash
 uv run litestar --app litestar_test.app:app run
@@ -49,10 +51,6 @@ Tracked items not yet implemented (see also the code review notes):
   the provider SDKs largely as-is (`{**model.params, **request}`). `model` is
   overridden, but other fields (e.g. `extra_headers`, large `n`) pass through.
   Consider an allowlist of accepted parameters per operation.
-- **`JWT_SECRET` dev default** — `config.py` falls back to an insecure default if
-  `JWT_SECRET` is unset, so a misconfigured production deploy could use a known
-  signing key (forgeable tokens). Consider failing fast when unset in production,
-  as is already done for `SALT_KEY`.
 - **Cross-team credential usage (by design)** — credentials are platform-global,
   so any team admin can reference any credential in a model and consume it (they
   cannot read its secret). This is intentional for now; tie credentials to a
@@ -81,3 +79,7 @@ Tracked items not yet implemented (see also the code review notes):
   creates the user atomically; `create_team` creates the team and both admin
   memberships in a single transaction (the platform admin is the team's first
   admin, plus the named lead). Single-write repositories still commit per call.
+- **`JWT_SECRET` dev default** — with `ENVIRONMENT=production` (or `prod`) the app
+  fails fast at startup if `JWT_SECRET` is unset or left at the insecure dev
+  default, so a misconfigured production deploy can't sign tokens with a known
+  key. Outside production the dev default is still allowed for convenience.

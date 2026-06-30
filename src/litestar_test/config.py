@@ -9,8 +9,15 @@ from dotenv import load_dotenv
 
 DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///api_keys.db"
 DEFAULT_ADMIN_EMAIL = "admin@example.com"
+DEFAULT_ENVIRONMENT = "development"
 # ≥32 bytes to satisfy HS256 key-length recommendations. Override in production.
 DEFAULT_JWT_SECRET = "dev-insecure-change-me-please-0123456789"
+
+_PRODUCTION_ENVIRONMENTS = frozenset({"production", "prod"})
+
+
+class InsecureConfigurationError(RuntimeError):
+    """Raised at startup when a production deploy uses an insecure default."""
 
 
 @dataclass(frozen=True)
@@ -20,11 +27,25 @@ class Settings:
     # Bootstrap password for the admin user. Required only when the users table
     # is empty; absence + empty table raises at startup.
     master_key: str | None
-    # Secret used to sign login JWTs. MUST be overridden in production.
+    # Secret used to sign login JWTs. MUST be overridden in production — leaving it
+    # at the dev default in production fails fast (see __post_init__).
     jwt_secret: str
     # Encryption key for credential values at rest. No default (a fixed key would
     # defeat encryption); credential operations fail clearly if it is unset.
     salt_key: str | None
+    # Deployment environment. "production"/"prod" enables fail-fast config checks.
+    environment: str = DEFAULT_ENVIRONMENT
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() in _PRODUCTION_ENVIRONMENTS
+
+    def __post_init__(self) -> None:
+        # Fail fast rather than silently signing JWTs with a publicly known key.
+        if self.is_production and (not self.jwt_secret or self.jwt_secret == DEFAULT_JWT_SECRET):
+            raise InsecureConfigurationError(
+                "JWT_SECRET must be set to a strong, non-default value in production"
+            )
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -35,4 +56,5 @@ class Settings:
             master_key=os.environ.get("MASTER_KEY"),
             jwt_secret=os.environ.get("JWT_SECRET", DEFAULT_JWT_SECRET),
             salt_key=os.environ.get("SALT_KEY"),
+            environment=os.environ.get("ENVIRONMENT", DEFAULT_ENVIRONMENT),
         )
