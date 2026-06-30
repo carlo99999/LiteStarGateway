@@ -86,6 +86,14 @@ class LLMGateway(Protocol):
         `chat.completion.chunk` dicts. Resolution errors surface before streaming."""
         ...
 
+    def embeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]: ...
+
+    async def aembeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]: ...
+
 
 class ModelRepository(Protocol):
     """Persistence port for team-scoped model deployments."""

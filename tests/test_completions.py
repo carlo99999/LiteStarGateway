@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import pytest
 from litestar.status_codes import (
     HTTP_200_OK,
+    HTTP_400_BAD_REQUEST,
     HTTP_404_NOT_FOUND,
     HTTP_409_CONFLICT,
     HTTP_501_NOT_IMPLEMENTED,
@@ -81,6 +82,18 @@ class FakeClient:
         FakeClient.last_init = kwargs
         self.chat = SimpleNamespace(completions=self)
         self.responses = self
+        self.embeddings = SimpleNamespace(create=self._embed)
+
+    async def _embed(self, **kwargs):
+        FakeClient.last_kwargs = kwargs
+        return _Result(
+            {
+                "object": "list",
+                "model": kwargs.get("model"),
+                "data": [{"object": "embedding", "index": 0, "embedding": [0.1, 0.2, 0.3]}],
+                "usage": {"prompt_tokens": 1, "total_tokens": 1},
+            }
+        )
 
     async def create(self, **kwargs):
         FakeClient.last_kwargs = kwargs
@@ -226,6 +239,7 @@ async def _setup(
     values: dict | None = None,
     provider_model_id: str = "gpt-4o",
     enabled: bool = True,
+    model_type: str = "chat",
 ) -> str:
     """Configure a credential + team + model 'm' + key. Returns the team API key."""
     admin = await _admin(client)
@@ -252,7 +266,7 @@ async def _setup(
             "name": "m",
             "provider": provider,
             "credential_id": cred,
-            "type": "chat",
+            "type": model_type,
             "provider_model_id": provider_model_id,
             "enabled": enabled,
         },
@@ -558,6 +572,57 @@ async def test_streaming_unknown_model_404_before_stream(
         headers=_bearer(api_key),
     )
     assert resp.status_code == HTTP_404_NOT_FOUND
+
+
+async def test_embeddings_openai(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client, provider_model_id="text-embedding-3-small", model_type="embeddings"
+    )
+    resp = await client.post(
+        "/v1/embeddings",
+        json={"model": "m", "input": "hello"},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeClient.last_kwargs["model"] == "text-embedding-3-small"
+    assert FakeClient.last_kwargs["input"] == "hello"
+    body = resp.json()
+    assert body["data"][0]["embedding"] == [0.1, 0.2, 0.3]
+
+
+async def test_embeddings_wrong_model_type_400(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A chat model used on /v1/embeddings → type mismatch.
+    _patch(monkeypatch)
+    api_key = await _setup(client, model_type="chat")
+    resp = await client.post(
+        "/v1/embeddings",
+        json={"model": "m", "input": "hello"},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_400_BAD_REQUEST
+
+
+async def test_embeddings_unsupported_provider_501(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Anthropic has no embeddings API → 501 (model type is correct).
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="irrelevant",
+        model_type="embeddings",
+    )
+    resp = await client.post(
+        "/v1/embeddings",
+        json={"model": "m", "input": "hello"},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_501_NOT_IMPLEMENTED
 
 
 async def test_unknown_model_alias_404(

@@ -27,6 +27,7 @@ from litestar_test.domain.exceptions import (
     ModelDisabled,
     ModelNameExists,
     ModelNotFound,
+    ModelTypeMismatch,
     OrganizationNotFound,
     PermissionDenied,
     ProviderMismatch,
@@ -57,6 +58,7 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     (InvalidInvite, HTTP_400_BAD_REQUEST),
     (WeakPassword, HTTP_400_BAD_REQUEST),
     (ProviderMismatch, HTTP_400_BAD_REQUEST),
+    (ModelTypeMismatch, HTTP_400_BAD_REQUEST),
     (UnsupportedOperation, HTTP_501_NOT_IMPLEMENTED),
     (SaltKeyMissing, HTTP_503_SERVICE_UNAVAILABLE),
 ]
