@@ -17,7 +17,6 @@ from typing import Any
 from anthropic import Anthropic, AsyncAnthropic
 
 from litestar_test.domain.entities import Model
-from litestar_test.infrastructure.llm.streaming import mock_chat_stream
 
 # Anthropic requires max_tokens; use this when the request omits it.
 DEFAULT_MAX_TOKENS = 1024
@@ -100,6 +99,26 @@ def from_anthropic_response(message: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def anthropic_event_to_delta(event: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    """Map one Anthropic stream event to an OpenAI chunk (delta, finish_reason).
+
+    Returns (None, None) for events that produce no chunk (e.g. pings, block stops).
+    """
+    etype = event.get("type")
+    if etype == "message_start":
+        return {"role": "assistant"}, None
+    if etype == "content_block_delta":
+        delta = event.get("delta") or {}
+        if delta.get("type") == "text_delta":
+            return {"content": delta.get("text", "")}, None
+        return None, None
+    if etype == "message_delta":
+        reason = (event.get("delta") or {}).get("stop_reason")
+        if reason:
+            return {}, _FINISH_REASON.get(reason, "stop")
+    return None, None
+
+
 def _base_url(model: Model, credentials: dict[str, str]) -> str | None:
     return model.api_base or credentials.get("api_base")
 
@@ -124,6 +143,22 @@ class AnthropicAdapter:
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        # TODO(streaming): real Messages streaming — mocked on the protocol branch.
-        async for chunk in mock_chat_stream(model):
-            yield chunk
+        client = AsyncAnthropic(
+            api_key=credentials["api_key"], base_url=_base_url(model, credentials)
+        )
+        base = {
+            "id": "chatcmpl-anthropic",
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": model.provider_model_id,
+        }
+        kwargs: dict[str, Any] = {**to_anthropic_request(request, model), "stream": True}
+        stream: Any = await client.messages.create(**kwargs)
+        async for event in stream:
+            delta, finish = anthropic_event_to_delta(event.model_dump())
+            if delta is None and finish is None:
+                continue
+            yield {
+                **base,
+                "choices": [{"index": 0, "delta": delta or {}, "finish_reason": finish}],
+            }
