@@ -134,6 +134,8 @@ class User:
     password_hash: str
     is_admin: bool
     created_at: datetime
+    # Bumped on logout to invalidate previously issued JWTs.
+    token_version: int = 0
 
 
 @dataclass(frozen=True)

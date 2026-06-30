@@ -172,6 +172,8 @@ class UserRepository(Protocol):
 
     async def count(self) -> int: ...
 
+    async def increment_token_version(self, user_id: UUID) -> None: ...
+
 
 class InviteRepository(Protocol):
     """Persistence port for invites."""

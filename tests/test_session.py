@@ -90,6 +90,29 @@ async def test_me_returns_current_user(client: AsyncTestClient) -> None:
     assert body["is_admin"] is False
 
 
+async def test_logout_revokes_existing_tokens(client: AsyncTestClient) -> None:
+    await _signup(client, "alice@b.com", "S3cret!!")
+    token = (
+        await client.post("/login", json={"email": "alice@b.com", "password": "S3cret!!"})
+    ).json()["access_token"]
+    auth = {"Authorization": f"Bearer {token}"}
+
+    assert (await client.get("/me", headers=auth)).status_code == HTTP_200_OK
+
+    logout = await client.post("/logout", headers=auth)
+    assert logout.status_code in (200, 204)
+
+    # The same token is now revoked.
+    assert (await client.get("/me", headers=auth)).status_code == HTTP_401_UNAUTHORIZED
+
+    # A fresh login still works.
+    new_token = (
+        await client.post("/login", json={"email": "alice@b.com", "password": "S3cret!!"})
+    ).json()["access_token"]
+    after = await client.get("/me", headers={"Authorization": f"Bearer {new_token}"})
+    assert after.status_code == HTTP_200_OK
+
+
 async def test_admin_can_login_with_master_key(client: AsyncTestClient) -> None:
     # The bootstrapped admin's password IS the master key.
     resp = await client.post("/login", json={"email": ADMIN_EMAIL, "password": MASTER_KEY})

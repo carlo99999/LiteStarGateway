@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.domain.entities import User
@@ -21,11 +21,20 @@ class SQLAlchemyUserRepository:
             email=user.email,
             password_hash=user.password_hash,
             is_admin=user.is_admin,
+            token_version=user.token_version,
         )
         self._session.add(model)
         await self._session.commit()
         await self._session.refresh(model)
         return model.to_entity()
+
+    async def increment_token_version(self, user_id: UUID) -> None:
+        await self._session.execute(
+            update(UserModel)
+            .where(UserModel.id == user_id)
+            .values(token_version=UserModel.token_version + 1)
+        )
+        await self._session.commit()
 
     async def get(self, user_id: UUID) -> User | None:
         model = await self._session.get(UserModel, user_id)

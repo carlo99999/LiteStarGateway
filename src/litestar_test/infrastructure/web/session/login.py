@@ -24,5 +24,5 @@ async def login(
     except InvalidCredentials as exc:
         raise NotAuthorizedException("Invalid email or password") from exc
 
-    access_token, expires_in = issue_access_token(str(user.id), jwt_secret)
+    access_token, expires_in = issue_access_token(str(user.id), jwt_secret, user.token_version)
     return TokenResponse(access_token=access_token, token_type="bearer", expires_in=expires_in)
