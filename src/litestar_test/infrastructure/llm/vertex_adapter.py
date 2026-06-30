@@ -113,6 +113,29 @@ def gemini_chunk_to_delta(chunk: dict[str, Any]) -> tuple[dict[str, Any] | None,
     return delta, finish
 
 
+def to_gemini_embed_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
+    effective = {**model.params, **request}
+    return {"model": model.provider_model_id, "contents": effective.get("input")}
+
+
+def from_gemini_embeddings(response: dict[str, Any], model_id: str) -> dict[str, Any]:
+    embeddings = response.get("embeddings") or []
+    data = [
+        {
+            "object": "embedding",
+            "index": i,
+            "embedding": e.get("values") if isinstance(e, dict) else [],
+        }
+        for i, e in enumerate(embeddings)
+    ]
+    return {
+        "object": "list",
+        "data": data,
+        "model": model_id,
+        "usage": {"prompt_tokens": None, "total_tokens": None},
+    }
+
+
 def _client(credentials: dict[str, str]) -> genai.Client:
     creds = None
     if raw := credentials.get("vertex_credentials"):
@@ -168,3 +191,17 @@ class VertexAdapter:
                 **base,
                 "choices": [{"index": 0, "delta": delta or {}, "finish_reason": finish}],
             }
+
+    def embeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        client = _client(credentials)
+        response = client.models.embed_content(**to_gemini_embed_request(request, model))
+        return from_gemini_embeddings(response.model_dump(), model.provider_model_id)
+
+    async def aembeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        client = _client(credentials)
+        response = await client.aio.models.embed_content(**to_gemini_embed_request(request, model))
+        return from_gemini_embeddings(response.model_dump(), model.provider_model_id)
