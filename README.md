@@ -41,9 +41,6 @@ uv run pytest
 
 Tracked items not yet implemented (see also the code review notes):
 
-- **Rate limiting** — there is no throttling on `/v1/*`, `/login`, or `/signup`.
-  A production deployment should add per-key / per-IP rate limits to bound abuse
-  and provider costs.
 - **Email enumeration on signup** — `POST /signup` returns `409` with the email
   when it already exists, revealing which emails are registered. Login is already
   generic; signup should be made non-revealing.
@@ -73,6 +70,13 @@ Tracked items not yet implemented (see also the code review notes):
   persists `last_used_at` at most once per minute per key.
 - **No token revocation / logout** — `POST /logout` bumps the user's
   `token_version` (embedded in the JWT), invalidating all previously issued tokens.
+- **Rate limiting** — `/v1/*` is throttled **per API key** (hashed, never the
+  plaintext; falls back to per-IP for anonymous/invalid tokens) to bound provider
+  spend, and `/login` + `/signup` are throttled **per IP** to bound brute force
+  and account spam. Limits are conservative constants in
+  `infrastructure/web/rate_limit.py`; back the store with Redis for multi-process
+  deploys, and set the real client IP upstream (e.g. `--proxy-headers`) behind a
+  proxy, since `X-Forwarded-For` is not trusted by default.
 - **Non-atomic multi-write operations** — the multi-step flows now run as a unit
   of work: their repositories only stage (`flush`) and the service commits once,
   so the operation persists fully or not at all. `register` consumes the invite +

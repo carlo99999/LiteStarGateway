@@ -21,14 +21,19 @@ from litestar_test.infrastructure.web.api_router.completions import (
 )
 from litestar_test.infrastructure.web.api_router.wo_am_i import whoami
 from litestar_test.infrastructure.web.auth import APIKeyAuthMiddleware
+from litestar_test.infrastructure.web.rate_limit import build_inference_rate_limit
 
 API_PREFIX = "/"
 
 
 def create_api_router(config: SQLAlchemyAsyncConfig) -> Router:
+    # Rate limit (per API key) runs before auth, so floods are throttled cheaply.
     return Router(
         path=API_PREFIX,
         route_handlers=[whoami, chat_completions, responses, embeddings, images],
-        middleware=[DefineMiddleware(APIKeyAuthMiddleware, config=config)],
+        middleware=[
+            build_inference_rate_limit().middleware,
+            DefineMiddleware(APIKeyAuthMiddleware, config=config),
+        ],
         tags=["api-endpoint"],
     )
