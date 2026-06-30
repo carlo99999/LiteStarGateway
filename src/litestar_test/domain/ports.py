@@ -94,6 +94,14 @@ class LLMGateway(Protocol):
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]: ...
 
+    def images(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]: ...
+
+    async def aimages(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]: ...
+
 
 class ModelRepository(Protocol):
     """Persistence port for team-scoped model deployments."""

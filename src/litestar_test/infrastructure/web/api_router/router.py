@@ -16,6 +16,7 @@ from litestar.router import Router
 from litestar_test.infrastructure.web.api_router.completions import (
     chat_completions,
     embeddings,
+    images,
     responses,
 )
 from litestar_test.infrastructure.web.api_router.wo_am_i import whoami
@@ -27,7 +28,7 @@ API_PREFIX = "/"
 def create_api_router(config: SQLAlchemyAsyncConfig) -> Router:
     return Router(
         path=API_PREFIX,
-        route_handlers=[whoami, chat_completions, responses, embeddings],
+        route_handlers=[whoami, chat_completions, responses, embeddings, images],
         middleware=[DefineMiddleware(APIKeyAuthMiddleware, config=config)],
         tags=["api-endpoint"],
     )

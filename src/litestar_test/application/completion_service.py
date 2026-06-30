@@ -74,3 +74,7 @@ class CompletionService:
     async def embeddings(self, team_id: UUID, request: dict[str, Any]) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.EMBEDDINGS)
         return await self._gateway.aembeddings(request, model, values)
+
+    async def images(self, team_id: UUID, request: dict[str, Any]) -> dict[str, Any]:
+        model, values = await self._prepare(team_id, request, ModelType.IMAGE)
+        return await self._gateway.aimages(request, model, values)

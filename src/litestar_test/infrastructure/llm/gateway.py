@@ -21,6 +21,7 @@ from litestar_test.infrastructure.llm.vertex_adapter import VertexAdapter
 _CHAT = "chat.completions"
 _RESPONSES = "responses"
 _EMBEDDINGS = "embeddings"
+_IMAGES = "image_generation"
 
 
 class LLMGatewayImpl:
@@ -28,10 +29,13 @@ class LLMGatewayImpl:
         openai_adapter = OpenAIAdapter()  # OpenAI + Databricks share the client surface
         # provider -> (adapter, supported operation shapes)
         self._registry = {
-            Provider.OPENAI: (openai_adapter, frozenset({_CHAT, _RESPONSES, _EMBEDDINGS})),
+            Provider.OPENAI: (
+                openai_adapter,
+                frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES}),
+            ),
             Provider.AZURE_OPENAI: (
                 AzureOpenAIAdapter(),
-                frozenset({_CHAT, _RESPONSES, _EMBEDDINGS}),
+                frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES}),
             ),
             # Databricks: no native Responses API (emulated); embeddings are OpenAI-compatible.
             Provider.DATABRICKS: (
@@ -101,3 +105,15 @@ class LLMGatewayImpl:
     ) -> dict[str, Any]:
         adapter = self._resolve(model.provider, "embeddings")
         return await adapter.aembeddings(request, model, credentials)
+
+    def images(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        adapter = self._resolve(model.provider, "image_generation")
+        return adapter.images(request, model, credentials)
+
+    async def aimages(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        adapter = self._resolve(model.provider, "image_generation")
+        return await adapter.aimages(request, model, credentials)
