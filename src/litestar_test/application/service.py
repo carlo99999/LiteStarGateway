@@ -7,7 +7,7 @@ SQLAlchemy or Litestar. This is the hexagon's core.
 from __future__ import annotations
 
 import dataclasses
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from litestar_test.domain.entities import APIKey, IssuedKey
@@ -15,9 +15,17 @@ from litestar_test.domain.exceptions import APIKeyNotFound, InvalidAPIKey
 from litestar_test.domain.key_generator import generate_key, hash_key
 from litestar_test.domain.ports import APIKeyRepository
 
+# Only persist last_used_at this often, to avoid a DB write on every request.
+_LAST_USED_THROTTLE = timedelta(minutes=1)
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _as_utc(dt: datetime) -> datetime:
+    # SQLite reads timestamps back naive; treat naive values as UTC for comparison.
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
 class APIKeyService:
@@ -44,7 +52,12 @@ class APIKeyService:
         key = await self._repo.get_by_hash(hash_key(plaintext))
         if key is None or not key.is_active:
             raise InvalidAPIKey("Invalid or revoked API key")
-        return await self._repo.update(dataclasses.replace(key, last_used_at=_now()))
+        now = _now()
+        # Throttle the last_used_at write: skip it (and the DB commit) if it was
+        # updated recently, so the auth hot path isn't a write on every request.
+        if key.last_used_at is None or now - _as_utc(key.last_used_at) >= _LAST_USED_THROTTLE:
+            return await self._repo.update(dataclasses.replace(key, last_used_at=now))
+        return key
 
     async def revoke_for_team(self, team_id: UUID, key_id: UUID) -> None:
         key = await self._repo.get(key_id)

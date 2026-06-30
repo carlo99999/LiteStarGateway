@@ -22,6 +22,7 @@ class FakeAPIKeyRepository:
 
     def __init__(self) -> None:
         self._store: dict[UUID, APIKey] = {}
+        self.update_calls = 0
 
     async def add(self, key: APIKey) -> APIKey:
         self._store[key.id] = key
@@ -37,6 +38,7 @@ class FakeAPIKeyRepository:
         return [k for k in self._store.values() if k.team_id == team_id]
 
     async def update(self, key: APIKey) -> APIKey:
+        self.update_calls += 1
         self._store[key.id] = key
         return key
 
@@ -44,6 +46,17 @@ class FakeAPIKeyRepository:
 @pytest.fixture
 def service() -> APIKeyService:
     return APIKeyService(FakeAPIKeyRepository())
+
+
+async def test_last_used_write_is_throttled() -> None:
+    repo = FakeAPIKeyRepository()
+    service = APIKeyService(repo)
+    issued = await service.issue(team_id=TEAM_ID, created_by=USER_ID)
+
+    await service.authenticate(issued.plaintext)  # first use: last_used None -> writes
+    assert repo.update_calls == 1
+    await service.authenticate(issued.plaintext)  # within throttle window -> no write
+    assert repo.update_calls == 1
 
 
 async def test_issue_then_authenticate(service: APIKeyService) -> None:
