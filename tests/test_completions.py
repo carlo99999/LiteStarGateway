@@ -181,6 +181,10 @@ class _FakeGeminiModels:
             }
         )
 
+    async def embed_content(self, **kwargs):
+        FakeGenaiClient.last_kwargs = kwargs
+        return _Result({"embeddings": [{"values": [0.4, 0.5, 0.6]}]})
+
     async def generate_content_stream(self, **kwargs):
         FakeGenaiClient.last_kwargs = kwargs
         return _FakeStream(
@@ -594,6 +598,28 @@ async def test_embeddings_openai(client: AsyncTestClient, monkeypatch: pytest.Mo
     assert FakeClient.last_kwargs["input"] == "hello"
     body = resp.json()
     assert body["data"][0]["embedding"] == [0.1, 0.2, 0.3]
+
+
+async def test_embeddings_vertex(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="vertex_ai",
+        values=VERTEX_VALUES,
+        provider_model_id="text-embedding-004",
+        model_type="embeddings",
+    )
+    resp = await client.post(
+        "/v1/embeddings",
+        json={"model": "m", "input": "hello"},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeGenaiClient.last_kwargs["model"] == "text-embedding-004"
+    assert FakeGenaiClient.last_kwargs["contents"] == "hello"
+    body = resp.json()
+    assert body["object"] == "list"
+    assert body["data"][0]["embedding"] == [0.4, 0.5, 0.6]
 
 
 async def test_embeddings_wrong_model_type_400(

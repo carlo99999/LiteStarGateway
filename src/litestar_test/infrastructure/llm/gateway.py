@@ -47,10 +47,10 @@ class LLMGatewayImpl:
                 ChatToResponsesAdapter(AnthropicAdapter()),
                 frozenset({_CHAT, _RESPONSES}),
             ),
-            # Vertex/Gemini: chat + emulated Responses. (Embeddings: TODO via embed_content.)
+            # Vertex/Gemini: chat + emulated Responses + embeddings (embed_content).
             Provider.VERTEX_AI: (
                 ChatToResponsesAdapter(VertexAdapter()),
-                frozenset({_CHAT, _RESPONSES}),
+                frozenset({_CHAT, _RESPONSES, _EMBEDDINGS}),
             ),
         }
 
