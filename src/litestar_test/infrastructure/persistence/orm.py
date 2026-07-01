@@ -17,6 +17,7 @@ from litestar_test.domain.entities import (
     Model,
     ModelType,
     Organization,
+    PasswordReset,
     Provider,
     Team,
     TeamMembership,
@@ -55,6 +56,25 @@ class InviteModel(base.UUIDAuditBase):
             id=self.id,
             token_hash=self.token_hash,
             created_at=self.created_at,
+            used_at=self.used_at,
+        )
+
+
+class PasswordResetModel(base.UUIDAuditBase):
+    __tablename__ = "password_reset"
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("user_account.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column()
+    used_at: Mapped[datetime | None] = mapped_column(default=None)
+
+    def to_entity(self) -> PasswordReset:
+        return PasswordReset(
+            id=self.id,
+            user_id=self.user_id,
+            token_hash=self.token_hash,
+            created_at=self.created_at,
+            expires_at=self.expires_at,
             used_at=self.used_at,
         )
 

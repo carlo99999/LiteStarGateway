@@ -13,6 +13,7 @@ from litestar_test.domain.entities import (
     Invite,
     Model,
     Organization,
+    PasswordReset,
     Team,
     TeamMembership,
     User,
@@ -174,6 +175,10 @@ class UserRepository(Protocol):
 
     async def increment_token_version(self, user_id: UUID) -> None: ...
 
+    async def set_password(self, user_id: UUID, password_hash: str) -> None:
+        """Set a new password hash and bump token_version (revoking old JWTs)."""
+        ...
+
 
 class InviteRepository(Protocol):
     """Persistence port for invites."""
@@ -183,6 +188,16 @@ class InviteRepository(Protocol):
     async def get_by_token_hash(self, token_hash: str) -> Invite | None: ...
 
     async def mark_used(self, invite_id: UUID, used_at: datetime) -> bool: ...
+
+
+class PasswordResetRepository(Protocol):
+    """Persistence port for admin-issued password resets."""
+
+    async def add(self, reset: PasswordReset) -> PasswordReset: ...
+
+    async def get_by_token_hash(self, token_hash: str) -> PasswordReset | None: ...
+
+    async def mark_used(self, reset_id: UUID, used_at: datetime) -> bool: ...
 
 
 class Transaction(Protocol):

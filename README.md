@@ -143,8 +143,12 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
    [`adding-observability-via-mlflow`](https://github.com/carlo99999/LiteStarGateway/blob/adding-observability-via-mlflow/docs/observability.md)
 10. **Usage & cost accounting + budgets** — authoritative usage records, `GET /usage`, pre-call budget enforcement.
     [`adding-usage-cost`](https://github.com/carlo99999/LiteStarGateway/blob/adding-usage-cost/docs/usage-cost.md)
-11. **Account recovery & password change** — `POST /me/password` + admin reset (email flow optional).
-    [`adding-account-recovery`](https://github.com/carlo99999/LiteStarGateway/blob/adding-account-recovery/docs/account-recovery.md)
+11. ✅ **Account recovery** _(shipped)_ — admin-issued password reset: a platform
+    admin creates a single-use, expiring token (`POST /password-resets`, like an
+    invite) that the user redeems to set their **own** new password
+    (`POST /reset-password`), revoking existing sessions. The admin never sees the
+    password; the redeem endpoint is rate-limited and non-revealing
+    ([design](docs/account-recovery.md)).
 
 ### Enterprise (post-v1)
 
