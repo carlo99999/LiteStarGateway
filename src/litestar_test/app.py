@@ -2,6 +2,8 @@
 
 from litestar import Litestar, get
 from litestar.di import NamedDependency, Provide
+from litestar.openapi.config import OpenAPIConfig
+from litestar.openapi.plugins import ScalarRenderPlugin, StoplightRenderPlugin, SwaggerRenderPlugin
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.config import Settings
@@ -43,6 +45,9 @@ def create_app(settings: Settings | None = None) -> Litestar:
     settings = settings or Settings.from_env()
     database = create_database(settings)
     llm_gateway = build_llm_gateway(settings)  # shared, stateless; built once
+    swagger_plugin = SwaggerRenderPlugin(version="5.18.2", path="/")
+    scalar_plugin = ScalarRenderPlugin(version="1.19.5", path="/scalar")
+    stoplight_plugin = StoplightRenderPlugin(version="7.7.18", path="/elements")
 
     def provide_keyring(db_session: NamedDependency[AsyncSession]) -> Keyring:
         # Per-purpose masters: SALT_KEY wraps credential keys, JWT_SECRET wraps JWT
@@ -63,6 +68,23 @@ def create_app(settings: Settings | None = None) -> Litestar:
             ModelController,  # team-admin: team-scoped model deployments
             CredentialController,  # platform-admin: encrypted provider credentials
         ],
+        openapi_config=OpenAPIConfig(
+            title="Litestar Gateway API",
+            version="0.1.0",
+            description=(
+                "A gateway for LLM inference, model deployments, and API key "
+                "management.\n\n"
+                "**Docs viewers:**\n\n"
+                "- [Swagger UI](/)\n"
+                "- [Scalar](/scalar)\n"
+                "- [Stoplight Elements](/elements)\n"
+                "- [OpenAPI schema](/openapi.json)\n"
+            ),
+            # Serve the docs from the root so `/` is the landing page (plugin paths
+            # are relative to this base). The schema JSON is at `/openapi.json`.
+            path="/",
+            render_plugins=[swagger_plugin, scalar_plugin, stoplight_plugin],
+        ),
         plugins=[database.plugin],
         logging_config=build_logging_config(settings),
         on_startup=[make_bootstrap_admin(database, settings)],
