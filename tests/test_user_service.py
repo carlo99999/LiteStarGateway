@@ -33,6 +33,17 @@ class FakeUserRepository:
     async def get_by_email(self, email: str) -> User | None:
         return self._by_email.get(email)
 
+    async def get_by_sso_subject(self, subject: str) -> User | None:
+        return next((u for u in self._by_email.values() if u.sso_subject == subject), None)
+
+    async def bind_sso(self, user_id: UUID, sso_subject: str, is_admin: bool) -> User:
+        for email, user in self._by_email.items():
+            if user.id == user_id:
+                updated = dataclasses.replace(user, sso_subject=sso_subject, is_admin=is_admin)
+                self._by_email[email] = updated
+                return updated
+        raise AssertionError(f"no user {user_id}")
+
     async def count(self) -> int:
         return len(self._by_email)
 

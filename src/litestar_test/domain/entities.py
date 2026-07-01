@@ -56,6 +56,7 @@ class ExternalIdentity:
 
     subject: str  # the IdP's stable user id (`sub`)
     email: str
+    email_verified: bool  # the IdP asserts it verified this address
     groups: tuple[str, ...]
 
 
@@ -215,6 +216,9 @@ class User:
     created_at: datetime
     # Bumped on logout to invalidate previously issued JWTs.
     token_version: int = 0
+    # The IdP subject (`sub`) this account is federated to, once linked via SSO.
+    # None for password-only accounts. Stable across the user's email changes.
+    sso_subject: str | None = None
 
 
 @dataclass(frozen=True)

@@ -22,6 +22,11 @@ from litestar_test.domain.entities import ExternalIdentity
 _ID_TOKEN_ALGS = ["RS256", "RS384", "RS512", "ES256", "ES384", "ES512"]
 
 
+def _claim_is_true(value: object) -> bool:
+    """OIDC booleans arrive as a JSON bool or, from some IdPs, the string "true"."""
+    return value is True or (isinstance(value, str) and value.strip().lower() == "true")
+
+
 class OIDCIdentityProvider:
     def __init__(
         self, discovery_url: str, client_id: str, client_secret: str | None, scopes: str
@@ -62,6 +67,7 @@ class OIDCIdentityProvider:
         return ExternalIdentity(
             subject=str(claims["sub"]),
             email=str(claims.get("email") or ""),
+            email_verified=_claim_is_true(claims.get("email_verified")),
             groups=tuple(str(g) for g in groups),
         )
 

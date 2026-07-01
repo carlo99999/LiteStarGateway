@@ -50,6 +50,17 @@ class UserNotFound(DomainError):
     """No user exists for the given identifier/email."""
 
 
+class SSOIdentityConflict(DomainError):
+    """The SSO email already belongs to an account linked to a different IdP
+    subject — refuse to let one identity adopt another's account (e.g. a recycled
+    corporate email being reassigned at the IdP)."""
+
+
+class SSOEmailNotVerified(DomainError):
+    """The IdP did not assert the email address as verified, so it cannot be
+    trusted to resolve or provision a local account."""
+
+
 class OrganizationNotFound(DomainError):
     """No organization exists for the given id."""
 
