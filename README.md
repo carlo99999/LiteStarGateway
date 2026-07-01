@@ -39,38 +39,57 @@ uv run pytest
 
 ## Roadmap
 
-Planned work, **in priority order**. Each item has a design doc parked on its own
-branch (linked) — we'll resume from there. Priority is a recommendation; reorder
-as needed.
+Planned work, split into **Toward v1** (must-have before publishing) and **v2**
+(after v1). Each item with a design doc has it parked on its own branch (linked) —
+we resume from there. Order within a phase is a recommendation; reorder as needed.
 
-1. **Request parameter allowlist** — deny-by-default sanitizing of client params
-   before they reach the provider SDKs. _Closes the last security follow-up and
-   is small._
-   [`adding-param-allowlist`](https://github.com/carlo99999/LiteStarGateway/blob/adding-param-allowlist/docs/param-allowlist.md)
-2. **Database migrations (Alembic)** — replace `create_all` with versioned
-   migrations. _Prerequisite for production and for the new tables added by the
-   routing features below._
+### Toward v1 (pre-launch)
+
+1. **CI (GitHub Actions)** — run `pytest` + `ruff` + `pyrefly` on every PR.
+   [`adding-ci`](https://github.com/carlo99999/LiteStarGateway/blob/adding-ci/docs/ci.md)
+2. **Container image & deployment** — Dockerfile, uvicorn workers + `--proxy-headers`, TLS, deploy guide.
+   [`adding-docker-deploy`](https://github.com/carlo99999/LiteStarGateway/blob/adding-docker-deploy/docs/deployment.md)
+3. **Database migrations (Alembic)** — replace `create_all` with versioned migrations.
    [`adding-db-migrations`](https://github.com/carlo99999/LiteStarGateway/blob/adding-db-migrations/docs/db-migrations.md)
-3. **Observability via MLflow** — `TraceSink` port + MLflow adapter (OSS or
-   Databricks) logging usage/cost/latency (+ optional payloads) off the hot path,
-   a general firehose experiment plus optional per-team experiments. _Needed to
-   run in production with visibility._
+4. **Production Postgres** — asyncpg + connection pool + validate concurrency on PG.
+   [`adding-postgres`](https://github.com/carlo99999/LiteStarGateway/blob/adding-postgres/docs/postgres.md)
+5. **Provider resilience** — timeouts, bounded retries with backoff, per-provider circuit breaker.
+   [`adding-provider-resilience`](https://github.com/carlo99999/LiteStarGateway/blob/adding-provider-resilience/docs/provider-resilience.md)
+6. **Request parameter allowlist** — deny-by-default sanitizing of client params before the provider SDKs.
+   [`adding-param-allowlist`](https://github.com/carlo99999/LiteStarGateway/blob/adding-param-allowlist/docs/param-allowlist.md)
+7. **Structured logging & error hygiene** — JSON logs, request ids, no internal leakage on 5xx.
+   [`adding-structured-logging`](https://github.com/carlo99999/LiteStarGateway/blob/adding-structured-logging/docs/logging.md)
+8. **Secrets management & key rotation** — supply secrets from a manager; rotate `SALT_KEY` (keyring + re-encrypt) and `JWT_SECRET`.
+   [`adding-secrets-rotation`](https://github.com/carlo99999/LiteStarGateway/blob/adding-secrets-rotation/docs/secrets-rotation.md)
+9. **Observability via MLflow** — `TraceSink` port + MLflow adapter (OSS or Databricks), off the hot path.
    [`adding-observability-via-mlflow`](https://github.com/carlo99999/LiteStarGateway/blob/adding-observability-via-mlflow/docs/observability.md)
-4. **AWS Bedrock provider** — Converse API + boto3 (no hand-rolled SigV4),
-   responses emulated. _Provider completeness; do it when Bedrock is actually
-   needed._
-   [`adding-bedrock`](https://github.com/carlo99999/LiteStarGateway/blob/adding-bedrock/docs/bedrock.md)
-5. **Weighted multi-model routing** — an alias splitting traffic across ≤5 models
-   by percentage (e.g. 50/50). _Feature; introduces the shared routing layer._
-   [`adding-weighted-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-weighted-routing/docs/weighted-routing.md)
-6. **Smart (judge-based) routing** — four difficulty tiers + a swappable judge
-   adapter that picks the model. _Feature; builds on the routing layer and a
-   `Judge` port._
-   [`adding-smart-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-smart-routing/docs/smart-routing.md)
-7. **Web UI** _(post-v1)_ — an SPA client over the JSON API for login and admin
-   (orgs/teams/members/credentials/models/keys) plus usage dashboards. _Deferred
-   until the gateway is feature-complete at v1._
-   [`adding-web-ui`](https://github.com/carlo99999/LiteStarGateway/blob/adding-web-ui/docs/web-ui.md)
+10. **Usage & cost accounting + budgets** — authoritative usage records, `GET /usage`, pre-call budget enforcement.
+    [`adding-usage-cost`](https://github.com/carlo99999/LiteStarGateway/blob/adding-usage-cost/docs/usage-cost.md)
+11. **Account recovery & password change** — `POST /me/password` + admin reset (email flow optional).
+    [`adding-account-recovery`](https://github.com/carlo99999/LiteStarGateway/blob/adding-account-recovery/docs/account-recovery.md)
+
+### Enterprise (post-v1)
+
+- **SSO / SCIM / RBAC / audit** — federate identity via OIDC/SAML (identity as a
+  swappable `IdentityProvider` port), auto-provision via SCIM, map IdP groups to
+  teams/roles, extend RBAC, and add an append-only audit log. Reuses the existing
+  multi-tenant model and JWT session. _The path to being a governed, enterprise-
+  grade gateway rather than a broad LiteLLM clone._
+  [`adding-enterprise-sso`](https://github.com/carlo99999/LiteStarGateway/blob/adding-enterprise-sso/docs/enterprise-sso.md)
+
+### v2 (after v1)
+
+- **AWS Bedrock provider** — Converse API + boto3 (no hand-rolled SigV4), responses emulated.
+  [`adding-bedrock`](https://github.com/carlo99999/LiteStarGateway/blob/adding-bedrock/docs/bedrock.md)
+- **Weighted multi-model routing** — an alias splitting traffic across ≤5 models by percentage.
+  [`adding-weighted-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-weighted-routing/docs/weighted-routing.md)
+- **Smart (judge-based) routing** — four difficulty tiers + a swappable judge adapter.
+  [`adding-smart-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-smart-routing/docs/smart-routing.md)
+- **Web UI** — SPA over the JSON API for login + admin + usage dashboards.
+  [`adding-web-ui`](https://github.com/carlo99999/LiteStarGateway/blob/adding-web-ui/docs/web-ui.md)
+- **LICENSE & repo hygiene** — add a LICENSE, `CONTRIBUTING`, and a security policy _(no branch yet)_.
+- **Test coverage gate** — enforce 80% (`--cov-fail-under`) in CI _(no branch yet)_.
+- **Minor hardening** — `GET /v1/models`, request body-size limits, security headers, DB backups, dependency scanning (pip-audit / Dependabot), admin audit log, API-key expiry _(no branch yet)_.
 
 ## Security — known issues & follow-ups
 
