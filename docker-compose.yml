@@ -1,46 +1,39 @@
-# Local prod-like run of the gateway image.
+# Local prod-like run of the gateway backed by Postgres.
 #
-#   MASTER_KEY=… JWT_SECRET=… SALT_KEY=… docker compose up --build
+#   MASTER_KEY=… JWT_SECRET=… SALT_KEY=… POSTGRES_PASSWORD=… docker compose up --build
 #
 # (or put those in a .env file next to this one — it is gitignored). Secrets are
 # read from the environment, never hardcoded here.
 
 services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or a .env file}
+      POSTGRES_DB: gateway
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   app:
     build: .
     image: litestar-gateway
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
-      # SQLite on a named volume by default. For a real deployment use Postgres
-      # (see the commented block below + the `adding-postgres` roadmap item).
-      DATABASE_URL: sqlite+aiosqlite:////data/gateway.db
+      DATABASE_URL: postgresql+asyncpg://gateway:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or a .env file}@db:5432/gateway
       ENVIRONMENT: production
       MASTER_KEY: ${MASTER_KEY:?set MASTER_KEY in your environment or a .env file}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in your environment or a .env file}
       SALT_KEY: ${SALT_KEY:?set SALT_KEY in your environment or a .env file}
     ports:
       - "8000:8000"
-    volumes:
-      - gateway-data:/data
 
 volumes:
-  gateway-data:
-
-# ---- Postgres (recommended for real deployments) ----
-# Requires the asyncpg driver (see the `adding-postgres` roadmap item). Once it
-# lands, uncomment the block below and move it under `services:`, add
-#   depends_on: {db: {condition: service_healthy}}
-# to `app`, add `pg-data:` under the top-level `volumes:`, and point DATABASE_URL
-# at postgresql+asyncpg://gateway:${POSTGRES_PASSWORD}@db:5432/gateway
-#
-#  db:
-#    image: postgres:17
-#    environment:
-#      POSTGRES_USER: gateway
-#      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-#      POSTGRES_DB: gateway
-#    volumes:
-#      - pg-data:/var/lib/postgresql/data
-#    healthcheck:
-#      test: ["CMD-SHELL", "pg_isready -U gateway"]
-#      interval: 5s
-#      retries: 5
+  pg-data:

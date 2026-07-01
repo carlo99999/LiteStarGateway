@@ -64,8 +64,8 @@ The app ships as a container (multi-stage `Dockerfile`, non-root, served by
 uvicorn with `--proxy-headers`). Provide the secrets via the environment.
 
 ```bash
-# Local prod-like run (SQLite on a named volume) via compose:
-MASTER_KEY=… JWT_SECRET=… SALT_KEY=… docker compose up --build
+# Local prod-like run (app + Postgres) via compose:
+MASTER_KEY=… JWT_SECRET=… SALT_KEY=… POSTGRES_PASSWORD=… docker compose up --build
 # → http://localhost:8000  (GET /health for liveness)
 ```
 
@@ -85,9 +85,10 @@ Notes:
   `--proxy-headers` and set uvicorn's `--forwarded-allow-ips` to your proxy's
   address (the image default `*` trusts any upstream — fine only when a single
   trusted ingress fronts it) so the real client IP reaches the per-IP rate limit.
-- **Database**: the image defaults to SQLite on the `/data` volume. For real
-  deployments use Postgres (`postgresql+asyncpg://…`) — see the `adding-postgres`
-  roadmap item and the commented service in `docker-compose.yml`.
+- **Database**: `docker-compose.yml` runs Postgres (`postgresql+asyncpg://…`,
+  the recommended production backend) and the app connects to it. Pool sizing is
+  configurable via `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` (Postgres only). The image
+  alone still defaults to SQLite on the `/data` volume for a zero-dependency run.
 - **Multi-process/replicas**: the rate-limit store is in-memory per process; back
   it with a shared store (Redis) when running multiple workers/replicas.
 
@@ -108,8 +109,11 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
    service is stubbed pending the Postgres item._
 3. **Database migrations (Alembic)** — replace `create_all` with versioned migrations.
    [`adding-db-migrations`](https://github.com/carlo99999/LiteStarGateway/blob/adding-db-migrations/docs/db-migrations.md)
-4. **Production Postgres** — asyncpg + connection pool + validate concurrency on PG.
-   [`adding-postgres`](https://github.com/carlo99999/LiteStarGateway/blob/adding-postgres/docs/postgres.md)
+4. ✅ **Production Postgres** _(shipped)_ — `asyncpg` driver + configurable
+   connection pool (Postgres only); the compose stack runs on Postgres and the
+   unit-of-work / bootstrap flow is validated against it
+   ([design](docs/postgres.md)). _Running the full test suite on Postgres in CI is
+   a further step._
 5. **Provider resilience** — timeouts, bounded retries with backoff, per-provider circuit breaker.
    [`adding-provider-resilience`](https://github.com/carlo99999/LiteStarGateway/blob/adding-provider-resilience/docs/provider-resilience.md)
 6. ✅ **Request parameter allowlist** _(shipped)_ — deny-by-default sanitizing of
@@ -158,8 +162,10 @@ Tracked items not yet implemented (see also the code review notes):
   so any team admin can reference any credential in a model and consume it (they
   cannot read its secret). This is intentional for now; tie credentials to a
   team/org if per-team isolation becomes a requirement.
-- **SQLite for dev/test** — the default is file SQLite (single-writer, weak
-  concurrency). Production should use Postgres (`postgresql+asyncpg://…`).
+- **SQLite is the dev/test default** — the zero-config default is file SQLite
+  (single-writer, weak concurrency); the test suite runs on it. Production should
+  use the supported Postgres backend (`postgresql+asyncpg://…`, the compose
+  default). Running the test suite itself on Postgres in CI is still a follow-up.
 
 ### Resolved
 

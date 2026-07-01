@@ -11,6 +11,7 @@ dependencies = [
     "advanced-alchemy>=1.11.0",
     "aiosqlite>=0.22.1",
     "anthropic>=0.115.0",
+    "asyncpg>=0.31.0",
     "cryptography>=49.0.0",
     "google-genai>=2.10.0",
     "litestar[standard]>=2.24.0",
