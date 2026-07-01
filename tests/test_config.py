@@ -21,7 +21,7 @@ _BASE = Settings(
     admin_email="admin@example.com",
     master_key="master",
     jwt_secret=STRONG_SECRET,
-    salt_key="salt",
+    salt_key="a-strong-random-salt-key-0123456789",
     environment="development",
 )
 
@@ -42,9 +42,49 @@ def test_production_accepts_strong_jwt_secret() -> None:
 
 
 def test_development_allows_default_jwt_secret() -> None:
-    # The dev default is intentionally permitted outside production.
+    # The dev default is intentionally permitted in local environments.
     settings = dataclasses.replace(_BASE, environment="development", jwt_secret=DEFAULT_JWT_SECRET)
     assert settings.is_production is False
+
+
+def test_non_local_env_rejects_default_jwt_secret() -> None:
+    # Not just "production"/"prod": staging (or a typo) must also fail fast.
+    with pytest.raises(InsecureConfigurationError):
+        dataclasses.replace(_BASE, environment="staging", jwt_secret=DEFAULT_JWT_SECRET)
+
+
+def test_non_local_env_rejects_short_jwt_secret() -> None:
+    weak = "too-short"
+    with pytest.raises(InsecureConfigurationError):
+        dataclasses.replace(_BASE, environment="production", jwt_secret=weak)
+
+
+def test_non_local_env_rejects_short_salt_key() -> None:
+    weak = "short"
+    with pytest.raises(InsecureConfigurationError):
+        dataclasses.replace(
+            _BASE, environment="production", jwt_secret=STRONG_SECRET, salt_key=weak
+        )
+
+
+def test_production_allows_no_salt_key() -> None:
+    # SALT_KEY is optional (credential encryption is opt-in).
+    settings = dataclasses.replace(
+        _BASE, environment="production", jwt_secret=STRONG_SECRET, salt_key=None
+    )
+    assert settings.is_production is True
+
+
+def test_from_env_rejects_non_numeric_pool_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DB_POOL_SIZE", "ten")
+    with pytest.raises(InsecureConfigurationError):
+        Settings.from_env()
+
+
+def test_from_env_rejects_negative_pool_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DB_POOL_SIZE", "-1")
+    with pytest.raises(InsecureConfigurationError):
+        Settings.from_env()
 
 
 def test_sso_enabled_requires_discovery_client_id_and_secret() -> None:

@@ -14,7 +14,7 @@ def _settings(environment: str) -> Settings:
         admin_email="admin@example.com",
         master_key="m",
         jwt_secret="x" * 40,
-        salt_key="s",
+        salt_key="s" * 32,
         environment=environment,
     )
 

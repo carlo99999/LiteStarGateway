@@ -16,7 +16,7 @@ def _settings(url: str) -> Settings:
         admin_email="admin@example.com",
         master_key="m",
         jwt_secret="x" * 40,
-        salt_key="s",
+        salt_key="s" * 32,
     )
 
 
@@ -48,7 +48,7 @@ def test_create_all_disabled_in_production() -> None:
         admin_email="admin@example.com",
         master_key="m",
         jwt_secret="x" * 40,
-        salt_key="s",
+        salt_key="s" * 32,
         environment="production",
     )
     assert create_database(production).config.create_all is False
