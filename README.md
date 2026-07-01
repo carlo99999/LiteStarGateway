@@ -125,14 +125,18 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
 5. 🟡 **Provider resilience** _(timeouts + retries shipped)_ — provider SDK clients
    now use a bounded per-call timeout + retry budget (`REQUEST_TIMEOUT` /
    `MAX_RETRIES`), so a slow/failing upstream fails fast instead of hanging (~10 min
-   default). _A per-provider circuit breaker is still to come_
+   default). _A per-provider circuit breaker is deferred until the complex routing
+   endpoints land (where isolating providers under load matters more)_
    ([design](docs/provider-resilience.md)).
 6. ✅ **Request parameter allowlist** _(shipped)_ — deny-by-default sanitizing of
    client params before the provider SDKs
    ([`request_policy.py`](src/litestar_test/domain/request_policy.py),
    [design](docs/param-allowlist.md)).
-7. **Structured logging & error hygiene** — JSON logs, request ids, no internal leakage on 5xx.
-   [`adding-structured-logging`](https://github.com/carlo99999/LiteStarGateway/blob/adding-structured-logging/docs/logging.md)
+7. ✅ **Structured logging** _(shipped)_ — an environment-aware logging factory:
+   human-readable console logs in development, structured **JSON** (structlog) in
+   production; exceptions logged server-side, no stack traces leaked to clients
+   ([`logging.py`](src/litestar_test/infrastructure/logging.py),
+   [design](docs/logging.md)). _Request-id correlation is a further step._
 8. **Secrets management & key rotation** — supply secrets from a manager; rotate `SALT_KEY` (keyring + re-encrypt) and `JWT_SECRET`.
    [`adding-secrets-rotation`](https://github.com/carlo99999/LiteStarGateway/blob/adding-secrets-rotation/docs/secrets-rotation.md)
 9. **Observability via MLflow** — `TraceSink` port + MLflow adapter (OSS or Databricks), off the hot path.
