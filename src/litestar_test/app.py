@@ -73,7 +73,7 @@ def create_app(settings: Settings | None = None) -> Litestar:
         ],
         openapi_config=OpenAPIConfig(
             title="Litestar Gateway API",
-            version="0.1.0",
+            version="1.0.0",
             description=(
                 "A gateway for LLM inference, model deployments, and API key "
                 "management.\n\n"
