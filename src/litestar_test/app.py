@@ -17,6 +17,7 @@ from litestar_test.infrastructure.rotation import make_rotation_scheduler
 from litestar_test.infrastructure.web.api_router.dependencies import (
     build_llm_gateway,
     provide_completion_service,
+    provide_usage_repository,
 )
 from litestar_test.infrastructure.web.api_router.router import create_api_router
 from litestar_test.infrastructure.web.credentials import CredentialController
@@ -74,6 +75,7 @@ def create_app(settings: Settings | None = None) -> Litestar:
             "model_service": Provide(provide_model_service, sync_to_thread=False),
             "credential_service": Provide(provide_credential_service, sync_to_thread=False),
             "completion_service": Provide(provide_completion_service, sync_to_thread=False),
+            "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
             "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
             # Envelope-encryption keyring (credentials + JWT). Built lazily;
             # raises SaltKeyMissing (503) if SALT_KEY — the master key — is unset.

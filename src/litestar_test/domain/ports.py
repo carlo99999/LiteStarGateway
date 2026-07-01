@@ -18,6 +18,8 @@ from litestar_test.domain.entities import (
     SecretKey,
     Team,
     TeamMembership,
+    UsageAggregate,
+    UsageEvent,
     User,
 )
 
@@ -200,6 +202,26 @@ class PasswordResetRepository(Protocol):
     async def get_by_token_hash(self, token_hash: str) -> PasswordReset | None: ...
 
     async def mark_used(self, reset_id: UUID, used_at: datetime) -> bool: ...
+
+
+# runtime_checkable: injected directly into a handler, so Litestar runs
+# isinstance() on the resolved value during signature validation.
+@runtime_checkable
+class UsageRepository(Protocol):
+    """Persistence port for recorded usage events + aggregation."""
+
+    async def record(self, event: UsageEvent) -> None: ...
+
+    async def aggregate(
+        self,
+        team_id: UUID,
+        *,
+        model_name: str | None = None,
+        api_key_id: UUID | None = None,
+    ) -> list[UsageAggregate]:
+        """Usage summed per model for a team, optionally filtered by model name
+        and/or API key."""
+        ...
 
 
 class SecretKeyRepository(Protocol):

@@ -22,6 +22,35 @@ class KeyPurpose(StrEnum):
 
 
 @dataclass(frozen=True)
+class UsageEvent:
+    """One recorded model call: token counts and estimated cost, tagged with the
+    API key and model so usage can be broken down by either."""
+
+    id: UUID
+    team_id: UUID
+    api_key_id: UUID
+    model_id: UUID
+    model_name: str
+    operation: str
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class UsageAggregate:
+    """Usage summed for one model (over an optional api-key/model filter)."""
+
+    model_id: UUID
+    model_name: str
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+    calls: int
+
+
+@dataclass(frozen=True)
 class SecretKey:
     """A rotating keyring key. `material` is the master-wrapped key bytes; only
     the wrapped form is persisted. Retired keys are kept for decrypt/verify only.

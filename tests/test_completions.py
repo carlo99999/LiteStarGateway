@@ -363,6 +363,67 @@ async def test_provider_client_gets_timeout_and_retries(
     assert FakeClient.last_init["max_retries"] == DEFAULT_MAX_RETRIES
 
 
+async def test_usage_is_recorded_and_queryable(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    admin = await _admin(client)
+    cred = (
+        await client.post(
+            "/credentials",
+            json={"name": "c", "provider": "openai", "values": OPENAI_VALUES},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    org = (
+        await client.post("/organizations", json={"name": "Acme"}, headers=_bearer(admin))
+    ).json()["id"]
+    team = (
+        await client.post(
+            f"/organizations/{org}/teams",
+            json={"name": "Core", "admin_email": ADMIN_EMAIL},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    await client.post(
+        f"/teams/{team}/models",
+        json={
+            "name": "m",
+            "provider": "openai",
+            "credential_id": cred,
+            "type": "chat",
+            "provider_model_id": "gpt-4o",
+            "enabled": True,
+        },
+        headers=_bearer(admin),
+    )
+    key = (
+        await client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(admin))
+    ).json()["plaintext"]
+
+    # Two chat calls → usage recorded (the fake reports 1 token in + 1 out each).
+    for _ in range(2):
+        await client.post(
+            "/v1/chat/completions",
+            json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+            headers=_bearer(key),
+        )
+
+    usage = await client.get(f"/teams/{team}/usage", headers=_bearer(admin))
+    assert usage.status_code == HTTP_200_OK
+    rows = usage.json()
+    assert len(rows) == 1
+    assert rows[0]["model"] == "m"
+    assert rows[0]["prompt_tokens"] == 2
+    assert rows[0]["completion_tokens"] == 2
+    assert rows[0]["total_tokens"] == 4
+    assert rows[0]["calls"] == 2
+
+    # Filtering by an unknown model returns nothing.
+    filtered = await client.get(f"/teams/{team}/usage?model=nope", headers=_bearer(admin))
+    assert filtered.json() == []
+
+
 async def test_openai_responses(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch(monkeypatch)
     api_key = await _setup(client)

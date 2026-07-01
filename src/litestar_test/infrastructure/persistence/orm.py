@@ -24,6 +24,7 @@ from litestar_test.domain.entities import (
     Team,
     TeamMembership,
     TeamRole,
+    UsageEvent,
     User,
 )
 
@@ -119,6 +120,33 @@ class TeamMembershipModel(base.UUIDAuditBase):
             team_id=self.team_id,
             user_id=self.user_id,
             role=TeamRole(self.role),
+            created_at=self.created_at,
+        )
+
+
+class UsageEventModel(base.UUIDAuditBase):
+    __tablename__ = "usage_event"
+
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    api_key_id: Mapped[UUID] = mapped_column(ForeignKey("api_key.id"), index=True)
+    model_id: Mapped[UUID] = mapped_column(index=True)
+    model_name: Mapped[str] = mapped_column()
+    operation: Mapped[str] = mapped_column()
+    prompt_tokens: Mapped[int] = mapped_column(default=0)
+    completion_tokens: Mapped[int] = mapped_column(default=0)
+    cost: Mapped[float] = mapped_column(default=0.0)
+
+    def to_entity(self) -> UsageEvent:
+        return UsageEvent(
+            id=self.id,
+            team_id=self.team_id,
+            api_key_id=self.api_key_id,
+            model_id=self.model_id,
+            model_name=self.model_name,
+            operation=self.operation,
+            prompt_tokens=self.prompt_tokens,
+            completion_tokens=self.completion_tokens,
+            cost=self.cost,
             created_at=self.created_at,
         )
 
