@@ -22,7 +22,9 @@ repos:
     hooks:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
-        exclude: (?x)^(uv\.lock|\.secrets\.baseline)$
+        # migrations are generated schema code (column names like *_hash trip the
+        # keyword detector); they hold no secrets.
+        exclude: (?x)^(uv\.lock|\.secrets\.baseline|migrations/.*)$
 
   # Lint + format, reusing the project's pinned ruff (single source of truth,
   # same as CI) rather than a separately versioned mirror.
@@ -36,7 +38,7 @@ repos:
         require_serial: true
       - id: ruff-format
         name: ruff format (check)
-        entry: uv run ruff format --check
+        entry: uv run ruff format --check --force-exclude
         language: system
         types_or: [python, pyi]
         require_serial: true

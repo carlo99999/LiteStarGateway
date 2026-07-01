@@ -39,10 +39,12 @@ class Database:
 
 
 def create_database(settings: Settings) -> Database:
-    # create_all=True is fine for SQLite/dev; use Alembic migrations in production.
+    # Dev/test auto-create the schema for zero-config runs; production uses Alembic
+    # migrations instead (the container runs `database upgrade` on start), so the
+    # two never fight over creating the same tables.
     config = SQLAlchemyAsyncConfig(
         connection_string=settings.database_url,
-        create_all=True,
+        create_all=not settings.is_production,
         engine_config=_engine_config(settings),
     )
     return Database(config=config, plugin=SQLAlchemyPlugin(config=config))

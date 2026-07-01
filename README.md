@@ -89,6 +89,12 @@ Notes:
   the recommended production backend) and the app connects to it. Pool sizing is
   configurable via `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` (Postgres only). The image
   alone still defaults to SQLite on the `/data` volume for a zero-dependency run.
+- **Migrations**: production uses Alembic (`create_all` is dev/test only). The
+  container applies pending migrations on start (`litestar … database upgrade`,
+  idempotent). After changing the ORM models, generate a migration in dev with
+  `uv run litestar --app litestar_test.app:app database make-migrations`, review
+  it, and commit it. (With many replicas, prefer a one-shot migration job over
+  migrate-on-start to avoid concurrent upgrades.)
 - **Multi-process/replicas**: the rate-limit store is in-memory per process; back
   it with a shared store (Redis) when running multiple workers/replicas.
 
@@ -107,8 +113,10 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
    (non-root, uvicorn + `--proxy-headers`, healthcheck) + [`docker-compose.yml`](docker-compose.yml),
    see [Deployment](#deployment) and the [design](docs/deployment.md). _Postgres
    service is stubbed pending the Postgres item._
-3. **Database migrations (Alembic)** — replace `create_all` with versioned migrations.
-   [`adding-db-migrations`](https://github.com/carlo99999/LiteStarGateway/blob/adding-db-migrations/docs/db-migrations.md)
+3. ✅ **Database migrations (Alembic)** _(shipped)_ — production manages the schema
+   via Alembic (in `migrations/`); `create_all` is used only in dev/test. The
+   container runs `database upgrade` on start ([design](docs/db-migrations.md)).
+   _An "autogenerate diff is empty" CI guard is a further step._
 4. ✅ **Production Postgres** _(shipped)_ — `asyncpg` driver + configurable
    connection pool (Postgres only); the compose stack runs on Postgres and the
    unit-of-work / bootstrap flow is validated against it
