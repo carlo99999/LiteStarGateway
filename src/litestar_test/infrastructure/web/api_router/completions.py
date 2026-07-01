@@ -57,7 +57,7 @@ async def chat_completions(
     team_id = UUID(request.user)
     if data.get("stream"):
         # Resolve eagerly so errors become a proper HTTP status before the SSE starts.
-        chunks = await completion_service.open_chat_stream(team_id, data)
+        chunks = await completion_service.open_chat_stream(team_id, request.auth.id, data)
         return ServerSentEvent(_sse_events(chunks))
     return Response(await completion_service.chat_completion(team_id, request.auth.id, data))
 
@@ -80,7 +80,7 @@ async def responses(
 ) -> Response[Any]:
     team_id = UUID(request.user)
     if data.get("stream"):
-        events = await completion_service.open_responses_stream(team_id, data)
+        events = await completion_service.open_responses_stream(team_id, request.auth.id, data)
         return ServerSentEvent(_sse_response_events(events))
     return Response(await completion_service.responses(team_id, request.auth.id, data))
 

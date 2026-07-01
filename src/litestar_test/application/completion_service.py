@@ -140,23 +140,52 @@ class CompletionService:
         await self._observe(team_id, api_key_id, model, "responses", response, latency_ms)
         return response
 
+    async def _metered_stream(
+        self,
+        team_id: UUID,
+        api_key_id: UUID,
+        model: Model,
+        operation: str,
+        stream: AsyncIterator[dict[str, Any]],
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Relay chunks unchanged while capturing usage as it flows, then record a
+        UsageEvent + emit a trace once the stream finishes (or the client
+        disconnects — the `finally` runs on generator close). Without this,
+        streamed calls were neither billed nor observed."""
+        start = perf_counter()
+        usage: dict[str, Any] = {}
+        try:
+            async for chunk in stream:
+                # OpenAI chat puts usage at the top level (final chunk); the
+                # Responses API nests it under `response`.
+                found = chunk.get("usage") or (chunk.get("response") or {}).get("usage")
+                if found:
+                    usage = found
+                yield chunk
+        finally:
+            latency_ms = (perf_counter() - start) * 1000
+            await self._observe(team_id, api_key_id, model, operation, {"usage": usage}, latency_ms)
+
     async def open_chat_stream(
-        self, team_id: UUID, request: dict[str, Any]
+        self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> AsyncIterator[dict[str, Any]]:
         """Resolve the model + credentials (may raise → HTTP error) and return an
-        async iterator of OpenAI chunk dicts. Awaited before streaming starts."""
+        async iterator of OpenAI chunk dicts, metered for usage. Awaited before
+        streaming starts so resolution errors surface as HTTP status codes."""
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("chat.completions", request)
-        return await self._gateway.astream_chat_completion(clean, model, values)
+        stream = await self._gateway.astream_chat_completion(clean, model, values)
+        return self._metered_stream(team_id, api_key_id, model, "chat.completions", stream)
 
     async def open_responses_stream(
-        self, team_id: UUID, request: dict[str, Any]
+        self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> AsyncIterator[dict[str, Any]]:
         """Resolve (may raise → HTTP error) and return an async iterator of
-        Responses-API stream events. Awaited before streaming starts."""
+        Responses-API stream events, metered for usage."""
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("responses", request)
-        return await self._gateway.astream_responses(clean, model, values)
+        stream = await self._gateway.astream_responses(clean, model, values)
+        return self._metered_stream(team_id, api_key_id, model, "responses", stream)
 
     async def embeddings(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]

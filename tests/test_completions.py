@@ -70,6 +70,8 @@ def _stream_chunks(model: str | None) -> list[dict]:
         {**base, "choices": [{"index": 0, "delta": {"role": "assistant"}}]},
         {**base, "choices": [{"index": 0, "delta": {"content": "Hi"}}]},
         {**base, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+        # Final usage chunk (emitted when stream_options.include_usage is set).
+        {**base, "choices": [], "usage": {"prompt_tokens": 5, "completion_tokens": 7}},
     ]
 
 
@@ -624,6 +626,63 @@ async def test_streaming_openai_sse(
     assert "chat.completion.chunk" in body
     assert "Hi" in body
     assert "data: [DONE]" in body
+
+
+async def test_streaming_records_usage(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A streamed chat call must still be billed + observed (previously it wasn't).
+    _patch(monkeypatch)
+    admin = await _admin(client)
+    cred = (
+        await client.post(
+            "/credentials",
+            json={"name": "c", "provider": "openai", "values": OPENAI_VALUES},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    org = (
+        await client.post("/organizations", json={"name": "Acme"}, headers=_bearer(admin))
+    ).json()["id"]
+    team = (
+        await client.post(
+            f"/organizations/{org}/teams",
+            json={"name": "Core", "admin_email": ADMIN_EMAIL},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    await client.post(
+        f"/teams/{team}/models",
+        json={
+            "name": "m",
+            "provider": "openai",
+            "credential_id": cred,
+            "type": "chat",
+            "provider_model_id": "gpt-4o",
+            "enabled": True,
+        },
+        headers=_bearer(admin),
+    )
+    key = (
+        await client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(admin))
+    ).json()["plaintext"]
+
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [], "stream": True},
+        headers=_bearer(key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    _ = resp.text  # fully consume the stream so the final usage chunk is metered
+    # The gateway forces include_usage so streamed calls can be metered.
+    assert FakeClient.last_kwargs["stream_options"] == {"include_usage": True}
+
+    # A usage row now exists for the streamed call, with the streamed token counts.
+    rows = (await client.get(f"/teams/{team}/usage", headers=_bearer(admin))).json()
+    assert len(rows) == 1
+    assert rows[0]["prompt_tokens"] == 5
+    assert rows[0]["completion_tokens"] == 7
+    assert rows[0]["calls"] == 1
 
 
 async def test_streaming_databricks_sse(

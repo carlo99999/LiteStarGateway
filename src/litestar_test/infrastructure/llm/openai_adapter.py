@@ -87,6 +87,10 @@ class OpenAICompatibleAdapter:
         client = self._async_client(model, credentials)
         kwargs = _kwargs(request, model)
         kwargs["stream"] = True
+        # Ask for the final usage chunk so the gateway can meter streamed calls
+        # (OpenAI omits usage from streams unless this is set). Forced on: billing
+        # must not depend on the client opting in.
+        kwargs["stream_options"] = {**kwargs.get("stream_options", {}), "include_usage": True}
         # Any: with stream=True the SDK returns AsyncStream (no model_dump itself);
         # each yielded chunk is a ChatCompletionChunk that does have model_dump.
         stream: Any = await client.chat.completions.create(**kwargs)
