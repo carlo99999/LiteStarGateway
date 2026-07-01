@@ -61,11 +61,10 @@ async def sso_callback(
     if not flow_state or request.cookies.get(_STATE_COOKIE) != flow_state:
         raise NotAuthorizedException("Invalid SSO state")
     identity = await identity_provider.exchange(code, _redirect_uri(request))
-    if not identity.email:
-        raise NotAuthorizedException("SSO identity has no email")
 
     is_admin = bool(set(identity.groups) & set(sso_admin_groups))
-    user = await user_service.upsert_sso_user(identity.email, is_admin)
+    # Email presence/verification and subject-binding rules live in the service.
+    user = await user_service.upsert_sso_user(identity, is_admin)
     secret = await keyring.active_jwt_secret()
     access_token, expires_in = issue_access_token(str(user.id), secret, user.token_version)
     return TokenResponse(access_token=access_token, token_type="bearer", expires_in=expires_in)

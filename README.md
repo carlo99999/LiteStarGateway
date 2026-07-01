@@ -177,10 +177,11 @@ on their own branch (linked). Order within a phase is a recommendation.
 
 - 🟡 **SSO (OIDC)** _(shipped)_ — an `IdentityProvider` port + generic OIDC adapter
   (Authlib; works with Google/Microsoft/Okta/Keycloak via their discovery URL).
-  `GET /sso/login` → IdP → `GET /sso/callback` JIT-provisions the user and mints
-  our JWT; an IdP admin group maps to platform admin. Registered only when
+  `GET /sso/login` → IdP → `GET /sso/callback` JIT-provisions the user (bound to
+  the IdP `sub`, verified email required) and mints our JWT; an IdP admin group
+  maps to platform admin and is re-synced on every login. Registered only when
   `OIDC_DISCOVERY_URL` is set. Design ported from LiteLLM's OIDC SSO (MIT), no
-  code copied. _Follow-ups: group→team mapping, role re-sync, SCIM, SAML, audit,
+  code copied. _Follow-ups: group→team mapping, SCIM, SAML, audit,
   per-org SSO, fine-grained RBAC._
   [design](docs/enterprise-sso.md)
 

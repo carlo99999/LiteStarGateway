@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from litestar_test.domain.entities import (
+    ExternalIdentity,
     Invite,
     IssuedInvite,
     IssuedPasswordReset,
@@ -26,6 +27,8 @@ from litestar_test.domain.exceptions import (
     InvalidPasswordReset,
     MasterKeyMissing,
     PermissionDenied,
+    SSOEmailNotVerified,
+    SSOIdentityConflict,
     UserNotFound,
     WeakPassword,
 )
@@ -148,25 +151,58 @@ class UserService:
         """Invalidate all of the user's existing JWTs by bumping token_version."""
         await self._users.increment_token_version(user.id)
 
-    async def upsert_sso_user(self, email: str, is_admin: bool) -> User:
-        """Find or JIT-create an SSO user by email (they never log in by password).
+    async def upsert_sso_user(self, identity: ExternalIdentity, is_admin: bool) -> User:
+        """Resolve (or JIT-provision) the local account for a verified SSO identity.
 
-        Role is set at creation; re-syncing it on IdP group changes is a follow-up.
+        Accounts are bound to the IdP subject (`sub`), which is stable across the
+        user's email changes. An email is adopted only when the IdP asserts it
+        verified, and never when it already belongs to a *different* subject (so a
+        recycled/spoofed email cannot take over another account). The admin flag is
+        re-synced from the IdP groups on every login — the IdP is the source of truth.
         """
-        normalized = _normalize_email(email)
-        existing = await self._users.get_by_email(normalized)
-        if existing is not None:
-            return existing
-        # A random, unknowable password hash — SSO users authenticate only via SSO.
-        return await self._users.add(
-            User(
-                id=uuid4(),
-                email=normalized,
-                password_hash=hash_password(secrets.token_urlsafe(_INVITE_TOKEN_BYTES)),
-                is_admin=is_admin,
-                created_at=_now(),
+        if not identity.email or not identity.email_verified:
+            raise SSOEmailNotVerified(identity.email or "<none>")
+        normalized = _normalize_email(identity.email)
+
+        existing = await self._users.get_by_sso_subject(identity.subject)
+        if existing is None:
+            existing = await self._resolve_or_create_sso_user(identity, normalized, is_admin)
+            if existing.sso_subject == identity.subject:
+                # Freshly JIT-created with the right subject and role already set.
+                return existing
+        return await self._users.bind_sso(existing.id, identity.subject, is_admin)
+
+    async def _resolve_or_create_sso_user(
+        self, identity: ExternalIdentity, normalized_email: str, is_admin: bool
+    ) -> User:
+        """No account is bound to this subject yet: adopt the verified-email account
+        if one exists (and is unlinked), else JIT-create. Raises on a subject clash."""
+        by_email = await self._users.get_by_email(normalized_email)
+        if by_email is not None:
+            if by_email.sso_subject is not None:
+                raise SSOIdentityConflict(normalized_email)
+            return by_email  # link this previously password-only account
+        try:
+            # A random, unknowable password hash — SSO users authenticate only via SSO.
+            return await self._users.add(
+                User(
+                    id=uuid4(),
+                    email=normalized_email,
+                    password_hash=hash_password(secrets.token_urlsafe(_INVITE_TOKEN_BYTES)),
+                    is_admin=is_admin,
+                    created_at=_now(),
+                    sso_subject=identity.subject,
+                )
             )
-        )
+        except EmailAlreadyRegistered:
+            # Concurrent first login for the same identity created the row between
+            # our lookups — re-resolve and let the caller sync role via bind_sso.
+            raced = await self._users.get_by_sso_subject(identity.subject)
+            if raced is None:
+                raced = await self._users.get_by_email(normalized_email)
+            if raced is None or raced.sso_subject not in (None, identity.subject):
+                raise SSOIdentityConflict(normalized_email) from None
+            return raced
 
     async def create_password_reset(self, actor: User, email: str) -> IssuedPasswordReset:
         """Platform-admin issues a single-use, expiring reset token for a user.
