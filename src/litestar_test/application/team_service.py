@@ -23,6 +23,7 @@ from uuid import UUID, uuid4
 from litestar_test.domain.entities import Team, TeamMembership, TeamRole, User
 from litestar_test.domain.exceptions import (
     AlreadyMember,
+    LastTeamAdmin,
     MembershipNotFound,
     OrganizationNotFound,
     PermissionDenied,
@@ -79,6 +80,12 @@ class TeamService:
             role=TeamRole.ADMIN,
             created_at=_now(),
         )
+
+    async def _is_last_admin(self, team_id: UUID, user_id: UUID) -> bool:
+        """True if `user_id` is the team's only remaining admin, so demoting or
+        removing them would leave the team with no admin."""
+        admins = [m for m in await self._memberships.list_by_team(team_id) if m.is_admin]
+        return len(admins) == 1 and admins[0].user_id == user_id
 
     async def ensure_can_manage_team(self, actor: User, team_id: UUID) -> Team:
         """Return the team if `actor` may manage it, else raise."""
@@ -151,13 +158,24 @@ class TeamService:
         membership = await self._memberships.get(team_id, user_id)
         if membership is None:
             raise MembershipNotFound(str(user_id))
+        # Demoting the sole admin would leave the team unmanageable.
+        if (
+            membership.is_admin
+            and role is not TeamRole.ADMIN
+            and await self._is_last_admin(team_id, user_id)
+        ):
+            raise LastTeamAdmin("Cannot demote the last admin of the team")
         async with self._unit_of_work():
             updated = await self._memberships.update(dataclasses.replace(membership, role=role))
         return updated
 
     async def remove_member(self, actor: User, team_id: UUID, user_id: UUID) -> None:
         await self.ensure_can_manage_team(actor, team_id)
-        if await self._memberships.get(team_id, user_id) is None:
+        membership = await self._memberships.get(team_id, user_id)
+        if membership is None:
             raise MembershipNotFound(str(user_id))
+        # Removing the sole admin would leave the team unmanageable.
+        if membership.is_admin and await self._is_last_admin(team_id, user_id):
+            raise LastTeamAdmin("Cannot remove the last admin of the team")
         async with self._unit_of_work():
             await self._memberships.remove(team_id, user_id)
