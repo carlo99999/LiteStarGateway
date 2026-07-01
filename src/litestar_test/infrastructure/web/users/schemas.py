@@ -28,10 +28,16 @@ class ResetPasswordRequest:
 
 
 @dataclass(frozen=True)
+class SetUserActiveRequest:
+    is_active: bool
+
+
+@dataclass(frozen=True)
 class UserResponse:
     id: UUID
     email: str
     is_admin: bool
+    is_active: bool
     created_at: datetime
 
     @classmethod
@@ -40,6 +46,7 @@ class UserResponse:
             id=user.id,
             email=user.email,
             is_admin=user.is_admin,
+            is_active=user.is_active,
             created_at=user.created_at,
         )
 

@@ -110,6 +110,9 @@ class FakeUserRepo:
     async def increment_token_version(self, user_id: UUID) -> None:  # pragma: no cover
         return None
 
+    async def set_active(self, user_id: UUID, is_active: bool) -> None:  # pragma: no cover
+        return None
+
 
 class FakeTransaction:
     """No-op unit-of-work boundary; the in-memory fakes persist on write."""

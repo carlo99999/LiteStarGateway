@@ -90,6 +90,43 @@ async def test_me_returns_current_user(client: AsyncTestClient) -> None:
     assert body["is_admin"] is False
 
 
+async def test_admin_disable_locks_user_out(client: AsyncTestClient) -> None:
+    await _signup(client, "bob@b.com", "S3cret!!")
+    token = (
+        await client.post("/login", json={"email": "bob@b.com", "password": "S3cret!!"})
+    ).json()["access_token"]
+    auth = {"Authorization": f"Bearer {token}"}
+    user_id = (await client.get("/me", headers=auth)).json()["id"]
+    admin = {"Authorization": f"Bearer {await _admin_token(client)}"}
+
+    patched = await client.patch(f"/users/{user_id}", json={"is_active": False}, headers=admin)
+    assert patched.status_code == HTTP_200_OK
+    assert patched.json()["is_active"] is False
+
+    # Existing token is revoked, and a fresh login is refused.
+    assert (await client.get("/me", headers=auth)).status_code == HTTP_401_UNAUTHORIZED
+    relogin = await client.post("/login", json={"email": "bob@b.com", "password": "S3cret!!"})
+    assert relogin.status_code == HTTP_401_UNAUTHORIZED
+
+    # Re-enabling restores login.
+    await client.patch(f"/users/{user_id}", json={"is_active": True}, headers=admin)
+    assert (
+        await client.post("/login", json={"email": "bob@b.com", "password": "S3cret!!"})
+    ).status_code == HTTP_200_OK
+
+
+async def test_non_admin_cannot_disable_users(client: AsyncTestClient) -> None:
+    await _signup(client, "bob@b.com", "S3cret!!")
+    token = (
+        await client.post("/login", json={"email": "bob@b.com", "password": "S3cret!!"})
+    ).json()["access_token"]
+    auth = {"Authorization": f"Bearer {token}"}
+    user_id = (await client.get("/me", headers=auth)).json()["id"]
+    # bob (non-admin) tries to disable himself via the admin endpoint → 403.
+    resp = await client.patch(f"/users/{user_id}", json={"is_active": False}, headers=auth)
+    assert resp.status_code == 403
+
+
 async def test_logout_revokes_existing_tokens(client: AsyncTestClient) -> None:
     await _signup(client, "alice@b.com", "S3cret!!")
     token = (

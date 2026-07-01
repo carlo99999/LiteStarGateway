@@ -145,6 +145,9 @@ class UserService:
         user = await self._users.get_by_email(_normalize_email(email))
         if user is None or not verify_password(password, user.password_hash):
             raise InvalidCredentials("Invalid email or password")
+        # A disabled account cannot log in; same generic error (don't reveal state).
+        if not user.is_active:
+            raise InvalidCredentials("Invalid email or password")
         return user
 
     async def get_by_id(self, user_id: UUID) -> User | None:
@@ -206,6 +209,22 @@ class UserService:
             if raced is None or raced.sso_subject not in (None, identity.subject):
                 raise SSOIdentityConflict(normalized_email) from None
             return raced
+
+    async def set_user_active(self, actor: User, user_id: UUID, is_active: bool) -> User:
+        """Platform-admin enables/disables another account. Disabling revokes the
+        target's existing sessions. An admin cannot disable their own account (a
+        lockout footgun)."""
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        if actor.id == user_id:
+            raise PermissionDenied("Cannot change your own active status")
+        if await self._users.get(user_id) is None:
+            raise UserNotFound(str(user_id))
+        await self._users.set_active(user_id, is_active)
+        updated = await self._users.get(user_id)
+        if updated is None:  # pragma: no cover - just set it
+            raise UserNotFound(str(user_id))
+        return updated
 
     async def create_password_reset(self, actor: User, email: str) -> IssuedPasswordReset:
         """Platform-admin issues a single-use, expiring reset token for a user.

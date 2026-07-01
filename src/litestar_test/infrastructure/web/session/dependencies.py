@@ -40,6 +40,9 @@ async def provide_current_user(
     # Reject tokens issued before a logout (token_version bump).
     if token_version != user.token_version:
         raise NotAuthorizedException("Token has been revoked")
+    # A disabled account cannot authenticate, even with an otherwise-valid token.
+    if not user.is_active:
+        raise NotAuthorizedException("Account is disabled")
     return user
 
 
