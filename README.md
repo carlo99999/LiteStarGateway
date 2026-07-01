@@ -68,6 +68,15 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
 11. **Account recovery & password change** — `POST /me/password` + admin reset (email flow optional).
     [`adding-account-recovery`](https://github.com/carlo99999/LiteStarGateway/blob/adding-account-recovery/docs/account-recovery.md)
 
+### Enterprise (post-v1)
+
+- **SSO / SCIM / RBAC / audit** — federate identity via OIDC/SAML (identity as a
+  swappable `IdentityProvider` port), auto-provision via SCIM, map IdP groups to
+  teams/roles, extend RBAC, and add an append-only audit log. Reuses the existing
+  multi-tenant model and JWT session. _The path to being a governed, enterprise-
+  grade gateway rather than a broad LiteLLM clone._
+  [`adding-enterprise-sso`](https://github.com/carlo99999/LiteStarGateway/blob/adding-enterprise-sso/docs/enterprise-sso.md)
+
 ### v2 (after v1)
 
 - **AWS Bedrock provider** — Converse API + boto3 (no hand-rolled SigV4), responses emulated.
