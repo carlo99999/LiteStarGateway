@@ -32,10 +32,43 @@ def _env_bool(name: str, default: bool) -> bool:
 DEFAULT_JWT_SECRET = "dev-insecure-change-me-please-0123456789"
 
 _PRODUCTION_ENVIRONMENTS = frozenset({"production", "prod"})
+# Explicitly-local environments where insecure defaults are tolerated. Anything
+# NOT in this set (production, staging, a typo, …) is treated as security-sensitive.
+_LOCAL_ENVIRONMENTS = frozenset({"development", "dev", "test", "local"})
+# Minimum length for configured secrets outside local envs. The envelope-encryption
+# master key is derived from these via SHA-256, so their entropy must come from
+# length/randomness — a short passphrase would be brute-forceable.
+MIN_SECRET_LENGTH = 32
 
 
 class InsecureConfigurationError(RuntimeError):
-    """Raised at startup when a production deploy uses an insecure default."""
+    """Raised at startup when a non-local deploy uses an insecure default."""
+
+
+def _env_int(name: str, default: int, *, minimum: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise InsecureConfigurationError(f"{name} must be an integer, got {raw!r}") from exc
+    if value < minimum:
+        raise InsecureConfigurationError(f"{name} must be >= {minimum}, got {value}")
+    return value
+
+
+def _env_float(name: str, default: float, *, minimum: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise InsecureConfigurationError(f"{name} must be a number, got {raw!r}") from exc
+    if value <= minimum:
+        raise InsecureConfigurationError(f"{name} must be > {minimum}, got {value}")
+    return value
 
 
 @dataclass(frozen=True)
@@ -88,14 +121,32 @@ class Settings:
         return self.environment.strip().lower() in _PRODUCTION_ENVIRONMENTS
 
     @property
+    def is_local(self) -> bool:
+        return self.environment.strip().lower() in _LOCAL_ENVIRONMENTS
+
+    @property
     def is_postgres(self) -> bool:
         return self.database_url.startswith(("postgresql", "postgres"))
 
     def __post_init__(self) -> None:
-        # Fail fast rather than silently signing JWTs with a publicly known key.
-        if self.is_production and (not self.jwt_secret or self.jwt_secret == DEFAULT_JWT_SECRET):
+        # Fail fast on insecure secrets everywhere except explicitly-local envs, so a
+        # staging or misspelled environment cannot silently run on the public default
+        # or a brute-forceable short key.
+        if self.is_local:
+            return
+        if not self.jwt_secret or self.jwt_secret == DEFAULT_JWT_SECRET:
             raise InsecureConfigurationError(
-                "JWT_SECRET must be set to a strong, non-default value in production"
+                "JWT_SECRET must be set to a strong, non-default value outside local environments"
+            )
+        if len(self.jwt_secret) < MIN_SECRET_LENGTH:
+            raise InsecureConfigurationError(
+                f"JWT_SECRET must be at least {MIN_SECRET_LENGTH} characters"
+            )
+        # SALT_KEY is optional (credential encryption is opt-in), but if set it wraps
+        # the credential keyring, so it must be strong too.
+        if self.salt_key is not None and len(self.salt_key) < MIN_SECRET_LENGTH:
+            raise InsecureConfigurationError(
+                f"SALT_KEY must be at least {MIN_SECRET_LENGTH} characters when set"
             )
 
     @classmethod
@@ -108,10 +159,10 @@ class Settings:
             jwt_secret=os.environ.get("JWT_SECRET", DEFAULT_JWT_SECRET),
             salt_key=os.environ.get("SALT_KEY"),
             environment=os.environ.get("ENVIRONMENT", DEFAULT_ENVIRONMENT),
-            db_pool_size=int(os.environ.get("DB_POOL_SIZE", DEFAULT_DB_POOL_SIZE)),
-            db_max_overflow=int(os.environ.get("DB_MAX_OVERFLOW", DEFAULT_DB_MAX_OVERFLOW)),
-            request_timeout=float(os.environ.get("REQUEST_TIMEOUT", DEFAULT_REQUEST_TIMEOUT)),
-            max_retries=int(os.environ.get("MAX_RETRIES", DEFAULT_MAX_RETRIES)),
+            db_pool_size=_env_int("DB_POOL_SIZE", DEFAULT_DB_POOL_SIZE, minimum=1),
+            db_max_overflow=_env_int("DB_MAX_OVERFLOW", DEFAULT_DB_MAX_OVERFLOW, minimum=0),
+            request_timeout=_env_float("REQUEST_TIMEOUT", DEFAULT_REQUEST_TIMEOUT, minimum=0.0),
+            max_retries=_env_int("MAX_RETRIES", DEFAULT_MAX_RETRIES, minimum=0),
             rotation_enabled=_env_bool("KEY_ROTATION_ENABLED", False),
             rotation_time=os.environ.get("KEY_ROTATION_TIME", DEFAULT_ROTATION_TIME),
             mlflow_tracking_uri=os.environ.get("MLFLOW_TRACKING_URI"),
