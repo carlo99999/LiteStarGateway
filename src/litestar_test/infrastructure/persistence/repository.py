@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.domain.entities import APIKey
+from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_test.infrastructure.persistence.orm import APIKeyModel
 
 
@@ -43,11 +44,15 @@ class SQLAlchemyAPIKeyRepository:
         )
         return model.to_entity() if model else None
 
-    async def list_by_team(self, team_id: UUID) -> list[APIKey]:
+    async def list_by_team(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[APIKey]:
         models = await self._session.scalars(
             select(APIKeyModel)
             .where(APIKeyModel.team_id == team_id)
             .order_by(APIKeyModel.created_at)
+            .limit(limit)
+            .offset(offset)
         )
         return [m.to_entity() for m in models]
 

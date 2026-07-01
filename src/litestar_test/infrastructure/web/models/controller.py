@@ -11,11 +11,12 @@ from uuid import UUID
 
 from litestar import Controller, delete, get, patch, post
 from litestar.di import NamedDependency, Provide
-from litestar.params import FromPath
+from litestar.params import FromPath, FromQuery
 
 from litestar_test.application.model_service import ModelService
 from litestar_test.application.team_service import TeamService
 from litestar_test.domain.entities import User
+from litestar_test.domain.pagination import resolve_page
 from litestar_test.infrastructure.web.models.schemas import (
     CreateModelRequest,
     ModelResponse,
@@ -69,9 +70,12 @@ class ModelController(Controller):
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
         model_service: NamedDependency[ModelService],
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
     ) -> list[ModelResponse]:
         await team_service.ensure_can_manage_team(current_user, team_id)
-        models = await model_service.list_for_team(team_id)
+        page_limit, page_offset = resolve_page(limit, offset)
+        models = await model_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
         return [ModelResponse.from_entity(m) for m in models]
 
     @patch(

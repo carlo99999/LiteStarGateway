@@ -13,10 +13,11 @@ from uuid import UUID
 from litestar import Controller, delete, get, post
 from litestar.di import NamedDependency, Provide
 from litestar.openapi.spec import Example
-from litestar.params import Body, FromPath
+from litestar.params import Body, FromPath, FromQuery
 
 from litestar_test.application.credential_service import CredentialService
 from litestar_test.domain.entities import User
+from litestar_test.domain.pagination import resolve_page
 from litestar_test.infrastructure.web.credentials.schemas import (
     CreateCredentialRequest,
     CredentialResponse,
@@ -109,8 +110,13 @@ class CredentialController(Controller):
         self,
         current_admin: NamedDependency[User],
         credential_service: NamedDependency[CredentialService],
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
     ) -> list[CredentialResponse]:
-        credentials = await credential_service.list(current_admin)
+        page_limit, page_offset = resolve_page(limit, offset)
+        credentials = await credential_service.list(
+            current_admin, limit=page_limit, offset=page_offset
+        )
         return [CredentialResponse.from_entity(c) for c in credentials]
 
     @delete(

@@ -8,6 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.domain.entities import Model
+from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_test.infrastructure.persistence.orm import ModelRecord
 
 
@@ -45,11 +46,15 @@ class SQLAlchemyModelRepository:
         )
         return record.to_entity() if record else None
 
-    async def list_by_team(self, team_id: UUID) -> list[Model]:
+    async def list_by_team(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[Model]:
         records = await self._session.scalars(
             select(ModelRecord)
             .where(ModelRecord.team_id == team_id)
             .order_by(ModelRecord.created_at)
+            .limit(limit)
+            .offset(offset)
         )
         return [r.to_entity() for r in records]
 

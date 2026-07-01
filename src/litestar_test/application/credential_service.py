@@ -16,6 +16,7 @@ from litestar_test.domain.exceptions import (
     CredentialNotFound,
     PermissionDenied,
 )
+from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_test.domain.ports import CredentialRepository
 
 
@@ -41,9 +42,11 @@ class CredentialService:
         credential = Credential(id=uuid4(), name=name, provider=provider, created_at=_now())
         return await self._repo.add(credential, values)
 
-    async def list(self, actor: User) -> list[Credential]:
+    async def list(
+        self, actor: User, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[Credential]:
         _require_platform_admin(actor)
-        return await self._repo.list()
+        return await self._repo.list(limit=limit, offset=offset)
 
     async def delete(self, actor: User, credential_id: UUID) -> None:
         _require_platform_admin(actor)

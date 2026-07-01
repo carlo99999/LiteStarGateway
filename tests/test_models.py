@@ -133,6 +133,29 @@ async def test_duplicate_name_in_team_conflicts(client: AsyncTestClient) -> None
     ).status_code == HTTP_409_CONFLICT
 
 
+async def test_list_models_pagination(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    cred = await _credential(client, admin, "openai")
+    team = await _team(client, admin)
+    for i in range(3):
+        await client.post(
+            f"/teams/{team}/models",
+            json={
+                "name": f"m{i}",
+                "provider": "openai",
+                "credential_id": cred,
+                "type": "chat",
+                "provider_model_id": "gpt-4o",
+            },
+            headers=_bearer(admin),
+        )
+    first = await client.get(f"/teams/{team}/models?limit=2", headers=_bearer(admin))
+    assert first.status_code == HTTP_200_OK
+    assert [m["name"] for m in first.json()] == ["m0", "m1"]
+    second = await client.get(f"/teams/{team}/models?limit=2&offset=2", headers=_bearer(admin))
+    assert [m["name"] for m in second.json()] == ["m2"]
+
+
 async def test_list_update_delete(client: AsyncTestClient) -> None:
     admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
     cred = await _credential(client, admin, "openai")

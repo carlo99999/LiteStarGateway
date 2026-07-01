@@ -24,6 +24,7 @@ from litestar_test.domain.entities import (
     UsageEvent,
     User,
 )
+from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
 
 
 class APIKeyRepository(Protocol):
@@ -35,7 +36,9 @@ class APIKeyRepository(Protocol):
 
     async def get_by_hash(self, key_hash: str) -> APIKey | None: ...
 
-    async def list_by_team(self, team_id: UUID) -> list[APIKey]: ...
+    async def list_by_team(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[APIKey]: ...
 
     async def update(self, key: APIKey) -> APIKey: ...
 
@@ -52,7 +55,9 @@ class CredentialRepository(Protocol):
 
     async def get_by_name(self, name: str) -> Credential | None: ...
 
-    async def list(self) -> list[Credential]: ...
+    async def list(
+        self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[Credential]: ...
 
     async def get_values(self, credential_id: UUID) -> dict[str, str] | None: ...
 
@@ -127,7 +132,9 @@ class ModelRepository(Protocol):
 
     async def get_by_name(self, team_id: UUID, name: str) -> Model | None: ...
 
-    async def list_by_team(self, team_id: UUID) -> list[Model]: ...
+    async def list_by_team(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[Model]: ...
 
     async def update(self, model: Model) -> Model: ...
 

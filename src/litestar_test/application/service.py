@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 from litestar_test.domain.entities import APIKey, IssuedKey
 from litestar_test.domain.exceptions import APIKeyNotFound, InvalidAPIKey
 from litestar_test.domain.key_generator import generate_key, hash_key
+from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_test.domain.ports import APIKeyRepository
 
 # Only persist last_used_at this often, to avoid a DB write on every request.
@@ -66,5 +67,7 @@ class APIKeyService:
         if key.is_active:
             await self._repo.update(dataclasses.replace(key, revoked_at=_now()))
 
-    async def list_for_team(self, team_id: UUID) -> list[APIKey]:
-        return await self._repo.list_by_team(team_id)
+    async def list_for_team(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[APIKey]:
+        return await self._repo.list_by_team(team_id, limit=limit, offset=offset)

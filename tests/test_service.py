@@ -34,8 +34,11 @@ class FakeAPIKeyRepository:
     async def get_by_hash(self, key_hash: str) -> APIKey | None:
         return next((k for k in self._store.values() if k.key_hash == key_hash), None)
 
-    async def list_by_team(self, team_id: UUID) -> list[APIKey]:
-        return [k for k in self._store.values() if k.team_id == team_id]
+    async def list_by_team(
+        self, team_id: UUID, *, limit: int = 100, offset: int = 0
+    ) -> list[APIKey]:
+        keys = [k for k in self._store.values() if k.team_id == team_id]
+        return keys[offset : offset + limit]
 
     async def update(self, key: APIKey) -> APIKey:
         self.update_calls += 1
