@@ -17,6 +17,8 @@ DEFAULT_REQUEST_TIMEOUT = 60.0
 DEFAULT_MAX_RETRIES = 2
 # Daily key rotation (UTC time, "HH:MM"). Opt-in via KEY_ROTATION_ENABLED.
 DEFAULT_ROTATION_TIME = "03:00"
+# Observability. No tracking URI ⇒ tracing disabled (NullSink).
+DEFAULT_MLFLOW_EXPERIMENT = "litestar-gateway"
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -58,6 +60,9 @@ class Settings:
     # Daily automatic key rotation (opt-in), at rotation_time (UTC, "HH:MM").
     rotation_enabled: bool = False
     rotation_time: str = DEFAULT_ROTATION_TIME
+    # Observability: MLflow tracking URI (None ⇒ tracing disabled) + general experiment.
+    mlflow_tracking_uri: str | None = None
+    mlflow_experiment: str = DEFAULT_MLFLOW_EXPERIMENT
 
     @property
     def is_production(self) -> bool:
@@ -90,4 +95,6 @@ class Settings:
             max_retries=int(os.environ.get("MAX_RETRIES", DEFAULT_MAX_RETRIES)),
             rotation_enabled=_env_bool("KEY_ROTATION_ENABLED", False),
             rotation_time=os.environ.get("KEY_ROTATION_TIME", DEFAULT_ROTATION_TIME),
+            mlflow_tracking_uri=os.environ.get("MLFLOW_TRACKING_URI"),
+            mlflow_experiment=os.environ.get("MLFLOW_EXPERIMENT", DEFAULT_MLFLOW_EXPERIMENT),
         )

@@ -11,6 +11,8 @@ from litestar_test.domain.exceptions import DomainError
 from litestar_test.infrastructure.bootstrap import make_bootstrap_admin
 from litestar_test.infrastructure.keyring import Keyring
 from litestar_test.infrastructure.logging import build_logging_config
+from litestar_test.infrastructure.observability.dispatcher import TraceDispatcher
+from litestar_test.infrastructure.observability.factory import build_trace_sink
 from litestar_test.infrastructure.persistence.database import create_database
 from litestar_test.infrastructure.persistence.secret_key_repository import (
     SQLAlchemySecretKeyRepository,
@@ -45,6 +47,7 @@ def create_app(settings: Settings | None = None) -> Litestar:
     settings = settings or Settings.from_env()
     database = create_database(settings)
     llm_gateway = build_llm_gateway(settings)  # shared, stateless; built once
+    trace_dispatcher = TraceDispatcher(build_trace_sink(settings))  # observability, off-path
     swagger_plugin = SwaggerRenderPlugin(version="5.18.2", path="/")
     scalar_plugin = ScalarRenderPlugin(version="1.19.5", path="/scalar")
     stoplight_plugin = StoplightRenderPlugin(version="7.7.18", path="/elements")
@@ -86,7 +89,7 @@ def create_app(settings: Settings | None = None) -> Litestar:
         plugins=[database.plugin],
         logging_config=build_logging_config(settings),
         on_startup=[make_bootstrap_admin(database, settings)],
-        lifespan=[make_rotation_scheduler(database, settings)],
+        lifespan=[make_rotation_scheduler(database, settings), trace_dispatcher.run],
         dependencies={
             "api_key_service": Provide(provide_api_key_service, sync_to_thread=False),
             "user_service": Provide(provide_user_service, sync_to_thread=False),
@@ -96,6 +99,7 @@ def create_app(settings: Settings | None = None) -> Litestar:
             "credential_service": Provide(provide_credential_service, sync_to_thread=False),
             "completion_service": Provide(provide_completion_service, sync_to_thread=False),
             "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
+            "trace_dispatcher": Provide(lambda: trace_dispatcher, sync_to_thread=False),
             "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
             "keyring": Provide(provide_keyring, sync_to_thread=False),
         },

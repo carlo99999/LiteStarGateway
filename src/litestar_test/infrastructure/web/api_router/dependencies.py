@@ -11,6 +11,7 @@ from litestar_test.domain.ports import LLMGateway, UsageRepository
 from litestar_test.infrastructure.keyring import Keyring
 from litestar_test.infrastructure.llm.gateway import LLMGatewayImpl
 from litestar_test.infrastructure.llm.resilience import ResilienceConfig
+from litestar_test.infrastructure.observability.dispatcher import TraceDispatcher
 from litestar_test.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
 )
@@ -39,10 +40,12 @@ def provide_completion_service(
     db_session: NamedDependency[AsyncSession],
     keyring: NamedDependency[Keyring],
     llm_gateway: NamedDependency[LLMGateway],
+    trace_dispatcher: NamedDependency[TraceDispatcher],
 ) -> CompletionService:
     return CompletionService(
         models=SQLAlchemyModelRepository(db_session),
         credentials=SQLAlchemyCredentialRepository(db_session, keyring),
         gateway=llm_gateway,
         usage=SQLAlchemyUsageRepository(db_session),
+        emit_trace=trace_dispatcher.enqueue,
     )
