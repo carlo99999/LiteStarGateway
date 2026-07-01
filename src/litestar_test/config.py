@@ -75,7 +75,9 @@ class Settings:
 
     @property
     def sso_enabled(self) -> bool:
-        return bool(self.oidc_discovery_url and self.oidc_client_id)
+        # Confidential-client flow: the secret is mandatory. Missing it ⇒ SSO stays
+        # off (routes unregistered) rather than booting a broken/public-client flow.
+        return bool(self.oidc_discovery_url and self.oidc_client_id and self.oidc_client_secret)
 
     @property
     def is_production(self) -> bool:

@@ -26,6 +26,7 @@ from litestar_test.infrastructure.web.session.jwt import issue_access_token
 from litestar_test.infrastructure.web.session.schemas import TokenResponse
 
 _STATE_COOKIE = "sso_state"
+_STATE_TTL_SECONDS = 600  # the user must complete the round-trip within 10 minutes
 
 
 def _redirect_uri(request: Request) -> str:
@@ -41,8 +42,16 @@ async def sso_login(
     return Redirect(
         url,
         cookies=[
-            # secure=True behind TLS in production; Lax lets it ride the callback.
-            Cookie(key=_STATE_COOKIE, value=state, max_age=600, httponly=True, samesite="lax")
+            # `Secure` whenever we're serving over HTTPS — the state cookie is only
+            # meaningful over TLS; `Lax` still lets it ride the top-level callback.
+            Cookie(
+                key=_STATE_COOKIE,
+                value=state,
+                max_age=_STATE_TTL_SECONDS,
+                httponly=True,
+                secure=request.url.scheme == "https",
+                samesite="lax",
+            )
         ],
     )
 
@@ -50,16 +59,20 @@ async def sso_login(
 @get("/sso/callback", middleware=[build_auth_rate_limit().middleware])
 async def sso_callback(
     request: Request,
-    code: FromQuery[str],
-    # `state` is a reserved kwarg in Litestar (the app State), so alias the query.
-    flow_state: Annotated[str, QueryParameter(name="state")],
     identity_provider: NamedDependency[IdentityProvider],
     user_service: NamedDependency[UserService],
     keyring: NamedDependency[Keyring],
     sso_admin_groups: NamedDependency[tuple[str, ...]],
+    code: FromQuery[str | None] = None,
+    # `state` is a reserved kwarg in Litestar (the app State), so alias the query.
+    flow_state: Annotated[str | None, QueryParameter(name="state")] = None,
+    # The IdP redirects here with `?error=...` (no code) when the user declines.
+    error: FromQuery[str | None] = None,
 ) -> TokenResponse:
     if not flow_state or request.cookies.get(_STATE_COOKIE) != flow_state:
         raise NotAuthorizedException("Invalid SSO state")
+    if error or not code:
+        raise NotAuthorizedException("SSO login was not completed")
     identity = await identity_provider.exchange(code, _redirect_uri(request))
 
     is_admin = bool(set(identity.groups) & set(sso_admin_groups))
