@@ -1,5 +1,19 @@
 # LiteStar Gateway
 
+**A straightforward, OpenAI-compatible LLM gateway — one clean, direct path from
+your application to any provider. Focused, predictable, and free of accumulated
+complexity: it does one job and does it well.**
+
+Built on a few deliberate principles:
+
+- **Focused over sprawling** — a curated set of providers, done right, instead of
+  a long tail of half-supported ones.
+- **Official SDKs** — every provider is called through its own maintained client,
+  not reverse-engineered wire formats.
+- **Security-first** — encrypted credentials, scoped API keys, rate limiting, and
+  a clean multi-tenant model, by design rather than as an afterthought.
+- **Auditable** — a small, hexagonal codebase a team can read in an afternoon.
+
 An OpenAI-compatible LLM gateway (Litestar, hexagonal architecture). Customers
 point the stock OpenAI client at this server with a team API key:
 
