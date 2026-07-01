@@ -8,8 +8,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from advanced_alchemy.config import EngineConfig
-from advanced_alchemy.extensions.litestar import SQLAlchemyAsyncConfig, SQLAlchemyPlugin
+from advanced_alchemy.extensions.litestar import (
+    EngineConfig,
+    SQLAlchemyAsyncConfig,
+    SQLAlchemyPlugin,
+)
 
 from litestar_test.config import Settings
 
