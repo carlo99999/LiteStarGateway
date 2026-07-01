@@ -457,6 +457,70 @@ async def test_usage_record_failure_is_logged_not_swallowed(
     )
 
 
+async def test_key_spending_report_includes_revoked_keys(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Past (revoked) keys and their accumulated spend must stay visible.
+    _patch(monkeypatch)
+    admin = await _admin(client)
+    cred = (
+        await client.post(
+            "/credentials",
+            json={"name": "c", "provider": "openai", "values": OPENAI_VALUES},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    org = (
+        await client.post("/organizations", json={"name": "Acme"}, headers=_bearer(admin))
+    ).json()["id"]
+    team = (
+        await client.post(
+            f"/organizations/{org}/teams",
+            json={"name": "Core", "admin_email": ADMIN_EMAIL},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    await client.post(
+        f"/teams/{team}/models",
+        json={
+            "name": "m",
+            "provider": "openai",
+            "credential_id": cred,
+            "type": "chat",
+            "provider_model_id": "gpt-4o",
+            "enabled": True,
+        },
+        headers=_bearer(admin),
+    )
+    created = (
+        await client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(admin))
+    ).json()
+    key_id, key = created["id"], created["plaintext"]
+
+    # One chat call → the fake reports 1 prompt + 1 completion token.
+    await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+        headers=_bearer(key),
+    )
+
+    spending = (await client.get(f"/teams/{team}/keys/spending", headers=_bearer(admin))).json()
+    assert len(spending) == 1
+    assert spending[0]["id"] == key_id
+    assert spending[0]["is_active"] is True
+    assert spending[0]["prompt_tokens"] == 1
+    assert spending[0]["completion_tokens"] == 1
+    assert spending[0]["calls"] == 1
+
+    # After revoking, the key + its spend are still reported (now inactive).
+    await client.delete(f"/teams/{team}/keys/{key_id}", headers=_bearer(admin))
+    revoked = (await client.get(f"/teams/{team}/keys/spending", headers=_bearer(admin))).json()
+    assert len(revoked) == 1
+    assert revoked[0]["id"] == key_id
+    assert revoked[0]["is_active"] is False
+    assert revoked[0]["calls"] == 1
+
+
 async def test_openai_responses(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch(monkeypatch)
     api_key = await _setup(client)

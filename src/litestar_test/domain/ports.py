@@ -9,6 +9,7 @@ from uuid import UUID
 
 from litestar_test.domain.entities import (
     APIKey,
+    ApiKeySpend,
     Credential,
     ExternalIdentity,
     Invite,
@@ -237,6 +238,11 @@ class UsageRepository(Protocol):
     ) -> list[UsageAggregate]:
         """Usage summed per model for a team, optionally filtered by model name
         and/or API key."""
+        ...
+
+    async def spend_by_api_key(self, team_id: UUID) -> list[ApiKeySpend]:
+        """Token/cost totals grouped by API key for the team (includes keys that
+        are now revoked, as long as they have recorded usage)."""
         ...
 
 
