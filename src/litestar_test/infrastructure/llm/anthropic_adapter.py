@@ -133,13 +133,17 @@ class AnthropicAdapter:
     def chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
+        # Close the client after the call so its httpx pool isn't leaked.
         client = Anthropic(
             api_key=require_api_key(credentials),
             base_url=_base_url(credentials),
             **self._resilience.client_kwargs,
         )
-        message: Any = client.messages.create(**to_anthropic_request(request, model))
-        return from_anthropic_response(message.model_dump())
+        try:
+            message: Any = client.messages.create(**to_anthropic_request(request, model))
+            return from_anthropic_response(message.model_dump())
+        finally:
+            client.close()
 
     async def achat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -149,8 +153,11 @@ class AnthropicAdapter:
             base_url=_base_url(credentials),
             **self._resilience.client_kwargs,
         )
-        message: Any = await client.messages.create(**to_anthropic_request(request, model))
-        return from_anthropic_response(message.model_dump())
+        try:
+            message: Any = await client.messages.create(**to_anthropic_request(request, model))
+            return from_anthropic_response(message.model_dump())
+        finally:
+            await client.close()
 
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -167,12 +174,16 @@ class AnthropicAdapter:
             "model": model.provider_model_id,
         }
         kwargs: dict[str, Any] = {**to_anthropic_request(request, model), "stream": True}
-        stream: Any = await client.messages.create(**kwargs)
-        async for event in stream:
-            delta, finish = anthropic_event_to_delta(event.model_dump())
-            if delta is None and finish is None:
-                continue
-            yield {
-                **base,
-                "choices": [{"index": 0, "delta": delta or {}, "finish_reason": finish}],
-            }
+        # Keep the client open for the whole stream; close on completion/disconnect.
+        try:
+            stream: Any = await client.messages.create(**kwargs)
+            async for event in stream:
+                delta, finish = anthropic_event_to_delta(event.model_dump())
+                if delta is None and finish is None:
+                    continue
+                yield {
+                    **base,
+                    "choices": [{"index": 0, "delta": delta or {}, "finish_reason": finish}],
+                }
+        finally:
+            await client.close()

@@ -88,6 +88,9 @@ class FakeClient:
         self.embeddings = SimpleNamespace(create=self._embed)
         self.images = SimpleNamespace(generate=self._image)
 
+    async def close(self) -> None:  # AsyncOpenAI.close is a coroutine
+        return None
+
     async def _responses_create(self, **kwargs):
         FakeClient.last_kwargs = kwargs
         if kwargs.get("stream"):
@@ -149,6 +152,9 @@ class FakeAnthropic:
     def __init__(self, **kwargs) -> None:
         FakeAnthropic.last_init = kwargs
         self.messages = self
+
+    async def close(self) -> None:  # AsyncAnthropic.close is a coroutine
+        return None
 
     async def create(self, **kwargs):
         FakeAnthropic.last_kwargs = kwargs
