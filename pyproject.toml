@@ -26,6 +26,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.6.0",
     "pyrefly>=1.1.1",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",

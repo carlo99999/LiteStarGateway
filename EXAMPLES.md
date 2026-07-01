@@ -16,7 +16,7 @@ Real-world code examples demonstrating the four principles. Each example shows w
 def export_users(format='json'):
     """Export all users to a file."""
     users = User.query.all()
-    
+
     if format == 'json':
         with open('users.json', 'w') as f:
             json.dump([u.to_dict() for u in users], f)
@@ -25,7 +25,7 @@ def export_users(format='json'):
             writer = csv.DictWriter(f, fieldnames=['id', 'email', 'name'])
             writer.writeheader()
             writer.writerows([u.to_dict() for u in users])
-    
+
     return f"Exported {len(users)} users"
 ```
 
@@ -88,7 +88,7 @@ async def search(query: str) -> List[Result]:
    - Progressive loading
    - Estimated effort: 3 hours
 
-Current search takes ~500ms for typical queries. 
+Current search takes ~500ms for typical queries.
 Which aspect matters most for your use case?
 ```
 
@@ -116,14 +116,14 @@ class DiscountStrategy(ABC):
 class PercentageDiscount(DiscountStrategy):
     def __init__(self, percentage: float):
         self.percentage = percentage
-    
+
     def calculate(self, amount: float) -> float:
         return amount * (self.percentage / 100)
 
 class FixedDiscount(DiscountStrategy):
     def __init__(self, fixed_amount: float):
         self.fixed_amount = fixed_amount
-    
+
     def calculate(self, amount: float) -> float:
         return min(self.fixed_amount, amount)
 
@@ -136,7 +136,7 @@ class DiscountConfig:
 class DiscountCalculator:
     def __init__(self, config: DiscountConfig):
         self.config = config
-    
+
     def apply_discount(self, amount: float) -> float:
         if amount < self.config.min_purchase:
             return 0
@@ -171,37 +171,37 @@ class PreferenceManager:
         self.db = db
         self.cache = cache or InMemoryCache()
         self.validator = validator or DefaultValidator()
-    
-    def save(self, user_id: int, prefs: dict, 
-             merge: bool = True, 
+
+    def save(self, user_id: int, prefs: dict,
+             merge: bool = True,
              validate: bool = True,
              notify: bool = False) -> bool:
         """Save preferences with optional merging, validation, and notifications."""
-        
+
         if validate:
             errors = self.validator.validate(prefs)
             if errors:
                 raise ValidationError(errors)
-        
+
         existing = self.get(user_id) if merge else {}
-        
+
         if merge:
             existing.update(prefs)
             prefs = existing
-        
+
         self.db.execute(
             "UPDATE users SET preferences = ? WHERE id = ?",
             (json.dumps(prefs), user_id)
         )
-        
+
         if self.cache:
             self.cache.set(f"prefs:{user_id}", prefs)
-        
+
         if notify:
             self.notify_preference_change(user_id, prefs)
-        
+
         return True
-    
+
     def notify_preference_change(self, user_id: int, prefs: dict):
         # Another 30 lines for a feature nobody asked for
         pass
@@ -236,16 +236,16 @@ def save_preferences(db, user_id: int, preferences: dict):
 -     if not user_data.get('email'):
 +     """Validate user data."""
 +     email = user_data.get('email', '').strip()
-+     
++
 +     # Validate email
 +     if not email:
           raise ValueError("Email required")
--     
+-
 -     # Basic email validation
 -     if '@' not in user_data['email']:
 +     if '@' not in email or '.' not in email.split('@')[1]:
           raise ValueError("Invalid email")
-      
+
 -     # Check username
 -     if not user_data.get('username'):
 +     # Validate username
@@ -256,7 +256,7 @@ def save_preferences(db, user_id: int, preferences: dict):
 +         raise ValueError("Username too short")
 +     if not username.isalnum():
 +         raise ValueError("Username must be alphanumeric")
-      
+
       return True
 ```
 
@@ -275,16 +275,16 @@ def save_preferences(db, user_id: int, preferences: dict):
 +     email = user_data.get('email', '')
 +     if not email or not email.strip():
           raise ValueError("Email required")
-      
+
       # Basic email validation
 -     if '@' not in user_data['email']:
 +     if '@' not in email:
           raise ValueError("Invalid email")
-      
+
       # Check username
       if not user_data.get('username'):
           raise ValueError("Username required")
-      
+
       return True
 ```
 
@@ -301,13 +301,13 @@ def save_preferences(db, user_id: int, preferences: dict):
 + def upload_file(file_path: str, destination: str) -> bool:
 +     """Upload file to destination with logging."""
 +     logger.info(f"Uploading {file_path} to {destination}")
-+     
++
       try:
 -         with open(file_path, 'rb') as f:
 -             data = f.read()
--         
+-
 -         response = requests.post(destination, files={'file': data})
--         
+-
 -         if response.status_code == 200:
 -             return True
 -         else:
@@ -316,12 +316,12 @@ def save_preferences(db, user_id: int, preferences: dict):
 +             data = f.read()
 +         response = requests.post(destination, files={"file": data})
 +         success = response.status_code == 200
-+         
++
 +         if success:
 +             logger.info(f"Upload successful: {file_path}")
 +         else:
 +             logger.error(f"Upload failed: {file_path}, status={response.status_code}")
-+         
++
 +         return success
       except Exception as e:
 -         print(f"Error: {e}")
@@ -340,17 +340,17 @@ def save_preferences(db, user_id: int, preferences: dict):
 
 ```diff
 + import logging
-+ 
++
 + logger = logging.getLogger(__name__)
-+ 
++
   def upload_file(file_path, destination):
 +     logger.info(f'Starting upload: {file_path}')
       try:
           with open(file_path, 'rb') as f:
               data = f.read()
-          
+
           response = requests.post(destination, files={'file': data})
-          
+
           if response.status_code == 200:
 +             logger.info(f'Upload successful: {file_path}')
               return True
@@ -388,7 +388,7 @@ I'll fix the authentication system by:
 **✅ What Should Happen (Verifiable Goals)**
 
 ```
-To "fix authentication," I need to define success criteria. 
+To "fix authentication," I need to define success criteria.
 What specific issue are we solving?
 
 If the issue is "users stay logged in after password change":
@@ -428,7 +428,7 @@ What's the specific auth issue you're seeing?
 Plan for rate limiting:
 
 1. Add basic in-memory rate limiting (single endpoint)
-   Verify: 
+   Verify:
    - Test: 100 requests → first 10 succeed, rest get 429
    - Manual: curl endpoint 11 times, see rate limit error
 
@@ -474,9 +474,9 @@ def test_sort_with_duplicate_scores():
         {'name': 'Bob', 'score': 100},
         {'name': 'Charlie', 'score': 90},
     ]
-    
+
     result = sort_scores(scores)
-    
+
     # The bug: order is non-deterministic for duplicates
     # Run this test multiple times, it should be consistent
     assert result[0]['score'] == 100

@@ -1,5 +1,19 @@
 # LiteStar Gateway
 
+**A straightforward, OpenAI-compatible LLM gateway — one clean, direct path from
+your application to any provider. Focused, predictable, and free of accumulated
+complexity: it does one job and does it well.**
+
+Built on a few deliberate principles:
+
+- **Focused over sprawling** — a curated set of providers, done right, instead of
+  a long tail of half-supported ones.
+- **Official SDKs** — every provider is called through its own maintained client,
+  not reverse-engineered wire formats.
+- **Security-first** — encrypted credentials, scoped API keys, rate limiting, and
+  a clean multi-tenant model, by design rather than as an afterthought.
+- **Auditable** — a small, hexagonal codebase a team can read in an afternoon.
+
 An OpenAI-compatible LLM gateway (Litestar, hexagonal architecture). Customers
 point the stock OpenAI client at this server with a team API key:
 
@@ -37,14 +51,102 @@ uv run litestar --app litestar_test.app:app run
 uv run pytest
 ```
 
+Install the git hooks once per clone (lint, format, and secret scanning run on
+every commit; CI runs the same hooks on every PR):
+
+```bash
+uv run pre-commit install
+```
+
+## Deployment
+
+The app ships as a container (multi-stage `Dockerfile`, non-root, served by
+uvicorn with `--proxy-headers`). Provide the secrets via the environment.
+
+```bash
+# Local prod-like run (SQLite on a named volume) via compose:
+MASTER_KEY=… JWT_SECRET=… SALT_KEY=… docker compose up --build
+# → http://localhost:8000  (GET /health for liveness)
+```
+
+Or build and run the image directly:
+
+```bash
+docker build -t litestar-gateway .
+docker run -p 8000:8000 \
+  -e ENVIRONMENT=production \
+  -e MASTER_KEY=… -e JWT_SECRET=… -e SALT_KEY=… \
+  litestar-gateway
+```
+
+Notes:
+
+- **Behind a reverse proxy / TLS**: the app expects to sit behind one. Keep
+  `--proxy-headers` and set uvicorn's `--forwarded-allow-ips` to your proxy's
+  address (the image default `*` trusts any upstream — fine only when a single
+  trusted ingress fronts it) so the real client IP reaches the per-IP rate limit.
+- **Database**: the image defaults to SQLite on the `/data` volume. For real
+  deployments use Postgres (`postgresql+asyncpg://…`) — see the `adding-postgres`
+  roadmap item and the commented service in `docker-compose.yml`.
+- **Multi-process/replicas**: the rate-limit store is in-memory per process; back
+  it with a shared store (Redis) when running multiple workers/replicas.
+
 ## Roadmap
 
-- **Observability via MLflow** _(planned)_ — a `TraceSink` port + MLflow adapter
-  (OSS or Databricks) to log usage, cost, latency and optional payloads off the
-  request hot path, with a general firehose experiment plus optional per-team
-  experiments. Design doc and parked work live on the
-  [`adding-observability-via-mlflow`](https://github.com/carlo99999/LiteStarGateway/blob/adding-observability-via-mlflow/docs/observability.md)
-  branch; we'll resume it from there.
+Planned work, split into **Toward v1** (must-have before publishing) and **v2**
+(after v1). Each item with a design doc has it parked on its own branch (linked) —
+we resume from there. Order within a phase is a recommendation; reorder as needed.
+
+### Toward v1 (pre-launch)
+
+1. ✅ **CI (GitHub Actions)** _(shipped)_ — runs `ruff` + `pyrefly` + `pytest` on
+   every push to `main` and every PR ([`.github/workflows/ci.yml`](.github/workflows/ci.yml),
+   [design](docs/ci.md)).
+2. ✅ **Container image & deployment** _(shipped)_ — multi-stage [`Dockerfile`](Dockerfile)
+   (non-root, uvicorn + `--proxy-headers`, healthcheck) + [`docker-compose.yml`](docker-compose.yml),
+   see [Deployment](#deployment) and the [design](docs/deployment.md). _Postgres
+   service is stubbed pending the Postgres item._
+3. **Database migrations (Alembic)** — replace `create_all` with versioned migrations.
+   [`adding-db-migrations`](https://github.com/carlo99999/LiteStarGateway/blob/adding-db-migrations/docs/db-migrations.md)
+4. **Production Postgres** — asyncpg + connection pool + validate concurrency on PG.
+   [`adding-postgres`](https://github.com/carlo99999/LiteStarGateway/blob/adding-postgres/docs/postgres.md)
+5. **Provider resilience** — timeouts, bounded retries with backoff, per-provider circuit breaker.
+   [`adding-provider-resilience`](https://github.com/carlo99999/LiteStarGateway/blob/adding-provider-resilience/docs/provider-resilience.md)
+6. **Request parameter allowlist** — deny-by-default sanitizing of client params before the provider SDKs.
+   [`adding-param-allowlist`](https://github.com/carlo99999/LiteStarGateway/blob/adding-param-allowlist/docs/param-allowlist.md)
+7. **Structured logging & error hygiene** — JSON logs, request ids, no internal leakage on 5xx.
+   [`adding-structured-logging`](https://github.com/carlo99999/LiteStarGateway/blob/adding-structured-logging/docs/logging.md)
+8. **Secrets management & key rotation** — supply secrets from a manager; rotate `SALT_KEY` (keyring + re-encrypt) and `JWT_SECRET`.
+   [`adding-secrets-rotation`](https://github.com/carlo99999/LiteStarGateway/blob/adding-secrets-rotation/docs/secrets-rotation.md)
+9. **Observability via MLflow** — `TraceSink` port + MLflow adapter (OSS or Databricks), off the hot path.
+   [`adding-observability-via-mlflow`](https://github.com/carlo99999/LiteStarGateway/blob/adding-observability-via-mlflow/docs/observability.md)
+10. **Usage & cost accounting + budgets** — authoritative usage records, `GET /usage`, pre-call budget enforcement.
+    [`adding-usage-cost`](https://github.com/carlo99999/LiteStarGateway/blob/adding-usage-cost/docs/usage-cost.md)
+11. **Account recovery & password change** — `POST /me/password` + admin reset (email flow optional).
+    [`adding-account-recovery`](https://github.com/carlo99999/LiteStarGateway/blob/adding-account-recovery/docs/account-recovery.md)
+
+### Enterprise (post-v1)
+
+- **SSO / SCIM / RBAC / audit** — federate identity via OIDC/SAML (identity as a
+  swappable `IdentityProvider` port), auto-provision via SCIM, map IdP groups to
+  teams/roles, extend RBAC, and add an append-only audit log. Reuses the existing
+  multi-tenant model and JWT session. _The path to being a governed, enterprise-
+  grade gateway rather than a broad LiteLLM clone._
+  [`adding-enterprise-sso`](https://github.com/carlo99999/LiteStarGateway/blob/adding-enterprise-sso/docs/enterprise-sso.md)
+
+### v2 (after v1)
+
+- **AWS Bedrock provider** — Converse API + boto3 (no hand-rolled SigV4), responses emulated.
+  [`adding-bedrock`](https://github.com/carlo99999/LiteStarGateway/blob/adding-bedrock/docs/bedrock.md)
+- **Weighted multi-model routing** — an alias splitting traffic across ≤5 models by percentage.
+  [`adding-weighted-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-weighted-routing/docs/weighted-routing.md)
+- **Smart (judge-based) routing** — four difficulty tiers + a swappable judge adapter.
+  [`adding-smart-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-smart-routing/docs/smart-routing.md)
+- **Web UI** — SPA over the JSON API for login + admin + usage dashboards.
+  [`adding-web-ui`](https://github.com/carlo99999/LiteStarGateway/blob/adding-web-ui/docs/web-ui.md)
+- **LICENSE & repo hygiene** — add a LICENSE, `CONTRIBUTING`, and a security policy _(no branch yet)_.
+- **Test coverage gate** — enforce 80% (`--cov-fail-under`) in CI _(no branch yet)_.
+- **Minor hardening** — `GET /v1/models`, request body-size limits, security headers, DB backups, dependency scanning (pip-audit / Dependabot), admin audit log, API-key expiry _(no branch yet)_.
 
 ## Security — known issues & follow-ups
 
