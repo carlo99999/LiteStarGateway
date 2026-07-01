@@ -111,9 +111,10 @@ def create_app(
             lambda: settings.oidc_redirect_uri, sync_to_thread=False
         )
 
-    return Litestar(
-        route_handlers=route_handlers,
-        openapi_config=OpenAPIConfig(
+    # Public, unauthenticated when enabled — operators disable it in production
+    # (OPENAPI_ENABLED=false) so the full API surface isn't exposed.
+    openapi_config = (
+        OpenAPIConfig(
             title="Litestar Gateway API",
             version="1.0.0",
             description=(
@@ -127,7 +128,14 @@ def create_app(
             ),
             path="/",
             render_plugins=[swagger_plugin, scalar_plugin, stoplight_plugin],
-        ),
+        )
+        if settings.openapi_enabled
+        else None
+    )
+
+    return Litestar(
+        route_handlers=route_handlers,
+        openapi_config=openapi_config,
         plugins=[database.plugin],
         logging_config=build_logging_config(settings),
         on_startup=[make_bootstrap_admin(database, settings)],

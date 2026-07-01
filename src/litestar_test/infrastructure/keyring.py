@@ -20,6 +20,12 @@ from litestar_test.infrastructure.crypto import (
     new_key_material,
 )
 
+# A JWT signing key stays active until the next daily rotation, so a token signed
+# just before then is still valid for the full token TTL afterwards. Keep keys an
+# extra rotation interval beyond the TTL before deleting, or we'd invalidate tokens
+# that are still within their lifetime (spurious mid-session logouts).
+_JWT_KEY_RETENTION_GRACE = timedelta(days=1)
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -85,7 +91,7 @@ class Keyring:
         """Add a fresh JWT signing key and drop keys too old to have signed any
         still-valid token (older than the access-token TTL)."""
         await self._create(KeyPurpose.JWT)
-        cutoff = _now() - max_age
+        cutoff = _now() - max_age - _JWT_KEY_RETENTION_GRACE
         for key in await self._keys.list_usable(KeyPurpose.JWT):
             if key.created_at < cutoff:
                 await self._keys.delete(key.id)
