@@ -18,6 +18,7 @@ from anthropic import Anthropic, AsyncAnthropic
 
 from litestar_test.domain.entities import Model
 from litestar_test.infrastructure.llm.openai_adapter import require_api_key
+from litestar_test.infrastructure.llm.resilience import ResilienceConfig
 
 # Anthropic requires max_tokens; use this when the request omits it.
 DEFAULT_MAX_TOKENS = 1024
@@ -126,10 +127,17 @@ def _base_url(credentials: dict[str, str]) -> str | None:
 
 
 class AnthropicAdapter:
+    def __init__(self, resilience: ResilienceConfig | None = None) -> None:
+        self._resilience = resilience or ResilienceConfig()
+
     def chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = Anthropic(api_key=require_api_key(credentials), base_url=_base_url(credentials))
+        client = Anthropic(
+            api_key=require_api_key(credentials),
+            base_url=_base_url(credentials),
+            **self._resilience.client_kwargs,
+        )
         message: Any = client.messages.create(**to_anthropic_request(request, model))
         return from_anthropic_response(message.model_dump())
 
@@ -137,7 +145,9 @@ class AnthropicAdapter:
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         client = AsyncAnthropic(
-            api_key=require_api_key(credentials), base_url=_base_url(credentials)
+            api_key=require_api_key(credentials),
+            base_url=_base_url(credentials),
+            **self._resilience.client_kwargs,
         )
         message: Any = await client.messages.create(**to_anthropic_request(request, model))
         return from_anthropic_response(message.model_dump())
@@ -146,7 +156,9 @@ class AnthropicAdapter:
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
         client = AsyncAnthropic(
-            api_key=require_api_key(credentials), base_url=_base_url(credentials)
+            api_key=require_api_key(credentials),
+            base_url=_base_url(credentials),
+            **self._resilience.client_kwargs,
         )
         base = {
             "id": "chatcmpl-anthropic",
