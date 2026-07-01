@@ -15,6 +15,15 @@ DEFAULT_DB_MAX_OVERFLOW = 10
 # Upstream provider call resilience.
 DEFAULT_REQUEST_TIMEOUT = 60.0
 DEFAULT_MAX_RETRIES = 2
+# Daily key rotation (UTC time, "HH:MM"). Opt-in via KEY_ROTATION_ENABLED.
+DEFAULT_ROTATION_TIME = "03:00"
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    return default if raw is None else raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 # ≥32 bytes to satisfy HS256 key-length recommendations. Override in production.
 DEFAULT_JWT_SECRET = "dev-insecure-change-me-please-0123456789"
 
@@ -46,6 +55,9 @@ class Settings:
     # Per-call timeout (seconds) and retry budget for upstream provider SDKs.
     request_timeout: float = DEFAULT_REQUEST_TIMEOUT
     max_retries: int = DEFAULT_MAX_RETRIES
+    # Daily automatic key rotation (opt-in), at rotation_time (UTC, "HH:MM").
+    rotation_enabled: bool = False
+    rotation_time: str = DEFAULT_ROTATION_TIME
 
     @property
     def is_production(self) -> bool:
@@ -76,4 +88,6 @@ class Settings:
             db_max_overflow=int(os.environ.get("DB_MAX_OVERFLOW", DEFAULT_DB_MAX_OVERFLOW)),
             request_timeout=float(os.environ.get("REQUEST_TIMEOUT", DEFAULT_REQUEST_TIMEOUT)),
             max_retries=int(os.environ.get("MAX_RETRIES", DEFAULT_MAX_RETRIES)),
+            rotation_enabled=_env_bool("KEY_ROTATION_ENABLED", False),
+            rotation_time=os.environ.get("KEY_ROTATION_TIME", DEFAULT_ROTATION_TIME),
         )

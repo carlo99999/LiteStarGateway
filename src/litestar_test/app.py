@@ -1,14 +1,19 @@
 """Composition root: wires settings, persistence, services and the web layer."""
 
 from litestar import Litestar, get
-from litestar.di import Provide
+from litestar.di import NamedDependency, Provide
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.config import Settings
 from litestar_test.domain.exceptions import DomainError
 from litestar_test.infrastructure.bootstrap import make_bootstrap_admin
-from litestar_test.infrastructure.crypto import build_cipher
+from litestar_test.infrastructure.keyring import Keyring
 from litestar_test.infrastructure.logging import build_logging_config
 from litestar_test.infrastructure.persistence.database import create_database
+from litestar_test.infrastructure.persistence.secret_key_repository import (
+    SQLAlchemySecretKeyRepository,
+)
+from litestar_test.infrastructure.rotation import make_rotation_scheduler
 from litestar_test.infrastructure.web.api_router.dependencies import (
     build_llm_gateway,
     provide_completion_service,
@@ -38,6 +43,14 @@ def create_app(settings: Settings | None = None) -> Litestar:
     database = create_database(settings)
     llm_gateway = build_llm_gateway(settings)  # shared, stateless; built once
 
+    def provide_keyring(db_session: NamedDependency[AsyncSession]) -> Keyring:
+        # Per-purpose masters: SALT_KEY wraps credential keys, JWT_SECRET wraps JWT
+        # keys. Credential ops raise SaltKeyMissing (503) if SALT_KEY is unset; the
+        # data keys are created on first use (no startup bootstrap needed).
+        return Keyring(
+            SQLAlchemySecretKeyRepository(db_session), settings.salt_key, settings.jwt_secret
+        )
+
     return Litestar(
         route_handlers=[
             health,  # public
@@ -52,6 +65,7 @@ def create_app(settings: Settings | None = None) -> Litestar:
         plugins=[database.plugin],
         logging_config=build_logging_config(settings),
         on_startup=[make_bootstrap_admin(database, settings)],
+        lifespan=[make_rotation_scheduler(database, settings)],
         dependencies={
             "api_key_service": Provide(provide_api_key_service, sync_to_thread=False),
             "user_service": Provide(provide_user_service, sync_to_thread=False),
@@ -61,11 +75,9 @@ def create_app(settings: Settings | None = None) -> Litestar:
             "credential_service": Provide(provide_credential_service, sync_to_thread=False),
             "completion_service": Provide(provide_completion_service, sync_to_thread=False),
             "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
-            # Built lazily; raises SaltKeyMissing (503) if SALT_KEY is unset.
-            "credential_cipher": Provide(
-                lambda: build_cipher(settings.salt_key), sync_to_thread=False
-            ),
-            "jwt_secret": Provide(lambda: settings.jwt_secret, sync_to_thread=False),
+            # Envelope-encryption keyring (credentials + JWT). Built lazily;
+            # raises SaltKeyMissing (503) if SALT_KEY — the master key — is unset.
+            "keyring": Provide(provide_keyring, sync_to_thread=False),
         },
         exception_handlers={DomainError: domain_exception_handler},
     )
