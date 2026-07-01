@@ -1,0 +1,12 @@
+# Keep the build context small and never ship local state/secrets.
+.git
+.github
+.venv
+**/__pycache__/
+*.pyc
+*.db
+.env
+.pytest_cache/
+.ruff_cache/
+docs/
+tests/
