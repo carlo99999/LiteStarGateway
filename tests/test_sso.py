@@ -109,6 +109,17 @@ async def test_sso_callback_rejects_state_mismatch(
     assert resp.status_code == HTTP_401_UNAUTHORIZED
 
 
+async def test_sso_callback_rejects_idp_error_without_code(
+    admin_identity_client: AsyncTestClient,
+) -> None:
+    # User declined consent: the IdP redirects back with an error and no code.
+    # A matching state must still yield a clean 401, not a 400 validation error.
+    client = admin_identity_client
+    state = await _login_state(client)
+    resp = await client.get(f"/sso/callback?error=access_denied&state={state}")
+    assert resp.status_code == HTTP_401_UNAUTHORIZED
+
+
 async def test_sso_non_admin_group_creates_regular_user(tmp_path: Path) -> None:
     me = await _login_and_get_me(tmp_path, _identity("s2", "bob@corp.com", groups=("other",)))
     assert me["email"] == "bob@corp.com"

@@ -61,6 +61,12 @@ class SSOEmailNotVerified(DomainError):
     trusted to resolve or provision a local account."""
 
 
+class SSOExchangeError(DomainError):
+    """The OIDC authorization-code exchange or id_token verification failed
+    (misconfigured IdP, network error, missing/invalid token). Surfaced as an
+    auth failure rather than leaking the underlying provider error."""
+
+
 class OrganizationNotFound(DomainError):
     """No organization exists for the given id."""
 

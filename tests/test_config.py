@@ -45,3 +45,18 @@ def test_development_allows_default_jwt_secret() -> None:
     # The dev default is intentionally permitted outside production.
     settings = dataclasses.replace(_BASE, environment="development", jwt_secret=DEFAULT_JWT_SECRET)
     assert settings.is_production is False
+
+
+def test_sso_enabled_requires_discovery_client_id_and_secret() -> None:
+    # All three are needed; missing any one keeps SSO off (routes unregistered)
+    # rather than booting a broken or secret-less public-client flow.
+    full = dataclasses.replace(
+        _BASE,
+        oidc_discovery_url="https://idp.example/.well-known/openid-configuration",
+        oidc_client_id="client-abc",
+        oidc_client_secret="shhh",  # pragma: allowlist secret
+    )
+    assert full.sso_enabled is True
+    assert dataclasses.replace(full, oidc_client_secret=None).sso_enabled is False
+    assert dataclasses.replace(full, oidc_client_id=None).sso_enabled is False
+    assert dataclasses.replace(full, oidc_discovery_url=None).sso_enabled is False
