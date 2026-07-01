@@ -67,6 +67,10 @@ as needed.
    adapter that picks the model. _Feature; builds on the routing layer and a
    `Judge` port._
    [`adding-smart-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-smart-routing/docs/smart-routing.md)
+7. **Web UI** _(post-v1)_ — an SPA client over the JSON API for login and admin
+   (orgs/teams/members/credentials/models/keys) plus usage dashboards. _Deferred
+   until the gateway is feature-complete at v1._
+   [`adding-web-ui`](https://github.com/carlo99999/LiteStarGateway/blob/adding-web-ui/docs/web-ui.md)
 
 ## Security — known issues & follow-ups
 
