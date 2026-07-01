@@ -39,12 +39,34 @@ uv run pytest
 
 ## Roadmap
 
-- **Observability via MLflow** _(planned)_ — a `TraceSink` port + MLflow adapter
-  (OSS or Databricks) to log usage, cost, latency and optional payloads off the
-  request hot path, with a general firehose experiment plus optional per-team
-  experiments. Design doc and parked work live on the
-  [`adding-observability-via-mlflow`](https://github.com/carlo99999/LiteStarGateway/blob/adding-observability-via-mlflow/docs/observability.md)
-  branch; we'll resume it from there.
+Planned work, **in priority order**. Each item has a design doc parked on its own
+branch (linked) — we'll resume from there. Priority is a recommendation; reorder
+as needed.
+
+1. **Request parameter allowlist** — deny-by-default sanitizing of client params
+   before they reach the provider SDKs. _Closes the last security follow-up and
+   is small._
+   [`adding-param-allowlist`](https://github.com/carlo99999/LiteStarGateway/blob/adding-param-allowlist/docs/param-allowlist.md)
+2. **Database migrations (Alembic)** — replace `create_all` with versioned
+   migrations. _Prerequisite for production and for the new tables added by the
+   routing features below._
+   [`adding-db-migrations`](https://github.com/carlo99999/LiteStarGateway/blob/adding-db-migrations/docs/db-migrations.md)
+3. **Observability via MLflow** — `TraceSink` port + MLflow adapter (OSS or
+   Databricks) logging usage/cost/latency (+ optional payloads) off the hot path,
+   a general firehose experiment plus optional per-team experiments. _Needed to
+   run in production with visibility._
+   [`adding-observability-via-mlflow`](https://github.com/carlo99999/LiteStarGateway/blob/adding-observability-via-mlflow/docs/observability.md)
+4. **AWS Bedrock provider** — Converse API + boto3 (no hand-rolled SigV4),
+   responses emulated. _Provider completeness; do it when Bedrock is actually
+   needed._
+   [`adding-bedrock`](https://github.com/carlo99999/LiteStarGateway/blob/adding-bedrock/docs/bedrock.md)
+5. **Weighted multi-model routing** — an alias splitting traffic across ≤5 models
+   by percentage (e.g. 50/50). _Feature; introduces the shared routing layer._
+   [`adding-weighted-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-weighted-routing/docs/weighted-routing.md)
+6. **Smart (judge-based) routing** — four difficulty tiers + a swappable judge
+   adapter that picks the model. _Feature; builds on the routing layer and a
+   `Judge` port._
+   [`adding-smart-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-smart-routing/docs/smart-routing.md)
 
 ## Security — known issues & follow-ups
 
