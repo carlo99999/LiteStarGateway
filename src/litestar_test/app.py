@@ -7,6 +7,7 @@ from litestar_test.config import Settings
 from litestar_test.domain.exceptions import DomainError
 from litestar_test.infrastructure.bootstrap import make_bootstrap_admin
 from litestar_test.infrastructure.crypto import build_cipher
+from litestar_test.infrastructure.logging import build_logging_config
 from litestar_test.infrastructure.persistence.database import create_database
 from litestar_test.infrastructure.web.api_router.dependencies import (
     build_llm_gateway,
@@ -49,6 +50,7 @@ def create_app(settings: Settings | None = None) -> Litestar:
             CredentialController,  # platform-admin: encrypted provider credentials
         ],
         plugins=[database.plugin],
+        logging_config=build_logging_config(settings),
         on_startup=[make_bootstrap_admin(database, settings)],
         dependencies={
             "api_key_service": Provide(provide_api_key_service, sync_to_thread=False),
