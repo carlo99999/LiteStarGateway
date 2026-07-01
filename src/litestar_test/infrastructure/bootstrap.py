@@ -18,6 +18,9 @@ from litestar_test.infrastructure.persistence.database import Database
 from litestar_test.infrastructure.persistence.invite_repository import (
     SQLAlchemyInviteRepository,
 )
+from litestar_test.infrastructure.persistence.password_reset_repository import (
+    SQLAlchemyPasswordResetRepository,
+)
 from litestar_test.infrastructure.persistence.user_repository import (
     SQLAlchemyUserRepository,
 )
@@ -32,6 +35,7 @@ def make_bootstrap_admin(
             service = UserService(
                 users=SQLAlchemyUserRepository(session),
                 invites=SQLAlchemyInviteRepository(session),
+                password_resets=SQLAlchemyPasswordResetRepository(session),
             )
             await service.ensure_admin(settings.admin_email, settings.master_key)
 

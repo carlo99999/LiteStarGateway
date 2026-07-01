@@ -21,9 +21,11 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from google import genai
+from google.genai.types import HttpOptions
 from google.oauth2 import service_account
 
 from litestar_test.domain.entities import Model
+from litestar_test.infrastructure.llm.resilience import ResilienceConfig
 
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 
@@ -155,7 +157,7 @@ def from_imagen_response(response: dict[str, Any]) -> dict[str, Any]:
     return {"created": int(time.time()), "data": data}
 
 
-def _client(credentials: dict[str, str]) -> genai.Client:
+def _build_client(credentials: dict[str, str], timeout_ms: int) -> genai.Client:
     creds = None
     if raw := credentials.get("vertex_credentials"):
         creds = service_account.Credentials.from_service_account_info(
@@ -166,28 +168,35 @@ def _client(credentials: dict[str, str]) -> genai.Client:
         project=credentials.get("vertex_project"),
         location=credentials.get("vertex_location"),
         credentials=creds,
+        http_options=HttpOptions(timeout=timeout_ms),
     )
 
 
 class VertexAdapter:
+    def __init__(self, resilience: ResilienceConfig | None = None) -> None:
+        self._resilience = resilience or ResilienceConfig()
+
+    def _client(self, credentials: dict[str, str]) -> genai.Client:
+        return _build_client(credentials, self._resilience.timeout_ms)
+
     def chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = _client(credentials)
+        client = self._client(credentials)
         response = client.models.generate_content(**to_gemini_request(request, model))
         return from_gemini_response(response.model_dump())
 
     async def achat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = _client(credentials)
+        client = self._client(credentials)
         response = await client.aio.models.generate_content(**to_gemini_request(request, model))
         return from_gemini_response(response.model_dump())
 
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        client = _client(credentials)
+        client = self._client(credentials)
         base = {
             "id": "chatcmpl-gemini",
             "object": "chat.completion.chunk",
@@ -214,27 +223,27 @@ class VertexAdapter:
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = _client(credentials)
+        client = self._client(credentials)
         response = client.models.embed_content(**to_gemini_embed_request(request, model))
         return from_gemini_embeddings(response.model_dump(), model.provider_model_id)
 
     async def aembeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = _client(credentials)
+        client = self._client(credentials)
         response = await client.aio.models.embed_content(**to_gemini_embed_request(request, model))
         return from_gemini_embeddings(response.model_dump(), model.provider_model_id)
 
     def images(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = _client(credentials)
+        client = self._client(credentials)
         response = client.models.generate_images(**to_imagen_request(request, model))
         return from_imagen_response(response.model_dump())
 
     async def aimages(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = _client(credentials)
+        client = self._client(credentials)
         response = await client.aio.models.generate_images(**to_imagen_request(request, model))
         return from_imagen_response(response.model_dump())

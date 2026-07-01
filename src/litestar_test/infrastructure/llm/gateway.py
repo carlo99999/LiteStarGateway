@@ -15,6 +15,7 @@ from litestar_test.domain.exceptions import UnsupportedOperation
 from litestar_test.infrastructure.llm.anthropic_adapter import AnthropicAdapter
 from litestar_test.infrastructure.llm.azure_adapter import AzureOpenAIAdapter
 from litestar_test.infrastructure.llm.openai_adapter import OpenAIAdapter
+from litestar_test.infrastructure.llm.resilience import ResilienceConfig
 from litestar_test.infrastructure.llm.responses_emulation import ChatToResponsesAdapter
 from litestar_test.infrastructure.llm.vertex_adapter import VertexAdapter
 
@@ -25,8 +26,9 @@ _IMAGES = "image_generation"
 
 
 class LLMGatewayImpl:
-    def __init__(self) -> None:
-        openai_adapter = OpenAIAdapter()  # OpenAI + Databricks share the client surface
+    def __init__(self, resilience: ResilienceConfig | None = None) -> None:
+        resilience = resilience or ResilienceConfig()
+        openai_adapter = OpenAIAdapter(resilience)  # OpenAI + Databricks share the client surface
         # provider -> (adapter, supported operation shapes)
         self._registry = {
             Provider.OPENAI: (
@@ -34,7 +36,7 @@ class LLMGatewayImpl:
                 frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES}),
             ),
             Provider.AZURE_OPENAI: (
-                AzureOpenAIAdapter(),
+                AzureOpenAIAdapter(resilience),
                 frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES}),
             ),
             # Databricks: no native Responses API (emulated); embeddings are OpenAI-compatible.
@@ -44,12 +46,12 @@ class LLMGatewayImpl:
             ),
             # Anthropic: chat + emulated Responses. No embeddings API.
             Provider.ANTHROPIC: (
-                ChatToResponsesAdapter(AnthropicAdapter()),
+                ChatToResponsesAdapter(AnthropicAdapter(resilience)),
                 frozenset({_CHAT, _RESPONSES}),
             ),
             # Vertex/Gemini: chat + emulated Responses + embeddings + images (Imagen).
             Provider.VERTEX_AI: (
-                ChatToResponsesAdapter(VertexAdapter()),
+                ChatToResponsesAdapter(VertexAdapter(resilience)),
                 frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES}),
             ),
         }

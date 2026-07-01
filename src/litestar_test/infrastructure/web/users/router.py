@@ -5,9 +5,18 @@ from __future__ import annotations
 from litestar.router import Router
 
 from litestar_test.infrastructure.web.users.invites import create_invite
+from litestar_test.infrastructure.web.users.password_reset import (
+    create_password_reset,
+    reset_password,
+)
 from litestar_test.infrastructure.web.users.signup import signup
 
 
 def create_users_router() -> Router:
-    # Invite creation requires an admin JWT (enforced by its own dependency).
-    return Router(path="/", route_handlers=[signup, create_invite], tags=["users"])
+    # Admin-only handlers enforce the admin JWT via their own dependency; the
+    # public ones (signup, reset-password) are rate-limited per IP.
+    return Router(
+        path="/",
+        route_handlers=[signup, create_invite, create_password_reset, reset_password],
+        tags=["users"],
+    )

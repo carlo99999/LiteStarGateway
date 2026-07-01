@@ -1,5 +1,19 @@
 # LiteStar Gateway
 
+**A straightforward, OpenAI-compatible LLM gateway — one clean, direct path from
+your application to any provider. Focused, predictable, and free of accumulated
+complexity: it does one job and does it well.**
+
+Built on a few deliberate principles:
+
+- **Focused over sprawling** — a curated set of providers, done right, instead of
+  a long tail of half-supported ones.
+- **Official SDKs** — every provider is called through its own maintained client,
+  not reverse-engineered wire formats.
+- **Security-first** — encrypted credentials, scoped API keys, rate limiting, and
+  a clean multi-tenant model, by design rather than as an afterthought.
+- **Auditable** — a small, hexagonal codebase a team can read in an afternoon.
+
 An OpenAI-compatible LLM gateway (Litestar, hexagonal architecture). Customers
 point the stock OpenAI client at this server with a team API key:
 
@@ -37,58 +51,148 @@ uv run litestar --app litestar_test.app:app run
 uv run pytest
 ```
 
+Install the git hooks once per clone (lint, format, and secret scanning run on
+every commit; CI runs the same hooks on every PR):
+
+```bash
+uv run pre-commit install
+```
+
+## Deployment
+
+The app ships as a container (multi-stage `Dockerfile`, non-root, served by
+uvicorn with `--proxy-headers`). Provide the secrets via the environment.
+
+```bash
+# Local prod-like run (app + Postgres) via compose:
+MASTER_KEY=… JWT_SECRET=… SALT_KEY=… POSTGRES_PASSWORD=… docker compose up --build
+# → http://localhost:8000  (GET /health for liveness)
+```
+
+Or build and run the image directly:
+
+```bash
+docker build -t litestar-gateway .
+docker run -p 8000:8000 \
+  -e ENVIRONMENT=production \
+  -e MASTER_KEY=… -e JWT_SECRET=… -e SALT_KEY=… \
+  litestar-gateway
+```
+
+Notes:
+
+- **Behind a reverse proxy / TLS**: the app expects to sit behind one. Keep
+  `--proxy-headers` and set uvicorn's `--forwarded-allow-ips` to your proxy's
+  address (the image default `*` trusts any upstream — fine only when a single
+  trusted ingress fronts it) so the real client IP reaches the per-IP rate limit.
+- **Database**: `docker-compose.yml` runs Postgres (`postgresql+asyncpg://…`,
+  the recommended production backend) and the app connects to it. Pool sizing is
+  configurable via `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` (Postgres only). The image
+  alone still defaults to SQLite on the `/data` volume for a zero-dependency run.
+- **Migrations**: production uses Alembic (`create_all` is dev/test only). The
+  container applies pending migrations on start (`litestar … database upgrade`,
+  idempotent). After changing the ORM models, generate a migration in dev with
+  `uv run litestar --app litestar_test.app:app database make-migrations`, review
+  it, and commit it. (With many replicas, prefer a one-shot migration job over
+  migrate-on-start to avoid concurrent upgrades.)
+- **Multi-process/replicas**: the rate-limit store is in-memory per process; back
+  it with a shared store (Redis) when running multiple workers/replicas.
+
 ## Roadmap
 
-Planned work, **in priority order**. Each item has a design doc parked on its own
-branch (linked) — we'll resume from there. Priority is a recommendation; reorder
-as needed.
+Planned work, split into **Toward v1** (must-have before publishing) and **v2**
+(after v1). Each item with a design doc has it parked on its own branch (linked) —
+we resume from there. Order within a phase is a recommendation; reorder as needed.
 
-1. **Request parameter allowlist** — deny-by-default sanitizing of client params
-   before they reach the provider SDKs. _Closes the last security follow-up and
-   is small._
-   [`adding-param-allowlist`](https://github.com/carlo99999/LiteStarGateway/blob/adding-param-allowlist/docs/param-allowlist.md)
-2. **Database migrations (Alembic)** — replace `create_all` with versioned
-   migrations. _Prerequisite for production and for the new tables added by the
-   routing features below._
-   [`adding-db-migrations`](https://github.com/carlo99999/LiteStarGateway/blob/adding-db-migrations/docs/db-migrations.md)
-3. **Observability via MLflow** — `TraceSink` port + MLflow adapter (OSS or
-   Databricks) logging usage/cost/latency (+ optional payloads) off the hot path,
-   a general firehose experiment plus optional per-team experiments. _Needed to
-   run in production with visibility._
+### Toward v1 (pre-launch)
+
+1. ✅ **CI (GitHub Actions)** _(shipped)_ — runs `ruff` + `pyrefly` + `pytest` on
+   every push to `main` and every PR ([`.github/workflows/ci.yml`](.github/workflows/ci.yml),
+   [design](docs/ci.md)).
+2. ✅ **Container image & deployment** _(shipped)_ — multi-stage [`Dockerfile`](Dockerfile)
+   (non-root, uvicorn + `--proxy-headers`, healthcheck) + [`docker-compose.yml`](docker-compose.yml),
+   see [Deployment](#deployment) and the [design](docs/deployment.md). _Postgres
+   service is stubbed pending the Postgres item._
+3. ✅ **Database migrations (Alembic)** _(shipped)_ — production manages the schema
+   via Alembic (in `migrations/`); `create_all` is used only in dev/test. The
+   container runs `database upgrade` on start ([design](docs/db-migrations.md)).
+   _An "autogenerate diff is empty" CI guard is a further step._
+4. ✅ **Production Postgres** _(shipped)_ — `asyncpg` driver + configurable
+   connection pool (Postgres only); the compose stack runs on Postgres and the
+   unit-of-work / bootstrap flow is validated against it
+   ([design](docs/postgres.md)). _Running the full test suite on Postgres in CI is
+   a further step._
+5. 🟡 **Provider resilience** _(timeouts + retries shipped)_ — provider SDK clients
+   now use a bounded per-call timeout + retry budget (`REQUEST_TIMEOUT` /
+   `MAX_RETRIES`), so a slow/failing upstream fails fast instead of hanging (~10 min
+   default). _A per-provider circuit breaker is deferred until the complex routing
+   endpoints land (where isolating providers under load matters more)_
+   ([design](docs/provider-resilience.md)).
+6. ✅ **Request parameter allowlist** _(shipped)_ — deny-by-default sanitizing of
+   client params before the provider SDKs
+   ([`request_policy.py`](src/litestar_test/domain/request_policy.py),
+   [design](docs/param-allowlist.md)).
+7. ✅ **Structured logging** _(shipped)_ — an environment-aware logging factory:
+   human-readable console logs in development, structured **JSON** (structlog) in
+   production; exceptions logged server-side, no stack traces leaked to clients
+   ([`logging.py`](src/litestar_test/infrastructure/logging.py),
+   [design](docs/logging.md)). _Request-id correlation is a further step._
+8. **Secrets management & key rotation** — supply secrets from a manager; rotate `SALT_KEY` (keyring + re-encrypt) and `JWT_SECRET`.
+   [`adding-secrets-rotation`](https://github.com/carlo99999/LiteStarGateway/blob/adding-secrets-rotation/docs/secrets-rotation.md)
+9. **Observability via MLflow** — `TraceSink` port + MLflow adapter (OSS or Databricks), off the hot path.
    [`adding-observability-via-mlflow`](https://github.com/carlo99999/LiteStarGateway/blob/adding-observability-via-mlflow/docs/observability.md)
-4. **AWS Bedrock provider** — Converse API + boto3 (no hand-rolled SigV4),
-   responses emulated. _Provider completeness; do it when Bedrock is actually
-   needed._
-   [`adding-bedrock`](https://github.com/carlo99999/LiteStarGateway/blob/adding-bedrock/docs/bedrock.md)
-5. **Weighted multi-model routing** — an alias splitting traffic across ≤5 models
-   by percentage (e.g. 50/50). _Feature; introduces the shared routing layer._
-   [`adding-weighted-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-weighted-routing/docs/weighted-routing.md)
-6. **Smart (judge-based) routing** — four difficulty tiers + a swappable judge
-   adapter that picks the model. _Feature; builds on the routing layer and a
-   `Judge` port._
-   [`adding-smart-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-smart-routing/docs/smart-routing.md)
-7. **Web UI** _(post-v1)_ — an SPA client over the JSON API for login and admin
-   (orgs/teams/members/credentials/models/keys) plus usage dashboards. _Deferred
-   until the gateway is feature-complete at v1._
-   [`adding-web-ui`](https://github.com/carlo99999/LiteStarGateway/blob/adding-web-ui/docs/web-ui.md)
+10. **Usage & cost accounting + budgets** — authoritative usage records, `GET /usage`, pre-call budget enforcement.
+    [`adding-usage-cost`](https://github.com/carlo99999/LiteStarGateway/blob/adding-usage-cost/docs/usage-cost.md)
+11. ✅ **Account recovery** _(shipped)_ — admin-issued password reset: a platform
+    admin creates a single-use, expiring token (`POST /password-resets`, like an
+    invite) that the user redeems to set their **own** new password
+    (`POST /reset-password`), revoking existing sessions. The admin never sees the
+    password; the redeem endpoint is rate-limited and non-revealing
+    ([design](docs/account-recovery.md)).
+
+### Enterprise (post-v1)
+
+- **SSO / SCIM / RBAC / audit** — federate identity via OIDC/SAML (identity as a
+  swappable `IdentityProvider` port), auto-provision via SCIM, map IdP groups to
+  teams/roles, extend RBAC, and add an append-only audit log. Reuses the existing
+  multi-tenant model and JWT session. _The path to being a governed, enterprise-
+  grade gateway rather than a broad LiteLLM clone._
+  [`adding-enterprise-sso`](https://github.com/carlo99999/LiteStarGateway/blob/adding-enterprise-sso/docs/enterprise-sso.md)
+
+### v2 (after v1)
+
+- **AWS Bedrock provider** — Converse API + boto3 (no hand-rolled SigV4), responses emulated.
+  [`adding-bedrock`](https://github.com/carlo99999/LiteStarGateway/blob/adding-bedrock/docs/bedrock.md)
+- **Weighted multi-model routing** — an alias splitting traffic across ≤5 models by percentage.
+  [`adding-weighted-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-weighted-routing/docs/weighted-routing.md)
+- **Smart (judge-based) routing** — four difficulty tiers + a swappable judge adapter.
+  [`adding-smart-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-smart-routing/docs/smart-routing.md)
+- **Web UI** — SPA over the JSON API for login + admin + usage dashboards.
+  [`adding-web-ui`](https://github.com/carlo99999/LiteStarGateway/blob/adding-web-ui/docs/web-ui.md)
+- **LICENSE & repo hygiene** — add a LICENSE, `CONTRIBUTING`, and a security policy _(no branch yet)_.
+- **Test coverage gate** — enforce 80% (`--cov-fail-under`) in CI _(no branch yet)_.
+- **Minor hardening** — `GET /v1/models`, request body-size limits, security headers, DB backups, dependency scanning (pip-audit / Dependabot), admin audit log, API-key expiry _(no branch yet)_.
 
 ## Security — known issues & follow-ups
 
 Tracked items not yet implemented (see also the code review notes):
 
-- **Unvalidated request passthrough** — chat/responses requests are forwarded to
-  the provider SDKs largely as-is (`{**model.params, **request}`). `model` is
-  overridden, but other fields (e.g. `extra_headers`, large `n`) pass through.
-  Consider an allowlist of accepted parameters per operation.
 - **Cross-team credential usage (by design)** — credentials are platform-global,
   so any team admin can reference any credential in a model and consume it (they
   cannot read its secret). This is intentional for now; tie credentials to a
   team/org if per-team isolation becomes a requirement.
-- **SQLite for dev/test** — the default is file SQLite (single-writer, weak
-  concurrency). Production should use Postgres (`postgresql+asyncpg://…`).
+- **SQLite is the dev/test default** — the zero-config default is file SQLite
+  (single-writer, weak concurrency); the test suite runs on it. Production should
+  use the supported Postgres backend (`postgresql+asyncpg://…`, the compose
+  default). Running the test suite itself on Postgres in CI is still a follow-up.
 
 ### Resolved
 
+- **Unvalidated request passthrough** — the client's OpenAI-shaped body is now
+  sanitized against a per-operation allowlist before it reaches the provider SDK
+  (`domain/request_policy.py`), so SDK-special kwargs (`extra_headers`,
+  `extra_body`, `extra_query`, `timeout`, …) are dropped and cost drivers (`n`,
+  `max_tokens`) are clamped. Trusted `model.params` are merged separately.
 - **Credential exfiltration via model `api_base` (SSRF)** — the provider endpoint
   now comes only from the admin-managed credential, never from the team-controlled
   model (`Model.api_base` was removed). A team admin can no longer redirect a
