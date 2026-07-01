@@ -45,8 +45,9 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
 
 ### Toward v1 (pre-launch)
 
-1. **CI (GitHub Actions)** — run `pytest` + `ruff` + `pyrefly` on every PR.
-   [`adding-ci`](https://github.com/carlo99999/LiteStarGateway/blob/adding-ci/docs/ci.md)
+1. ✅ **CI (GitHub Actions)** _(shipped)_ — runs `ruff` + `pyrefly` + `pytest` on
+   every push to `main` and every PR ([`.github/workflows/ci.yml`](.github/workflows/ci.yml),
+   [design](docs/ci.md)).
 2. **Container image & deployment** — Dockerfile, uvicorn workers + `--proxy-headers`, TLS, deploy guide.
    [`adding-docker-deploy`](https://github.com/carlo99999/LiteStarGateway/blob/adding-docker-deploy/docs/deployment.md)
 3. **Database migrations (Alembic)** — replace `create_all` with versioned migrations.
