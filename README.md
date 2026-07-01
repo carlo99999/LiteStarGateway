@@ -211,6 +211,12 @@ Tracked items not yet implemented (see also the code review notes):
   (single-writer, weak concurrency); the test suite runs on it. Production should
   use the supported Postgres backend (`postgresql+asyncpg://…`, the compose
   default). Running the test suite itself on Postgres in CI is still a follow-up.
+- **No branch protection / CI merge gate (single maintainer)** — `main` is not
+  protected and there is no required CI check on merge. This is an accepted limit
+  while the project has a single contributor: every change is still developed on a
+  branch, opened as a PR, and merged only after the local gate (`pytest`, `pyrefly`,
+  `pre-commit`) is green. Before adding other contributors, enable branch
+  protection on `main` requiring PR review + a green CI run.
 
 ### Resolved
 
