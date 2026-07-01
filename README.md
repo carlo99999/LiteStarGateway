@@ -96,8 +96,12 @@ Notes:
   `uv run litestar --app litestar_test.app:app database make-migrations`, review
   it, and commit it. (With many replicas, prefer a one-shot migration job over
   migrate-on-start to avoid concurrent upgrades.)
+- **Observability**: set `MLFLOW_TRACKING_URI` to enable request tracing (classic
+  MLflow or `databricks`). The compose stack runs a classic MLflow server (UI at
+  `http://localhost:5000`) and points the app at it; unset the URI to disable.
 - **Multi-process/replicas**: the rate-limit store is in-memory per process; back
-  it with a shared store (Redis) when running multiple workers/replicas.
+  it with a shared store (Redis) when running multiple workers/replicas. The trace
+  queue is also per-process (each drains its own).
 
 ## Roadmap
 
@@ -144,8 +148,14 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
    lifespan task (`KEY_ROTATION_ENABLED` / `KEY_ROTATION_TIME`) rotates both —
    re-encrypting credentials to a fresh data key and adding a new JWT key while
    keeping recent ones for the token window ([design](docs/secrets-rotation.md)).
-9. **Observability via MLflow** — `TraceSink` port + MLflow adapter (OSS or Databricks), off the hot path.
-   [`adding-observability-via-mlflow`](https://github.com/carlo99999/LiteStarGateway/blob/adding-observability-via-mlflow/docs/observability.md)
+9. ✅ **Observability via MLflow** _(shipped)_ — a `TraceSink` port + MLflow adapter
+   (classic **or** Databricks, via `MLFLOW_TRACKING_URI`) records a per-call trace
+   (latency, model, tokens, cost, status) to a general experiment. Off the hot
+   path: a bounded queue + background worker (`mlflow-skinny` client; traces via
+   an explicit `experiment_id`, no global state). Unset URI ⇒ disabled. The compose
+   stack includes a classic MLflow server ([design](docs/observability.md)).
+   _Per-team experiments + payload opt-in, and error/streaming traces, are
+   follow-ups._
 10. ✅ **Usage accounting** _(shipped)_ — every model call records input/output
     tokens + estimated cost, tagged with the API key and model.
     `GET /teams/{id}/usage` returns per-model totals, filterable by `?model=` and

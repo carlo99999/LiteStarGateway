@@ -9,12 +9,13 @@ the caller already holds the model and credentials.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
+from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
 
-from litestar_test.domain.entities import Model, ModelType, UsageEvent
+from litestar_test.domain.entities import Model, ModelType, TraceRecord, UsageEvent
 from litestar_test.domain.exceptions import (
     CredentialNotFound,
     ModelDisabled,
@@ -39,27 +40,32 @@ class CompletionService:
         credentials: CredentialRepository,
         gateway: LLMGateway,
         usage: UsageRepository,
+        emit_trace: Callable[[TraceRecord], None],
     ) -> None:
         self._models = models
         self._credentials = credentials
         self._gateway = gateway
         self._usage = usage
+        self._emit_trace = emit_trace
 
-    async def _record_usage(
+    async def _observe(
         self,
         team_id: UUID,
         api_key_id: UUID,
         model: Model,
         operation: str,
         response: dict[str, Any],
+        latency_ms: float,
     ) -> None:
-        """Record token usage + estimated cost. Fail-safe: never breaks the call."""
+        """Record usage (billing) + emit an observability trace. Fail-safe."""
         usage = response.get("usage") or {}
         prompt = int(usage.get("prompt_tokens") or 0)
         completion = int(usage.get("completion_tokens") or 0)
         cost = prompt * (model.input_cost_per_token or 0.0) + completion * (
             model.output_cost_per_token or 0.0
         )
+        now = datetime.now(UTC)
+        # Usage = authoritative billing record (persisted).
         try:
             await self._usage.record(
                 UsageEvent(
@@ -72,11 +78,27 @@ class CompletionService:
                     prompt_tokens=prompt,
                     completion_tokens=completion,
                     cost=cost,
-                    created_at=datetime.now(UTC),
+                    created_at=now,
                 )
             )
         except Exception:  # pragma: no cover - recording must not fail the request
             logger.warning("failed to record usage", exc_info=True)
+        # Trace = observability (latency/analytics), fire-and-forget off the path.
+        self._emit_trace(
+            TraceRecord(
+                team_id=team_id,
+                api_key_id=api_key_id,
+                model_name=model.name,
+                provider=model.provider.value,
+                operation=operation,
+                prompt_tokens=prompt,
+                completion_tokens=completion,
+                cost=cost,
+                latency_ms=latency_ms,
+                status="ok",
+                created_at=now,
+            )
+        )
 
     async def _prepare(
         self, team_id: UUID, request: dict[str, Any], expected_type: ModelType
@@ -101,8 +123,10 @@ class CompletionService:
     ) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("chat.completions", request)
+        start = perf_counter()
         response = await self._gateway.achat_completion(clean, model, values)
-        await self._record_usage(team_id, api_key_id, model, "chat.completions", response)
+        latency_ms = (perf_counter() - start) * 1000
+        await self._observe(team_id, api_key_id, model, "chat.completions", response, latency_ms)
         return response
 
     async def responses(
@@ -110,8 +134,10 @@ class CompletionService:
     ) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("responses", request)
+        start = perf_counter()
         response = await self._gateway.aresponses(clean, model, values)
-        await self._record_usage(team_id, api_key_id, model, "responses", response)
+        latency_ms = (perf_counter() - start) * 1000
+        await self._observe(team_id, api_key_id, model, "responses", response, latency_ms)
         return response
 
     async def open_chat_stream(
@@ -137,8 +163,10 @@ class CompletionService:
     ) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.EMBEDDINGS)
         clean = sanitize_request("embeddings", request)
+        start = perf_counter()
         response = await self._gateway.aembeddings(clean, model, values)
-        await self._record_usage(team_id, api_key_id, model, "embeddings", response)
+        latency_ms = (perf_counter() - start) * 1000
+        await self._observe(team_id, api_key_id, model, "embeddings", response, latency_ms)
         return response
 
     async def images(
@@ -146,6 +174,8 @@ class CompletionService:
     ) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.IMAGE)
         clean = sanitize_request("images", request)
+        start = perf_counter()
         response = await self._gateway.aimages(clean, model, values)
-        await self._record_usage(team_id, api_key_id, model, "images", response)
+        latency_ms = (perf_counter() - start) * 1000
+        await self._observe(team_id, api_key_id, model, "images", response, latency_ms)
         return response

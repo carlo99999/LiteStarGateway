@@ -20,6 +20,20 @@ services:
       timeout: 3s
       retries: 5
 
+  # Classic MLflow server for observability traces (the app is skinny-client only;
+  # this separate full-MLflow container hosts the backend + UI at :5000). Point at
+  # a Databricks tracking URI instead to use Databricks-managed MLflow.
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+    volumes:
+      - mlflow-data:/mlflow
+    ports:
+      - "5000:5000"
+
   app:
     build: .
     image: litestar-gateway
@@ -32,8 +46,11 @@ services:
       MASTER_KEY: ${MASTER_KEY:?set MASTER_KEY in your environment or a .env file}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in your environment or a .env file}
       SALT_KEY: ${SALT_KEY:?set SALT_KEY in your environment or a .env file}
+      # Tracing is best-effort; the app starts even if MLflow isn't up yet.
+      MLFLOW_TRACKING_URI: http://mlflow:5000
     ports:
       - "8000:8000"
 
 volumes:
   pg-data:
+  mlflow-data:

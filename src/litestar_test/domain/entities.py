@@ -51,6 +51,23 @@ class UsageAggregate:
 
 
 @dataclass(frozen=True)
+class TraceRecord:
+    """One observability trace for a model call (metadata; no payload in v1)."""
+
+    team_id: UUID
+    api_key_id: UUID
+    model_name: str
+    provider: str
+    operation: str
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+    latency_ms: float
+    status: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class SecretKey:
     """A rotating keyring key. `material` is the master-wrapped key bytes; only
     the wrapped form is persisted. Retired keys are kept for decrypt/verify only.

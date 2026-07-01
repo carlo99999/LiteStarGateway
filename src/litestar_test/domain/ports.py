@@ -18,6 +18,7 @@ from litestar_test.domain.entities import (
     SecretKey,
     Team,
     TeamMembership,
+    TraceRecord,
     UsageAggregate,
     UsageEvent,
     User,
@@ -222,6 +223,13 @@ class UsageRepository(Protocol):
         """Usage summed per model for a team, optionally filtered by model name
         and/or API key."""
         ...
+
+
+class TraceSink(Protocol):
+    """Observability sink. `write` is synchronous — the dispatcher's worker calls
+    it off the event loop (MLflow's client is blocking)."""
+
+    def write(self, record: TraceRecord) -> None: ...
 
 
 class SecretKeyRepository(Protocol):
