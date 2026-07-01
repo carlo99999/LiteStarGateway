@@ -10,12 +10,13 @@ from litestar.exceptions import NotAuthorizedException, PermissionDeniedExceptio
 
 from litestar_test.application.user_service import UserService
 from litestar_test.domain.entities import User
+from litestar_test.infrastructure.keyring import Keyring
 from litestar_test.infrastructure.web.session.jwt import decode_token
 
 
 async def provide_current_user(
     request: Request,
-    jwt_secret: NamedDependency[str],
+    keyring: NamedDependency[Keyring],
     user_service: NamedDependency[UserService],
 ) -> User:
     """Authenticate via `Authorization: Bearer <jwt>` and load the user."""
@@ -26,7 +27,8 @@ async def provide_current_user(
     if scheme.lower() != "bearer" or not token:
         raise NotAuthorizedException("Invalid Authorization header")
 
-    subject, token_version = decode_token(token, jwt_secret)  # raises on invalid/expired
+    secrets = await keyring.jwt_verification_secrets()
+    subject, token_version = decode_token(token, secrets)  # raises on invalid/expired
     try:
         user_id = UUID(subject)
     except ValueError as exc:
@@ -43,11 +45,11 @@ async def provide_current_user(
 
 async def provide_current_admin(
     request: Request,
-    jwt_secret: NamedDependency[str],
+    keyring: NamedDependency[Keyring],
     user_service: NamedDependency[UserService],
 ) -> User:
     """Like `provide_current_user`, but rejects non-admin users with 403."""
-    user = await provide_current_user(request, jwt_secret, user_service)
+    user = await provide_current_user(request, keyring, user_service)
     if not user.is_admin:
         raise PermissionDeniedException("Admin privileges required")
     return user

@@ -1,13 +1,17 @@
 """JWT issuing/decoding for login sessions (HS256, 7-day expiry).
 
-Wraps Litestar's `Token`. `decode_access_token` raises `NotAuthorizedException`
-(a Litestar HTTP exception) on an invalid or expired token.
+Wraps Litestar's `Token`. Tokens are signed with the keyring's active JWT key and
+verified against any usable key (so daily key rotation doesn't invalidate tokens
+still within their lifetime). `decode_token` raises `NotAuthorizedException` when
+no key verifies the token.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
+from litestar.exceptions import NotAuthorizedException
 from litestar.security.jwt import Token
 
 ALGORITHM = "HS256"
@@ -25,7 +29,13 @@ def issue_access_token(subject: str, secret: str, token_version: int) -> tuple[s
     return encoded, int(ACCESS_TOKEN_TTL.total_seconds())
 
 
-def decode_token(encoded_token: str, secret: str) -> tuple[str, int]:
-    """Return (subject, token_version) from a valid token, else raise."""
-    token = Token.decode(encoded_token=encoded_token, secret=secret, algorithm=ALGORITHM)
-    return token.sub, int(token.extras.get("tv", 0))
+def decode_token(encoded_token: str, secrets: Sequence[str]) -> tuple[str, int]:
+    """Return (subject, token_version) from a token that verifies against any of
+    the given keyring secrets, else raise NotAuthorizedException."""
+    for secret in secrets:
+        try:
+            token = Token.decode(encoded_token=encoded_token, secret=secret, algorithm=ALGORITHM)
+        except NotAuthorizedException:
+            continue
+        return token.sub, int(token.extras.get("tv", 0))
+    raise NotAuthorizedException("Invalid or expired token")

@@ -1,7 +1,9 @@
-"""Symmetric encryption for credential values, keyed by the salt key.
+"""Envelope encryption for secrets at rest.
 
-A Fernet key (AES-128-CBC + HMAC) is derived from the salt key via SHA-256, so
-any salt-key string works. Ciphertext is opaque base64 and self-authenticating.
+A fixed **master key** (derived from `SALT_KEY`, never auto-rotated) wraps the
+**data keys** stored in the DB keyring. Data keys rotate; the master does not.
+Credential values are encrypted with a data key, and each ciphertext records
+which key produced it, so existing data stays readable across rotations.
 """
 
 from __future__ import annotations
@@ -15,14 +17,34 @@ from cryptography.fernet import Fernet
 from litestar_test.domain.exceptions import SaltKeyMissing
 
 
-def _derive_fernet_key(salt_key: str) -> bytes:
-    digest = hashlib.sha256(salt_key.encode("utf-8")).digest()
+def _derive_fernet_key(master_key: str) -> bytes:
+    digest = hashlib.sha256(master_key.encode("utf-8")).digest()
     return base64.urlsafe_b64encode(digest)
 
 
-class CredentialCipher:
-    def __init__(self, salt_key: str) -> None:
-        self._fernet = Fernet(_derive_fernet_key(salt_key))
+def new_key_material() -> bytes:
+    """Fresh random key material (a Fernet key; also usable as an HMAC secret)."""
+    return Fernet.generate_key()
+
+
+class MasterCipher:
+    """Wraps/unwraps data-key material with the fixed master key."""
+
+    def __init__(self, master_key: str) -> None:
+        self._fernet = Fernet(_derive_fernet_key(master_key))
+
+    def wrap(self, raw: bytes) -> str:
+        return self._fernet.encrypt(raw).decode("utf-8")
+
+    def unwrap(self, token: str) -> bytes:
+        return self._fernet.decrypt(token.encode("utf-8"))
+
+
+class DataCipher:
+    """Encrypts/decrypts credential value dicts with a single data key."""
+
+    def __init__(self, data_key: bytes) -> None:
+        self._fernet = Fernet(data_key)
 
     def encrypt(self, values: dict[str, str]) -> str:
         return self._fernet.encrypt(json.dumps(values).encode("utf-8")).decode("utf-8")
@@ -31,7 +53,7 @@ class CredentialCipher:
         return json.loads(self._fernet.decrypt(token.encode("utf-8")))
 
 
-def build_cipher(salt_key: str | None) -> CredentialCipher:
-    if not salt_key:
+def build_master_cipher(master_key: str | None) -> MasterCipher:
+    if not master_key:
         raise SaltKeyMissing("SALT_KEY is not configured")
-    return CredentialCipher(salt_key)
+    return MasterCipher(master_key)

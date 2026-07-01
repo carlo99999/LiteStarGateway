@@ -9,22 +9,37 @@ Use cases:
 from __future__ import annotations
 
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from litestar_test.domain.entities import Invite, IssuedInvite, User
+from litestar_test.domain.entities import (
+    Invite,
+    IssuedInvite,
+    IssuedPasswordReset,
+    PasswordReset,
+    User,
+)
 from litestar_test.domain.exceptions import (
     EmailAlreadyRegistered,
     InvalidCredentials,
     InvalidInvite,
+    InvalidPasswordReset,
     MasterKeyMissing,
+    PermissionDenied,
+    UserNotFound,
     WeakPassword,
 )
 from litestar_test.domain.key_generator import hash_key
 from litestar_test.domain.password import hash_password, verify_password
-from litestar_test.domain.ports import InviteRepository, UserRepository
+from litestar_test.domain.ports import (
+    InviteRepository,
+    PasswordResetRepository,
+    UserRepository,
+)
 
 _INVITE_TOKEN_BYTES = 32
+_RESET_TOKEN_BYTES = 32
+_RESET_TTL = timedelta(hours=24)
 
 
 def _now() -> datetime:
@@ -36,9 +51,15 @@ def _normalize_email(email: str) -> str:
 
 
 class UserService:
-    def __init__(self, users: UserRepository, invites: InviteRepository) -> None:
+    def __init__(
+        self,
+        users: UserRepository,
+        invites: InviteRepository,
+        password_resets: PasswordResetRepository,
+    ) -> None:
         self._users = users
         self._invites = invites
+        self._password_resets = password_resets
 
     async def ensure_admin(self, admin_email: str, master_key: str | None) -> None:
         """Bootstrap the first user. Raises if the table is empty and no key is set."""
@@ -85,19 +106,23 @@ class UserService:
         if invite is None or not invite.is_usable:
             raise InvalidInvite("Invite token is invalid or already used")
 
-        email = _normalize_email(email)
-        if await self._users.get_by_email(email) is not None:
-            raise EmailAlreadyRegistered(email)
-
+        # Validate the password before consuming the invite, so a legitimate
+        # typo does not burn the invite (and it leaks nothing about the email).
         try:
             self.__check_if_password_has_some_complexity(password)
         except ValueError as e:
             raise WeakPassword(str(e)) from e
 
-        # Consume the invite atomically *before* creating the user, so two
-        # concurrent signups can never reuse the same single-use invite.
+        # Consume the invite atomically *before* the email check, so two
+        # concurrent signups can never reuse one invite AND so probing whether an
+        # email exists costs a single-use, admin-issued invite per attempt
+        # (account-enumeration is bounded by invite scarcity).
         if not await self._invites.mark_used(invite.id, _now()):
             raise InvalidInvite("Invite token is invalid or already used")
+
+        email = _normalize_email(email)
+        if await self._users.get_by_email(email) is not None:
+            raise EmailAlreadyRegistered(email)
 
         return await self._users.add(
             User(
@@ -122,3 +147,46 @@ class UserService:
     async def logout(self, user: User) -> None:
         """Invalidate all of the user's existing JWTs by bumping token_version."""
         await self._users.increment_token_version(user.id)
+
+    async def create_password_reset(self, actor: User, email: str) -> IssuedPasswordReset:
+        """Platform-admin issues a single-use, expiring reset token for a user.
+
+        The admin relays the token; the user redeems it and picks a new password,
+        so the admin never learns it.
+        """
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        user = await self._users.get_by_email(_normalize_email(email))
+        if user is None:
+            raise UserNotFound(email)
+
+        token = secrets.token_urlsafe(_RESET_TOKEN_BYTES)
+        now = _now()
+        stored = await self._password_resets.add(
+            PasswordReset(
+                id=uuid4(),
+                user_id=user.id,
+                token_hash=hash_key(token),
+                created_at=now,
+                expires_at=now + _RESET_TTL,
+                used_at=None,
+            )
+        )
+        return IssuedPasswordReset(reset=stored, token=token)
+
+    async def reset_password(self, reset_token: str, new_password: str) -> None:
+        """Redeem a reset token: validate, set the new password, revoke old JWTs."""
+        reset = await self._password_resets.get_by_token_hash(hash_key(reset_token))
+        if reset is None or not reset.is_usable(_now()):
+            raise InvalidPasswordReset("Reset token is invalid, used, or expired")
+
+        try:
+            self.__check_if_password_has_some_complexity(new_password)
+        except ValueError as e:
+            raise WeakPassword(str(e)) from e
+
+        # Consume atomically before applying, so a token can't be used twice.
+        if not await self._password_resets.mark_used(reset.id, _now()):
+            raise InvalidPasswordReset("Reset token is invalid, used, or expired")
+
+        await self._users.set_password(reset.user_id, hash_password(new_password))

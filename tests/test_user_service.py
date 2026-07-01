@@ -9,11 +9,15 @@ from uuid import UUID
 import pytest
 
 from litestar_test.application.user_service import UserService
-from litestar_test.domain.entities import Invite, User
+from litestar_test.domain.entities import Invite, PasswordReset, User
 from litestar_test.domain.exceptions import (
     EmailAlreadyRegistered,
+    InvalidCredentials,
     InvalidInvite,
+    InvalidPasswordReset,
     MasterKeyMissing,
+    PermissionDenied,
+    UserNotFound,
     WeakPassword,
 )
 
@@ -39,6 +43,13 @@ class FakeUserRepository:
                     user, token_version=user.token_version + 1
                 )
 
+    async def set_password(self, user_id: UUID, password_hash: str) -> None:
+        for email, user in self._by_email.items():
+            if user.id == user_id:
+                self._by_email[email] = dataclasses.replace(
+                    user, password_hash=password_hash, token_version=user.token_version + 1
+                )
+
     async def get(self, user_id: UUID) -> User | None:
         return next((u for u in self._by_email.values() if u.id == user_id), None)
 
@@ -62,9 +73,32 @@ class FakeInviteRepository:
         return True
 
 
+class FakePasswordResetRepository:
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, PasswordReset] = {}
+
+    async def add(self, reset: PasswordReset) -> PasswordReset:
+        self._by_id[reset.id] = reset
+        return reset
+
+    async def get_by_token_hash(self, token_hash: str) -> PasswordReset | None:
+        return next((r for r in self._by_id.values() if r.token_hash == token_hash), None)
+
+    async def mark_used(self, reset_id: UUID, used_at: datetime) -> bool:
+        reset = self._by_id.get(reset_id)
+        if reset is None or reset.used_at is not None:
+            return False
+        self._by_id[reset_id] = dataclasses.replace(reset, used_at=used_at)
+        return True
+
+
 @pytest.fixture
 def service() -> UserService:
-    return UserService(users=FakeUserRepository(), invites=FakeInviteRepository())
+    return UserService(
+        users=FakeUserRepository(),
+        invites=FakeInviteRepository(),
+        password_resets=FakePasswordResetRepository(),
+    )
 
 
 async def test_ensure_admin_raises_when_empty_and_no_master_key(
@@ -125,3 +159,64 @@ async def test_register_rejects_weak_password(service: UserService, password: st
     issued = await service.create_invite()
     with pytest.raises(WeakPassword):
         await service.register(issued.token, "weak@b.com", password)
+
+
+async def _admin(service: UserService) -> User:
+    await service.ensure_admin("admin@example.com", master_key="secret")
+    admin = await service._users.get_by_email("admin@example.com")
+    assert admin is not None
+    return admin
+
+
+async def _make_user(service: UserService, email: str, password: str) -> None:
+    issued = await service.create_invite()
+    await service.register(issued.token, email, password)
+
+
+async def test_create_password_reset_requires_admin(service: UserService) -> None:
+    await _make_user(service, "u@b.com", "Passw0rd!")
+    non_admin = await service._users.get_by_email("u@b.com")
+    assert non_admin is not None
+    with pytest.raises(PermissionDenied):
+        await service.create_password_reset(non_admin, "u@b.com")
+
+
+async def test_create_password_reset_unknown_email(service: UserService) -> None:
+    admin = await _admin(service)
+    with pytest.raises(UserNotFound):
+        await service.create_password_reset(admin, "ghost@b.com")
+
+
+async def test_reset_password_changes_password(service: UserService) -> None:
+    admin = await _admin(service)
+    await _make_user(service, "u@b.com", "OldPassw0rd!")
+
+    issued = await service.create_password_reset(admin, "u@b.com")
+    await service.reset_password(issued.token, "NewPassw0rd!")
+
+    # New password works; old one no longer does.
+    await service.authenticate("u@b.com", "NewPassw0rd!")
+    with pytest.raises(InvalidCredentials):
+        await service.authenticate("u@b.com", "OldPassw0rd!")
+
+
+async def test_reset_token_is_single_use(service: UserService) -> None:
+    admin = await _admin(service)
+    await _make_user(service, "u@b.com", "Passw0rd!")
+    issued = await service.create_password_reset(admin, "u@b.com")
+    await service.reset_password(issued.token, "NewPassw0rd!")
+    with pytest.raises(InvalidPasswordReset):
+        await service.reset_password(issued.token, "Another1!")
+
+
+async def test_reset_password_rejects_invalid_token(service: UserService) -> None:
+    with pytest.raises(InvalidPasswordReset):
+        await service.reset_password("nope", "NewPassw0rd!")
+
+
+async def test_reset_password_rejects_weak_password(service: UserService) -> None:
+    admin = await _admin(service)
+    await _make_user(service, "u@b.com", "Passw0rd!")
+    issued = await service.create_password_reset(admin, "u@b.com")
+    with pytest.raises(WeakPassword):
+        await service.reset_password(issued.token, "weak")

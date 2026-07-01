@@ -137,8 +137,8 @@ async def test_values_are_encrypted_at_rest_and_round_trip(tmp_path: Path) -> No
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import create_async_engine
 
-    from litestar_test.infrastructure.crypto import build_cipher
-    from litestar_test.infrastructure.persistence.orm import CredentialModel
+    from litestar_test.infrastructure.crypto import DataCipher, MasterCipher
+    from litestar_test.infrastructure.persistence.orm import CredentialModel, SecretKeyModel
 
     settings = _settings(tmp_path)
     async with AsyncTestClient(app=create_app(settings)) as client:
@@ -156,10 +156,24 @@ async def test_values_are_encrypted_at_rest_and_round_trip(tmp_path: Path) -> No
     engine = create_async_engine(settings.database_url)
     try:
         async with engine.connect() as conn:
-            row = (await conn.execute(select(CredentialModel.__table__))).one()._mapping
+            cred = (await conn.execute(select(CredentialModel.__table__))).one()._mapping
+            key = (
+                (
+                    await conn.execute(
+                        select(SecretKeyModel.__table__).where(
+                            SecretKeyModel.__table__.c.id == cred["key_id"]
+                        )
+                    )
+                )
+                .one()
+                ._mapping
+            )
     finally:
         await engine.dispose()
 
-    assert "super-secret-value" not in row["encrypted_values"]
-    cipher = build_cipher(settings.salt_key)
-    assert cipher.decrypt(row["encrypted_values"]) == {"api_key": "super-secret-value"}
+    assert "super-secret-value" not in cred["encrypted_values"]
+    # Envelope: the ciphertext is under a data key wrapped by the master (SALT_KEY).
+    data_key = MasterCipher(SALT_KEY).unwrap(key["material"])
+    assert DataCipher(data_key).decrypt(cred["encrypted_values"]) == {
+        "api_key": "super-secret-value"
+    }
