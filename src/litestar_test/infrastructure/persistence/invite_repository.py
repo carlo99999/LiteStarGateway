@@ -21,6 +21,7 @@ class SQLAlchemyInviteRepository:
         model = InviteModel(
             id=invite.id,
             token_hash=invite.token_hash,
+            expires_at=invite.expires_at,
             used_at=invite.used_at,
         )
         self._session.add(model)

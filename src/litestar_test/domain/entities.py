@@ -223,16 +223,16 @@ class User:
 
 @dataclass(frozen=True)
 class Invite:
-    """A single-use invitation. Only the token hash is persisted."""
+    """A single-use, expiring invitation. Only the token hash is persisted."""
 
     id: UUID
     token_hash: str
     created_at: datetime
+    expires_at: datetime
     used_at: datetime | None
 
-    @property
-    def is_usable(self) -> bool:
-        return self.used_at is None
+    def is_usable(self, now: datetime) -> bool:
+        return self.used_at is None and now < self.expires_at
 
 
 @dataclass(frozen=True)

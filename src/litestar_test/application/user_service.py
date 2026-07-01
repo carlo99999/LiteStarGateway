@@ -43,6 +43,7 @@ from litestar_test.domain.ports import (
 _INVITE_TOKEN_BYTES = 32
 _RESET_TOKEN_BYTES = 32
 _RESET_TTL = timedelta(hours=24)
+_INVITE_TTL = timedelta(hours=72)
 
 
 def _now() -> datetime:
@@ -83,10 +84,12 @@ class UserService:
 
     async def create_invite(self) -> IssuedInvite:
         token = secrets.token_urlsafe(_INVITE_TOKEN_BYTES)
+        now = _now()
         invite = Invite(
             id=uuid4(),
             token_hash=hash_key(token),
-            created_at=_now(),
+            created_at=now,
+            expires_at=now + _INVITE_TTL,
             used_at=None,
         )
         stored = await self._invites.add(invite)
@@ -106,8 +109,8 @@ class UserService:
 
     async def register(self, invite_token: str, email: str, password: str) -> User:
         invite = await self._invites.get_by_token_hash(hash_key(invite_token))
-        if invite is None or not invite.is_usable:
-            raise InvalidInvite("Invite token is invalid or already used")
+        if invite is None or not invite.is_usable(_now()):
+            raise InvalidInvite("Invite token is invalid, expired, or already used")
 
         # Validate the password before consuming the invite, so a legitimate
         # typo does not burn the invite (and it leaks nothing about the email).

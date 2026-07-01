@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import pytest
@@ -77,8 +77,10 @@ class FakeInviteRepository:
         return next((i for i in self._by_id.values() if i.token_hash == token_hash), None)
 
     async def mark_used(self, invite_id: UUID, used_at: datetime) -> bool:
+        # Mirror the real repo's conditional UPDATE (consume only if not yet used);
+        # expiry is enforced in the service before mark_used is called.
         invite = self._by_id.get(invite_id)
-        if invite is None or not invite.is_usable:
+        if invite is None or invite.used_at is not None:
             return False
         self._by_id[invite_id] = dataclasses.replace(invite, used_at=used_at)
         return True
@@ -146,6 +148,27 @@ async def test_register_consumes_invite(service: UserService) -> None:
     await service.register(issued.token, "a@b.com", "Passw0rd!")
     with pytest.raises(InvalidInvite):
         await service.register(issued.token, "c@d.com", "Passw0rd!")
+
+
+async def test_register_rejects_expired_invite() -> None:
+    invites = FakeInviteRepository()
+    svc = UserService(
+        users=FakeUserRepository(),
+        invites=invites,
+        password_resets=FakePasswordResetRepository(),
+    )
+    issued = await svc.create_invite()
+    # Force the stored invite past its expiry.
+    invites._by_id[issued.invite.id] = dataclasses.replace(
+        invites._by_id[issued.invite.id], expires_at=datetime.now(UTC) - timedelta(seconds=1)
+    )
+    with pytest.raises(InvalidInvite):
+        await svc.register(issued.token, "late@b.com", "Passw0rd!")
+
+
+async def test_create_invite_sets_future_expiry(service: UserService) -> None:
+    issued = await service.create_invite()
+    assert issued.invite.expires_at > datetime.now(UTC)
 
 
 async def test_register_rejects_duplicate_email(service: UserService) -> None:
