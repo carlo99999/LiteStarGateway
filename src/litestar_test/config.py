@@ -19,6 +19,8 @@ DEFAULT_MAX_RETRIES = 2
 DEFAULT_ROTATION_TIME = "03:00"
 # Observability. No tracking URI ⇒ tracing disabled (NullSink).
 DEFAULT_MLFLOW_EXPERIMENT = "litestar-gateway"
+# SSO (OIDC). No discovery URL ⇒ SSO disabled.
+DEFAULT_OIDC_SCOPES = "openid email profile groups"
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -63,6 +65,17 @@ class Settings:
     # Observability: MLflow tracking URI (None ⇒ tracing disabled) + general experiment.
     mlflow_tracking_uri: str | None = None
     mlflow_experiment: str = DEFAULT_MLFLOW_EXPERIMENT
+    # SSO via OIDC. No discovery URL ⇒ disabled. `oidc_admin_groups` (comma-sep)
+    # maps IdP groups to platform admin.
+    oidc_discovery_url: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None
+    oidc_scopes: str = DEFAULT_OIDC_SCOPES
+    oidc_admin_groups: tuple[str, ...] = ()
+
+    @property
+    def sso_enabled(self) -> bool:
+        return bool(self.oidc_discovery_url and self.oidc_client_id)
 
     @property
     def is_production(self) -> bool:
@@ -97,4 +110,11 @@ class Settings:
             rotation_time=os.environ.get("KEY_ROTATION_TIME", DEFAULT_ROTATION_TIME),
             mlflow_tracking_uri=os.environ.get("MLFLOW_TRACKING_URI"),
             mlflow_experiment=os.environ.get("MLFLOW_EXPERIMENT", DEFAULT_MLFLOW_EXPERIMENT),
+            oidc_discovery_url=os.environ.get("OIDC_DISCOVERY_URL"),
+            oidc_client_id=os.environ.get("OIDC_CLIENT_ID"),
+            oidc_client_secret=os.environ.get("OIDC_CLIENT_SECRET"),
+            oidc_scopes=os.environ.get("OIDC_SCOPES", DEFAULT_OIDC_SCOPES),
+            oidc_admin_groups=tuple(
+                g.strip() for g in os.environ.get("OIDC_ADMIN_GROUPS", "").split(",") if g.strip()
+            ),
         )

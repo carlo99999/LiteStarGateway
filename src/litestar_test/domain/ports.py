@@ -10,6 +10,7 @@ from uuid import UUID
 from litestar_test.domain.entities import (
     APIKey,
     Credential,
+    ExternalIdentity,
     Invite,
     KeyPurpose,
     Model,
@@ -223,6 +224,16 @@ class UsageRepository(Protocol):
         """Usage summed per model for a team, optionally filtered by model name
         and/or API key."""
         ...
+
+
+# runtime_checkable: injected directly into a handler, so Litestar isinstance-checks it.
+@runtime_checkable
+class IdentityProvider(Protocol):
+    """SSO provider: build the login redirect and resolve the callback code."""
+
+    async def authorization_url(self, state: str, redirect_uri: str) -> str: ...
+
+    async def exchange(self, code: str, redirect_uri: str) -> ExternalIdentity: ...
 
 
 class TraceSink(Protocol):
