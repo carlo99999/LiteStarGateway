@@ -37,6 +37,13 @@ uv run litestar --app litestar_test.app:app run
 uv run pytest
 ```
 
+Install the git hooks once per clone (lint, format, and secret scanning run on
+every commit; CI runs the same hooks on every PR):
+
+```bash
+uv run pre-commit install
+```
+
 ## Roadmap
 
 Planned work, split into **Toward v1** (must-have before publishing) and **v2**

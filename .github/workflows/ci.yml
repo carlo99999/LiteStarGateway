@@ -25,11 +25,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
-      - name: Lint (ruff)
-        run: uv run ruff check .
+      - name: Cache pre-commit hooks
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
 
-      - name: Format check (ruff)
-        run: uv run ruff format --check .
+      # Runs all pre-commit hooks: ruff (lint + format), file hygiene, and secret
+      # scanning (detect-secrets, private-key detection).
+      - name: Pre-commit (lint, format, secrets, hygiene)
+        run: uv run pre-commit run --all-files --show-diff-on-failure
 
       - name: Type check (pyrefly)
         run: uv run pyrefly check

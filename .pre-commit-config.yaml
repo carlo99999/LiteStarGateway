@@ -1,0 +1,42 @@
+# Run locally with:  uv run pre-commit install   (then hooks run on every commit)
+# Run on everything: uv run pre-commit run --all-files
+# CI runs the same hooks on every PR (see .github/workflows/ci.yml).
+
+repos:
+  # General hygiene + secret/key safety.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key # blocks committed private keys (PEM, SSH, …)
+
+  # Scan for hardcoded secrets/passwords/tokens. The baseline whitelists the
+  # known dev-default and test-fixture strings; anything new is blocked.
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: (?x)^(uv\.lock|\.secrets\.baseline)$
+
+  # Lint + format, reusing the project's pinned ruff (single source of truth,
+  # same as CI) rather than a separately versioned mirror.
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format (check)
+        entry: uv run ruff format --check
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
