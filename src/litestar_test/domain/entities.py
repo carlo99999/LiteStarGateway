@@ -230,6 +230,9 @@ class User:
     # The IdP subject (`sub`) this account is federated to, once linked via SSO.
     # None for password-only accounts. Stable across the user's email changes.
     sso_subject: str | None = None
+    # A disabled account cannot authenticate (login JWTs are rejected). Toggled by
+    # a platform admin; disabling also revokes existing sessions (token_version bump).
+    is_active: bool = True
 
 
 @dataclass(frozen=True)

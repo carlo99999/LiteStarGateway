@@ -9,6 +9,7 @@ from litestar_test.infrastructure.web.users.password_reset import (
     create_password_reset,
     reset_password,
 )
+from litestar_test.infrastructure.web.users.set_active import set_user_active
 from litestar_test.infrastructure.web.users.signup import signup
 
 
@@ -17,6 +18,12 @@ def create_users_router() -> Router:
     # public ones (signup, reset-password) are rate-limited per IP.
     return Router(
         path="/",
-        route_handlers=[signup, create_invite, create_password_reset, reset_password],
+        route_handlers=[
+            signup,
+            create_invite,
+            create_password_reset,
+            reset_password,
+            set_user_active,
+        ],
         tags=["users"],
     )

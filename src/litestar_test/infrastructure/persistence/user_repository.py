@@ -25,6 +25,7 @@ class SQLAlchemyUserRepository:
             is_admin=user.is_admin,
             token_version=user.token_version,
             sso_subject=user.sso_subject,
+            is_active=user.is_active,
         )
         self._session.add(model)
         try:
@@ -36,6 +37,17 @@ class SQLAlchemyUserRepository:
             raise EmailAlreadyRegistered(user.email) from exc
         await self._session.refresh(model)
         return model.to_entity()
+
+    async def set_active(self, user_id: UUID, is_active: bool) -> None:
+        # Disabling revokes existing sessions too (bump token_version), so the
+        # account is locked out immediately, not just barred from new logins.
+        values: dict[str, object] = {"is_active": is_active}
+        if not is_active:
+            values["token_version"] = UserModel.token_version + 1
+        await self._session.execute(
+            update(UserModel).where(UserModel.id == user_id).values(**values)
+        )
+        await self._session.commit()
 
     async def increment_token_version(self, user_id: UUID) -> None:
         await self._session.execute(

@@ -39,6 +39,7 @@ class UserModel(base.UUIDAuditBase):
     # The IdP subject this account is federated to (NULL for password-only
     # accounts). Unique so two identities can't bind to the same local account.
     sso_subject: Mapped[str | None] = mapped_column(default=None, unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
 
     def to_entity(self) -> User:
         return User(
@@ -49,6 +50,7 @@ class UserModel(base.UUIDAuditBase):
             created_at=self.created_at,
             token_version=self.token_version,
             sso_subject=self.sso_subject,
+            is_active=self.is_active,
         )
 
 

@@ -189,6 +189,11 @@ class UserRepository(Protocol):
 
     async def count(self) -> int: ...
 
+    async def set_active(self, user_id: UUID, is_active: bool) -> None:
+        """Enable/disable the account; disabling also bumps token_version to revoke
+        the user's existing sessions."""
+        ...
+
     async def bind_sso(self, user_id: UUID, sso_subject: str, is_admin: bool) -> User:
         """Link an account to an IdP subject and set its admin flag (IdP is the
         source of truth for SSO role), returning the updated user."""

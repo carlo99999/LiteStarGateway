@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -61,6 +61,14 @@ class FakeUserRepository:
                     user, password_hash=password_hash, token_version=user.token_version + 1
                 )
 
+    async def set_active(self, user_id: UUID, is_active: bool) -> None:
+        for email, user in self._by_email.items():
+            if user.id == user_id:
+                tv = user.token_version + (0 if is_active else 1)
+                self._by_email[email] = dataclasses.replace(
+                    user, is_active=is_active, token_version=tv
+                )
+
     async def get(self, user_id: UUID) -> User | None:
         return next((u for u in self._by_email.values() if u.id == user_id), None)
 
@@ -112,6 +120,55 @@ def service() -> UserService:
         invites=FakeInviteRepository(),
         password_resets=FakePasswordResetRepository(),
     )
+
+
+def _account(email: str, *, is_admin: bool = False) -> User:
+    from litestar_test.domain.password import hash_password
+
+    return User(
+        id=uuid4(),
+        email=email,
+        password_hash=hash_password("Passw0rd!"),
+        is_admin=is_admin,
+        created_at=datetime.now(UTC),
+    )
+
+
+async def test_set_user_active_disables_and_revokes(service: UserService) -> None:
+    admin = _account("admin@b.com", is_admin=True)
+    target = _account("bob@b.com")
+    await service._users.add(admin)
+    await service._users.add(target)
+
+    updated = await service.set_user_active(admin, target.id, is_active=False)
+    assert updated.is_active is False
+    assert updated.token_version == target.token_version + 1  # sessions revoked
+
+
+async def test_set_user_active_requires_platform_admin(service: UserService) -> None:
+    non_admin = _account("nope@b.com")
+    other = _account("other@b.com")
+    await service._users.add(non_admin)
+    await service._users.add(other)
+    with pytest.raises(PermissionDenied):
+        await service.set_user_active(non_admin, other.id, is_active=False)
+
+
+async def test_set_user_active_forbids_self_disable(service: UserService) -> None:
+    admin = _account("admin@b.com", is_admin=True)
+    await service._users.add(admin)
+    with pytest.raises(PermissionDenied):
+        await service.set_user_active(admin, admin.id, is_active=False)
+
+
+async def test_disabled_user_cannot_authenticate(service: UserService) -> None:
+    admin = _account("admin@b.com", is_admin=True)
+    target = _account("bob@b.com")
+    await service._users.add(admin)
+    await service._users.add(target)
+    await service.set_user_active(admin, target.id, is_active=False)
+    with pytest.raises(InvalidCredentials):
+        await service.authenticate("bob@b.com", "Passw0rd!")
 
 
 async def test_ensure_admin_raises_when_empty_and_no_master_key(
