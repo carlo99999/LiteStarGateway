@@ -16,6 +16,33 @@ Counts: **1 CRITICAL · 5 HIGH · 13 MEDIUM · 6 LOW**.
 
 ---
 
+## Resolution status (updated after remediation)
+
+**Fixed & merged to `main`:**
+
+| Finding | Fix PR |
+|---|---|
+| C1 — streaming unbilled/untraced | #51 |
+| H1 — last-admin protection | #49 |
+| H2 — invite expiry | #50 |
+| H5 + M12 — provider SDK client leak / stream close | #52 |
+| H3 (entropy) + H4 + M2 + M3 (strength) + M10 — config/secret hardening | #53 |
+| M1 + M8 + M9 — JWT key window, Vertex credential errors, docs toggle | #54 |
+
+The former **H1 (credentials not org-scoped)** was reclassified **by design** — credentials are an intentionally global pool managed by cloud ops (see the by-design section below).
+
+**Deferred (deliberately not changed — larger refactor or product decision needed):**
+
+- **M4** — rotation atomicity: non-destructive today (retired keys stay readable, ciphertexts are key-tagged); making the multi-step rotation a single transaction / resumable is a refactor, not a correctness bug.
+- **M5** — unbounded list queries: adding pagination changes the API contract; needs a paging design.
+- **M6** — usage-record failure swallowed: fail-safe by design; a durable retry/dead-letter + alerting is an enhancement.
+- **M7** — `Model.update` can't reset an optional field to `null`: needs explicit PATCH null-vs-omitted semantics (msgspec sentinel).
+- **M11** — persistence transaction-boundary inconsistency: a repo-wide convention refactor.
+- **M13** — no standalone adapter unit tests: the adapters are already heavily exercised by `test_completions.py` via mocked SDKs; dedicated unit tests are optional.
+- **L1–L6** (LOW) — proxy-aware rate limiting, `tv`-claim strictness, admin-forced logout / account-disable, DTO format/length validation, explicit `204` on deletes, usage-table indexes. Ops/minor; see the LOW section.
+
+---
+
 ## CRITICAL
 
 ### C1 — Streaming inference is completely unbilled and untraced
