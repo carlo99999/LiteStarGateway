@@ -83,6 +83,11 @@ class MembershipNotFound(DomainError):
     """The user is not a member of the team."""
 
 
+class LastTeamAdmin(DomainError):
+    """The operation would leave the team with no admin (removing/demoting the
+    last remaining admin), orphaning team-level management."""
+
+
 class CredentialNotFound(DomainError):
     """No credential exists for the given id."""
 
