@@ -8,7 +8,7 @@ provide the client constructor; the four operations are shared.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 from openai import AsyncOpenAI, OpenAI
@@ -55,31 +55,53 @@ class OpenAICompatibleAdapter:
     def _async_client(self, model: Model, credentials: dict[str, str]) -> Any:
         raise NotImplementedError
 
+    def _run(
+        self, model: Model, credentials: dict[str, str], call: Callable[[Any], Any]
+    ) -> dict[str, Any]:
+        # Each SDK client owns an httpx connection pool; close it after the call so
+        # per-request clients don't leak sockets/file descriptors.
+        client = self._sync_client(model, credentials)
+        try:
+            return call(client).model_dump()
+        finally:
+            client.close()
+
+    async def _arun(
+        self, model: Model, credentials: dict[str, str], call: Callable[[Any], Awaitable[Any]]
+    ) -> dict[str, Any]:
+        client = self._async_client(model, credentials)
+        try:
+            return (await call(client)).model_dump()
+        finally:
+            await client.close()
+
     def chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = self._sync_client(model, credentials)
-        return client.chat.completions.create(**_kwargs(request, model)).model_dump()
+        return self._run(
+            model, credentials, lambda c: c.chat.completions.create(**_kwargs(request, model))
+        )
 
     async def achat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = self._async_client(model, credentials)
-        result = await client.chat.completions.create(**_kwargs(request, model))
-        return result.model_dump()
+        return await self._arun(
+            model, credentials, lambda c: c.chat.completions.create(**_kwargs(request, model))
+        )
 
     def responses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = self._sync_client(model, credentials)
-        return client.responses.create(**_kwargs(request, model)).model_dump()
+        return self._run(
+            model, credentials, lambda c: c.responses.create(**_kwargs(request, model))
+        )
 
     async def aresponses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = self._async_client(model, credentials)
-        result = await client.responses.create(**_kwargs(request, model))
-        return result.model_dump()
+        return await self._arun(
+            model, credentials, lambda c: c.responses.create(**_kwargs(request, model))
+        )
 
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -91,11 +113,16 @@ class OpenAICompatibleAdapter:
         # (OpenAI omits usage from streams unless this is set). Forced on: billing
         # must not depend on the client opting in.
         kwargs["stream_options"] = {**kwargs.get("stream_options", {}), "include_usage": True}
-        # Any: with stream=True the SDK returns AsyncStream (no model_dump itself);
-        # each yielded chunk is a ChatCompletionChunk that does have model_dump.
-        stream: Any = await client.chat.completions.create(**kwargs)
-        async for chunk in stream:
-            yield chunk.model_dump()
+        # Keep the client open for the whole stream; close it once iteration ends
+        # or the client disconnects (finally runs on generator close).
+        try:
+            # Any: with stream=True the SDK returns AsyncStream (no model_dump itself);
+            # each yielded chunk is a ChatCompletionChunk that does have model_dump.
+            stream: Any = await client.chat.completions.create(**kwargs)
+            async for chunk in stream:
+                yield chunk.model_dump()
+        finally:
+            await client.close()
 
     async def astream_responses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -103,35 +130,38 @@ class OpenAICompatibleAdapter:
         client = self._async_client(model, credentials)
         kwargs = _kwargs(request, model)
         kwargs["stream"] = True
-        stream: Any = await client.responses.create(**kwargs)
-        async for event in stream:
-            yield event.model_dump()
+        try:
+            stream: Any = await client.responses.create(**kwargs)
+            async for event in stream:
+                yield event.model_dump()
+        finally:
+            await client.close()
 
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = self._sync_client(model, credentials)
-        return client.embeddings.create(**_kwargs(request, model)).model_dump()
+        return self._run(
+            model, credentials, lambda c: c.embeddings.create(**_kwargs(request, model))
+        )
 
     async def aembeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = self._async_client(model, credentials)
-        result = await client.embeddings.create(**_kwargs(request, model))
-        return result.model_dump()
+        return await self._arun(
+            model, credentials, lambda c: c.embeddings.create(**_kwargs(request, model))
+        )
 
     def images(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = self._sync_client(model, credentials)
-        return client.images.generate(**_kwargs(request, model)).model_dump()
+        return self._run(model, credentials, lambda c: c.images.generate(**_kwargs(request, model)))
 
     async def aimages(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = self._async_client(model, credentials)
-        result = await client.images.generate(**_kwargs(request, model))
-        return result.model_dump()
+        return await self._arun(
+            model, credentials, lambda c: c.images.generate(**_kwargs(request, model))
+        )
 
 
 class OpenAIAdapter(OpenAICompatibleAdapter):
