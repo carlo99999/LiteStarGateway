@@ -15,6 +15,7 @@ from openai import AsyncOpenAI, OpenAI
 
 from litestar_test.domain.entities import Model
 from litestar_test.domain.exceptions import CredentialMisconfigured
+from litestar_test.infrastructure.llm.resilience import ResilienceConfig
 
 
 def require_api_key(credentials: dict[str, str]) -> str:
@@ -44,6 +45,9 @@ def _base_url(credentials: dict[str, str]) -> str | None:
 
 class OpenAICompatibleAdapter:
     """Shared operations for any client exposing the OpenAI SDK surface."""
+
+    def __init__(self, resilience: ResilienceConfig | None = None) -> None:
+        self._resilience = resilience or ResilienceConfig()
 
     def _sync_client(self, model: Model, credentials: dict[str, str]) -> Any:
         raise NotImplementedError
@@ -130,7 +134,15 @@ class OpenAIAdapter(OpenAICompatibleAdapter):
     """Plain OpenAI, and OpenAI-compatible endpoints (e.g. Databricks via base_url)."""
 
     def _sync_client(self, model: Model, credentials: dict[str, str]) -> OpenAI:
-        return OpenAI(api_key=require_api_key(credentials), base_url=_base_url(credentials))
+        return OpenAI(
+            api_key=require_api_key(credentials),
+            base_url=_base_url(credentials),
+            **self._resilience.client_kwargs,
+        )
 
     def _async_client(self, model: Model, credentials: dict[str, str]) -> AsyncOpenAI:
-        return AsyncOpenAI(api_key=require_api_key(credentials), base_url=_base_url(credentials))
+        return AsyncOpenAI(
+            api_key=require_api_key(credentials),
+            base_url=_base_url(credentials),
+            **self._resilience.client_kwargs,
+        )
