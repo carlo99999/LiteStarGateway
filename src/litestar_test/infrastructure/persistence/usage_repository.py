@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.domain.entities import UsageAggregate, UsageEvent
+from litestar_test.domain.entities import ApiKeySpend, UsageAggregate, UsageEvent
 from litestar_test.infrastructure.persistence.orm import UsageEventModel
 
 
@@ -65,6 +65,30 @@ class SQLAlchemyUsageRepository:
                 completion_tokens=int(row[3]),
                 cost=float(row[4]),
                 calls=int(row[5]),
+            )
+            for row in rows
+        ]
+
+    async def spend_by_api_key(self, team_id: UUID) -> list[ApiKeySpend]:
+        query = (
+            select(
+                UsageEventModel.api_key_id,
+                func.coalesce(func.sum(UsageEventModel.prompt_tokens), 0),
+                func.coalesce(func.sum(UsageEventModel.completion_tokens), 0),
+                func.coalesce(func.sum(UsageEventModel.cost), 0.0),
+                func.count(),
+            )
+            .where(UsageEventModel.team_id == team_id)
+            .group_by(UsageEventModel.api_key_id)
+        )
+        rows = (await self._session.execute(query)).all()
+        return [
+            ApiKeySpend(
+                api_key_id=row[0],
+                prompt_tokens=int(row[1]),
+                completion_tokens=int(row[2]),
+                cost=float(row[3]),
+                calls=int(row[4]),
             )
             for row in rows
         ]

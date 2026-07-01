@@ -23,6 +23,7 @@ from litestar_test.infrastructure.web.teams.schemas import (
     CreatedKeyResponse,
     CreateKeyRequest,
     KeyResponse,
+    KeySpendingResponse,
     MembershipResponse,
     SetRoleRequest,
     UsageResponse,
@@ -107,6 +108,25 @@ class TeamController(Controller):
         page_limit, page_offset = resolve_page(limit, offset)
         keys = await api_key_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
         return [KeyResponse.from_entity(k) for k in keys]
+
+    @get("/{team_id:uuid}/keys/spending", summary="API keys (incl. revoked) with their spend")
+    async def keys_spending(
+        self,
+        team_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        api_key_service: NamedDependency[APIKeyService],
+        usage_repository: NamedDependency[UsageRepository],
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
+    ) -> list[KeySpendingResponse]:
+        """Every API key of the team — active and revoked — with its accumulated
+        token/cost totals, so past keys and their spend stay visible."""
+        await team_service.ensure_can_manage_team(current_user, team_id)
+        page_limit, page_offset = resolve_page(limit, offset)
+        keys = await api_key_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
+        spend = {s.api_key_id: s for s in await usage_repository.spend_by_api_key(team_id)}
+        return [KeySpendingResponse.from_key_and_spend(k, spend.get(k.id)) for k in keys]
 
     @delete("/{team_id:uuid}/keys/{key_id:uuid}")
     async def revoke_key(

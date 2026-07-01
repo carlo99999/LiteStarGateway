@@ -51,6 +51,17 @@ class UsageAggregate:
 
 
 @dataclass(frozen=True)
+class ApiKeySpend:
+    """Accumulated usage/cost for one API key across all of its calls."""
+
+    api_key_id: UUID
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+    calls: int
+
+
+@dataclass(frozen=True)
 class ExternalIdentity:
     """An identity resolved from an SSO provider's id_token claims."""
 

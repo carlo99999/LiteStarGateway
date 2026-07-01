@@ -7,6 +7,8 @@ from datetime import datetime
 from uuid import UUID
 
 from litestar_test.domain.entities import (
+    APIKey,
+    ApiKeySpend,
     IssuedKey,
     Team,
     TeamMembership,
@@ -144,4 +146,39 @@ class KeyResponse:
             created_at=key.created_at,
             last_used_at=key.last_used_at,
             revoked_at=key.revoked_at,
+        )
+
+
+@dataclass(frozen=True)
+class KeySpendingResponse:
+    """An API key (active or revoked) with its accumulated spend."""
+
+    id: UUID
+    name: str | None
+    prefix: str
+    is_active: bool
+    created_at: datetime
+    revoked_at: datetime | None
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    cost: float
+    calls: int
+
+    @classmethod
+    def from_key_and_spend(cls, key: APIKey, spend: ApiKeySpend | None) -> KeySpendingResponse:
+        prompt = spend.prompt_tokens if spend else 0
+        completion = spend.completion_tokens if spend else 0
+        return cls(
+            id=key.id,
+            name=key.name,
+            prefix=key.prefix,
+            is_active=key.is_active,
+            created_at=key.created_at,
+            revoked_at=key.revoked_at,
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=prompt + completion,
+            cost=spend.cost if spend else 0.0,
+            calls=spend.calls if spend else 0,
         )
