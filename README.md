@@ -14,6 +14,11 @@ Built on a few deliberate principles:
   a clean multi-tenant model, by design rather than as an afterthought.
 - **Auditable** — a small, hexagonal codebase a team can read in an afternoon.
 
+**Status: `v1.0.0`** — the production-ready core is complete (CI, container +
+Postgres + migrations, provider resilience, request allowlist, structured
+logging, secrets/key rotation, usage accounting, and MLflow observability). See
+the [Roadmap](#roadmap) for what's next.
+
 An OpenAI-compatible LLM gateway (Litestar, hexagonal architecture). Customers
 point the stock OpenAI client at this server with a team API key:
 
@@ -105,11 +110,11 @@ Notes:
 
 ## Roadmap
 
-Planned work, split into **Toward v1** (must-have before publishing) and **v2**
-(after v1). Each item with a design doc has it parked on its own branch (linked) —
-we resume from there. Order within a phase is a recommendation; reorder as needed.
+**v1.0.0 is released** — everything under "v1 (shipped)" below is done. The
+**Enterprise** and **v2** phases are next; items with a design doc have it parked
+on their own branch (linked). Order within a phase is a recommendation.
 
-### Toward v1 (pre-launch)
+### v1 (shipped) ✅
 
 1. ✅ **CI (GitHub Actions)** _(shipped)_ — runs `ruff` + `pyrefly` + `pytest` on
    every push to `main` and every PR ([`.github/workflows/ci.yml`](.github/workflows/ci.yml),

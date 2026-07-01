@@ -1,7 +1,7 @@
 [project]
 name = "litestar-test"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.0.0"
+description = "An OpenAI-compatible LLM gateway (Litestar, hexagonal architecture)."
 readme = "README.md"
 authors = [
     { name = "Carlo Piccinin", email = "c.piccinin@teamsystem.com" }
