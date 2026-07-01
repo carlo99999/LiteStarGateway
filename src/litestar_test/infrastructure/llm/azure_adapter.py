@@ -28,7 +28,9 @@ def _client_kwargs(model: Model, credentials: dict[str, str]) -> dict[str, Any]:
 
 class AzureOpenAIAdapter(OpenAICompatibleAdapter):
     def _sync_client(self, model: Model, credentials: dict[str, str]) -> AzureOpenAI:
-        return AzureOpenAI(**_client_kwargs(model, credentials))
+        return AzureOpenAI(**_client_kwargs(model, credentials), **self._resilience.client_kwargs)
 
     def _async_client(self, model: Model, credentials: dict[str, str]) -> AsyncAzureOpenAI:
-        return AsyncAzureOpenAI(**_client_kwargs(model, credentials))
+        return AsyncAzureOpenAI(
+            **_client_kwargs(model, credentials), **self._resilience.client_kwargs
+        )

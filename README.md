@@ -122,8 +122,11 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
    unit-of-work / bootstrap flow is validated against it
    ([design](docs/postgres.md)). _Running the full test suite on Postgres in CI is
    a further step._
-5. **Provider resilience** — timeouts, bounded retries with backoff, per-provider circuit breaker.
-   [`adding-provider-resilience`](https://github.com/carlo99999/LiteStarGateway/blob/adding-provider-resilience/docs/provider-resilience.md)
+5. 🟡 **Provider resilience** _(timeouts + retries shipped)_ — provider SDK clients
+   now use a bounded per-call timeout + retry budget (`REQUEST_TIMEOUT` /
+   `MAX_RETRIES`), so a slow/failing upstream fails fast instead of hanging (~10 min
+   default). _A per-provider circuit breaker is still to come_
+   ([design](docs/provider-resilience.md)).
 6. ✅ **Request parameter allowlist** _(shipped)_ — deny-by-default sanitizing of
    client params before the provider SDKs
    ([`request_policy.py`](src/litestar_test/domain/request_policy.py),

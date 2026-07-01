@@ -12,6 +12,9 @@ DEFAULT_ADMIN_EMAIL = "admin@example.com"
 DEFAULT_ENVIRONMENT = "development"
 DEFAULT_DB_POOL_SIZE = 5
 DEFAULT_DB_MAX_OVERFLOW = 10
+# Upstream provider call resilience.
+DEFAULT_REQUEST_TIMEOUT = 60.0
+DEFAULT_MAX_RETRIES = 2
 # ≥32 bytes to satisfy HS256 key-length recommendations. Override in production.
 DEFAULT_JWT_SECRET = "dev-insecure-change-me-please-0123456789"
 
@@ -40,6 +43,9 @@ class Settings:
     # Connection-pool sizing (applied only to Postgres; SQLite ignores it).
     db_pool_size: int = DEFAULT_DB_POOL_SIZE
     db_max_overflow: int = DEFAULT_DB_MAX_OVERFLOW
+    # Per-call timeout (seconds) and retry budget for upstream provider SDKs.
+    request_timeout: float = DEFAULT_REQUEST_TIMEOUT
+    max_retries: int = DEFAULT_MAX_RETRIES
 
     @property
     def is_production(self) -> bool:
@@ -68,4 +74,6 @@ class Settings:
             environment=os.environ.get("ENVIRONMENT", DEFAULT_ENVIRONMENT),
             db_pool_size=int(os.environ.get("DB_POOL_SIZE", DEFAULT_DB_POOL_SIZE)),
             db_max_overflow=int(os.environ.get("DB_MAX_OVERFLOW", DEFAULT_DB_MAX_OVERFLOW)),
+            request_timeout=float(os.environ.get("REQUEST_TIMEOUT", DEFAULT_REQUEST_TIMEOUT)),
+            max_retries=int(os.environ.get("MAX_RETRIES", DEFAULT_MAX_RETRIES)),
         )
