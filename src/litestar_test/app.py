@@ -107,6 +107,9 @@ def create_app(
         dependencies["sso_admin_groups"] = Provide(
             lambda: settings.oidc_admin_groups, sync_to_thread=False
         )
+        dependencies["sso_redirect_uri"] = Provide(
+            lambda: settings.oidc_redirect_uri, sync_to_thread=False
+        )
 
     return Litestar(
         route_handlers=route_handlers,

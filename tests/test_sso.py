@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -162,6 +163,29 @@ async def test_sso_rejects_email_bound_to_other_subject(tmp_path: Path) -> None:
     # A different subject asserting the same email must not adopt the account.
     async with _client(tmp_path, _identity("sub-B", "eve@corp.com")) as client:
         assert (await _callback(client)).status_code == HTTP_401_UNAUTHORIZED
+
+
+async def test_sso_uses_configured_redirect_uri(tmp_path: Path) -> None:
+    # Behind a proxy the operator pins the public callback URL; the IdP must see it
+    # rather than the request-derived (internal) one.
+    public = "https://gateway.example.com/sso/callback"
+    captured: dict[str, str] = {}
+
+    class RecordingIdP(FakeIdP):
+        async def authorization_url(self, state: str, redirect_uri: str) -> str:
+            captured["authorize"] = redirect_uri
+            return await super().authorization_url(state, redirect_uri)
+
+        async def exchange(self, code: str, redirect_uri: str) -> ExternalIdentity:
+            captured["exchange"] = redirect_uri
+            return await super().exchange(code, redirect_uri)
+
+    settings = dataclasses.replace(_settings(tmp_path), oidc_redirect_uri=public)
+    idp = RecordingIdP(_identity("s-cfg", "frank@corp.com"))
+    async with AsyncTestClient(app=create_app(settings, identity_provider=idp)) as client:
+        await _callback(client)
+    assert captured["authorize"] == public
+    assert captured["exchange"] == public
 
 
 async def test_sso_routes_absent_when_not_configured(tmp_path: Path) -> None:

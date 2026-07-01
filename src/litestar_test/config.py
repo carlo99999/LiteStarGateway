@@ -72,6 +72,10 @@ class Settings:
     oidc_client_secret: str | None = None
     oidc_scopes: str = DEFAULT_OIDC_SCOPES
     oidc_admin_groups: tuple[str, ...] = ()
+    # Public callback URL registered at the IdP. Set this when the app runs behind
+    # a reverse proxy/ingress, where the request's own host/scheme is the internal
+    # one. When None, the callback URL is derived from the incoming request.
+    oidc_redirect_uri: str | None = None
 
     @property
     def sso_enabled(self) -> bool:
@@ -119,4 +123,5 @@ class Settings:
             oidc_admin_groups=tuple(
                 g.strip() for g in os.environ.get("OIDC_ADMIN_GROUPS", "").split(",") if g.strip()
             ),
+            oidc_redirect_uri=os.environ.get("OIDC_REDIRECT_URI"),
         )
