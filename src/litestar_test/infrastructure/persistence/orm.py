@@ -14,11 +14,13 @@ from litestar_test.domain.entities import (
     APIKey,
     Credential,
     Invite,
+    KeyPurpose,
     Model,
     ModelType,
     Organization,
     PasswordReset,
     Provider,
+    SecretKey,
     Team,
     TeamMembership,
     TeamRole,
@@ -121,13 +123,33 @@ class TeamMembershipModel(base.UUIDAuditBase):
         )
 
 
+class SecretKeyModel(base.UUIDAuditBase):
+    __tablename__ = "secret_key"
+
+    purpose: Mapped[str] = mapped_column(index=True)
+    # Master-wrapped key material (never stored in the clear).
+    material: Mapped[str] = mapped_column()
+    retired_at: Mapped[datetime | None] = mapped_column(default=None)
+
+    def to_entity(self) -> SecretKey:
+        return SecretKey(
+            id=self.id,
+            purpose=KeyPurpose(self.purpose),
+            material=self.material,
+            created_at=self.created_at,
+            retired_at=self.retired_at,
+        )
+
+
 class CredentialModel(base.UUIDAuditBase):
     __tablename__ = "credential"
 
     name: Mapped[str] = mapped_column(unique=True, index=True)
     provider: Mapped[str] = mapped_column(index=True)
-    # Fernet ciphertext of the JSON-encoded secret values.
+    # Data-key Fernet ciphertext of the JSON secret values.
     encrypted_values: Mapped[str] = mapped_column()
+    # Which keyring data key encrypted `encrypted_values` (envelope encryption).
+    key_id: Mapped[UUID] = mapped_column(ForeignKey("secret_key.id"))
 
     def to_entity(self) -> Credential:
         return Credential(

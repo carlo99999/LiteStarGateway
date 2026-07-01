@@ -137,8 +137,12 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
    production; exceptions logged server-side, no stack traces leaked to clients
    ([`logging.py`](src/litestar_test/infrastructure/logging.py),
    [design](docs/logging.md)). _Request-id correlation is a further step._
-8. **Secrets management & key rotation** — supply secrets from a manager; rotate `SALT_KEY` (keyring + re-encrypt) and `JWT_SECRET`.
-   [`adding-secrets-rotation`](https://github.com/carlo99999/LiteStarGateway/blob/adding-secrets-rotation/docs/secrets-rotation.md)
+8. ✅ **Secrets management & key rotation** _(shipped)_ — envelope encryption: the
+   env keys are fixed **masters** (`SALT_KEY` wraps credential keys, `JWT_SECRET`
+   wraps JWT signing keys) that wrap a rotating keyring stored in the DB. A daily
+   lifespan task (`KEY_ROTATION_ENABLED` / `KEY_ROTATION_TIME`) rotates both —
+   re-encrypting credentials to a fresh data key and adding a new JWT key while
+   keeping recent ones for the token window ([design](docs/secrets-rotation.md)).
 9. **Observability via MLflow** — `TraceSink` port + MLflow adapter (OSS or Databricks), off the hot path.
    [`adding-observability-via-mlflow`](https://github.com/carlo99999/LiteStarGateway/blob/adding-observability-via-mlflow/docs/observability.md)
 10. **Usage & cost accounting + budgets** — authoritative usage records, `GET /usage`, pre-call budget enforcement.

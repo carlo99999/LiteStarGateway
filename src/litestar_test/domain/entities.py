@@ -14,6 +14,30 @@ class TeamRole(StrEnum):
     MEMBER = "member"
 
 
+class KeyPurpose(StrEnum):
+    """What a keyring key is used for."""
+
+    CREDENTIAL = "credential"  # encrypts credential values at rest
+    JWT = "jwt"  # signs login JWTs
+
+
+@dataclass(frozen=True)
+class SecretKey:
+    """A rotating keyring key. `material` is the master-wrapped key bytes; only
+    the wrapped form is persisted. Retired keys are kept for decrypt/verify only.
+    """
+
+    id: UUID
+    purpose: KeyPurpose
+    material: str
+    created_at: datetime
+    retired_at: datetime | None
+
+    @property
+    def is_usable(self) -> bool:
+        return self.retired_at is None
+
+
 class Provider(StrEnum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"

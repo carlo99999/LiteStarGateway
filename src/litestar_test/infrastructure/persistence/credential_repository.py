@@ -1,4 +1,9 @@
-"""SQLAlchemy adapter for credentials — encrypts values at rest via the cipher."""
+"""SQLAlchemy adapter for credentials — encrypts values at rest via the keyring.
+
+Values are encrypted with the active credential data key (envelope encryption);
+each row records the `key_id` that encrypted it, so rotation can re-encrypt while
+old rows stay readable.
+"""
 
 from __future__ import annotations
 
@@ -8,29 +13,31 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.domain.entities import Credential
-from litestar_test.domain.exceptions import SaltKeyMissing
-from litestar_test.infrastructure.crypto import CredentialCipher
+from litestar_test.domain.exceptions import CredentialMisconfigured, SaltKeyMissing
+from litestar_test.infrastructure.keyring import Keyring
 from litestar_test.infrastructure.persistence.orm import CredentialModel
 
 
 class SQLAlchemyCredentialRepository:
-    def __init__(self, session: AsyncSession, cipher: CredentialCipher | None = None) -> None:
-        # `cipher` is only needed to encrypt/decrypt values. Metadata reads
+    def __init__(self, session: AsyncSession, keyring: Keyring | None = None) -> None:
+        # `keyring` is only needed to encrypt/decrypt values. Metadata reads
         # (get/get_by_name/list) work without it — useful for provider validation.
         self._session = session
-        self._cipher = cipher
+        self._keyring = keyring
 
-    def _require_cipher(self) -> CredentialCipher:
-        if self._cipher is None:
+    def _require_keyring(self) -> Keyring:
+        if self._keyring is None:
             raise SaltKeyMissing("SALT_KEY is not configured")
-        return self._cipher
+        return self._keyring
 
     async def add(self, credential: Credential, values: dict[str, str]) -> Credential:
+        key_id, cipher = await self._require_keyring().active_credential_cipher()
         model = CredentialModel(
             id=credential.id,
             name=credential.name,
             provider=credential.provider.value,
-            encrypted_values=self._require_cipher().encrypt(values),
+            encrypted_values=cipher.encrypt(values),
+            key_id=key_id,
         )
         self._session.add(model)
         await self._session.commit()
@@ -55,7 +62,27 @@ class SQLAlchemyCredentialRepository:
 
     async def get_values(self, credential_id: UUID) -> dict[str, str] | None:
         model = await self._session.get(CredentialModel, credential_id)
-        return self._require_cipher().decrypt(model.encrypted_values) if model else None
+        if model is None:
+            return None
+        cipher = await self._require_keyring().credential_cipher_for(model.key_id)
+        if cipher is None:  # pragma: no cover - a missing key row is not expected
+            raise CredentialMisconfigured("encryption key for credential is missing")
+        return cipher.decrypt(model.encrypted_values)
+
+    async def reencrypt_all(self) -> None:
+        """Re-encrypt every credential with the active data key (rotation)."""
+        keyring = self._require_keyring()
+        new_key_id, new_cipher = await keyring.active_credential_cipher()
+        models = list(await self._session.scalars(select(CredentialModel)))
+        for model in models:
+            if model.key_id == new_key_id:
+                continue
+            old = await keyring.credential_cipher_for(model.key_id)
+            if old is None:  # pragma: no cover
+                continue
+            model.encrypted_values = new_cipher.encrypt(old.decrypt(model.encrypted_values))
+            model.key_id = new_key_id
+        await self._session.commit()
 
     async def remove(self, credential_id: UUID) -> None:
         await self._session.execute(
