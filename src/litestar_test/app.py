@@ -80,8 +80,6 @@ def create_app(settings: Settings | None = None) -> Litestar:
                 "- [Stoplight Elements](/elements)\n"
                 "- [OpenAPI schema](/openapi.json)\n"
             ),
-            # Serve the docs from the root so `/` is the landing page (plugin paths
-            # are relative to this base). The schema JSON is at `/openapi.json`.
             path="/",
             render_plugins=[swagger_plugin, scalar_plugin, stoplight_plugin],
         ),
