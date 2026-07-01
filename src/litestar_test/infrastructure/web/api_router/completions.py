@@ -59,7 +59,7 @@ async def chat_completions(
         # Resolve eagerly so errors become a proper HTTP status before the SSE starts.
         chunks = await completion_service.open_chat_stream(team_id, data)
         return ServerSentEvent(_sse_events(chunks))
-    return Response(await completion_service.chat_completion(team_id, data))
+    return Response(await completion_service.chat_completion(team_id, request.auth.id, data))
 
 
 @post(
@@ -82,7 +82,7 @@ async def responses(
     if data.get("stream"):
         events = await completion_service.open_responses_stream(team_id, data)
         return ServerSentEvent(_sse_response_events(events))
-    return Response(await completion_service.responses(team_id, data))
+    return Response(await completion_service.responses(team_id, request.auth.id, data))
 
 
 @post(
@@ -96,7 +96,7 @@ async def embeddings(
     data: dict[str, Any],
     completion_service: NamedDependency[CompletionService],
 ) -> dict[str, Any]:
-    return await completion_service.embeddings(UUID(request.user), data)
+    return await completion_service.embeddings(UUID(request.user), request.auth.id, data)
 
 
 @post(
@@ -110,4 +110,4 @@ async def images(
     data: dict[str, Any],
     completion_service: NamedDependency[CompletionService],
 ) -> dict[str, Any]:
-    return await completion_service.images(UUID(request.user), data)
+    return await completion_service.images(UUID(request.user), request.auth.id, data)

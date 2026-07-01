@@ -14,6 +14,76 @@ class TeamRole(StrEnum):
     MEMBER = "member"
 
 
+class KeyPurpose(StrEnum):
+    """What a keyring key is used for."""
+
+    CREDENTIAL = "credential"  # encrypts credential values at rest
+    JWT = "jwt"  # signs login JWTs
+
+
+@dataclass(frozen=True)
+class UsageEvent:
+    """One recorded model call: token counts and estimated cost, tagged with the
+    API key and model so usage can be broken down by either."""
+
+    id: UUID
+    team_id: UUID
+    api_key_id: UUID
+    model_id: UUID
+    model_name: str
+    operation: str
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class UsageAggregate:
+    """Usage summed for one model (over an optional api-key/model filter)."""
+
+    model_id: UUID
+    model_name: str
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+    calls: int
+
+
+@dataclass(frozen=True)
+class TraceRecord:
+    """One observability trace for a model call (metadata; no payload in v1)."""
+
+    team_id: UUID
+    api_key_id: UUID
+    model_name: str
+    provider: str
+    operation: str
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+    latency_ms: float
+    status: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class SecretKey:
+    """A rotating keyring key. `material` is the master-wrapped key bytes; only
+    the wrapped form is persisted. Retired keys are kept for decrypt/verify only.
+    """
+
+    id: UUID
+    purpose: KeyPurpose
+    material: str
+    created_at: datetime
+    retired_at: datetime | None
+
+    @property
+    def is_usable(self) -> bool:
+        return self.retired_at is None
+
+
 class Provider(StrEnum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
@@ -157,4 +227,31 @@ class IssuedInvite:
     """Result of creating an invite: the entity plus the one-time token."""
 
     invite: Invite
+    token: str
+
+
+@dataclass(frozen=True)
+class PasswordReset:
+    """A single-use, expiring admin-issued password reset for a specific user.
+
+    Only the token hash is persisted; the plaintext is shown once to the admin,
+    who relays it. The user redeems it and chooses their own new password.
+    """
+
+    id: UUID
+    user_id: UUID
+    token_hash: str
+    created_at: datetime
+    expires_at: datetime
+    used_at: datetime | None
+
+    def is_usable(self, now: datetime) -> bool:
+        return self.used_at is None and now < self.expires_at
+
+
+@dataclass(frozen=True)
+class IssuedPasswordReset:
+    """Result of creating a reset: the entity plus the one-time token."""
+
+    reset: PasswordReset
     token: str

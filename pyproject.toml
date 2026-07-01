@@ -1,7 +1,7 @@
 [project]
 name = "litestar-test"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.0.0"
+description = "An OpenAI-compatible LLM gateway (Litestar, hexagonal architecture)."
 readme = "README.md"
 authors = [
     { name = "Carlo Piccinin", email = "c.piccinin@teamsystem.com" }
@@ -10,14 +10,18 @@ requires-python = ">=3.14"
 dependencies = [
     "advanced-alchemy>=1.11.0",
     "aiosqlite>=0.22.1",
+    "alembic>=1.18.5",
     "anthropic>=0.115.0",
+    "asyncpg>=0.31.0",
     "cryptography>=49.0.0",
     "google-genai>=2.10.0",
     "litestar[standard]>=2.24.0",
+    "mlflow-skinny>=3.14.0",
     "openai>=2.44.0",
     "pwdlib[argon2]>=0.3.0",
     "pyjwt>=2.13.0",
     "python-dotenv>=1.2.2",
+    "structlog>=26.1.0",
 ]
 
 [build-system]
@@ -26,6 +30,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.6.0",
     "pyrefly>=1.1.1",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
@@ -34,6 +39,8 @@ dev = [
 
 [tool.ruff]
 line-length = 100
+# Alembic migration scripts are generated; don't lint/format them.
+extend-exclude = ["migrations"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

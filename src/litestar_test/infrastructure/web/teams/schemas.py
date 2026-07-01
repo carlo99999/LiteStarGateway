@@ -6,7 +6,36 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from litestar_test.domain.entities import IssuedKey, Team, TeamMembership, TeamRole
+from litestar_test.domain.entities import (
+    IssuedKey,
+    Team,
+    TeamMembership,
+    TeamRole,
+    UsageAggregate,
+)
+
+
+@dataclass(frozen=True)
+class UsageResponse:
+    """Per-model usage totals (over the requested api-key/model filter)."""
+
+    model: str
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    cost: float
+    calls: int
+
+    @classmethod
+    def from_aggregate(cls, a: UsageAggregate) -> UsageResponse:
+        return cls(
+            model=a.model_name,
+            prompt_tokens=a.prompt_tokens,
+            completion_tokens=a.completion_tokens,
+            total_tokens=a.prompt_tokens + a.completion_tokens,
+            cost=a.cost,
+            calls=a.calls,
+        )
 
 
 @dataclass(frozen=True)

@@ -1,16 +1,27 @@
 """Composition root: wires settings, persistence, services and the web layer."""
 
 from litestar import Litestar, get
-from litestar.di import Provide
+from litestar.di import NamedDependency, Provide
+from litestar.openapi.config import OpenAPIConfig
+from litestar.openapi.plugins import ScalarRenderPlugin, StoplightRenderPlugin, SwaggerRenderPlugin
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.config import Settings
 from litestar_test.domain.exceptions import DomainError
 from litestar_test.infrastructure.bootstrap import make_bootstrap_admin
-from litestar_test.infrastructure.crypto import build_cipher
+from litestar_test.infrastructure.keyring import Keyring
+from litestar_test.infrastructure.logging import build_logging_config
+from litestar_test.infrastructure.observability.dispatcher import TraceDispatcher
+from litestar_test.infrastructure.observability.factory import build_trace_sink
 from litestar_test.infrastructure.persistence.database import create_database
+from litestar_test.infrastructure.persistence.secret_key_repository import (
+    SQLAlchemySecretKeyRepository,
+)
+from litestar_test.infrastructure.rotation import make_rotation_scheduler
 from litestar_test.infrastructure.web.api_router.dependencies import (
+    build_llm_gateway,
     provide_completion_service,
-    provide_llm_gateway,
+    provide_usage_repository,
 )
 from litestar_test.infrastructure.web.api_router.router import create_api_router
 from litestar_test.infrastructure.web.credentials import CredentialController
@@ -35,6 +46,19 @@ from litestar_test.infrastructure.web.users.dependencies import provide_user_ser
 def create_app(settings: Settings | None = None) -> Litestar:
     settings = settings or Settings.from_env()
     database = create_database(settings)
+    llm_gateway = build_llm_gateway(settings)  # shared, stateless; built once
+    trace_dispatcher = TraceDispatcher(build_trace_sink(settings))  # observability, off-path
+    swagger_plugin = SwaggerRenderPlugin(version="5.18.2", path="/")
+    scalar_plugin = ScalarRenderPlugin(version="1.19.5", path="/scalar")
+    stoplight_plugin = StoplightRenderPlugin(version="7.7.18", path="/elements")
+
+    def provide_keyring(db_session: NamedDependency[AsyncSession]) -> Keyring:
+        # Per-purpose masters: SALT_KEY wraps credential keys, JWT_SECRET wraps JWT
+        # keys. Credential ops raise SaltKeyMissing (503) if SALT_KEY is unset; the
+        # data keys are created on first use (no startup bootstrap needed).
+        return Keyring(
+            SQLAlchemySecretKeyRepository(db_session), settings.salt_key, settings.jwt_secret
+        )
 
     return Litestar(
         route_handlers=[
@@ -47,8 +71,25 @@ def create_app(settings: Settings | None = None) -> Litestar:
             ModelController,  # team-admin: team-scoped model deployments
             CredentialController,  # platform-admin: encrypted provider credentials
         ],
+        openapi_config=OpenAPIConfig(
+            title="Litestar Gateway API",
+            version="1.0.0",
+            description=(
+                "A gateway for LLM inference, model deployments, and API key "
+                "management.\n\n"
+                "**Docs viewers:**\n\n"
+                "- [Swagger UI](/)\n"
+                "- [Scalar](/scalar)\n"
+                "- [Stoplight Elements](/elements)\n"
+                "- [OpenAPI schema](/openapi.json)\n"
+            ),
+            path="/",
+            render_plugins=[swagger_plugin, scalar_plugin, stoplight_plugin],
+        ),
         plugins=[database.plugin],
+        logging_config=build_logging_config(settings),
         on_startup=[make_bootstrap_admin(database, settings)],
+        lifespan=[make_rotation_scheduler(database, settings), trace_dispatcher.run],
         dependencies={
             "api_key_service": Provide(provide_api_key_service, sync_to_thread=False),
             "user_service": Provide(provide_user_service, sync_to_thread=False),
@@ -57,12 +98,10 @@ def create_app(settings: Settings | None = None) -> Litestar:
             "model_service": Provide(provide_model_service, sync_to_thread=False),
             "credential_service": Provide(provide_credential_service, sync_to_thread=False),
             "completion_service": Provide(provide_completion_service, sync_to_thread=False),
-            "llm_gateway": Provide(provide_llm_gateway, sync_to_thread=False),
-            # Built lazily; raises SaltKeyMissing (503) if SALT_KEY is unset.
-            "credential_cipher": Provide(
-                lambda: build_cipher(settings.salt_key), sync_to_thread=False
-            ),
-            "jwt_secret": Provide(lambda: settings.jwt_secret, sync_to_thread=False),
+            "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
+            "trace_dispatcher": Provide(lambda: trace_dispatcher, sync_to_thread=False),
+            "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
+            "keyring": Provide(provide_keyring, sync_to_thread=False),
         },
         exception_handlers={DomainError: domain_exception_handler},
     )

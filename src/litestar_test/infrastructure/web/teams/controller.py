@@ -10,11 +10,12 @@ from uuid import UUID
 
 from litestar import Controller, delete, get, patch, post
 from litestar.di import NamedDependency, Provide
-from litestar.params import FromPath
+from litestar.params import FromPath, FromQuery
 
 from litestar_test.application.service import APIKeyService
 from litestar_test.application.team_service import TeamService
 from litestar_test.domain.entities import User
+from litestar_test.domain.ports import UsageRepository
 from litestar_test.infrastructure.web.session.dependencies import provide_current_user
 from litestar_test.infrastructure.web.teams.schemas import (
     AddMemberRequest,
@@ -23,6 +24,7 @@ from litestar_test.infrastructure.web.teams.schemas import (
     KeyResponse,
     MembershipResponse,
     SetRoleRequest,
+    UsageResponse,
 )
 
 
@@ -113,3 +115,21 @@ class TeamController(Controller):
     ) -> None:
         await team_service.ensure_can_manage_team(current_user, team_id)
         await api_key_service.revoke_for_team(team_id, key_id)
+
+    @get("/{team_id:uuid}/usage")
+    async def usage(
+        self,
+        team_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        usage_repository: NamedDependency[UsageRepository],
+        model: FromQuery[str | None] = None,
+        api_key_id: FromQuery[UUID | None] = None,
+    ) -> list[UsageResponse]:
+        """Per-model token/cost totals for the team. Optional `?model=` and
+        `?api_key_id=` query filters; unfiltered returns every model."""
+        await team_service.ensure_can_manage_team(current_user, team_id)
+        aggregates = await usage_repository.aggregate(
+            team_id, model_name=model, api_key_id=api_key_id
+        )
+        return [UsageResponse.from_aggregate(a) for a in aggregates]

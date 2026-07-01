@@ -1,0 +1,48 @@
+# Design doc — Structured logging & error hygiene
+
+> **Status:** Draft / parked (pre-v1). Branch `adding-structured-logging`.
+> No code yet.
+
+## 1. Goal
+
+Production-grade logs: **structured (JSON)**, with a **request/correlation id** on
+every line, sane levels, and a guarantee that **5xx responses never leak internals**
+(stack traces, SQL, secrets) to clients.
+
+## 2. Plan
+
+- **Structured logging**: configure Litestar's logging (it supports structlog /
+  the stdlib `LoggingConfig`) to emit JSON in production, human-readable in dev.
+- **Request id**: generate/propagate a correlation id per request (accept an
+  inbound `X-Request-ID`, else generate one), bind it to the log context, and
+  echo it in the response header. Litestar has request-lifecycle hooks for this.
+- **Access logs**: method, path, status, latency, team_id (from auth), request id
+  — **never** the API key or credential values.
+- **Error hygiene**: ensure the exception handlers return generic messages for
+  unexpected errors (500) while logging the full detail server-side (we already
+  do this for domain errors; extend to the catch-all). No debug mode in prod.
+- **Sensitive-data discipline**: never log Authorization headers, `lsk_` keys, or
+  credential values; redact known-sensitive fields.
+
+## 3. Open decisions
+
+1. **structlog vs stdlib** JSON logging — lean structlog for ergonomics, or
+   stdlib to avoid a dep.
+2. **Request-id header name** (`X-Request-ID`) and whether to trust inbound ids
+   (only from trusted proxies).
+3. **Log sink**: stdout (12-factor; the platform ships them) — recommended.
+4. **PII in logs**: with payload logging elsewhere (observability), keep the
+   app/access logs strictly metadata.
+
+## 4. Testing
+
+- A 500 path returns a generic body (no stack trace) and logs the detail.
+- The response carries a request id; the same id appears in the emitted log.
+- Assert Authorization / key values are absent from log output.
+
+## 5. Rollout
+
+1. `feat/structured-logging` — logging config (JSON in prod) + request-id
+   middleware + response header.
+2. `feat/error-hygiene` — catch-all 500 handler returns generic body, logs detail;
+   redaction of sensitive fields.

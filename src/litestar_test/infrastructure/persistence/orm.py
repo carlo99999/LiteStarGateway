@@ -14,13 +14,17 @@ from litestar_test.domain.entities import (
     APIKey,
     Credential,
     Invite,
+    KeyPurpose,
     Model,
     ModelType,
     Organization,
+    PasswordReset,
     Provider,
+    SecretKey,
     Team,
     TeamMembership,
     TeamRole,
+    UsageEvent,
     User,
 )
 
@@ -55,6 +59,25 @@ class InviteModel(base.UUIDAuditBase):
             id=self.id,
             token_hash=self.token_hash,
             created_at=self.created_at,
+            used_at=self.used_at,
+        )
+
+
+class PasswordResetModel(base.UUIDAuditBase):
+    __tablename__ = "password_reset"
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("user_account.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column()
+    used_at: Mapped[datetime | None] = mapped_column(default=None)
+
+    def to_entity(self) -> PasswordReset:
+        return PasswordReset(
+            id=self.id,
+            user_id=self.user_id,
+            token_hash=self.token_hash,
+            created_at=self.created_at,
+            expires_at=self.expires_at,
             used_at=self.used_at,
         )
 
@@ -101,13 +124,60 @@ class TeamMembershipModel(base.UUIDAuditBase):
         )
 
 
+class UsageEventModel(base.UUIDAuditBase):
+    __tablename__ = "usage_event"
+
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    api_key_id: Mapped[UUID] = mapped_column(ForeignKey("api_key.id"), index=True)
+    model_id: Mapped[UUID] = mapped_column(index=True)
+    model_name: Mapped[str] = mapped_column()
+    operation: Mapped[str] = mapped_column()
+    prompt_tokens: Mapped[int] = mapped_column(default=0)
+    completion_tokens: Mapped[int] = mapped_column(default=0)
+    cost: Mapped[float] = mapped_column(default=0.0)
+
+    def to_entity(self) -> UsageEvent:
+        return UsageEvent(
+            id=self.id,
+            team_id=self.team_id,
+            api_key_id=self.api_key_id,
+            model_id=self.model_id,
+            model_name=self.model_name,
+            operation=self.operation,
+            prompt_tokens=self.prompt_tokens,
+            completion_tokens=self.completion_tokens,
+            cost=self.cost,
+            created_at=self.created_at,
+        )
+
+
+class SecretKeyModel(base.UUIDAuditBase):
+    __tablename__ = "secret_key"
+
+    purpose: Mapped[str] = mapped_column(index=True)
+    # Master-wrapped key material (never stored in the clear).
+    material: Mapped[str] = mapped_column()
+    retired_at: Mapped[datetime | None] = mapped_column(default=None)
+
+    def to_entity(self) -> SecretKey:
+        return SecretKey(
+            id=self.id,
+            purpose=KeyPurpose(self.purpose),
+            material=self.material,
+            created_at=self.created_at,
+            retired_at=self.retired_at,
+        )
+
+
 class CredentialModel(base.UUIDAuditBase):
     __tablename__ = "credential"
 
     name: Mapped[str] = mapped_column(unique=True, index=True)
     provider: Mapped[str] = mapped_column(index=True)
-    # Fernet ciphertext of the JSON-encoded secret values.
+    # Data-key Fernet ciphertext of the JSON secret values.
     encrypted_values: Mapped[str] = mapped_column()
+    # Which keyring data key encrypted `encrypted_values` (envelope encryption).
+    key_id: Mapped[UUID] = mapped_column(ForeignKey("secret_key.id"))
 
     def to_entity(self) -> Credential:
         return Credential(
