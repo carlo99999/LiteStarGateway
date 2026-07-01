@@ -37,7 +37,8 @@ Databricks, Anthropic, Vertex/Gemini.
 | `POST /v1/images/generations` | ✅ | ✅ | 501 | 501 | ✅ |
 
 Plus: users/invites, JWT login, organizations → teams → memberships, team-scoped
-API keys, and encrypted provider credentials (admin-managed).
+API keys, encrypted provider credentials (admin-managed), and per-key/per-model
+usage accounting (`GET /teams/{id}/usage`).
 
 ## Configuration
 
@@ -145,8 +146,11 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
    keeping recent ones for the token window ([design](docs/secrets-rotation.md)).
 9. **Observability via MLflow** — `TraceSink` port + MLflow adapter (OSS or Databricks), off the hot path.
    [`adding-observability-via-mlflow`](https://github.com/carlo99999/LiteStarGateway/blob/adding-observability-via-mlflow/docs/observability.md)
-10. **Usage & cost accounting + budgets** — authoritative usage records, `GET /usage`, pre-call budget enforcement.
-    [`adding-usage-cost`](https://github.com/carlo99999/LiteStarGateway/blob/adding-usage-cost/docs/usage-cost.md)
+10. ✅ **Usage accounting** _(shipped)_ — every model call records input/output
+    tokens + estimated cost, tagged with the API key and model.
+    `GET /teams/{id}/usage` returns per-model totals, filterable by `?model=` and
+    `?api_key_id=` ([design](docs/usage-cost.md)). _Pre-call budget enforcement is
+    still a follow-up; streaming calls aren't token-counted yet._
 11. ✅ **Account recovery** _(shipped)_ — admin-issued password reset: a platform
     admin creates a single-use, expiring token (`POST /password-resets`, like an
     invite) that the user redeems to set their **own** new password

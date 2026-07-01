@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.application.completion_service import CompletionService
 from litestar_test.config import Settings
-from litestar_test.domain.ports import LLMGateway
+from litestar_test.domain.ports import LLMGateway, UsageRepository
 from litestar_test.infrastructure.keyring import Keyring
 from litestar_test.infrastructure.llm.gateway import LLMGatewayImpl
 from litestar_test.infrastructure.llm.resilience import ResilienceConfig
@@ -16,6 +16,9 @@ from litestar_test.infrastructure.persistence.credential_repository import (
 )
 from litestar_test.infrastructure.persistence.model_repository import (
     SQLAlchemyModelRepository,
+)
+from litestar_test.infrastructure.persistence.usage_repository import (
+    SQLAlchemyUsageRepository,
 )
 
 
@@ -28,6 +31,10 @@ def build_llm_gateway(settings: Settings) -> LLMGateway:
     )
 
 
+def provide_usage_repository(db_session: NamedDependency[AsyncSession]) -> UsageRepository:
+    return SQLAlchemyUsageRepository(db_session)
+
+
 def provide_completion_service(
     db_session: NamedDependency[AsyncSession],
     keyring: NamedDependency[Keyring],
@@ -37,4 +44,5 @@ def provide_completion_service(
         models=SQLAlchemyModelRepository(db_session),
         credentials=SQLAlchemyCredentialRepository(db_session, keyring),
         gateway=llm_gateway,
+        usage=SQLAlchemyUsageRepository(db_session),
     )
