@@ -51,6 +51,15 @@ class UsageAggregate:
 
 
 @dataclass(frozen=True)
+class ExternalIdentity:
+    """An identity resolved from an SSO provider's id_token claims."""
+
+    subject: str  # the IdP's stable user id (`sub`)
+    email: str
+    groups: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class TraceRecord:
     """One observability trace for a model call (metadata; no payload in v1)."""
 

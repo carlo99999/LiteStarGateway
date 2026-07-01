@@ -175,12 +175,14 @@ on their own branch (linked). Order within a phase is a recommendation.
 
 ### Enterprise (post-v1)
 
-- **SSO / SCIM / RBAC / audit** — federate identity via OIDC/SAML (identity as a
-  swappable `IdentityProvider` port), auto-provision via SCIM, map IdP groups to
-  teams/roles, extend RBAC, and add an append-only audit log. Reuses the existing
-  multi-tenant model and JWT session. _The path to being a governed, enterprise-
-  grade gateway rather than a broad LiteLLM clone._
-  [`adding-enterprise-sso`](https://github.com/carlo99999/LiteStarGateway/blob/adding-enterprise-sso/docs/enterprise-sso.md)
+- 🟡 **SSO (OIDC)** _(shipped)_ — an `IdentityProvider` port + generic OIDC adapter
+  (Authlib; works with Google/Microsoft/Okta/Keycloak via their discovery URL).
+  `GET /sso/login` → IdP → `GET /sso/callback` JIT-provisions the user and mints
+  our JWT; an IdP admin group maps to platform admin. Registered only when
+  `OIDC_DISCOVERY_URL` is set. Design ported from LiteLLM's OIDC SSO (MIT), no
+  code copied. _Follow-ups: group→team mapping, role re-sync, SCIM, SAML, audit,
+  per-org SSO, fine-grained RBAC._
+  [design](docs/enterprise-sso.md)
 
 ### v2 (after v1)
 

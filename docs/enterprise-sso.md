@@ -1,7 +1,49 @@
 # Design doc — Enterprise: SSO, SCIM, RBAC, audit
 
-> **Status:** Draft / parked (Enterprise, post-v1). Branch `adding-enterprise-sso`.
-> No code yet.
+> **Status:** SSO in progress (branch `adding-enterprise-sso`); SCIM/RBAC/audit
+> still parked. The rest of this doc is the broader enterprise plan.
+
+## 0. OIDC SSO — implementation plan (refined after studying LiteLLM)
+
+Design **inspired by LiteLLM's OIDC SSO** (`litellm/proxy/management_endpoints/ui_sso.py`,
+MIT) — patterns ported, **no code copied**; nothing from LiteLLM's proprietary
+`enterprise/` was used.
+
+**Ported patterns:** select the provider by config; on callback map the identity
+to a user; **derive role from IdP groups** via a hierarchy where the
+highest-privilege match wins with a default fallback (their
+`determine_role_from_groups`); **JIT-provision** the user on first login;
+reconcile team membership from groups (their `add_missing_team_member`).
+
+**Library — Authlib, not fastapi-sso.** LiteLLM uses `fastapi-sso` because it *is*
+FastAPI. Two spike findings pushed us off it: (1) its `OpenID` result has **no
+`groups`** (LiteLLM digs groups out of the raw JWT separately), and (2) it's
+FastAPI/Starlette-`Request`-coupled — awkward under Litestar. **Authlib** is
+framework-agnostic (httpx), installs on Python 3.14, and gives full `id_token`
+claim access (incl. `groups`), OIDC discovery, PKCE, and JWKS verification.
+
+**Flow / components (hexagonal):**
+- **Port** `IdentityProvider`: `authorization_url(state) -> str`,
+  `exchange(code, ...) -> ExternalIdentity(subject, email, groups, raw)`.
+- **Adapter** `OIDCIdentityProvider` (Authlib): discovery + PKCE + token exchange
+  + `id_token` verification; generic OIDC, with Google/Microsoft as config presets.
+- **Endpoints** (2): `GET /sso/login` (redirect to IdP, signed `state` + PKCE) and
+  `GET /sso/callback` (exchange → map → JIT upsert → **issue our own JWT** via the
+  existing keyring; rate-limited, non-revealing).
+- **Pure mapping**: `is_admin` from an admin-group set; `groups → (team, role)`
+  memberships reconciled against the user's current ones.
+- **JIT upsert** in `UserService`: create/update the SSO user (no password),
+  apply role + teams, bump `token_version` if disabled. `User` gains
+  `sso_subject`/`external_id` and `is_active`.
+- **Config**: OIDC discovery URL, client id/secret, scopes, `SSO_ADMIN_GROUPS`,
+  `SSO_TEAM_MAPPING` (group → team,role).
+- **Reuse**: the existing JWT session + keyring — SSO federates identity, then
+  mints our token (no second session system).
+
+**First PR scope:** generic OIDC (+ Google/Microsoft presets), login+callback, JIT
+upsert, group→admin and group→team, tests with a fake `IdentityProvider`.
+**Follow-ups:** SCIM (deprovisioning), SAML (python3-saml), audit log, per-org
+SSO, fine-grained RBAC (§ below).
 
 ## 1. Goal
 

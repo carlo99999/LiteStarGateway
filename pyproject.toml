@@ -13,6 +13,7 @@ dependencies = [
     "alembic>=1.18.5",
     "anthropic>=0.115.0",
     "asyncpg>=0.31.0",
+    "authlib>=1.7.2",
     "cryptography>=49.0.0",
     "google-genai>=2.10.0",
     "litestar[standard]>=2.24.0",

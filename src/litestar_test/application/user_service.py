@@ -148,6 +148,26 @@ class UserService:
         """Invalidate all of the user's existing JWTs by bumping token_version."""
         await self._users.increment_token_version(user.id)
 
+    async def upsert_sso_user(self, email: str, is_admin: bool) -> User:
+        """Find or JIT-create an SSO user by email (they never log in by password).
+
+        Role is set at creation; re-syncing it on IdP group changes is a follow-up.
+        """
+        normalized = _normalize_email(email)
+        existing = await self._users.get_by_email(normalized)
+        if existing is not None:
+            return existing
+        # A random, unknowable password hash — SSO users authenticate only via SSO.
+        return await self._users.add(
+            User(
+                id=uuid4(),
+                email=normalized,
+                password_hash=hash_password(secrets.token_urlsafe(_INVITE_TOKEN_BYTES)),
+                is_admin=is_admin,
+                created_at=_now(),
+            )
+        )
+
     async def create_password_reset(self, actor: User, email: str) -> IssuedPasswordReset:
         """Platform-admin issues a single-use, expiring reset token for a user.
 
