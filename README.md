@@ -44,6 +44,39 @@ every commit; CI runs the same hooks on every PR):
 uv run pre-commit install
 ```
 
+## Deployment
+
+The app ships as a container (multi-stage `Dockerfile`, non-root, served by
+uvicorn with `--proxy-headers`). Provide the secrets via the environment.
+
+```bash
+# Local prod-like run (SQLite on a named volume) via compose:
+MASTER_KEY=… JWT_SECRET=… SALT_KEY=… docker compose up --build
+# → http://localhost:8000  (GET /health for liveness)
+```
+
+Or build and run the image directly:
+
+```bash
+docker build -t litestar-gateway .
+docker run -p 8000:8000 \
+  -e ENVIRONMENT=production \
+  -e MASTER_KEY=… -e JWT_SECRET=… -e SALT_KEY=… \
+  litestar-gateway
+```
+
+Notes:
+
+- **Behind a reverse proxy / TLS**: the app expects to sit behind one. Keep
+  `--proxy-headers` and set uvicorn's `--forwarded-allow-ips` to your proxy's
+  address (the image default `*` trusts any upstream — fine only when a single
+  trusted ingress fronts it) so the real client IP reaches the per-IP rate limit.
+- **Database**: the image defaults to SQLite on the `/data` volume. For real
+  deployments use Postgres (`postgresql+asyncpg://…`) — see the `adding-postgres`
+  roadmap item and the commented service in `docker-compose.yml`.
+- **Multi-process/replicas**: the rate-limit store is in-memory per process; back
+  it with a shared store (Redis) when running multiple workers/replicas.
+
 ## Roadmap
 
 Planned work, split into **Toward v1** (must-have before publishing) and **v2**
@@ -55,8 +88,10 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
 1. ✅ **CI (GitHub Actions)** _(shipped)_ — runs `ruff` + `pyrefly` + `pytest` on
    every push to `main` and every PR ([`.github/workflows/ci.yml`](.github/workflows/ci.yml),
    [design](docs/ci.md)).
-2. **Container image & deployment** — Dockerfile, uvicorn workers + `--proxy-headers`, TLS, deploy guide.
-   [`adding-docker-deploy`](https://github.com/carlo99999/LiteStarGateway/blob/adding-docker-deploy/docs/deployment.md)
+2. ✅ **Container image & deployment** _(shipped)_ — multi-stage [`Dockerfile`](Dockerfile)
+   (non-root, uvicorn + `--proxy-headers`, healthcheck) + [`docker-compose.yml`](docker-compose.yml),
+   see [Deployment](#deployment) and the [design](docs/deployment.md). _Postgres
+   service is stubbed pending the Postgres item._
 3. **Database migrations (Alembic)** — replace `create_all` with versioned migrations.
    [`adding-db-migrations`](https://github.com/carlo99999/LiteStarGateway/blob/adding-db-migrations/docs/db-migrations.md)
 4. **Production Postgres** — asyncpg + connection pool + validate concurrency on PG.
