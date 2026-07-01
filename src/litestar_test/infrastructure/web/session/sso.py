@@ -29,16 +29,22 @@ _STATE_COOKIE = "sso_state"
 _STATE_TTL_SECONDS = 600  # the user must complete the round-trip within 10 minutes
 
 
-def _redirect_uri(request: Request) -> str:
+def _redirect_uri(request: Request, configured: str | None) -> str:
+    # A configured public callback URL wins (correct behind a reverse proxy, where
+    # the request's own host/scheme is the internal one); otherwise derive it.
+    if configured:
+        return configured
     return str(request.base_url).rstrip("/") + "/sso/callback"
 
 
 @get("/sso/login", middleware=[build_auth_rate_limit().middleware])
 async def sso_login(
-    request: Request, identity_provider: NamedDependency[IdentityProvider]
+    request: Request,
+    identity_provider: NamedDependency[IdentityProvider],
+    sso_redirect_uri: NamedDependency[str | None],
 ) -> Redirect:
     state = secrets.token_urlsafe(32)
-    url = await identity_provider.authorization_url(state, _redirect_uri(request))
+    url = await identity_provider.authorization_url(state, _redirect_uri(request, sso_redirect_uri))
     return Redirect(
         url,
         cookies=[
@@ -63,6 +69,7 @@ async def sso_callback(
     user_service: NamedDependency[UserService],
     keyring: NamedDependency[Keyring],
     sso_admin_groups: NamedDependency[tuple[str, ...]],
+    sso_redirect_uri: NamedDependency[str | None],
     code: FromQuery[str | None] = None,
     # `state` is a reserved kwarg in Litestar (the app State), so alias the query.
     flow_state: Annotated[str | None, QueryParameter(name="state")] = None,
@@ -73,7 +80,7 @@ async def sso_callback(
         raise NotAuthorizedException("Invalid SSO state")
     if error or not code:
         raise NotAuthorizedException("SSO login was not completed")
-    identity = await identity_provider.exchange(code, _redirect_uri(request))
+    identity = await identity_provider.exchange(code, _redirect_uri(request, sso_redirect_uri))
 
     is_admin = bool(set(identity.groups) & set(sso_admin_groups))
     # Email presence/verification and subject-binding rules live in the service.
