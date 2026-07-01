@@ -112,8 +112,10 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
    [`adding-postgres`](https://github.com/carlo99999/LiteStarGateway/blob/adding-postgres/docs/postgres.md)
 5. **Provider resilience** — timeouts, bounded retries with backoff, per-provider circuit breaker.
    [`adding-provider-resilience`](https://github.com/carlo99999/LiteStarGateway/blob/adding-provider-resilience/docs/provider-resilience.md)
-6. **Request parameter allowlist** — deny-by-default sanitizing of client params before the provider SDKs.
-   [`adding-param-allowlist`](https://github.com/carlo99999/LiteStarGateway/blob/adding-param-allowlist/docs/param-allowlist.md)
+6. ✅ **Request parameter allowlist** _(shipped)_ — deny-by-default sanitizing of
+   client params before the provider SDKs
+   ([`request_policy.py`](src/litestar_test/domain/request_policy.py),
+   [design](docs/param-allowlist.md)).
 7. **Structured logging & error hygiene** — JSON logs, request ids, no internal leakage on 5xx.
    [`adding-structured-logging`](https://github.com/carlo99999/LiteStarGateway/blob/adding-structured-logging/docs/logging.md)
 8. **Secrets management & key rotation** — supply secrets from a manager; rotate `SALT_KEY` (keyring + re-encrypt) and `JWT_SECRET`.
@@ -152,10 +154,6 @@ we resume from there. Order within a phase is a recommendation; reorder as neede
 
 Tracked items not yet implemented (see also the code review notes):
 
-- **Unvalidated request passthrough** — chat/responses requests are forwarded to
-  the provider SDKs largely as-is (`{**model.params, **request}`). `model` is
-  overridden, but other fields (e.g. `extra_headers`, large `n`) pass through.
-  Consider an allowlist of accepted parameters per operation.
 - **Cross-team credential usage (by design)** — credentials are platform-global,
   so any team admin can reference any credential in a model and consume it (they
   cannot read its secret). This is intentional for now; tie credentials to a
@@ -165,6 +163,11 @@ Tracked items not yet implemented (see also the code review notes):
 
 ### Resolved
 
+- **Unvalidated request passthrough** — the client's OpenAI-shaped body is now
+  sanitized against a per-operation allowlist before it reaches the provider SDK
+  (`domain/request_policy.py`), so SDK-special kwargs (`extra_headers`,
+  `extra_body`, `extra_query`, `timeout`, …) are dropped and cost drivers (`n`,
+  `max_tokens`) are clamped. Trusted `model.params` are merged separately.
 - **Credential exfiltration via model `api_base` (SSRF)** — the provider endpoint
   now comes only from the admin-managed credential, never from the team-controlled
   model (`Model.api_base` was removed). A team admin can no longer redirect a
