@@ -10,6 +10,7 @@ requires-python = ">=3.14"
 dependencies = [
     "advanced-alchemy>=1.11.0",
     "aiosqlite>=0.22.1",
+    "alembic>=1.18.5",
     "anthropic>=0.115.0",
     "asyncpg>=0.31.0",
     "cryptography>=49.0.0",
@@ -36,6 +37,8 @@ dev = [
 
 [tool.ruff]
 line-length = 100
+# Alembic migration scripts are generated; don't lint/format them.
+extend-exclude = ["migrations"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

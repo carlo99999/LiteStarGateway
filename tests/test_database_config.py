@@ -34,3 +34,21 @@ def test_sqlite_leaves_pool_at_library_defaults() -> None:
     engine_config = create_database(_settings("sqlite+aiosqlite:///:memory:")).config.engine_config
     assert engine_config.pool_pre_ping is not True
     assert engine_config.pool_size != DEFAULT_DB_POOL_SIZE
+
+
+def test_create_all_enabled_in_development() -> None:
+    # Dev/test auto-create the schema (no migrations needed).
+    assert create_database(_settings("sqlite+aiosqlite:///:memory:")).config.create_all is True
+
+
+def test_create_all_disabled_in_production() -> None:
+    # Production manages the schema via Alembic migrations, not create_all.
+    production = Settings(
+        database_url="postgresql+asyncpg://u:p@h:5432/db",
+        admin_email="admin@example.com",
+        master_key="m",
+        jwt_secret="x" * 40,
+        salt_key="s",
+        environment="production",
+    )
+    assert create_database(production).config.create_all is False

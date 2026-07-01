@@ -28,6 +28,9 @@ WORKDIR /app
 COPY --from=builder --chown=app:app /app /app
 
 ENV PATH="/app/.venv/bin:$PATH" \
+    # Containers are production: enables the fail-fast config checks and switches
+    # schema management from create_all to Alembic migrations (run on start).
+    ENVIRONMENT="production" \
     # Default to SQLite on the writable /data volume; override for Postgres.
     DATABASE_URL="sqlite+aiosqlite:////data/gateway.db"
 
@@ -35,11 +38,10 @@ USER app
 EXPOSE 8000
 
 # Liveness probe: /health does not touch the database.
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()" || exit 1
 
-# --proxy-headers + --forwarded-allow-ips expose the real client IP (needed for
-# the per-IP rate limiting). In production, replace "*" with your proxy's address.
-CMD ["uvicorn", "litestar_test.app:app", \
-     "--host", "0.0.0.0", "--port", "8000", \
-     "--proxy-headers", "--forwarded-allow-ips", "*"]
+# Applies migrations, then serves. --proxy-headers + --forwarded-allow-ips expose
+# the real client IP (needed for the per-IP rate limiting); in production replace
+# "*" with your proxy's address.
+CMD ["sh", "/app/docker-entrypoint.sh"]

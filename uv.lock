@@ -646,6 +646,7 @@ source = { editable = "." }
 dependencies = [
     { name = "advanced-alchemy" },
     { name = "aiosqlite" },
+    { name = "alembic" },
     { name = "anthropic" },
     { name = "asyncpg" },
     { name = "cryptography" },
@@ -670,6 +671,7 @@ dev = [
 requires-dist = [
     { name = "advanced-alchemy", specifier = ">=1.11.0" },
     { name = "aiosqlite", specifier = ">=0.22.1" },
+    { name = "alembic", specifier = ">=1.18.5" },
     { name = "anthropic", specifier = ">=0.115.0" },
     { name = "asyncpg", specifier = ">=0.31.0" },
     { name = "cryptography", specifier = ">=49.0.0" },
