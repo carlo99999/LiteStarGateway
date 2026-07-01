@@ -19,6 +19,7 @@ from litestar_test.domain.exceptions import (
     ModelNotFound,
     ProviderMismatch,
 )
+from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_test.domain.ports import CredentialRepository, ModelRepository
 
 
@@ -76,8 +77,10 @@ class ModelService:
             )
         )
 
-    async def list_for_team(self, team_id: UUID) -> list[Model]:
-        return await self._models.list_by_team(team_id)
+    async def list_for_team(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[Model]:
+        return await self._models.list_by_team(team_id, limit=limit, offset=offset)
 
     async def _get_scoped(self, team_id: UUID, model_id: UUID) -> Model:
         model = await self._models.get(model_id)

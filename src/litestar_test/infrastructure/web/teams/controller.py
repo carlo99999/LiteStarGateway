@@ -15,6 +15,7 @@ from litestar.params import FromPath, FromQuery
 from litestar_test.application.service import APIKeyService
 from litestar_test.application.team_service import TeamService
 from litestar_test.domain.entities import User
+from litestar_test.domain.pagination import resolve_page
 from litestar_test.domain.ports import UsageRepository
 from litestar_test.infrastructure.web.session.dependencies import provide_current_user
 from litestar_test.infrastructure.web.teams.schemas import (
@@ -99,9 +100,12 @@ class TeamController(Controller):
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
         api_key_service: NamedDependency[APIKeyService],
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
     ) -> list[KeyResponse]:
         await team_service.ensure_can_manage_team(current_user, team_id)
-        keys = await api_key_service.list_for_team(team_id)
+        page_limit, page_offset = resolve_page(limit, offset)
+        keys = await api_key_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
         return [KeyResponse.from_entity(k) for k in keys]
 
     @delete("/{team_id:uuid}/keys/{key_id:uuid}")
