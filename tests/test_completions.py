@@ -956,6 +956,26 @@ async def test_images_unsupported_provider_501(
     assert resp.status_code == HTTP_501_NOT_IMPLEMENTED
 
 
+async def test_vertex_invalid_service_account_json_400(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A malformed vertex_credentials JSON must yield a clean 400, never a 500 that
+    # could echo private-key material.
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="vertex_ai",
+        values={"vertex_project": "p", "vertex_location": "us", "vertex_credentials": "{not-json"},
+        provider_model_id="gemini-1.5-pro",
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_400_BAD_REQUEST
+
+
 async def test_missing_api_key_in_credential_400(
     client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

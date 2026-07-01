@@ -98,6 +98,10 @@ class Settings:
     # Observability: MLflow tracking URI (None ⇒ tracing disabled) + general experiment.
     mlflow_tracking_uri: str | None = None
     mlflow_experiment: str = DEFAULT_MLFLOW_EXPERIMENT
+    # Serve the interactive OpenAPI docs (Swagger/Scalar/Stoplight + /openapi.json).
+    # Public and unauthenticated when on — disable in production to avoid exposing
+    # the full admin/credential API surface.
+    openapi_enabled: bool = True
     # SSO via OIDC. No discovery URL ⇒ disabled. `oidc_admin_groups` (comma-sep)
     # maps IdP groups to platform admin.
     oidc_discovery_url: str | None = None
@@ -167,6 +171,7 @@ class Settings:
             rotation_time=os.environ.get("KEY_ROTATION_TIME", DEFAULT_ROTATION_TIME),
             mlflow_tracking_uri=os.environ.get("MLFLOW_TRACKING_URI"),
             mlflow_experiment=os.environ.get("MLFLOW_EXPERIMENT", DEFAULT_MLFLOW_EXPERIMENT),
+            openapi_enabled=_env_bool("OPENAPI_ENABLED", True),
             oidc_discovery_url=os.environ.get("OIDC_DISCOVERY_URL"),
             oidc_client_id=os.environ.get("OIDC_CLIENT_ID"),
             oidc_client_secret=os.environ.get("OIDC_CLIENT_SECRET"),

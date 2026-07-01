@@ -25,6 +25,7 @@ from google.genai.types import HttpOptions
 from google.oauth2 import service_account
 
 from litestar_test.domain.entities import Model
+from litestar_test.domain.exceptions import CredentialMisconfigured
 from litestar_test.infrastructure.llm.resilience import ResilienceConfig
 
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
@@ -160,9 +161,16 @@ def from_imagen_response(response: dict[str, Any]) -> dict[str, Any]:
 def _build_client(credentials: dict[str, str], timeout_ms: int) -> genai.Client:
     creds = None
     if raw := credentials.get("vertex_credentials"):
-        creds = service_account.Credentials.from_service_account_info(
-            json.loads(raw), scopes=[_SCOPE]
-        )
+        # Never let a malformed service-account JSON surface as a 500 whose message
+        # could echo the credential's private-key material.
+        try:
+            creds = service_account.Credentials.from_service_account_info(
+                json.loads(raw), scopes=[_SCOPE]
+            )
+        except (ValueError, KeyError, TypeError) as exc:
+            raise CredentialMisconfigured(
+                "vertex_credentials is not a valid service-account JSON"
+            ) from exc
     return genai.Client(
         vertexai=True,
         project=credentials.get("vertex_project"),
