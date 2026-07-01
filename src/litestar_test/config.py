@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///api_keys.db"
 DEFAULT_ADMIN_EMAIL = "admin@example.com"
 DEFAULT_ENVIRONMENT = "development"
+DEFAULT_DB_POOL_SIZE = 5
+DEFAULT_DB_MAX_OVERFLOW = 10
 # ≥32 bytes to satisfy HS256 key-length recommendations. Override in production.
 DEFAULT_JWT_SECRET = "dev-insecure-change-me-please-0123456789"
 
@@ -35,10 +37,17 @@ class Settings:
     salt_key: str | None
     # Deployment environment. "production"/"prod" enables fail-fast config checks.
     environment: str = DEFAULT_ENVIRONMENT
+    # Connection-pool sizing (applied only to Postgres; SQLite ignores it).
+    db_pool_size: int = DEFAULT_DB_POOL_SIZE
+    db_max_overflow: int = DEFAULT_DB_MAX_OVERFLOW
 
     @property
     def is_production(self) -> bool:
         return self.environment.strip().lower() in _PRODUCTION_ENVIRONMENTS
+
+    @property
+    def is_postgres(self) -> bool:
+        return self.database_url.startswith(("postgresql", "postgres"))
 
     def __post_init__(self) -> None:
         # Fail fast rather than silently signing JWTs with a publicly known key.
@@ -57,4 +66,6 @@ class Settings:
             jwt_secret=os.environ.get("JWT_SECRET", DEFAULT_JWT_SECRET),
             salt_key=os.environ.get("SALT_KEY"),
             environment=os.environ.get("ENVIRONMENT", DEFAULT_ENVIRONMENT),
+            db_pool_size=int(os.environ.get("DB_POOL_SIZE", DEFAULT_DB_POOL_SIZE)),
+            db_max_overflow=int(os.environ.get("DB_MAX_OVERFLOW", DEFAULT_DB_MAX_OVERFLOW)),
         )
