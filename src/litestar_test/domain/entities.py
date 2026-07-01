@@ -158,3 +158,30 @@ class IssuedInvite:
 
     invite: Invite
     token: str
+
+
+@dataclass(frozen=True)
+class PasswordReset:
+    """A single-use, expiring admin-issued password reset for a specific user.
+
+    Only the token hash is persisted; the plaintext is shown once to the admin,
+    who relays it. The user redeems it and chooses their own new password.
+    """
+
+    id: UUID
+    user_id: UUID
+    token_hash: str
+    created_at: datetime
+    expires_at: datetime
+    used_at: datetime | None
+
+    def is_usable(self, now: datetime) -> bool:
+        return self.used_at is None and now < self.expires_at
+
+
+@dataclass(frozen=True)
+class IssuedPasswordReset:
+    """Result of creating a reset: the entity plus the one-time token."""
+
+    reset: PasswordReset
+    token: str

@@ -36,6 +36,15 @@ class SQLAlchemyUserRepository:
         )
         await self._session.commit()
 
+    async def set_password(self, user_id: UUID, password_hash: str) -> None:
+        # Bump token_version in the same update so a reset revokes existing JWTs.
+        await self._session.execute(
+            update(UserModel)
+            .where(UserModel.id == user_id)
+            .values(password_hash=password_hash, token_version=UserModel.token_version + 1)
+        )
+        await self._session.commit()
+
     async def get(self, user_id: UUID) -> User | None:
         model = await self._session.get(UserModel, user_id)
         return model.to_entity() if model else None

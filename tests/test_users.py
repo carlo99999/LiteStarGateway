@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from litestar import Litestar
 from litestar.status_codes import (
+    HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
@@ -188,6 +189,57 @@ async def test_signup_normalizes_email(client: AsyncTestClient) -> None:
     )
     assert resp.status_code == HTTP_201_CREATED
     assert resp.json()["email"] == "mixed@b.com"
+
+
+async def _register(client: AsyncTestClient, email: str, password: str) -> None:
+    invite = await _new_invite(client)
+    await client.post(
+        "/signup", json={"invite_token": invite, "email": email, "password": password}
+    )
+
+
+async def test_admin_password_reset_flow(client: AsyncTestClient) -> None:
+    admin = await _admin_token(client)
+    await _register(client, "u@b.com", "OldPassw0rd!")
+
+    # Admin issues a reset token for the user.
+    issued = await client.post(
+        "/password-resets", json={"email": "u@b.com"}, headers={"Authorization": f"Bearer {admin}"}
+    )
+    assert issued.status_code == HTTP_201_CREATED
+    token = issued.json()["token"]
+
+    # User redeems it with their own new password.
+    redeemed = await client.post(
+        "/reset-password", json={"reset_token": token, "new_password": "NewPassw0rd!"}
+    )
+    assert redeemed.status_code in (200, 204)
+
+    # New password works; old one no longer does.
+    assert (
+        await client.post("/login", json={"email": "u@b.com", "password": "NewPassw0rd!"})
+    ).status_code == HTTP_200_OK
+    assert (
+        await client.post("/login", json={"email": "u@b.com", "password": "OldPassw0rd!"})
+    ).status_code == HTTP_401_UNAUTHORIZED
+
+
+async def test_password_reset_requires_admin(client: AsyncTestClient) -> None:
+    await _register(client, "u@b.com", "Passw0rd!")
+    user = (await client.post("/login", json={"email": "u@b.com", "password": "Passw0rd!"})).json()[
+        "access_token"
+    ]
+    resp = await client.post(
+        "/password-resets", json={"email": "u@b.com"}, headers={"Authorization": f"Bearer {user}"}
+    )
+    assert resp.status_code == HTTP_403_FORBIDDEN
+
+
+async def test_reset_password_invalid_token_is_non_revealing(client: AsyncTestClient) -> None:
+    resp = await client.post(
+        "/reset-password", json={"reset_token": "nope", "new_password": "NewPassw0rd!"}
+    )
+    assert resp.status_code == HTTP_400_BAD_REQUEST
 
 
 def test_app_imports_and_routes() -> None:

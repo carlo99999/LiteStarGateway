@@ -19,6 +19,10 @@ class InvalidInvite(DomainError):
     """The invite token is unknown or already used."""
 
 
+class InvalidPasswordReset(DomainError):
+    """The password-reset token is unknown, already used, or expired."""
+
+
 class EmailAlreadyRegistered(DomainError):
     """A user with this email already exists."""
 
