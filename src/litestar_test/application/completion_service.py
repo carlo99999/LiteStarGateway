@@ -48,6 +48,28 @@ class CompletionService:
         self._usage = usage
         self._emit_trace = emit_trace
 
+    async def _record_usage(self, event: UsageEvent) -> None:
+        """Persist the billing record. A failed write must never fail the request,
+        but it must not vanish silently either: on failure we log the full event at
+        ERROR (no secrets — ids, tokens, cost) so billing can be reconciled/replayed
+        from logs rather than under-counting invisibly."""
+        try:
+            await self._usage.record(event)
+        except Exception:  # recording must not fail the request
+            logger.error(
+                "usage event dropped (record failed): "
+                "team=%s api_key=%s model=%s op=%s prompt=%s completion=%s cost=%s at=%s",
+                event.team_id,
+                event.api_key_id,
+                event.model_name,
+                event.operation,
+                event.prompt_tokens,
+                event.completion_tokens,
+                event.cost,
+                event.created_at.isoformat(),
+                exc_info=True,
+            )
+
     async def _observe(
         self,
         team_id: UUID,
@@ -66,23 +88,19 @@ class CompletionService:
         )
         now = datetime.now(UTC)
         # Usage = authoritative billing record (persisted).
-        try:
-            await self._usage.record(
-                UsageEvent(
-                    id=uuid4(),
-                    team_id=team_id,
-                    api_key_id=api_key_id,
-                    model_id=model.id,
-                    model_name=model.name,
-                    operation=operation,
-                    prompt_tokens=prompt,
-                    completion_tokens=completion,
-                    cost=cost,
-                    created_at=now,
-                )
-            )
-        except Exception:  # pragma: no cover - recording must not fail the request
-            logger.warning("failed to record usage", exc_info=True)
+        event = UsageEvent(
+            id=uuid4(),
+            team_id=team_id,
+            api_key_id=api_key_id,
+            model_id=model.id,
+            model_name=model.name,
+            operation=operation,
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            cost=cost,
+            created_at=now,
+        )
+        await self._record_usage(event)
         # Trace = observability (latency/analytics), fire-and-forget off the path.
         self._emit_trace(
             TraceRecord(

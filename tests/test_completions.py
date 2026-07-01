@@ -432,6 +432,31 @@ async def test_usage_is_recorded_and_queryable(
     assert filtered.json() == []
 
 
+async def test_usage_record_failure_is_logged_not_swallowed(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # If the billing write fails, the request still succeeds (fail-safe) but the
+    # dropped event is logged at ERROR with its details — not silently swallowed.
+    _patch(monkeypatch)
+    from litestar_test.infrastructure.persistence import usage_repository
+
+    async def boom(self: object, event: object) -> None:
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(usage_repository.SQLAlchemyUsageRepository, "record", boom)
+    api_key = await _setup(client)
+    with caplog.at_level("ERROR", logger="litestar_test.usage"):
+        resp = await client.post(
+            "/v1/chat/completions",
+            json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+            headers=_bearer(api_key),
+        )
+    assert resp.status_code == HTTP_200_OK  # request unaffected by the billing failure
+    assert any(
+        "usage event dropped" in r.message and "prompt=1" in r.message for r in caplog.records
+    )
+
+
 async def test_openai_responses(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch(monkeypatch)
     api_key = await _setup(client)
