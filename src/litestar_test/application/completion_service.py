@@ -24,6 +24,7 @@ from litestar_test.domain.ports import (
     LLMGateway,
     ModelRepository,
 )
+from litestar_test.domain.request_policy import sanitize_request
 
 
 class CompletionService:
@@ -57,11 +58,13 @@ class CompletionService:
 
     async def chat_completion(self, team_id: UUID, request: dict[str, Any]) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
-        return await self._gateway.achat_completion(request, model, values)
+        clean = sanitize_request("chat.completions", request)
+        return await self._gateway.achat_completion(clean, model, values)
 
     async def responses(self, team_id: UUID, request: dict[str, Any]) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
-        return await self._gateway.aresponses(request, model, values)
+        clean = sanitize_request("responses", request)
+        return await self._gateway.aresponses(clean, model, values)
 
     async def open_chat_stream(
         self, team_id: UUID, request: dict[str, Any]
@@ -69,7 +72,8 @@ class CompletionService:
         """Resolve the model + credentials (may raise → HTTP error) and return an
         async iterator of OpenAI chunk dicts. Awaited before streaming starts."""
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
-        return await self._gateway.astream_chat_completion(request, model, values)
+        clean = sanitize_request("chat.completions", request)
+        return await self._gateway.astream_chat_completion(clean, model, values)
 
     async def open_responses_stream(
         self, team_id: UUID, request: dict[str, Any]
@@ -77,12 +81,15 @@ class CompletionService:
         """Resolve (may raise → HTTP error) and return an async iterator of
         Responses-API stream events. Awaited before streaming starts."""
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
-        return await self._gateway.astream_responses(request, model, values)
+        clean = sanitize_request("responses", request)
+        return await self._gateway.astream_responses(clean, model, values)
 
     async def embeddings(self, team_id: UUID, request: dict[str, Any]) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.EMBEDDINGS)
-        return await self._gateway.aembeddings(request, model, values)
+        clean = sanitize_request("embeddings", request)
+        return await self._gateway.aembeddings(clean, model, values)
 
     async def images(self, team_id: UUID, request: dict[str, Any]) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.IMAGE)
-        return await self._gateway.aimages(request, model, values)
+        clean = sanitize_request("images", request)
+        return await self._gateway.aimages(clean, model, values)

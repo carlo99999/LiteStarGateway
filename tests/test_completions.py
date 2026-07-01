@@ -20,7 +20,8 @@ from litestar.status_codes import (
 from litestar.testing import AsyncTestClient
 
 from litestar_test.app import create_app
-from litestar_test.config import Settings
+from litestar_test.config import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, Settings
+from litestar_test.domain.request_policy import MAX_N
 from litestar_test.infrastructure.llm import (
     anthropic_adapter,
     azure_adapter,
@@ -323,6 +324,43 @@ async def test_openai_chat_completions(
     assert FakeClient.last_kwargs["model"] == "gpt-4o"  # alias -> upstream id
     assert FakeClient.last_init["api_key"] == "sk-x"
     assert resp.json()["model"] == "gpt-4o"
+
+
+async def test_request_params_are_sanitized_before_provider(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(client)
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "hi"}],
+            "n": 999,  # cost driver → clamped
+            "extra_headers": {"X-Evil": "1"},  # transport injection → dropped
+            "extra_body": {"foo": "bar"},  # → dropped
+        },
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert "extra_headers" not in FakeClient.last_kwargs
+    assert "extra_body" not in FakeClient.last_kwargs
+    assert FakeClient.last_kwargs["n"] == MAX_N
+
+
+async def test_provider_client_gets_timeout_and_retries(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(client)
+    await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+        headers=_bearer(api_key),
+    )
+    # The SDK client is built with a bounded timeout + retry budget (no 10-min hang).
+    assert FakeClient.last_init["timeout"] == DEFAULT_REQUEST_TIMEOUT
+    assert FakeClient.last_init["max_retries"] == DEFAULT_MAX_RETRIES
 
 
 async def test_openai_responses(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
