@@ -97,8 +97,6 @@ def create_app(settings: Settings | None = None) -> Litestar:
             "completion_service": Provide(provide_completion_service, sync_to_thread=False),
             "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
             "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
-            # Envelope-encryption keyring (credentials + JWT). Built lazily;
-            # raises SaltKeyMissing (503) if SALT_KEY — the master key — is unset.
             "keyring": Provide(provide_keyring, sync_to_thread=False),
         },
         exception_handlers={DomainError: domain_exception_handler},
