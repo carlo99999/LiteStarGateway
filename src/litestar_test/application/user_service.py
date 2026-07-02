@@ -95,7 +95,7 @@ class UserService:
         stored = await self._invites.add(invite)
         return IssuedInvite(invite=stored, token=token)
 
-    def __check_if_password_has_some_complexity(self, password: str) -> None:
+    def _check_password_complexity(self, password: str) -> None:
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters long")
         if not any(c.islower() for c in password):
@@ -115,7 +115,7 @@ class UserService:
         # Validate the password before consuming the invite, so a legitimate
         # typo does not burn the invite (and it leaks nothing about the email).
         try:
-            self.__check_if_password_has_some_complexity(password)
+            self._check_password_complexity(password)
         except ValueError as e:
             raise WeakPassword(str(e)) from e
 
@@ -259,7 +259,7 @@ class UserService:
             raise InvalidPasswordReset("Reset token is invalid, used, or expired")
 
         try:
-            self.__check_if_password_has_some_complexity(new_password)
+            self._check_password_complexity(new_password)
         except ValueError as e:
             raise WeakPassword(str(e)) from e
 
