@@ -108,9 +108,10 @@ Notes:
 - **Observability**: set `MLFLOW_TRACKING_URI` to enable request tracing (classic
   MLflow or `databricks`). The compose stack runs a classic MLflow server (UI at
   `http://localhost:5000`) and points the app at it; unset the URI to disable.
-- **Multi-process/replicas**: the rate-limit store is in-memory per process; back
-  it with a shared store (Redis) when running multiple workers/replicas. The trace
-  queue is also per-process (each drains its own).
+- **Multi-process/replicas**: set `REDIS_URL` to back the rate-limit store with a
+  shared Redis so limits hold across workers/replicas (the compose stack includes
+  a `redis` service and sets it; drop the var to fall back to the in-memory
+  per-process store). The trace queue is still per-process (each drains its own).
 
 ## Roadmap
 

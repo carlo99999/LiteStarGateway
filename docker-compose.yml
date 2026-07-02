@@ -34,11 +34,23 @@ services:
     ports:
       - "5000:5000"
 
+  # Shared rate-limit store. Only needed when running multiple app replicas so the
+  # limits are enforced across them; a single instance works without it (in-memory).
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   app:
     build: .
     image: litestar-gateway
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+asyncpg://gateway:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or a .env file}@db:5432/gateway
@@ -48,6 +60,8 @@ services:
       SALT_KEY: ${SALT_KEY:?set SALT_KEY in your environment or a .env file}
       # Tracing is best-effort; the app starts even if MLflow isn't up yet.
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      # Shared rate-limit store (drop this line to fall back to in-memory).
+      REDIS_URL: redis://redis:6379
     ports:
       - "8000:8000"
 

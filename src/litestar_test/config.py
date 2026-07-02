@@ -106,6 +106,9 @@ class Settings:
     # envs; set explicitly (SESSION_COOKIE_SECURE) when TLS terminates at a proxy
     # that speaks HTTP to the app, so the request scheme alone can't be trusted.
     session_cookie_secure: bool = False
+    # Optional Redis backing for the rate-limit store, shared across replicas. When
+    # unset, an in-memory per-process store is used (fine for a single instance).
+    redis_url: str | None = None
     # SSO via OIDC. No discovery URL ⇒ disabled. `oidc_admin_groups` (comma-sep)
     # maps IdP groups to platform admin.
     oidc_discovery_url: str | None = None
@@ -181,6 +184,7 @@ class Settings:
             # Secure cookies on by default outside local envs; overridable for
             # proxy topologies where the request scheme is HTTP behind TLS.
             session_cookie_secure=_env_bool("SESSION_COOKIE_SECURE", not is_local),
+            redis_url=os.environ.get("REDIS_URL"),
             oidc_discovery_url=os.environ.get("OIDC_DISCOVERY_URL"),
             oidc_client_id=os.environ.get("OIDC_CLIENT_ID"),
             oidc_client_secret=os.environ.get("OIDC_CLIENT_SECRET"),
