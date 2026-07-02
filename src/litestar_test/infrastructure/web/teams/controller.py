@@ -43,8 +43,13 @@ class TeamController(Controller):
         team_id: FromPath[UUID],
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
     ) -> list[MembershipResponse]:
-        members = await team_service.list_members(current_user, team_id)
+        page_limit, page_offset = resolve_page(limit, offset)
+        members = await team_service.list_members(
+            current_user, team_id, limit=page_limit, offset=page_offset
+        )
         return [MembershipResponse.from_entity(m) for m in members]
 
     @post("/{team_id:uuid}/members")
@@ -205,11 +210,18 @@ class TeamController(Controller):
         usage_repository: NamedDependency[UsageRepository],
         model: FromQuery[str | None] = None,
         api_key_id: FromQuery[UUID | None] = None,
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
     ) -> list[UsageResponse]:
         """Per-model token/cost totals for the team. Optional `?model=` and
-        `?api_key_id=` query filters; unfiltered returns every model."""
+        `?api_key_id=` query filters; unfiltered returns every model, paged."""
         await team_service.ensure_can_manage_team(current_user, team_id)
+        page_limit, page_offset = resolve_page(limit, offset)
         aggregates = await usage_repository.aggregate(
-            team_id, model_name=model, api_key_id=api_key_id
+            team_id,
+            model_name=model,
+            api_key_id=api_key_id,
+            limit=page_limit,
+            offset=page_offset,
         )
         return [UsageResponse.from_aggregate(a) for a in aggregates]

@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from litestar_test.domain.entities import Organization, User
 from litestar_test.domain.exceptions import PermissionDenied
+from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_test.domain.ports import OrganizationRepository
 
 
@@ -27,6 +28,8 @@ class OrganizationService:
         _require_platform_admin(actor)
         return await self._orgs.add(Organization(id=uuid4(), name=name, created_at=_now()))
 
-    async def list(self, actor: User) -> list[Organization]:
+    async def list(
+        self, actor: User, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[Organization]:
         _require_platform_admin(actor)
-        return await self._orgs.list()
+        return await self._orgs.list(limit=limit, offset=offset)

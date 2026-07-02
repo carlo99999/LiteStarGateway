@@ -41,7 +41,11 @@ class SQLAlchemyUsageRepository:
         *,
         model_name: str | None = None,
         api_key_id: UUID | None = None,
+        limit: int = DEFAULT_PAGE_SIZE,
+        offset: int = 0,
     ) -> list[UsageAggregate]:
+        # One row per model (GROUP BY), but a team's model count is unbounded, so
+        # this pages like every other list query.
         query = (
             select(
                 UsageEventModel.model_id,
@@ -54,6 +58,8 @@ class SQLAlchemyUsageRepository:
             .where(UsageEventModel.team_id == team_id)
             .group_by(UsageEventModel.model_id, UsageEventModel.model_name)
             .order_by(UsageEventModel.model_name)
+            .limit(limit)
+            .offset(offset)
         )
         if model_name is not None:
             query = query.where(UsageEventModel.model_name == model_name)

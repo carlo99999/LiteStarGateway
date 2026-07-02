@@ -151,7 +151,9 @@ class OrganizationRepository(Protocol):
 
     async def get(self, organization_id: UUID) -> Organization | None: ...
 
-    async def list(self) -> list[Organization]: ...
+    async def list(
+        self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[Organization]: ...
 
 
 class TeamRepository(Protocol):
@@ -171,7 +173,9 @@ class TeamMembershipRepository(Protocol):
 
     async def get(self, team_id: UUID, user_id: UUID) -> TeamMembership | None: ...
 
-    async def list_by_team(self, team_id: UUID) -> list[TeamMembership]: ...
+    async def list_by_team(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[TeamMembership]: ...
 
     async def update(self, membership: TeamMembership) -> TeamMembership: ...
 
@@ -242,9 +246,11 @@ class UsageRepository(Protocol):
         *,
         model_name: str | None = None,
         api_key_id: UUID | None = None,
+        limit: int = DEFAULT_PAGE_SIZE,
+        offset: int = 0,
     ) -> list[UsageAggregate]:
         """Usage summed per model for a team, optionally filtered by model name
-        and/or API key."""
+        and/or API key. One row per model, paged like every other list query."""
         ...
 
     async def spend_by_api_key(self, team_id: UUID) -> list[ApiKeySpend]:

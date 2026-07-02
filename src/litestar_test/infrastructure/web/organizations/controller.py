@@ -6,11 +6,12 @@ from uuid import UUID
 
 from litestar import Controller, get, post
 from litestar.di import NamedDependency, Provide
-from litestar.params import FromPath
+from litestar.params import FromPath, FromQuery
 
 from litestar_test.application.organization_service import OrganizationService
 from litestar_test.application.team_service import TeamService
 from litestar_test.domain.entities import User
+from litestar_test.domain.pagination import resolve_page
 from litestar_test.infrastructure.web.organizations.schemas import (
     CreateOrganizationRequest,
     OrganizationResponse,
@@ -40,8 +41,13 @@ class OrganizationController(Controller):
         self,
         current_admin: NamedDependency[User],
         organization_service: NamedDependency[OrganizationService],
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
     ) -> list[OrganizationResponse]:
-        orgs = await organization_service.list(current_admin)
+        page_limit, page_offset = resolve_page(limit, offset)
+        orgs = await organization_service.list(
+            current_admin, limit=page_limit, offset=page_offset
+        )
         return [OrganizationResponse.from_entity(o) for o in orgs]
 
     @post("/{organization_id:uuid}/teams")
