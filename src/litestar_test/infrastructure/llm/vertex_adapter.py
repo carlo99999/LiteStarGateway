@@ -190,16 +190,27 @@ class VertexAdapter:
     def chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
+        # Each genai.Client owns an httpx connection pool; close it after the call
+        # so per-request clients don't leak sockets/file descriptors (same pattern
+        # as the OpenAI/Anthropic adapters).
         client = self._client(credentials)
-        response = client.models.generate_content(**to_gemini_request(request, model))
-        return from_gemini_response(response.model_dump())
+        try:
+            response = client.models.generate_content(**to_gemini_request(request, model))
+            return from_gemini_response(response.model_dump())
+        finally:
+            client.close()
 
     async def achat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         client = self._client(credentials)
-        response = await client.aio.models.generate_content(**to_gemini_request(request, model))
-        return from_gemini_response(response.model_dump())
+        try:
+            response = await client.aio.models.generate_content(
+                **to_gemini_request(request, model)
+            )
+            return from_gemini_response(response.model_dump())
+        finally:
+            await client.aio.aclose()
 
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -211,47 +222,66 @@ class VertexAdapter:
             "created": int(time.time()),
             "model": model.provider_model_id,
         }
-        # Gemini has no separate "start" event; emit the role delta ourselves.
-        yield {
-            **base,
-            "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
-        }
-        stream: Any = await client.aio.models.generate_content_stream(
-            **to_gemini_request(request, model)
-        )
-        async for chunk in stream:
-            delta, finish = gemini_chunk_to_delta(chunk.model_dump())
-            if delta is None and finish is None:
-                continue
+        # Keep the client open for the whole stream; close on completion/disconnect
+        # (finally runs on generator close).
+        try:
+            # Gemini has no separate "start" event; emit the role delta ourselves.
             yield {
                 **base,
-                "choices": [{"index": 0, "delta": delta or {}, "finish_reason": finish}],
+                "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
             }
+            stream: Any = await client.aio.models.generate_content_stream(
+                **to_gemini_request(request, model)
+            )
+            async for chunk in stream:
+                delta, finish = gemini_chunk_to_delta(chunk.model_dump())
+                if delta is None and finish is None:
+                    continue
+                yield {
+                    **base,
+                    "choices": [{"index": 0, "delta": delta or {}, "finish_reason": finish}],
+                }
+        finally:
+            await client.aio.aclose()
 
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         client = self._client(credentials)
-        response = client.models.embed_content(**to_gemini_embed_request(request, model))
-        return from_gemini_embeddings(response.model_dump(), model.provider_model_id)
+        try:
+            response = client.models.embed_content(**to_gemini_embed_request(request, model))
+            return from_gemini_embeddings(response.model_dump(), model.provider_model_id)
+        finally:
+            client.close()
 
     async def aembeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         client = self._client(credentials)
-        response = await client.aio.models.embed_content(**to_gemini_embed_request(request, model))
-        return from_gemini_embeddings(response.model_dump(), model.provider_model_id)
+        try:
+            response = await client.aio.models.embed_content(
+                **to_gemini_embed_request(request, model)
+            )
+            return from_gemini_embeddings(response.model_dump(), model.provider_model_id)
+        finally:
+            await client.aio.aclose()
 
     def images(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         client = self._client(credentials)
-        response = client.models.generate_images(**to_imagen_request(request, model))
-        return from_imagen_response(response.model_dump())
+        try:
+            response = client.models.generate_images(**to_imagen_request(request, model))
+            return from_imagen_response(response.model_dump())
+        finally:
+            client.close()
 
     async def aimages(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         client = self._client(credentials)
-        response = await client.aio.models.generate_images(**to_imagen_request(request, model))
-        return from_imagen_response(response.model_dump())
+        try:
+            response = await client.aio.models.generate_images(**to_imagen_request(request, model))
+            return from_imagen_response(response.model_dump())
+        finally:
+            await client.aio.aclose()

@@ -233,11 +233,19 @@ class _FakeGeminiModels:
 class FakeGenaiClient:
     last_init: dict = {}
     last_kwargs: dict = {}
+    closed: bool = False
 
     def __init__(self, **kwargs) -> None:
         FakeGenaiClient.last_init = kwargs
-        self.aio = SimpleNamespace(models=_FakeGeminiModels())
+        FakeGenaiClient.closed = False
+        self.aio = SimpleNamespace(models=_FakeGeminiModels(), aclose=self._aclose)
         self.models = _FakeGeminiModels()
+
+    def close(self) -> None:  # genai.Client.close is sync
+        FakeGenaiClient.closed = True
+
+    async def _aclose(self) -> None:  # the async surface closes via client.aio.aclose()
+        FakeGenaiClient.closed = True
 
 
 def _patch(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -692,6 +700,8 @@ async def test_vertex_chat_translation(
     assert body["choices"][0]["finish_reason"] == "stop"
     assert body["usage"]["prompt_tokens"] == 4
     assert body["usage"]["completion_tokens"] == 2
+    # The per-request genai client must be closed after the call (no pool leak).
+    assert FakeGenaiClient.closed is True
 
 
 async def test_vertex_responses_emulated(
