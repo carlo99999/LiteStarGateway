@@ -432,11 +432,13 @@ async def test_usage_is_recorded_and_queryable(
     assert filtered.json() == []
 
 
-async def test_usage_record_failure_is_logged_not_swallowed(
-    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+async def test_usage_record_failure_dead_letters_to_outbox(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    # If the billing write fails, the request still succeeds (fail-safe) but the
-    # dropped event is logged at ERROR with its details — not silently swallowed.
+    # If the ledger write fails, the request still succeeds (fail-safe) and the
+    # event is dead-lettered to the durable outbox — recoverable, not dropped.
+    import sqlite3
+
     _patch(monkeypatch)
     from litestar_test.infrastructure.persistence import usage_repository
 
@@ -445,16 +447,20 @@ async def test_usage_record_failure_is_logged_not_swallowed(
 
     monkeypatch.setattr(usage_repository.SQLAlchemyUsageRepository, "record", boom)
     api_key = await _setup(client)
-    with caplog.at_level("ERROR", logger="litestar_test.usage"):
-        resp = await client.post(
-            "/v1/chat/completions",
-            json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
-            headers=_bearer(api_key),
-        )
-    assert resp.status_code == HTTP_200_OK  # request unaffected by the billing failure
-    assert any(
-        "usage event dropped" in r.message and "prompt=1" in r.message for r in caplog.records
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+        headers=_bearer(api_key),
     )
+    assert resp.status_code == HTTP_200_OK  # request unaffected by the billing failure
+
+    # The event landed in the outbox (a separate connection sees the committed row).
+    conn = sqlite3.connect(str(tmp_path / "inf.db"))
+    try:
+        (pending,) = conn.execute("SELECT count(*) FROM pending_usage_event").fetchone()
+    finally:
+        conn.close()
+    assert pending == 1
 
 
 async def test_key_spending_report_includes_revoked_keys(

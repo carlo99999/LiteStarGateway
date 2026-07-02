@@ -50,14 +50,19 @@ class CompletionService:
 
     async def _record_usage(self, event: UsageEvent) -> None:
         """Persist the billing record. A failed write must never fail the request,
-        but it must not vanish silently either: on failure we log the full event at
-        ERROR (no secrets — ids, tokens, cost) so billing can be reconciled/replayed
-        from logs rather than under-counting invisibly."""
+        but it must not vanish either: on failure the event is dead-lettered to a
+        durable outbox and retried by the background reconciler. Only if that also
+        fails do we fall back to an ERROR log with the full event (no secrets)."""
         try:
             await self._usage.record(event)
+            return
         except Exception:  # recording must not fail the request
+            logger.warning("usage record failed; dead-lettering to outbox", exc_info=True)
+        try:
+            await self._usage.enqueue_pending(event)
+        except Exception:
             logger.error(
-                "usage event dropped (record failed): "
+                "usage event dropped (record + outbox failed): "
                 "team=%s api_key=%s model=%s op=%s prompt=%s completion=%s cost=%s at=%s",
                 event.team_id,
                 event.api_key_id,

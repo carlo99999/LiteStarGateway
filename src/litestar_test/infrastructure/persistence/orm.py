@@ -185,6 +185,25 @@ class UsageEventModel(base.UUIDAuditBase):
         )
 
 
+class PendingUsageEventModel(base.UUIDAuditBase):
+    """Dead-letter outbox for usage events whose ledger write failed. A background
+    reconciler retries these into `usage_event` (idempotent by `event_id`), so a
+    transient failure never silently loses a billing record."""
+
+    __tablename__ = "pending_usage_event"
+
+    event_id: Mapped[UUID] = mapped_column(unique=True, index=True)  # intended usage_event.id
+    team_id: Mapped[UUID] = mapped_column(index=True)
+    api_key_id: Mapped[UUID] = mapped_column()
+    model_id: Mapped[UUID] = mapped_column()
+    model_name: Mapped[str] = mapped_column()
+    operation: Mapped[str] = mapped_column()
+    prompt_tokens: Mapped[int] = mapped_column(default=0)
+    completion_tokens: Mapped[int] = mapped_column(default=0)
+    cost: Mapped[float] = mapped_column(default=0.0)
+    event_created_at: Mapped[datetime] = mapped_column()
+
+
 class SecretKeyModel(base.UUIDAuditBase):
     __tablename__ = "secret_key"
 

@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.domain.entities import ApiKeySpend, UsageAggregate, UsageEvent
-from litestar_test.infrastructure.persistence.orm import UsageEventModel
+from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_test.infrastructure.persistence.orm import PendingUsageEventModel, UsageEventModel
+
+logger = logging.getLogger("litestar_test.usage")
 
 
 class SQLAlchemyUsageRepository:
@@ -92,3 +96,57 @@ class SQLAlchemyUsageRepository:
             )
             for row in rows
         ]
+
+    async def enqueue_pending(self, event: UsageEvent) -> None:
+        # The request session may be in a failed state after the ledger commit
+        # failed; roll back before writing the dead-letter row.
+        await self._session.rollback()
+        self._session.add(
+            PendingUsageEventModel(
+                event_id=event.id,
+                team_id=event.team_id,
+                api_key_id=event.api_key_id,
+                model_id=event.model_id,
+                model_name=event.model_name,
+                operation=event.operation,
+                prompt_tokens=event.prompt_tokens,
+                completion_tokens=event.completion_tokens,
+                cost=event.cost,
+                event_created_at=event.created_at,
+            )
+        )
+        await self._session.commit()
+
+    async def reconcile_pending(self, *, limit: int = DEFAULT_PAGE_SIZE) -> int:
+        pending = (
+            await self._session.scalars(
+                select(PendingUsageEventModel)
+                .order_by(PendingUsageEventModel.created_at)
+                .limit(limit)
+            )
+        ).all()
+        settled = 0
+        for row in pending:
+            try:
+                # Idempotent: skip the ledger insert if the event already landed.
+                if await self._session.get(UsageEventModel, row.event_id) is None:
+                    self._session.add(
+                        UsageEventModel(
+                            id=row.event_id,
+                            team_id=row.team_id,
+                            api_key_id=row.api_key_id,
+                            model_id=row.model_id,
+                            model_name=row.model_name,
+                            operation=row.operation,
+                            prompt_tokens=row.prompt_tokens,
+                            completion_tokens=row.completion_tokens,
+                            cost=row.cost,
+                        )
+                    )
+                await self._session.delete(row)
+                await self._session.commit()
+                settled += 1
+            except Exception:  # leave it queued for the next cycle
+                await self._session.rollback()
+                logger.warning("failed to reconcile pending usage event", exc_info=True)
+        return settled

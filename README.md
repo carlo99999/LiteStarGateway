@@ -225,6 +225,14 @@ Tracked items not yet implemented (see also the code review notes):
 
 ### Resolved
 
+- **Durable billing** — a failed usage-ledger write no longer just logs-and-drops:
+  the event is dead-lettered to a `pending_usage_event` outbox and a background
+  reconciler (every 60s) retries it into `usage_event` (idempotent by event id).
+  The synchronous ledger write on success is unchanged, so `/usage` stays
+  immediately consistent. _Caveat: the outbox is in the same Postgres, so a total
+  DB outage still can't be survived — it recovers transient/contention failures
+  and provides at-least-once capture; failed dead-letter writes fall back to an
+  ERROR log with the full event._
 - **Audit log** — privileged actions are recorded to an append-only `audit_event`
   table (who / what / target / from where / when) and read via `GET /audit`
   (platform-admin, paginated, newest first). Written synchronously and durably
