@@ -30,6 +30,7 @@ from litestar_test.domain.exceptions import (
     TeamNotFound,
     UserNotFound,
 )
+from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_test.domain.ports import (
     OrganizationRepository,
     TeamMembershipRepository,
@@ -126,9 +127,11 @@ class TeamService:
                 await self._memberships.add(self._admin_membership(team.id, lead.id))
         return team
 
-    async def list_members(self, actor: User, team_id: UUID) -> list[TeamMembership]:
+    async def list_members(
+        self, actor: User, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[TeamMembership]:
         await self.ensure_can_manage_team(actor, team_id)
-        return await self._memberships.list_by_team(team_id)
+        return await self._memberships.list_by_team(team_id, limit=limit, offset=offset)
 
     async def add_member(
         self, actor: User, team_id: UUID, email: str, role: TeamRole

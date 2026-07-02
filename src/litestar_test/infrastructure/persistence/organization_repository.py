@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.domain.entities import Organization
+from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_test.infrastructure.persistence.orm import OrganizationModel
 
 
@@ -26,8 +27,11 @@ class SQLAlchemyOrganizationRepository:
         model = await self._session.get(OrganizationModel, organization_id)
         return model.to_entity() if model else None
 
-    async def list(self) -> list[Organization]:
+    async def list(self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0) -> list[Organization]:
         models = await self._session.scalars(
-            select(OrganizationModel).order_by(OrganizationModel.created_at)
+            select(OrganizationModel)
+            .order_by(OrganizationModel.created_at)
+            .limit(limit)
+            .offset(offset)
         )
         return [m.to_entity() for m in models]

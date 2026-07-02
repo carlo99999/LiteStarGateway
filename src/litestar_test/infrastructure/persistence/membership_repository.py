@@ -8,6 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.domain.entities import TeamMembership
+from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_test.infrastructure.persistence.orm import TeamMembershipModel
 
 
@@ -37,11 +38,15 @@ class SQLAlchemyTeamMembershipRepository:
         )
         return model.to_entity() if model else None
 
-    async def list_by_team(self, team_id: UUID) -> list[TeamMembership]:
+    async def list_by_team(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[TeamMembership]:
         models = await self._session.scalars(
             select(TeamMembershipModel)
             .where(TeamMembershipModel.team_id == team_id)
             .order_by(TeamMembershipModel.created_at)
+            .limit(limit)
+            .offset(offset)
         )
         return [m.to_entity() for m in models]
 

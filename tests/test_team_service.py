@@ -76,7 +76,9 @@ class FakeMembershipRepo:
             None,
         )
 
-    async def list_by_team(self, team_id: UUID) -> list[TeamMembership]:
+    async def list_by_team(
+        self, team_id: UUID, *, limit: int = 100, offset: int = 0
+    ) -> list[TeamMembership]:
         return [m for m in self.items if m.team_id == team_id]
 
     async def update(self, m: TeamMembership) -> TeamMembership:

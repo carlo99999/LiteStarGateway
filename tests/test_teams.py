@@ -178,3 +178,34 @@ async def test_platform_admin_manages_any_team(client: AsyncTestClient) -> None:
         headers=_bearer(admin),
     )
     assert resp.status_code == HTTP_201_CREATED
+
+
+async def test_list_members_pagination(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, ADMIN_EMAIL)
+    for i in range(3):
+        email = f"m{i}@corp.com"
+        await _register(client, admin, email)
+        await client.post(
+            f"/teams/{team_id}/members",
+            json={"email": email, "role": "member"},
+            headers=_bearer(admin),
+        )
+    first = await client.get(f"/teams/{team_id}/members?limit=2", headers=_bearer(admin))
+    assert first.status_code == HTTP_200_OK
+    assert len(first.json()) == 2
+    # 1 team admin (bootstrap) + 3 members = 4 total; page 2 holds the rest.
+    second = await client.get(f"/teams/{team_id}/members?limit=2&offset=2", headers=_bearer(admin))
+    assert len(second.json()) == 2
+
+
+async def test_list_organizations_pagination(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    for name in ("A", "B", "C"):
+        await client.post("/organizations", json={"name": name}, headers=_bearer(admin))
+    first = await client.get("/organizations?limit=2", headers=_bearer(admin))
+    assert first.status_code == HTTP_200_OK
+    assert [o["name"] for o in first.json()] == ["A", "B"]
+    second = await client.get("/organizations?limit=2&offset=2", headers=_bearer(admin))
+    assert [o["name"] for o in second.json()] == ["C"]
