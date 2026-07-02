@@ -174,16 +174,38 @@ class AnthropicAdapter:
             "model": model.provider_model_id,
         }
         kwargs: dict[str, Any] = {**to_anthropic_request(request, model), "stream": True}
+        # Anthropic reports input tokens on message_start and cumulative output
+        # tokens on message_delta; accumulate them and emit a trailing
+        # OpenAI-style usage chunk so streamed calls can be metered.
+        input_tokens = 0
+        output_tokens = 0
         # Keep the client open for the whole stream; close on completion/disconnect.
         try:
             stream: Any = await client.messages.create(**kwargs)
             async for event in stream:
-                delta, finish = anthropic_event_to_delta(event.model_dump())
+                raw = event.model_dump()
+                if raw.get("type") == "message_start":
+                    start_usage = (raw.get("message") or {}).get("usage") or {}
+                    input_tokens = start_usage.get("input_tokens") or 0
+                    output_tokens = start_usage.get("output_tokens") or 0
+                elif raw.get("type") == "message_delta":
+                    delta_usage = raw.get("usage") or {}
+                    output_tokens = delta_usage.get("output_tokens") or output_tokens
+                delta, finish = anthropic_event_to_delta(raw)
                 if delta is None and finish is None:
                     continue
                 yield {
                     **base,
                     "choices": [{"index": 0, "delta": delta or {}, "finish_reason": finish}],
                 }
+            yield {
+                **base,
+                "choices": [],
+                "usage": {
+                    "prompt_tokens": input_tokens,
+                    "completion_tokens": output_tokens,
+                    "total_tokens": input_tokens + output_tokens,
+                },
+            }
         finally:
             await client.close()

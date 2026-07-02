@@ -86,8 +86,17 @@ class CompletionService:
     ) -> None:
         """Record usage (billing) + emit an observability trace. Fail-safe."""
         usage = response.get("usage") or {}
-        prompt = int(usage.get("prompt_tokens") or 0)
-        completion = int(usage.get("completion_tokens") or 0)
+        # Chat completions report prompt/completion_tokens; the Responses API
+        # reports input/output_tokens. Bill either shape. Explicit key-presence
+        # checks (not `or`-chaining) so a legitimate 0 is never overridden.
+        if "prompt_tokens" in usage:
+            prompt = int(usage.get("prompt_tokens") or 0)
+        else:
+            prompt = int(usage.get("input_tokens") or 0)
+        if "completion_tokens" in usage:
+            completion = int(usage.get("completion_tokens") or 0)
+        else:
+            completion = int(usage.get("output_tokens") or 0)
         cost = prompt * (model.input_cost_per_token or 0.0) + completion * (
             model.output_cost_per_token or 0.0
         )

@@ -231,14 +231,33 @@ class VertexAdapter:
             stream: Any = await client.aio.models.generate_content_stream(
                 **to_gemini_request(request, model)
             )
+            # Gemini reports (cumulative) usage_metadata on stream chunks; keep
+            # the latest and emit a trailing OpenAI-style usage chunk so
+            # streamed calls can be metered.
+            usage_metadata: dict[str, Any] = {}
             async for chunk in stream:
-                delta, finish = gemini_chunk_to_delta(chunk.model_dump())
+                raw = chunk.model_dump()
+                if raw.get("usage_metadata"):
+                    usage_metadata = raw["usage_metadata"]
+                delta, finish = gemini_chunk_to_delta(raw)
                 if delta is None and finish is None:
                     continue
                 yield {
                     **base,
                     "choices": [{"index": 0, "delta": delta or {}, "finish_reason": finish}],
                 }
+            prompt_tokens = usage_metadata.get("prompt_token_count") or 0
+            completion_tokens = usage_metadata.get("candidates_token_count") or 0
+            yield {
+                **base,
+                "choices": [],
+                "usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": usage_metadata.get("total_token_count")
+                    or (prompt_tokens + completion_tokens),
+                },
+            }
         finally:
             await client.aio.aclose()
 

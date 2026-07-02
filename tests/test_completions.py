@@ -93,6 +93,8 @@ class FakeClient:
 
     async def _responses_create(self, **kwargs):
         FakeClient.last_kwargs = kwargs
+        # Responses-API usage shape: input/output tokens (not prompt/completion).
+        usage = {"input_tokens": 2, "output_tokens": 3, "total_tokens": 5}
         if kwargs.get("stream"):
             return _FakeStream(
                 [
@@ -100,11 +102,18 @@ class FakeClient:
                     {"type": "response.output_text.delta", "delta": "Hi"},
                     {
                         "type": "response.completed",
-                        "response": {"id": "r", "status": "completed", "output_text": "Hi"},
+                        "response": {
+                            "id": "r",
+                            "status": "completed",
+                            "output_text": "Hi",
+                            "usage": usage,
+                        },
                     },
                 ]
             )
-        return _Result({"id": "r", "object": "response", "model": kwargs.get("model")})
+        return _Result(
+            {"id": "r", "object": "response", "model": kwargs.get("model"), "usage": usage}
+        )
 
     async def _embed(self, **kwargs):
         FakeClient.last_kwargs = kwargs
@@ -159,15 +168,27 @@ class FakeAnthropic:
     async def create(self, **kwargs):
         FakeAnthropic.last_kwargs = kwargs
         if kwargs.get("stream"):
+            # Real Anthropic streams report input tokens on message_start and
+            # cumulative output tokens on message_delta (top-level `usage`).
             return _FakeStream(
                 [
-                    {"type": "message_start", "message": {"id": "msg-x"}},
+                    {
+                        "type": "message_start",
+                        "message": {
+                            "id": "msg-x",
+                            "usage": {"input_tokens": 3, "output_tokens": 1},
+                        },
+                    },
                     {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "Hi"}},
                     {
                         "type": "content_block_delta",
                         "delta": {"type": "text_delta", "text": " there"},
                     },
-                    {"type": "message_delta", "delta": {"stop_reason": "end_turn"}},
+                    {
+                        "type": "message_delta",
+                        "delta": {"stop_reason": "end_turn"},
+                        "usage": {"output_tokens": 5},
+                    },
                     {"type": "message_stop"},
                 ]
             )
@@ -215,6 +236,7 @@ class _FakeGeminiModels:
 
     async def generate_content_stream(self, **kwargs):
         FakeGenaiClient.last_kwargs = kwargs
+        # Real Gemini streams carry (cumulative) usage_metadata on the final chunk.
         return _FakeStream(
             [
                 {"candidates": [{"content": {"role": "model", "parts": [{"text": "ci"}]}}]},
@@ -224,7 +246,12 @@ class _FakeGeminiModels:
                             "content": {"role": "model", "parts": [{"text": "ao"}]},
                             "finish_reason": "STOP",
                         }
-                    ]
+                    ],
+                    "usage_metadata": {
+                        "prompt_token_count": 4,
+                        "candidates_token_count": 2,
+                        "total_token_count": 6,
+                    },
                 },
             ]
         )
@@ -278,15 +305,17 @@ async def _admin(client: AsyncTestClient) -> str:
     ).json()["access_token"]
 
 
-async def _setup(
+async def _setup_team(
     client: AsyncTestClient,
     provider: str = "openai",
     values: dict | None = None,
     provider_model_id: str = "gpt-4o",
     enabled: bool = True,
     model_type: str = "chat",
-) -> str:
-    """Configure a credential + team + model 'm' + key. Returns the team API key."""
+) -> tuple[str, str, str]:
+    """Configure a credential + team + model 'm' + key.
+
+    Returns (team API key, team id, admin token)."""
     admin = await _admin(client)
     cred = (
         await client.post(
@@ -321,9 +350,34 @@ async def _setup(
         },
         headers=_bearer(admin),
     )
-    return (
+    key = (
         await client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(admin))
     ).json()["plaintext"]
+    return key, team, admin
+
+
+async def _setup(
+    client: AsyncTestClient,
+    provider: str = "openai",
+    values: dict | None = None,
+    provider_model_id: str = "gpt-4o",
+    enabled: bool = True,
+    model_type: str = "chat",
+) -> str:
+    """Configure a credential + team + model 'm' + key. Returns the team API key."""
+    key, _, _ = await _setup_team(
+        client,
+        provider=provider,
+        values=values,
+        provider_model_id=provider_model_id,
+        enabled=enabled,
+        model_type=model_type,
+    )
+    return key
+
+
+async def _team_usage(client: AsyncTestClient, team: str, admin: str) -> list[dict]:
+    return (await client.get(f"/teams/{team}/usage", headers=_bearer(admin))).json()
 
 
 async def test_openai_chat_completions(
@@ -902,6 +956,142 @@ async def test_streaming_responses_emulated_anthropic(
     assert "event: response.output_text.delta" in body
     assert "event: response.completed" in body
     assert "Hi" in body and "there" in body
+
+
+async def test_streaming_anthropic_records_usage(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Anthropic reports stream usage on message_start/message_delta events; the
+    # gateway must translate it and bill it (previously recorded as 0 tokens).
+    _patch(monkeypatch)
+    key, team, admin = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-3-5-sonnet",
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}], "stream": True},
+        headers=_bearer(key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    _ = resp.text  # fully consume the stream
+    rows = await _team_usage(client, team, admin)
+    assert len(rows) == 1
+    assert rows[0]["prompt_tokens"] == 3
+    assert rows[0]["completion_tokens"] == 5
+    assert rows[0]["calls"] == 1
+
+
+async def test_streaming_vertex_records_usage(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Gemini reports stream usage via usage_metadata on the final chunk; the
+    # gateway must translate it and bill it (previously recorded as 0 tokens).
+    _patch(monkeypatch)
+    key, team, admin = await _setup_team(
+        client, provider="vertex_ai", values=VERTEX_VALUES, provider_model_id="gemini-1.5-pro"
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}], "stream": True},
+        headers=_bearer(key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    _ = resp.text  # fully consume the stream
+    rows = await _team_usage(client, team, admin)
+    assert len(rows) == 1
+    assert rows[0]["prompt_tokens"] == 4
+    assert rows[0]["completion_tokens"] == 2
+    assert rows[0]["calls"] == 1
+
+
+async def test_responses_native_records_usage(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Responses-API usage uses input/output_tokens keys — billing must map them
+    # (previously only prompt/completion_tokens were read → billed as 0).
+    _patch(monkeypatch)
+    key, team, admin = await _setup_team(client)
+    resp = await client.post(
+        "/v1/responses", json={"model": "m", "input": "hi"}, headers=_bearer(key)
+    )
+    assert resp.status_code == HTTP_200_OK
+    rows = await _team_usage(client, team, admin)
+    assert len(rows) == 1
+    assert rows[0]["prompt_tokens"] == 2
+    assert rows[0]["completion_tokens"] == 3
+    assert rows[0]["calls"] == 1
+
+
+async def test_streaming_responses_native_records_usage(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Native Responses streaming carries usage on the response.completed event.
+    _patch(monkeypatch)
+    key, team, admin = await _setup_team(client)
+    resp = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "hi", "stream": True},
+        headers=_bearer(key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    _ = resp.text  # fully consume the stream
+    rows = await _team_usage(client, team, admin)
+    assert len(rows) == 1
+    assert rows[0]["prompt_tokens"] == 2
+    assert rows[0]["completion_tokens"] == 3
+    assert rows[0]["calls"] == 1
+
+
+async def test_responses_emulated_records_usage(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Emulated (non-streaming) Responses over Anthropic chat must bill the
+    # underlying chat usage (input 3 / output 5 from the fake).
+    _patch(monkeypatch)
+    key, team, admin = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-3-5-sonnet",
+    )
+    resp = await client.post(
+        "/v1/responses", json={"model": "m", "input": "hi"}, headers=_bearer(key)
+    )
+    assert resp.status_code == HTTP_200_OK
+    rows = await _team_usage(client, team, admin)
+    assert len(rows) == 1
+    assert rows[0]["prompt_tokens"] == 3
+    assert rows[0]["completion_tokens"] == 5
+    assert rows[0]["calls"] == 1
+
+
+async def test_streaming_responses_emulated_records_usage(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Emulated Responses streaming must propagate the inner chat stream's usage
+    # into response.completed and bill it (previously dropped entirely).
+    _patch(monkeypatch)
+    key, team, admin = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-3-5-sonnet",
+    )
+    resp = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "hi", "stream": True},
+        headers=_bearer(key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    _ = resp.text  # fully consume the stream
+    rows = await _team_usage(client, team, admin)
+    assert len(rows) == 1
+    assert rows[0]["prompt_tokens"] == 3
+    assert rows[0]["completion_tokens"] == 5
+    assert rows[0]["calls"] == 1
 
 
 async def test_streaming_unknown_model_404_before_stream(
