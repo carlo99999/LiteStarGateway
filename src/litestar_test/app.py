@@ -1,11 +1,13 @@
 """Composition root: wires settings, persistence, services and the web layer."""
 
-from litestar import Litestar, get
+from litestar import Litestar, Response, get
 from litestar.di import NamedDependency, Provide
 from litestar.openapi.config import OpenAPIConfig
 from litestar.openapi.plugins import ScalarRenderPlugin, StoplightRenderPlugin, SwaggerRenderPlugin
+from litestar.status_codes import HTTP_503_SERVICE_UNAVAILABLE
 from litestar.stores.base import Store
 from litestar.stores.redis import RedisStore
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_test.config import Settings
@@ -73,7 +75,8 @@ def create_app(
         )
 
     route_handlers: list = [
-        health,  # public
+        health,  # public liveness
+        readiness,  # public readiness (DB check)
         create_api_router(database.config),  # the protected "api-endpoint" group
         create_users_router(),  # signup (public) + invites (admin JWT)
         create_session_router(),  # login (public) + /me (JWT)
@@ -173,7 +176,22 @@ def create_app(
 
 @get("/health")
 async def health() -> dict:
+    """Liveness: the process is up. Cheap, no dependencies."""
     return {"status": "ok"}
+
+
+@get("/health/ready")
+async def readiness(db_session: NamedDependency[AsyncSession]) -> Response[dict]:
+    """Readiness: the app can actually serve — verifies DB connectivity. Returns
+    503 when a dependency is unavailable so a load balancer holds traffic back."""
+    try:
+        await db_session.execute(text("SELECT 1"))
+    except Exception:
+        return Response(
+            {"status": "not_ready", "checks": {"database": "down"}},
+            status_code=HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    return Response({"status": "ready", "checks": {"database": "ok"}})
 
 
 app = create_app()
