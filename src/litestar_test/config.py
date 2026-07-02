@@ -102,6 +102,10 @@ class Settings:
     # Public and unauthenticated when on — disable in production to avoid exposing
     # the full admin/credential API surface.
     openapi_enabled: bool = True
+    # Mark the SSO state cookie `Secure` (HTTPS-only). Defaults on outside local
+    # envs; set explicitly (SESSION_COOKIE_SECURE) when TLS terminates at a proxy
+    # that speaks HTTP to the app, so the request scheme alone can't be trusted.
+    session_cookie_secure: bool = False
     # SSO via OIDC. No discovery URL ⇒ disabled. `oidc_admin_groups` (comma-sep)
     # maps IdP groups to platform admin.
     oidc_discovery_url: str | None = None
@@ -156,13 +160,15 @@ class Settings:
     @classmethod
     def from_env(cls) -> Settings:
         load_dotenv()  # no-op if .env is absent
+        environment = os.environ.get("ENVIRONMENT", DEFAULT_ENVIRONMENT)
+        is_local = environment.strip().lower() in _LOCAL_ENVIRONMENTS
         return cls(
             database_url=os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL),
             admin_email=os.environ.get("ADMIN_EMAIL", DEFAULT_ADMIN_EMAIL),
             master_key=os.environ.get("MASTER_KEY"),
             jwt_secret=os.environ.get("JWT_SECRET", DEFAULT_JWT_SECRET),
             salt_key=os.environ.get("SALT_KEY"),
-            environment=os.environ.get("ENVIRONMENT", DEFAULT_ENVIRONMENT),
+            environment=environment,
             db_pool_size=_env_int("DB_POOL_SIZE", DEFAULT_DB_POOL_SIZE, minimum=1),
             db_max_overflow=_env_int("DB_MAX_OVERFLOW", DEFAULT_DB_MAX_OVERFLOW, minimum=0),
             request_timeout=_env_float("REQUEST_TIMEOUT", DEFAULT_REQUEST_TIMEOUT, minimum=0.0),
@@ -172,6 +178,9 @@ class Settings:
             mlflow_tracking_uri=os.environ.get("MLFLOW_TRACKING_URI"),
             mlflow_experiment=os.environ.get("MLFLOW_EXPERIMENT", DEFAULT_MLFLOW_EXPERIMENT),
             openapi_enabled=_env_bool("OPENAPI_ENABLED", True),
+            # Secure cookies on by default outside local envs; overridable for
+            # proxy topologies where the request scheme is HTTP behind TLS.
+            session_cookie_secure=_env_bool("SESSION_COOKIE_SECURE", not is_local),
             oidc_discovery_url=os.environ.get("OIDC_DISCOVERY_URL"),
             oidc_client_id=os.environ.get("OIDC_CLIENT_ID"),
             oidc_client_secret=os.environ.get("OIDC_CLIENT_SECRET"),

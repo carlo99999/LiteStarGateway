@@ -110,6 +110,9 @@ def create_app(
         dependencies["sso_redirect_uri"] = Provide(
             lambda: settings.oidc_redirect_uri, sync_to_thread=False
         )
+        dependencies["sso_cookie_secure"] = Provide(
+            lambda: settings.session_cookie_secure, sync_to_thread=False
+        )
 
     # Public, unauthenticated when enabled — operators disable it in production
     # (OPENAPI_ENABLED=false) so the full API surface isn't exposed.
