@@ -31,6 +31,11 @@ def _env_bool(name: str, default: bool) -> bool:
 # ≥32 bytes to satisfy HS256 key-length recommendations. Override in production.
 DEFAULT_JWT_SECRET = "dev-insecure-change-me-please-0123456789"
 
+# The MASTER_KEY placeholder shipped in .env.sample. It becomes the platform
+# admin's password on first boot, so a forgotten override must never make it
+# past startup outside local envs.
+SAMPLE_MASTER_KEY = "change-me-please"
+
 _PRODUCTION_ENVIRONMENTS = frozenset({"production", "prod"})
 # Explicitly-local environments where insecure defaults are tolerated. Anything
 # NOT in this set (production, staging, a typo, …) is treated as security-sensitive.
@@ -159,6 +164,18 @@ class Settings:
             raise InsecureConfigurationError(
                 f"SALT_KEY must be at least {MIN_SECRET_LENGTH} characters when set"
             )
+        # MASTER_KEY is optional (only needed to bootstrap an empty users table),
+        # but when set it becomes the platform admin's password — the sample
+        # placeholder or a short passphrase would hand over the whole gateway.
+        if self.master_key is not None:
+            if self.master_key == SAMPLE_MASTER_KEY:
+                raise InsecureConfigurationError(
+                    "MASTER_KEY is the .env.sample placeholder; set a strong random value"
+                )
+            if len(self.master_key) < MIN_SECRET_LENGTH:
+                raise InsecureConfigurationError(
+                    f"MASTER_KEY must be at least {MIN_SECRET_LENGTH} characters when set"
+                )
 
     @classmethod
     def from_env(cls) -> Settings:

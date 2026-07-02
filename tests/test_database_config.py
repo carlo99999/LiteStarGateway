@@ -14,7 +14,7 @@ def _settings(url: str) -> Settings:
     return Settings(
         database_url=url,
         admin_email="admin@example.com",
-        master_key="m",
+        master_key="m" * 32,
         jwt_secret="x" * 40,
         salt_key="s" * 32,
     )
@@ -46,7 +46,7 @@ def test_create_all_disabled_in_production() -> None:
     production = Settings(
         database_url="postgresql+asyncpg://u:p@h:5432/db",
         admin_email="admin@example.com",
-        master_key="m",
+        master_key="m" * 32,
         jwt_secret="x" * 40,
         salt_key="s" * 32,
         environment="production",
