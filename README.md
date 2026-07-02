@@ -111,7 +111,9 @@ Notes:
 - **Multi-process/replicas**: set `REDIS_URL` to back the rate-limit store with a
   shared Redis so limits hold across workers/replicas (the compose stack includes
   a `redis` service and sets it; drop the var to fall back to the in-memory
-  per-process store). The trace queue is still per-process (each drains its own).
+  per-process store). `REDIS_URL` also enables a distributed lock so only one
+  replica runs the daily key rotation (without it, rotation assumes a single
+  instance). The trace queue is still per-process (each drains its own).
 
 ## Roadmap
 

@@ -15,14 +15,16 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
 from litestar import Litestar
 
 from litestar_test.config import Settings
+from litestar_test.domain.ports import DistributedLock
 from litestar_test.infrastructure.keyring import Keyring
+from litestar_test.infrastructure.locks import build_distributed_lock
 from litestar_test.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
 )
@@ -33,6 +35,22 @@ from litestar_test.infrastructure.persistence.secret_key_repository import (
 from litestar_test.infrastructure.web.session.jwt import ACCESS_TOKEN_TTL
 
 logger = logging.getLogger("litestar_test.rotation")
+
+# Only one replica should rotate at a time; hold a cross-replica lock while doing
+# so. TTL comfortably exceeds a normal rotation but stays well under the daily
+# interval, so a crashed holder can't block the next day's rotation.
+_ROTATION_LOCK_NAME = "litestar-gateway:key-rotation"
+_ROTATION_LOCK_TTL = timedelta(minutes=15)
+
+
+async def guarded_rotate(lock: DistributedLock, rotate: Callable[[], Awaitable[None]]) -> bool:
+    """Run `rotate` only if the cross-replica lock is acquired; return whether it ran."""
+    async with lock.hold(_ROTATION_LOCK_NAME, ttl=_ROTATION_LOCK_TTL) as acquired:
+        if acquired:
+            await rotate()
+        else:
+            logger.info("key rotation skipped: another instance holds the lock")
+        return acquired
 
 
 class RotationService:
@@ -67,14 +85,20 @@ def seconds_until(target_hhmm: str, now: datetime) -> float:
 def make_rotation_scheduler(database: Database, settings: Settings):
     """Return a Litestar lifespan that runs daily rotation when enabled."""
 
+    lock = build_distributed_lock(settings)
+
     async def _rotate_once(app: Litestar) -> None:
-        session_maker = app.state[database.config.session_maker_app_state_key]
-        async with session_maker() as session:
-            keyring = Keyring(
-                SQLAlchemySecretKeyRepository(session), settings.salt_key, settings.jwt_secret
-            )
-            credentials = SQLAlchemyCredentialRepository(session, keyring)
-            await RotationService(keyring, credentials, ACCESS_TOKEN_TTL).rotate_all()
+        async def _rotate() -> None:
+            session_maker = app.state[database.config.session_maker_app_state_key]
+            async with session_maker() as session:
+                keyring = Keyring(
+                    SQLAlchemySecretKeyRepository(session), settings.salt_key, settings.jwt_secret
+                )
+                credentials = SQLAlchemyCredentialRepository(session, keyring)
+                await RotationService(keyring, credentials, ACCESS_TOKEN_TTL).rotate_all()
+
+        # With multiple replicas, only the lock holder rotates; the rest skip.
+        await guarded_rotate(lock, _rotate)
 
     async def _loop(app: Litestar) -> None:
         while True:
