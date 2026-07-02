@@ -91,6 +91,10 @@ Notes:
   `--proxy-headers` and set uvicorn's `--forwarded-allow-ips` to your proxy's
   address (the image default `*` trusts any upstream — fine only when a single
   trusted ingress fronts it) so the real client IP reaches the per-IP rate limit.
+  When TLS terminates at the proxy (the app sees plain HTTP), also set
+  `SESSION_COOKIE_SECURE=true` so the SSO state cookie is still marked `Secure`
+  (it defaults on outside local envs), and set `OIDC_REDIRECT_URI` to the public
+  callback URL so the IdP redirect matches what's registered.
 - **Database**: `docker-compose.yml` runs Postgres (`postgresql+asyncpg://…`,
   the recommended production backend) and the app connects to it. Pool sizing is
   configurable via `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` (Postgres only). The image

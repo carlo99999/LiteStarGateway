@@ -42,20 +42,22 @@ async def sso_login(
     request: Request,
     identity_provider: NamedDependency[IdentityProvider],
     sso_redirect_uri: NamedDependency[str | None],
+    sso_cookie_secure: NamedDependency[bool],
 ) -> Redirect:
     state = secrets.token_urlsafe(32)
     url = await identity_provider.authorization_url(state, _redirect_uri(request, sso_redirect_uri))
     return Redirect(
         url,
         cookies=[
-            # `Secure` whenever we're serving over HTTPS — the state cookie is only
-            # meaningful over TLS; `Lax` still lets it ride the top-level callback.
+            # `Secure` when configured (SESSION_COOKIE_SECURE) or when the request
+            # itself is HTTPS — behind a TLS-terminating proxy the app sees HTTP, so
+            # the config flag is the reliable signal. `Lax` rides the top-level callback.
             Cookie(
                 key=_STATE_COOKIE,
                 value=state,
                 max_age=_STATE_TTL_SECONDS,
                 httponly=True,
-                secure=request.url.scheme == "https",
+                secure=sso_cookie_secure or request.url.scheme == "https",
                 samesite="lax",
             )
         ],

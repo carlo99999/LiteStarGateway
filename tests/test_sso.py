@@ -188,6 +188,29 @@ async def test_sso_uses_configured_redirect_uri(tmp_path: Path) -> None:
     assert captured["exchange"] == public
 
 
+async def test_sso_state_cookie_secure_when_configured(tmp_path: Path) -> None:
+    # With SESSION_COOKIE_SECURE the state cookie is marked Secure even though the
+    # test client speaks HTTP (the case behind a TLS-terminating proxy).
+    settings = dataclasses.replace(_settings(tmp_path), session_cookie_secure=True)
+    idp = FakeIdP(_identity("s-sec", "sec@corp.com"))
+    async with AsyncTestClient(app=create_app(settings, identity_provider=idp)) as client:
+        resp = await client.get("/sso/login", follow_redirects=False)
+    set_cookie = resp.headers.get("set-cookie", "")
+    assert "sso_state=" in set_cookie
+    assert "Secure" in set_cookie
+    assert "HttpOnly" in set_cookie
+
+
+async def test_sso_state_cookie_not_secure_over_http_by_default(tmp_path: Path) -> None:
+    # Default (local/dev): no Secure flag, so the cookie works over plain HTTP.
+    idp = FakeIdP(_identity("s-plain", "plain@corp.com"))
+    async with AsyncTestClient(
+        app=create_app(_settings(tmp_path), identity_provider=idp)
+    ) as client:
+        resp = await client.get("/sso/login", follow_redirects=False)
+    assert "Secure" not in resp.headers.get("set-cookie", "")
+
+
 async def test_sso_routes_absent_when_not_configured(tmp_path: Path) -> None:
     # No identity provider and no OIDC config ⇒ the SSO routes are not registered.
     settings = Settings(
