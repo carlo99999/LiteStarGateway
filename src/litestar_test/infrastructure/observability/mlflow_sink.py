@@ -39,18 +39,21 @@ class MLflowTraceSink:
         return self._experiment_id
 
     def write(self, record: TraceRecord) -> None:
+        attributes = {
+            "team_id": str(record.team_id),
+            "api_key_id": str(record.api_key_id),
+            "model": record.model_name,
+            "provider": record.provider,
+            "prompt_tokens": str(record.prompt_tokens),
+            "completion_tokens": str(record.completion_tokens),
+            "cost": str(record.cost),
+            "latency_ms": str(record.latency_ms),
+        }
+        if record.error_type:
+            attributes["error_type"] = record.error_type
         span = self._client.start_trace(
             name=record.operation,
-            attributes={
-                "team_id": str(record.team_id),
-                "api_key_id": str(record.api_key_id),
-                "model": record.model_name,
-                "provider": record.provider,
-                "prompt_tokens": str(record.prompt_tokens),
-                "completion_tokens": str(record.completion_tokens),
-                "cost": str(record.cost),
-                "latency_ms": str(record.latency_ms),
-            },
+            attributes=attributes,
             tags={"operation": record.operation, "status": record.status},
             experiment_id=self._experiment(),
         )
