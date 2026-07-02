@@ -34,7 +34,7 @@ from litestar_test.infrastructure.llm.errors import translate_stream, translate_
 
 MASTER_KEY = "master-secret"
 ADMIN_EMAIL = "admin@example.com"
-JWT_SECRET = "test-secret-key-0123456789-abcdefghij"
+JWT_SECRET = "test-secret-key-0123456789-abcdefghij"  # pragma: allowlist secret
 SALT_KEY = "unit-test-salt-key"
 
 
@@ -135,7 +135,11 @@ async def _setup(client: AsyncTestClient) -> str:
     cred = (
         await client.post(
             "/credentials",
-            json={"name": "c-openai", "provider": "openai", "values": {"api_key": "sk-x"}},
+            json={
+                "name": "c-openai",
+                "provider": "openai",
+                "values": {"api_key": "sk-x"},  # pragma: allowlist secret
+            },
             headers=_bearer(admin),
         )
     ).json()["id"]
