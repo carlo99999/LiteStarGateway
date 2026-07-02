@@ -14,6 +14,11 @@ from litestar_test.domain.entities import Model, Provider
 from litestar_test.domain.exceptions import UnsupportedOperation
 from litestar_test.infrastructure.llm.anthropic_adapter import AnthropicAdapter
 from litestar_test.infrastructure.llm.azure_adapter import AzureOpenAIAdapter
+from litestar_test.infrastructure.llm.errors import (
+    arun_translated,
+    run_translated,
+    translate_stream,
+)
 from litestar_test.infrastructure.llm.openai_adapter import OpenAIAdapter
 from litestar_test.infrastructure.llm.resilience import ResilienceConfig
 from litestar_test.infrastructure.llm.responses_emulation import ChatToResponsesAdapter
@@ -69,59 +74,59 @@ class LLMGatewayImpl:
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         adapter = self._resolve(model.provider, "chat.completions")
-        return adapter.chat_completion(request, model, credentials)
+        return run_translated(lambda: adapter.chat_completion(request, model, credentials))
 
     async def achat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         adapter = self._resolve(model.provider, "chat.completions")
-        return await adapter.achat_completion(request, model, credentials)
+        return await arun_translated(adapter.achat_completion(request, model, credentials))
 
     def responses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         adapter = self._resolve(model.provider, "responses")
-        return adapter.responses(request, model, credentials)
+        return run_translated(lambda: adapter.responses(request, model, credentials))
 
     async def aresponses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         adapter = self._resolve(model.provider, "responses")
-        return await adapter.aresponses(request, model, credentials)
+        return await arun_translated(adapter.aresponses(request, model, credentials))
 
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
         # Resolve eagerly (await) so capability errors surface before streaming.
         adapter = self._resolve(model.provider, "chat.completions")
-        return adapter.astream_chat_completion(request, model, credentials)
+        return translate_stream(adapter.astream_chat_completion(request, model, credentials))
 
     async def astream_responses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
         adapter = self._resolve(model.provider, "responses")
-        return adapter.astream_responses(request, model, credentials)
+        return translate_stream(adapter.astream_responses(request, model, credentials))
 
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         adapter = self._resolve(model.provider, "embeddings")
-        return adapter.embeddings(request, model, credentials)
+        return run_translated(lambda: adapter.embeddings(request, model, credentials))
 
     async def aembeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         adapter = self._resolve(model.provider, "embeddings")
-        return await adapter.aembeddings(request, model, credentials)
+        return await arun_translated(adapter.aembeddings(request, model, credentials))
 
     def images(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         adapter = self._resolve(model.provider, "image_generation")
-        return adapter.images(request, model, credentials)
+        return run_translated(lambda: adapter.images(request, model, credentials))
 
     async def aimages(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         adapter = self._resolve(model.provider, "image_generation")
-        return await adapter.aimages(request, model, credentials)
+        return await arun_translated(adapter.aimages(request, model, credentials))
