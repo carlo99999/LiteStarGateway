@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from litestar import Controller, delete, get, post
+from litestar import Controller, Request, delete, get, post
 from litestar.di import NamedDependency, Provide
 from litestar.openapi.spec import Example
 from litestar.params import Body, FromPath, FromQuery
@@ -18,6 +18,8 @@ from litestar.params import Body, FromPath, FromQuery
 from litestar_test.application.credential_service import CredentialService
 from litestar_test.domain.entities import User
 from litestar_test.domain.pagination import resolve_page
+from litestar_test.domain.ports import AuditLog
+from litestar_test.infrastructure.web.audit.recorder import record_audit
 from litestar_test.infrastructure.web.credentials.schemas import (
     CreateCredentialRequest,
     CredentialResponse,
@@ -96,9 +98,20 @@ class CredentialController(Controller):
         ],
         current_admin: NamedDependency[User],
         credential_service: NamedDependency[CredentialService],
+        request: Request,
+        audit_log: NamedDependency[AuditLog],
     ) -> CredentialResponse:
         credential = await credential_service.create(
             current_admin, data.name, data.provider, data.values
+        )
+        await record_audit(
+            audit_log,
+            request,
+            current_admin,
+            "credential.create",
+            target_type="credential",
+            target_id=credential.id,
+            detail=f"{credential.name} ({credential.provider})",
         )
         return CredentialResponse.from_entity(credential)
 
@@ -129,5 +142,15 @@ class CredentialController(Controller):
         credential_id: FromPath[UUID],
         current_admin: NamedDependency[User],
         credential_service: NamedDependency[CredentialService],
+        request: Request,
+        audit_log: NamedDependency[AuditLog],
     ) -> None:
         await credential_service.delete(current_admin, credential_id)
+        await record_audit(
+            audit_log,
+            request,
+            current_admin,
+            "credential.delete",
+            target_type="credential",
+            target_id=credential_id,
+        )

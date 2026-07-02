@@ -10,6 +10,7 @@ from uuid import UUID
 from litestar_test.domain.entities import (
     APIKey,
     ApiKeySpend,
+    AuditEvent,
     Credential,
     ExternalIdentity,
     Invite,
@@ -248,6 +249,20 @@ class UsageRepository(Protocol):
     async def spend_by_api_key(self, team_id: UUID) -> list[ApiKeySpend]:
         """Token/cost totals grouped by API key for the team (includes keys that
         are now revoked, as long as they have recorded usage)."""
+        ...
+
+
+# runtime_checkable: injected directly into a handler, so Litestar isinstance-checks it.
+@runtime_checkable
+class AuditLog(Protocol):
+    """Append-only audit trail of privileged actions."""
+
+    async def record(self, event: AuditEvent) -> None: ...
+
+    async def list_recent(
+        self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[AuditEvent]:
+        """Most recent audit events first (for the admin read API)."""
         ...
 
 
