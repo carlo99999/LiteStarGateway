@@ -32,6 +32,57 @@ from litestar_test.domain.request_policy import sanitize_request
 
 logger = logging.getLogger("litestar_test.usage")
 
+# Coarse industry heuristic, used only when no authoritative usage arrives
+# (client disconnect mid-stream, or a provider stream that never reports it).
+_CHARS_PER_TOKEN = 4
+
+
+def _estimate_tokens(chars: int) -> int:
+    return (chars + _CHARS_PER_TOKEN - 1) // _CHARS_PER_TOKEN
+
+
+def _request_text(request: dict[str, Any]) -> str:
+    """Concatenated prompt text of a chat or Responses request, for estimation."""
+    parts: list[str] = []
+    if isinstance(request.get("instructions"), str):
+        parts.append(request["instructions"])
+    value = request.get("input")
+    if isinstance(value, str):
+        parts.append(value)
+    items = request.get("messages") or (value if isinstance(value, list) else [])
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        content = item.get("content")
+        if isinstance(content, str):
+            parts.append(content)
+        elif isinstance(content, list):
+            parts.extend(
+                c.get("text", "")
+                for c in content
+                if isinstance(c, dict) and isinstance(c.get("text"), str)
+            )
+    return "\n".join(parts)
+
+
+def _chunk_output_text(chunk: dict[str, Any]) -> str:
+    """Output text carried by one stream chunk (chat delta or Responses event)."""
+    if chunk.get("type") == "response.output_text.delta":
+        delta = chunk.get("delta")
+        return delta if isinstance(delta, str) else ""
+    choices = chunk.get("choices") or []
+    if choices and isinstance(choices[0], dict):
+        content = (choices[0].get("delta") or {}).get("content")
+        return content if isinstance(content, str) else ""
+    return ""
+
+
+def _has_tokens(usage: dict[str, Any]) -> bool:
+    return any(
+        int(usage.get(key) or 0)
+        for key in ("prompt_tokens", "completion_tokens", "input_tokens", "output_tokens")
+    )
+
 
 class CompletionService:
     def __init__(
@@ -235,6 +286,7 @@ class CompletionService:
         model: Model,
         operation: str,
         stream: AsyncIterator[dict[str, Any]],
+        request: dict[str, Any],
     ) -> AsyncIterator[dict[str, Any]]:
         """Relay chunks unchanged while capturing usage as it flows, then record a
         UsageEvent + emit a trace once the stream finishes (or the client
@@ -242,9 +294,13 @@ class CompletionService:
         streamed calls were neither billed nor observed. A provider error
         mid-stream emits a status='error' trace instead of a fake 'ok' one
         (a client disconnect — GeneratorExit — still records as 'ok': bill
-        what was seen)."""
+        what was seen). If no authoritative usage arrived by then (disconnect
+        before the usage chunk, or a provider that never reported one), usage
+        is estimated from the request text + streamed output rather than
+        silently billed as zero."""
         start = perf_counter()
         usage: dict[str, Any] = {}
+        streamed_chars = 0
         error: Exception | None = None
         try:
             async for chunk in stream:
@@ -253,6 +309,7 @@ class CompletionService:
                 found = chunk.get("usage") or (chunk.get("response") or {}).get("usage")
                 if found:
                     usage = found
+                streamed_chars += len(_chunk_output_text(chunk))
                 yield chunk
         except Exception as exc:
             error = exc
@@ -262,6 +319,24 @@ class CompletionService:
             if error is not None:
                 self._emit_error_trace(team_id, api_key_id, model, operation, latency_ms, error)
             else:
+                # Even with zero streamed output (disconnect before the first
+                # content chunk) the provider consumed the prompt — bill it.
+                if not _has_tokens(usage):
+                    estimate = {
+                        "prompt_tokens": _estimate_tokens(len(_request_text(request))),
+                        "completion_tokens": _estimate_tokens(streamed_chars),
+                    }
+                    if _has_tokens(estimate):
+                        usage = estimate
+                        logger.warning(
+                            "stream ended without authoritative usage; billing estimate: "
+                            "team=%s model=%s op=%s prompt=%s completion=%s",
+                            team_id,
+                            model.name,
+                            operation,
+                            usage["prompt_tokens"],
+                            usage["completion_tokens"],
+                        )
                 await self._observe(
                     team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
                 )
@@ -275,7 +350,7 @@ class CompletionService:
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("chat.completions", request)
         stream = await self._gateway.astream_chat_completion(clean, model, values)
-        return self._metered_stream(team_id, api_key_id, model, "chat.completions", stream)
+        return self._metered_stream(team_id, api_key_id, model, "chat.completions", stream, clean)
 
     async def open_responses_stream(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
@@ -285,7 +360,7 @@ class CompletionService:
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("responses", request)
         stream = await self._gateway.astream_responses(clean, model, values)
-        return self._metered_stream(team_id, api_key_id, model, "responses", stream)
+        return self._metered_stream(team_id, api_key_id, model, "responses", stream, clean)
 
     async def embeddings(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
