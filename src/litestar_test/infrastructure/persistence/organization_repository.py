@@ -27,9 +27,7 @@ class SQLAlchemyOrganizationRepository:
         model = await self._session.get(OrganizationModel, organization_id)
         return model.to_entity() if model else None
 
-    async def list(
-        self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
-    ) -> list[Organization]:
+    async def list(self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0) -> list[Organization]:
         models = await self._session.scalars(
             select(OrganizationModel)
             .order_by(OrganizationModel.created_at)

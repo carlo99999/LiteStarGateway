@@ -196,9 +196,7 @@ async def test_list_members_pagination(client: AsyncTestClient) -> None:
     assert first.status_code == HTTP_200_OK
     assert len(first.json()) == 2
     # 1 team admin (bootstrap) + 3 members = 4 total; page 2 holds the rest.
-    second = await client.get(
-        f"/teams/{team_id}/members?limit=2&offset=2", headers=_bearer(admin)
-    )
+    second = await client.get(f"/teams/{team_id}/members?limit=2&offset=2", headers=_bearer(admin))
     assert len(second.json()) == 2
 
 

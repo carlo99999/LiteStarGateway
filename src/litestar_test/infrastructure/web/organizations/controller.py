@@ -45,9 +45,7 @@ class OrganizationController(Controller):
         offset: FromQuery[int | None] = None,
     ) -> list[OrganizationResponse]:
         page_limit, page_offset = resolve_page(limit, offset)
-        orgs = await organization_service.list(
-            current_admin, limit=page_limit, offset=page_offset
-        )
+        orgs = await organization_service.list(current_admin, limit=page_limit, offset=page_offset)
         return [OrganizationResponse.from_entity(o) for o in orgs]
 
     @post("/{organization_id:uuid}/teams")
