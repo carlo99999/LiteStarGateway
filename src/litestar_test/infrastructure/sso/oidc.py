@@ -5,9 +5,10 @@ Microsoft/Entra, Okta, Keycloak, … — by pointing `OIDC_DISCOVERY_URL` at its
 `.well-known/openid-configuration`. Authlib handles the authorization-code
 exchange; joserfc verifies the `id_token` against the provider's JWKS.
 
-Confidential-client flow (a client secret is required — see `Settings.sso_enabled`),
-so CSRF is covered by the `state` parameter. PKCE and `nonce` are hardening
-follow-ups.
+Confidential-client flow (a client secret is required — see `Settings.sso_enabled`).
+CSRF is covered by the `state` parameter; the `nonce` claim binds the id_token to
+this authorization request (replay defense) and PKCE (S256) protects the
+authorization code against interception. Both are verified on exchange.
 
 Failures during discovery/exchange/verification are translated to the domain
 `SSOExchangeError` (→ 401) so a misconfigured or flaky IdP surfaces as an auth
@@ -70,29 +71,45 @@ class OIDCIdentityProvider:
 
     def _client(self, redirect_uri: str) -> AsyncOAuth2Client:
         return AsyncOAuth2Client(
-            self._client_id, self._client_secret, scope=self._scopes, redirect_uri=redirect_uri
+            self._client_id,
+            self._client_secret,
+            scope=self._scopes,
+            redirect_uri=redirect_uri,
+            code_challenge_method="S256",
         )
 
-    async def authorization_url(self, state: str, redirect_uri: str) -> str:
+    async def authorization_url(
+        self, state: str, redirect_uri: str, *, nonce: str, code_verifier: str
+    ) -> str:
         metadata = await self._load_metadata()
         # AsyncOAuth2Client owns an httpx connection pool; close it after each use
         # so logins don't leak sockets/file descriptors.
         client = self._client(redirect_uri)
         try:
+            # Authlib derives the S256 code_challenge from the verifier; `nonce`
+            # is appended to the query and echoed back inside the id_token.
             url, _ = client.create_authorization_url(
-                metadata["authorization_endpoint"], state=state
+                metadata["authorization_endpoint"],
+                state=state,
+                nonce=nonce,
+                code_verifier=code_verifier,
             )
         finally:
             await client.aclose()  # type: ignore[missing-attribute]  # httpx.AsyncClient base; authlib stub omits it
         return url
 
-    async def exchange(self, code: str, redirect_uri: str) -> ExternalIdentity:
+    async def exchange(
+        self, code: str, redirect_uri: str, *, nonce: str, code_verifier: str
+    ) -> ExternalIdentity:
         metadata = await self._load_metadata()
         try:
             client = self._client(redirect_uri)
             try:
                 token = await client.fetch_token(
-                    metadata["token_endpoint"], code=code, grant_type="authorization_code"
+                    metadata["token_endpoint"],
+                    code=code,
+                    grant_type="authorization_code",
+                    code_verifier=code_verifier,
                 )
             finally:
                 await client.aclose()  # type: ignore[missing-attribute]  # httpx.AsyncClient base; authlib stub omits it
@@ -102,6 +119,10 @@ class OIDCIdentityProvider:
             claims = await self._verify_id_token(id_token, metadata)
         except (httpx.HTTPError, AuthlibBaseError, JoseError, ValueError, KeyError) as exc:
             raise SSOExchangeError("SSO authorization-code exchange failed") from exc
+        # The id_token must echo our nonce, or it was minted for a different
+        # authorization request (replay/injection).
+        if claims.get("nonce") != nonce:
+            raise SSOExchangeError("id_token nonce mismatch")
         groups = claims.get("groups") or []
         return ExternalIdentity(
             subject=str(claims["sub"]),

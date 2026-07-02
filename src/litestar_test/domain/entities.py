@@ -103,6 +103,8 @@ class TraceRecord:
     latency_ms: float
     status: str
     created_at: datetime
+    # Exception class name when status == "error" (no message: keep traces secret-free).
+    error_type: str | None = None
 
 
 @dataclass(frozen=True)

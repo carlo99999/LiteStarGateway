@@ -39,5 +39,6 @@ jobs:
       - name: Type check (pyrefly)
         run: uv run pyrefly check
 
-      - name: Tests (pytest)
-        run: uv run pytest -q
+      # Coverage gate: the project's stated bar is 80% (currently ~94%).
+      - name: Tests (pytest + coverage gate)
+        run: uv run pytest -q --cov=src/litestar_test --cov-report=term --cov-fail-under=80

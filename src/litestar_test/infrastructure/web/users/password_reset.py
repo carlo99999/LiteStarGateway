@@ -24,7 +24,12 @@ from litestar_test.infrastructure.web.users.schemas import (
 )
 
 
-@post("/password-resets", dependencies={"admin_user": Provide(provide_current_admin)})
+# Admin-gated, but rate-limited like the other auth-surface endpoints for consistency.
+@post(
+    "/password-resets",
+    dependencies={"admin_user": Provide(provide_current_admin)},
+    middleware=[build_auth_rate_limit().middleware],
+)
 async def create_password_reset(
     data: PasswordResetCreateRequest,
     admin_user: NamedDependency[User],

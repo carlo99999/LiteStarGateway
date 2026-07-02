@@ -280,11 +280,20 @@ class AuditLog(Protocol):
 # runtime_checkable: injected directly into a handler, so Litestar isinstance-checks it.
 @runtime_checkable
 class IdentityProvider(Protocol):
-    """SSO provider: build the login redirect and resolve the callback code."""
+    """SSO provider: build the login redirect and resolve the callback code.
 
-    async def authorization_url(self, state: str, redirect_uri: str) -> str: ...
+    `nonce` binds the id_token to this authorization request (replay defense);
+    `code_verifier` is the PKCE secret whose S256 challenge rides the redirect
+    (authorization-code interception defense). Both are generated per login and
+    verified on exchange."""
 
-    async def exchange(self, code: str, redirect_uri: str) -> ExternalIdentity: ...
+    async def authorization_url(
+        self, state: str, redirect_uri: str, *, nonce: str, code_verifier: str
+    ) -> str: ...
+
+    async def exchange(
+        self, code: str, redirect_uri: str, *, nonce: str, code_verifier: str
+    ) -> ExternalIdentity: ...
 
 
 class DistributedLock(Protocol):

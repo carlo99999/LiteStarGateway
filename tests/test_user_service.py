@@ -334,3 +334,13 @@ async def test_ensure_admin_tolerates_concurrent_replica_bootstrap() -> None:
     # Second replica loses the insert race; ensure_admin must swallow the conflict.
     await service.ensure_admin("admin@example.com", master_key="secret")
     assert await users.get_by_email("admin@example.com") is not None
+
+
+async def test_async_password_wrappers_roundtrip() -> None:
+    """The a* variants offload Argon2 to a thread but must match the sync hasher."""
+    from litestar_test.domain.password import ahash_password, averify_password, verify_password
+
+    hashed = await ahash_password("Passw0rd!")
+    assert verify_password("Passw0rd!", hashed)
+    assert await averify_password("Passw0rd!", hashed)
+    assert not await averify_password("wrong-password", hashed)

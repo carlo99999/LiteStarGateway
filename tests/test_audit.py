@@ -87,3 +87,67 @@ async def test_audit_read_requires_platform_admin(client: AsyncTestClient) -> No
     assert resp.status_code == HTTP_403_FORBIDDEN
     # And the admin can read it.
     assert (await client.get("/audit", headers=_bearer(admin))).status_code == HTTP_200_OK
+
+
+async def test_model_and_org_lifecycle_is_audited(client: AsyncTestClient) -> None:
+    """Model create/update/delete and org/team creation must hit the audit log."""
+    admin = await _admin_token(client)
+    cred = (
+        await client.post(
+            "/credentials",
+            json={
+                "name": "prod-openai",
+                "provider": "openai",
+                "values": {"api_key": FAKE_OPENAI_VALUE},
+            },
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    org = (
+        await client.post("/organizations", json={"name": "Acme"}, headers=_bearer(admin))
+    ).json()["id"]
+    team = (
+        await client.post(
+            f"/organizations/{org}/teams",
+            json={"name": "Core", "admin_email": ADMIN_EMAIL},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    model = (
+        await client.post(
+            f"/teams/{team}/models",
+            json={
+                "name": "m",
+                "provider": "openai",
+                "credential_id": cred,
+                "type": "chat",
+                "provider_model_id": "gpt-4o",
+                "enabled": True,
+            },
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    await client.patch(
+        f"/teams/{team}/models/{model}", json={"enabled": False}, headers=_bearer(admin)
+    )
+    await client.delete(f"/teams/{team}/models/{model}", headers=_bearer(admin))
+
+    events = (await client.get("/audit", headers=_bearer(admin))).json()
+    actions = [e["action"] for e in events]
+    for expected in (
+        "organization.create",
+        "team.create",
+        "model.create",
+        "model.update",
+        "model.delete",
+    ):
+        assert expected in actions
+
+    created = next(e for e in events if e["action"] == "model.create")
+    assert created["actor_email"] == ADMIN_EMAIL
+    assert created["target_type"] == "model"
+    assert created["target_id"] == model
+    org_created = next(e for e in events if e["action"] == "organization.create")
+    assert org_created["target_id"] == org
+    team_created = next(e for e in events if e["action"] == "team.create")
+    assert team_created["target_id"] == team
