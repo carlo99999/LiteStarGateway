@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import datetime
+from contextlib import AbstractAsyncContextManager
+from datetime import datetime, timedelta
 from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
@@ -284,6 +285,15 @@ class IdentityProvider(Protocol):
     async def authorization_url(self, state: str, redirect_uri: str) -> str: ...
 
     async def exchange(self, code: str, redirect_uri: str) -> ExternalIdentity: ...
+
+
+class DistributedLock(Protocol):
+    """Cross-process mutual exclusion, e.g. so only one replica runs key rotation."""
+
+    def hold(self, name: str, *, ttl: timedelta) -> AbstractAsyncContextManager[bool]:
+        """Async context manager that yields True if the lock was acquired (held
+        for the block, auto-expiring after `ttl`), or False if another holder has it."""
+        ...
 
 
 class TraceSink(Protocol):

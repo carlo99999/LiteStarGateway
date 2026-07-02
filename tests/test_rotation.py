@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
@@ -82,3 +83,74 @@ def test_seconds_until_same_day() -> None:
 def test_seconds_until_next_day_when_passed() -> None:
     now = datetime(2026, 1, 1, 5, 0, 0, tzinfo=UTC)
     assert seconds_until("03:00", now) == 22 * 3600
+
+
+class _FakeLock:
+    """Yields a fixed acquired/not-acquired result, to drive guarded_rotate."""
+
+    def __init__(self, acquired: bool) -> None:
+        self._acquired = acquired
+
+    @asynccontextmanager
+    async def hold(self, name: str, *, ttl: timedelta):  # noqa: ANN201
+        yield self._acquired
+
+
+async def test_guarded_rotate_runs_when_lock_acquired() -> None:
+    from litestar_test.infrastructure.rotation import guarded_rotate
+
+    ran: list[bool] = []
+
+    async def rotate() -> None:
+        ran.append(True)
+
+    did = await guarded_rotate(_FakeLock(True), rotate)
+    assert did is True
+    assert ran == [True]
+
+
+async def test_guarded_rotate_skips_when_lock_held_elsewhere() -> None:
+    from litestar_test.infrastructure.rotation import guarded_rotate
+
+    ran: list[bool] = []
+
+    async def rotate() -> None:
+        ran.append(True)
+
+    did = await guarded_rotate(_FakeLock(False), rotate)
+    assert did is False
+    assert ran == []  # another replica holds the lock → we did not rotate
+
+
+def _lock_settings(redis_url: str | None):  # noqa: ANN202
+    from litestar_test.config import Settings
+
+    return Settings(
+        database_url="sqlite+aiosqlite:///:memory:",
+        admin_email="admin@example.com",
+        master_key="master",
+        jwt_secret="dev-jwt",  # pragma: allowlist secret
+        salt_key="dev-salt",
+        environment="development",
+        redis_url=redis_url,
+    )
+
+
+def test_build_distributed_lock_selects_backend() -> None:
+    from litestar_test.infrastructure.locks import (
+        NoOpDistributedLock,
+        RedisDistributedLock,
+        build_distributed_lock,
+    )
+
+    assert isinstance(build_distributed_lock(_lock_settings(None)), NoOpDistributedLock)
+    assert isinstance(
+        build_distributed_lock(_lock_settings("redis://localhost:6379")), RedisDistributedLock
+    )
+
+
+async def test_noop_lock_always_acquires() -> None:
+    from litestar_test.infrastructure.locks import NoOpDistributedLock
+
+    async with NoOpDistributedLock().hold("x", ttl=timedelta(seconds=1)) as acquired:
+        assert acquired is True
