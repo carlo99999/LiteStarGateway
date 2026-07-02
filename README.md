@@ -72,7 +72,7 @@ uvicorn with `--proxy-headers`). Provide the secrets via the environment.
 ```bash
 # Local prod-like run (app + Postgres) via compose:
 MASTER_KEY=… JWT_SECRET=… SALT_KEY=… POSTGRES_PASSWORD=… docker compose up --build
-# → http://localhost:8000  (GET /health for liveness)
+# → http://localhost:8000  (GET /health liveness, GET /health/ready readiness)
 ```
 
 Or build and run the image directly:
