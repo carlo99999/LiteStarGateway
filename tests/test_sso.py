@@ -34,10 +34,14 @@ class FakeIdP:
     def __init__(self, identity: ExternalIdentity) -> None:
         self._identity = identity
 
-    async def authorization_url(self, state: str, redirect_uri: str) -> str:
-        return f"https://idp.example/authorize?state={state}"
+    async def authorization_url(
+        self, state: str, redirect_uri: str, *, nonce: str, code_verifier: str
+    ) -> str:
+        return f"https://idp.example/authorize?state={state}&nonce={nonce}"
 
-    async def exchange(self, code: str, redirect_uri: str) -> ExternalIdentity:
+    async def exchange(
+        self, code: str, redirect_uri: str, *, nonce: str, code_verifier: str
+    ) -> ExternalIdentity:
         return self._identity
 
 
@@ -172,13 +176,21 @@ async def test_sso_uses_configured_redirect_uri(tmp_path: Path) -> None:
     captured: dict[str, str] = {}
 
     class RecordingIdP(FakeIdP):
-        async def authorization_url(self, state: str, redirect_uri: str) -> str:
+        async def authorization_url(
+            self, state: str, redirect_uri: str, *, nonce: str, code_verifier: str
+        ) -> str:
             captured["authorize"] = redirect_uri
-            return await super().authorization_url(state, redirect_uri)
+            return await super().authorization_url(
+                state, redirect_uri, nonce=nonce, code_verifier=code_verifier
+            )
 
-        async def exchange(self, code: str, redirect_uri: str) -> ExternalIdentity:
+        async def exchange(
+            self, code: str, redirect_uri: str, *, nonce: str, code_verifier: str
+        ) -> ExternalIdentity:
             captured["exchange"] = redirect_uri
-            return await super().exchange(code, redirect_uri)
+            return await super().exchange(
+                code, redirect_uri, nonce=nonce, code_verifier=code_verifier
+            )
 
     settings = dataclasses.replace(_settings(tmp_path), oidc_redirect_uri=public)
     idp = RecordingIdP(_identity("s-cfg", "frank@corp.com"))

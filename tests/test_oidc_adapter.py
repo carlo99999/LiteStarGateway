@@ -26,6 +26,8 @@ _METADATA = {
     "token_endpoint": f"{_ISSUER}/token",
     "jwks_uri": f"{_ISSUER}/jwks",
 }
+NONCE = "nonce-123"
+VERIFIER = "a-code-verifier-that-is-long-enough-for-pkce-0123456789"
 
 
 @pytest.fixture
@@ -49,6 +51,7 @@ def _id_token(signing_key: RSAKey, **overrides: Any) -> str:
         "email": "a@corp.com",
         "email_verified": True,
         "groups": ["g1"],
+        "nonce": NONCE,
     }
     claims.update(overrides)
     return jwt.encode({"alg": "RS256", "kid": "k1"}, claims, signing_key)
@@ -100,7 +103,9 @@ async def test_exchange_parses_identity(
         monkeypatch,
         {"id_token": _id_token(signing_key, email_verified="true", groups=["g1", "admins"])},
     )
-    identity = await provider.exchange("code", "https://app/sso/callback")
+    identity = await provider.exchange(
+        "code", "https://app/sso/callback", nonce=NONCE, code_verifier=VERIFIER
+    )
     assert identity.subject == "u1"
     assert identity.email == "a@corp.com"
     assert identity.email_verified is True
@@ -113,7 +118,9 @@ async def test_exchange_missing_id_token_raises(
     provider = _seeded_provider(signing_key)
     _patch_fetch_token(monkeypatch, {"access_token": "at"})  # no id_token
     with pytest.raises(SSOExchangeError):
-        await provider.exchange("code", "https://app/sso/callback")
+        await provider.exchange(
+            "code", "https://app/sso/callback", nonce=NONCE, code_verifier=VERIFIER
+        )
 
 
 async def test_exchange_wrong_issuer_raises(
@@ -124,7 +131,9 @@ async def test_exchange_wrong_issuer_raises(
         monkeypatch, {"id_token": _id_token(signing_key, iss="https://evil.example")}
     )
     with pytest.raises(SSOExchangeError):  # joserfc claim error, translated
-        await provider.exchange("code", "https://app/sso/callback")
+        await provider.exchange(
+            "code", "https://app/sso/callback", nonce=NONCE, code_verifier=VERIFIER
+        )
 
 
 async def test_exchange_wrong_audience_raises(
@@ -133,7 +142,9 @@ async def test_exchange_wrong_audience_raises(
     provider = _seeded_provider(signing_key)
     _patch_fetch_token(monkeypatch, {"id_token": _id_token(signing_key, aud="someone-else")})
     with pytest.raises(SSOExchangeError):
-        await provider.exchange("code", "https://app/sso/callback")
+        await provider.exchange(
+            "code", "https://app/sso/callback", nonce=NONCE, code_verifier=VERIFIER
+        )
 
 
 async def test_exchange_tampered_signature_raises(
@@ -144,7 +155,9 @@ async def test_exchange_tampered_signature_raises(
     other = RSAKey.generate_key(2048, parameters={"kid": "k1"}, private=True)
     _patch_fetch_token(monkeypatch, {"id_token": _id_token(other)})
     with pytest.raises(SSOExchangeError):
-        await provider.exchange("code", "https://app/sso/callback")
+        await provider.exchange(
+            "code", "https://app/sso/callback", nonce=NONCE, code_verifier=VERIFIER
+        )
 
 
 async def test_full_discovery_and_jwks_http_flow(
@@ -160,7 +173,9 @@ async def test_full_discovery_and_jwks_http_flow(
     )
     _patch_fetch_token(monkeypatch, {"id_token": _id_token(signing_key)})
     provider = OIDCIdentityProvider(_DISCOVERY_URL, _CLIENT_ID, "secret", "openid email")
-    identity = await provider.exchange("code", "https://app/sso/callback")
+    identity = await provider.exchange(
+        "code", "https://app/sso/callback", nonce=NONCE, code_verifier=VERIFIER
+    )
     assert identity.subject == "u1"
 
 
@@ -175,7 +190,41 @@ async def test_authorization_url_is_built_from_discovery(
     signing_key: RSAKey,
 ) -> None:
     provider = _seeded_provider(signing_key)
-    url = await provider.authorization_url("state-123", "https://app/sso/callback")
+    url = await provider.authorization_url(
+        "state-123", "https://app/sso/callback", nonce=NONCE, code_verifier=VERIFIER
+    )
     assert url.startswith(f"{_ISSUER}/authorize")
     assert "state=state-123" in url
     assert "client_id=client-abc" in url
+    # nonce rides the query; PKCE sends the S256 challenge, never the verifier.
+    assert f"nonce={NONCE}" in url
+    assert "code_challenge=" in url
+    assert "code_challenge_method=S256" in url
+    assert VERIFIER not in url
+
+
+async def test_exchange_nonce_mismatch_raises(
+    signing_key: RSAKey, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An id_token minted for a different authorization request must be rejected.
+    provider = _seeded_provider(signing_key)
+    _patch_fetch_token(monkeypatch, {"id_token": _id_token(signing_key, nonce="other-nonce")})
+    with pytest.raises(SSOExchangeError):
+        await provider.exchange(
+            "code", "https://app/sso/callback", nonce=NONCE, code_verifier=VERIFIER
+        )
+
+
+async def test_exchange_sends_code_verifier(
+    signing_key: RSAKey, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_fetch_token(self: Any, url: str, **kwargs: Any) -> dict[str, Any]:
+        captured.update(kwargs)
+        return {"id_token": _id_token(signing_key)}
+
+    monkeypatch.setattr(AsyncOAuth2Client, "fetch_token", fake_fetch_token)
+    provider = _seeded_provider(signing_key)
+    await provider.exchange("code", "https://app/sso/callback", nonce=NONCE, code_verifier=VERIFIER)
+    assert captured["code_verifier"] == VERIFIER
