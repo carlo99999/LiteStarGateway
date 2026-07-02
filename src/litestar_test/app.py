@@ -22,6 +22,7 @@ from litestar_test.infrastructure.persistence.secret_key_repository import (
 )
 from litestar_test.infrastructure.rotation import make_rotation_scheduler
 from litestar_test.infrastructure.sso.oidc import OIDCIdentityProvider
+from litestar_test.infrastructure.usage_reconciler import make_usage_reconciler
 from litestar_test.infrastructure.web.api_router.dependencies import (
     build_llm_gateway,
     provide_completion_service,
@@ -159,7 +160,11 @@ def create_app(
         plugins=[database.plugin],
         logging_config=build_logging_config(settings),
         on_startup=[make_bootstrap_admin(database, settings)],
-        lifespan=[make_rotation_scheduler(database, settings), trace_dispatcher.run],
+        lifespan=[
+            make_rotation_scheduler(database, settings),
+            make_usage_reconciler(database, settings),
+            trace_dispatcher.run,
+        ],
         dependencies=dependencies,
         stores=stores,
         exception_handlers={DomainError: domain_exception_handler},

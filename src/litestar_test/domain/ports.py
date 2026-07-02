@@ -251,6 +251,16 @@ class UsageRepository(Protocol):
         are now revoked, as long as they have recorded usage)."""
         ...
 
+    async def enqueue_pending(self, event: UsageEvent) -> None:
+        """Durable dead-letter for a usage event whose ledger write failed, so a
+        background reconciler can retry it instead of the event being lost."""
+        ...
+
+    async def reconcile_pending(self, *, limit: int = DEFAULT_PAGE_SIZE) -> int:
+        """Move up to `limit` dead-lettered usage events into the ledger (idempotent
+        by event id), removing settled ones. Returns how many were settled."""
+        ...
+
 
 # runtime_checkable: injected directly into a handler, so Litestar isinstance-checks it.
 @runtime_checkable
