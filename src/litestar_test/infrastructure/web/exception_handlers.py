@@ -9,8 +9,11 @@ from litestar.status_codes import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
     HTTP_409_CONFLICT,
+    HTTP_429_TOO_MANY_REQUESTS,
     HTTP_501_NOT_IMPLEMENTED,
+    HTTP_502_BAD_GATEWAY,
     HTTP_503_SERVICE_UNAVAILABLE,
+    HTTP_504_GATEWAY_TIMEOUT,
 )
 
 from litestar_test.domain.exceptions import (
@@ -40,6 +43,9 @@ from litestar_test.domain.exceptions import (
     SSOIdentityConflict,
     TeamNotFound,
     UnsupportedOperation,
+    UpstreamRateLimited,
+    UpstreamTimeout,
+    UpstreamUnavailable,
     UserNotFound,
     WeakPassword,
 )
@@ -73,6 +79,9 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     (CredentialMisconfigured, HTTP_400_BAD_REQUEST),
     (UnsupportedOperation, HTTP_501_NOT_IMPLEMENTED),
     (SaltKeyMissing, HTTP_503_SERVICE_UNAVAILABLE),
+    (UpstreamRateLimited, HTTP_429_TOO_MANY_REQUESTS),
+    (UpstreamTimeout, HTTP_504_GATEWAY_TIMEOUT),
+    (UpstreamUnavailable, HTTP_502_BAD_GATEWAY),
 ]
 
 
@@ -82,4 +91,9 @@ def domain_exception_handler(_: Request, exc: DomainError) -> Response:
         HTTP_400_BAD_REQUEST,
     )
     detail = str(exc) or exc.__class__.__name__
-    return Response({"detail": detail}, status_code=status)
+    headers: dict[str, str] = {}
+    # Forward the provider's Retry-After so client SDK backoff keeps working.
+    retry_after = getattr(exc, "retry_after", None)
+    if isinstance(retry_after, str):
+        headers["Retry-After"] = retry_after
+    return Response({"detail": detail}, status_code=status, headers=headers or None)

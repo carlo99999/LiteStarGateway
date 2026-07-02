@@ -33,7 +33,7 @@ from litestar_test.domain.exceptions import (
     WeakPassword,
 )
 from litestar_test.domain.key_generator import hash_key
-from litestar_test.domain.password import hash_password, verify_password
+from litestar_test.domain.password import ahash_password, averify_password
 from litestar_test.domain.ports import (
     InviteRepository,
     PasswordResetRepository,
@@ -76,11 +76,17 @@ class UserService:
         admin = User(
             id=uuid4(),
             email=_normalize_email(admin_email),
-            password_hash=hash_password(master_key),
+            password_hash=await ahash_password(master_key),
             is_admin=True,
             created_at=_now(),
         )
-        await self._users.add(admin)
+        try:
+            await self._users.add(admin)
+        except EmailAlreadyRegistered:
+            # Multi-replica startup race: another replica bootstrapped between our
+            # count() and add(). The unique email constraint is the arbiter — the
+            # admin exists, which is all this hook guarantees.
+            return
 
     async def create_invite(self) -> IssuedInvite:
         token = secrets.token_urlsafe(_INVITE_TOKEN_BYTES)
@@ -95,7 +101,7 @@ class UserService:
         stored = await self._invites.add(invite)
         return IssuedInvite(invite=stored, token=token)
 
-    def __check_if_password_has_some_complexity(self, password: str) -> None:
+    def _check_password_complexity(self, password: str) -> None:
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters long")
         if not any(c.islower() for c in password):
@@ -115,7 +121,7 @@ class UserService:
         # Validate the password before consuming the invite, so a legitimate
         # typo does not burn the invite (and it leaks nothing about the email).
         try:
-            self.__check_if_password_has_some_complexity(password)
+            self._check_password_complexity(password)
         except ValueError as e:
             raise WeakPassword(str(e)) from e
 
@@ -134,7 +140,7 @@ class UserService:
             User(
                 id=uuid4(),
                 email=email,
-                password_hash=hash_password(password),
+                password_hash=await ahash_password(password),
                 is_admin=False,
                 created_at=_now(),
             )
@@ -143,7 +149,7 @@ class UserService:
     async def authenticate(self, email: str, password: str) -> User:
         """Verify login credentials. Raises InvalidCredentials on any mismatch."""
         user = await self._users.get_by_email(_normalize_email(email))
-        if user is None or not verify_password(password, user.password_hash):
+        if user is None or not await averify_password(password, user.password_hash):
             raise InvalidCredentials("Invalid email or password")
         # A disabled account cannot log in; same generic error (don't reveal state).
         if not user.is_active:
@@ -194,7 +200,7 @@ class UserService:
                 User(
                     id=uuid4(),
                     email=normalized_email,
-                    password_hash=hash_password(secrets.token_urlsafe(_INVITE_TOKEN_BYTES)),
+                    password_hash=await ahash_password(secrets.token_urlsafe(_INVITE_TOKEN_BYTES)),
                     is_admin=is_admin,
                     created_at=_now(),
                     sso_subject=identity.subject,
@@ -259,7 +265,7 @@ class UserService:
             raise InvalidPasswordReset("Reset token is invalid, used, or expired")
 
         try:
-            self.__check_if_password_has_some_complexity(new_password)
+            self._check_password_complexity(new_password)
         except ValueError as e:
             raise WeakPassword(str(e)) from e
 
@@ -267,4 +273,4 @@ class UserService:
         if not await self._password_resets.mark_used(reset.id, _now()):
             raise InvalidPasswordReset("Reset token is invalid, used, or expired")
 
-        await self._users.set_password(reset.user_id, hash_password(new_password))
+        await self._users.set_password(reset.user_id, await ahash_password(new_password))

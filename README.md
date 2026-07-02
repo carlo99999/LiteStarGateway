@@ -87,10 +87,11 @@ docker run -p 8000:8000 \
 
 Notes:
 
-- **Behind a reverse proxy / TLS**: the app expects to sit behind one. Keep
-  `--proxy-headers` and set uvicorn's `--forwarded-allow-ips` to your proxy's
-  address (the image default `*` trusts any upstream — fine only when a single
-  trusted ingress fronts it) so the real client IP reaches the per-IP rate limit.
+- **Behind a reverse proxy / TLS**: the app expects to sit behind one. Set
+  `FORWARDED_ALLOW_IPS` to your proxy's IP/CIDR so the real client IP reaches
+  the per-IP rate limit. The image default is loopback: forwarded headers from
+  any other peer are ignored, so a direct client cannot forge its IP to bypass
+  the auth rate limit or spoof the audit log.
   When TLS terminates at the proxy (the app sees plain HTTP), also set
   `SESSION_COOKIE_SECURE=true` so the SSO state cookie is still marked `Secure`
   (it defaults on outside local envs), and set `OIDC_REDIRECT_URI` to the public

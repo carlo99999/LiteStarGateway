@@ -8,6 +8,7 @@ import pytest
 
 from litestar_test.config import (
     DEFAULT_JWT_SECRET,
+    SAMPLE_MASTER_KEY,
     InsecureConfigurationError,
     Settings,
 )
@@ -19,7 +20,7 @@ STRONG_SECRET = "a-strong-random-production-secret-0123456789"
 _BASE = Settings(
     database_url="sqlite+aiosqlite:///:memory:",
     admin_email="admin@example.com",
-    master_key="master",
+    master_key="a-strong-random-master-key-0123456789",
     jwt_secret=STRONG_SECRET,
     salt_key="a-strong-random-salt-key-0123456789",
     environment="development",
@@ -100,3 +101,26 @@ def test_sso_enabled_requires_discovery_client_id_and_secret() -> None:
     assert dataclasses.replace(full, oidc_client_secret=None).sso_enabled is False
     assert dataclasses.replace(full, oidc_client_id=None).sso_enabled is False
     assert dataclasses.replace(full, oidc_discovery_url=None).sso_enabled is False
+
+
+def test_non_local_env_rejects_sample_master_key() -> None:
+    # .env.sample ships MASTER_KEY=change-me-please; a forgotten override would
+    # create the platform admin with a publicly-known password.
+    with pytest.raises(InsecureConfigurationError):
+        dataclasses.replace(_BASE, environment="production", master_key=SAMPLE_MASTER_KEY)
+
+
+def test_non_local_env_rejects_short_master_key() -> None:
+    with pytest.raises(InsecureConfigurationError):
+        dataclasses.replace(_BASE, environment="production", master_key="short-password")
+
+
+def test_production_allows_no_master_key() -> None:
+    # MASTER_KEY is only needed to bootstrap an empty users table.
+    settings = dataclasses.replace(_BASE, environment="production", master_key=None)
+    assert settings.is_production is True
+
+
+def test_development_allows_weak_master_key() -> None:
+    settings = dataclasses.replace(_BASE, environment="development", master_key="master")
+    assert settings.is_production is False

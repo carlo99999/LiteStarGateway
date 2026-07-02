@@ -9,7 +9,7 @@ the caller already holds the model and credentials.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
@@ -123,6 +123,58 @@ class CompletionService:
             )
         )
 
+    def _emit_error_trace(
+        self,
+        team_id: UUID,
+        api_key_id: UUID,
+        model: Model,
+        operation: str,
+        latency_ms: float,
+        exc: BaseException,
+    ) -> None:
+        """Emit a status='error' trace for a failed gateway call. Without this,
+        provider outages/timeouts/rate-limits are invisible in tracing — exactly
+        the events operators most need to see. No UsageEvent: there is no usage
+        to bill (the provider reported none)."""
+        self._emit_trace(
+            TraceRecord(
+                team_id=team_id,
+                api_key_id=api_key_id,
+                model_name=model.name,
+                provider=model.provider.value,
+                operation=operation,
+                prompt_tokens=0,
+                completion_tokens=0,
+                cost=0.0,
+                latency_ms=latency_ms,
+                status="error",
+                created_at=datetime.now(UTC),
+                error_type=type(exc).__name__,
+            )
+        )
+
+    async def _dispatch(
+        self,
+        team_id: UUID,
+        api_key_id: UUID,
+        model: Model,
+        operation: str,
+        call: Callable[[], Awaitable[dict[str, Any]]],
+    ) -> dict[str, Any]:
+        """Run one gateway call, observing success (usage + trace) and failure
+        (error trace) before the exception propagates to the HTTP layer."""
+        start = perf_counter()
+        try:
+            response = await call()
+        except Exception as exc:
+            self._emit_error_trace(
+                team_id, api_key_id, model, operation, (perf_counter() - start) * 1000, exc
+            )
+            raise
+        latency_ms = (perf_counter() - start) * 1000
+        await self._observe(team_id, api_key_id, model, operation, response, latency_ms)
+        return response
+
     async def _prepare(
         self, team_id: UUID, request: dict[str, Any], expected_type: ModelType
     ) -> tuple[Model, dict[str, str]]:
@@ -146,22 +198,26 @@ class CompletionService:
     ) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("chat.completions", request)
-        start = perf_counter()
-        response = await self._gateway.achat_completion(clean, model, values)
-        latency_ms = (perf_counter() - start) * 1000
-        await self._observe(team_id, api_key_id, model, "chat.completions", response, latency_ms)
-        return response
+        return await self._dispatch(
+            team_id,
+            api_key_id,
+            model,
+            "chat.completions",
+            lambda: self._gateway.achat_completion(clean, model, values),
+        )
 
     async def responses(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("responses", request)
-        start = perf_counter()
-        response = await self._gateway.aresponses(clean, model, values)
-        latency_ms = (perf_counter() - start) * 1000
-        await self._observe(team_id, api_key_id, model, "responses", response, latency_ms)
-        return response
+        return await self._dispatch(
+            team_id,
+            api_key_id,
+            model,
+            "responses",
+            lambda: self._gateway.aresponses(clean, model, values),
+        )
 
     async def _metered_stream(
         self,
@@ -174,9 +230,13 @@ class CompletionService:
         """Relay chunks unchanged while capturing usage as it flows, then record a
         UsageEvent + emit a trace once the stream finishes (or the client
         disconnects — the `finally` runs on generator close). Without this,
-        streamed calls were neither billed nor observed."""
+        streamed calls were neither billed nor observed. A provider error
+        mid-stream emits a status='error' trace instead of a fake 'ok' one
+        (a client disconnect — GeneratorExit — still records as 'ok': bill
+        what was seen)."""
         start = perf_counter()
         usage: dict[str, Any] = {}
+        error: Exception | None = None
         try:
             async for chunk in stream:
                 # OpenAI chat puts usage at the top level (final chunk); the
@@ -185,9 +245,17 @@ class CompletionService:
                 if found:
                     usage = found
                 yield chunk
+        except Exception as exc:
+            error = exc
+            raise
         finally:
             latency_ms = (perf_counter() - start) * 1000
-            await self._observe(team_id, api_key_id, model, operation, {"usage": usage}, latency_ms)
+            if error is not None:
+                self._emit_error_trace(team_id, api_key_id, model, operation, latency_ms, error)
+            else:
+                await self._observe(
+                    team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
+                )
 
     async def open_chat_stream(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
@@ -215,19 +283,23 @@ class CompletionService:
     ) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.EMBEDDINGS)
         clean = sanitize_request("embeddings", request)
-        start = perf_counter()
-        response = await self._gateway.aembeddings(clean, model, values)
-        latency_ms = (perf_counter() - start) * 1000
-        await self._observe(team_id, api_key_id, model, "embeddings", response, latency_ms)
-        return response
+        return await self._dispatch(
+            team_id,
+            api_key_id,
+            model,
+            "embeddings",
+            lambda: self._gateway.aembeddings(clean, model, values),
+        )
 
     async def images(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
         model, values = await self._prepare(team_id, request, ModelType.IMAGE)
         clean = sanitize_request("images", request)
-        start = perf_counter()
-        response = await self._gateway.aimages(clean, model, values)
-        latency_ms = (perf_counter() - start) * 1000
-        await self._observe(team_id, api_key_id, model, "images", response, latency_ms)
-        return response
+        return await self._dispatch(
+            team_id,
+            api_key_id,
+            model,
+            "images",
+            lambda: self._gateway.aimages(clean, model, values),
+        )

@@ -311,3 +311,36 @@ async def test_reset_password_rejects_weak_password(service: UserService) -> Non
     issued = await service.create_password_reset(admin, "u@b.com")
     with pytest.raises(WeakPassword):
         await service.reset_password(issued.token, "weak")
+
+
+async def test_ensure_admin_tolerates_concurrent_replica_bootstrap() -> None:
+    """Two replicas racing ensure_admin on an empty table: the loser's add() hits
+    the unique email constraint (EmailAlreadyRegistered) and must not crash startup."""
+
+    class RacedUserRepository(FakeUserRepository):
+        async def count(self) -> int:
+            return 0  # both replicas observed an empty table
+
+        async def add(self, user: User) -> User:
+            if user.email in self._by_email:
+                raise EmailAlreadyRegistered(user.email)
+            return await super().add(user)
+
+    users = RacedUserRepository()
+    service = UserService(
+        users=users, invites=FakeInviteRepository(), password_resets=FakePasswordResetRepository()
+    )
+    await service.ensure_admin("admin@example.com", master_key="secret")
+    # Second replica loses the insert race; ensure_admin must swallow the conflict.
+    await service.ensure_admin("admin@example.com", master_key="secret")
+    assert await users.get_by_email("admin@example.com") is not None
+
+
+async def test_async_password_wrappers_roundtrip() -> None:
+    """The a* variants offload Argon2 to a thread but must match the sync hasher."""
+    from litestar_test.domain.password import ahash_password, averify_password, verify_password
+
+    hashed = await ahash_password("Passw0rd!")
+    assert verify_password("Passw0rd!", hashed)
+    assert await averify_password("Passw0rd!", hashed)
+    assert not await averify_password("wrong-password", hashed)

@@ -126,3 +126,24 @@ class UnsupportedOperation(DomainError):
 
 class ModelTypeMismatch(DomainError):
     """The model's type does not match the requested operation (e.g. chat vs embeddings)."""
+
+
+class UpstreamError(DomainError):
+    """Base for provider-side failures surfaced by the gateway (not gateway bugs)."""
+
+
+class UpstreamRateLimited(UpstreamError):
+    """The provider rate-limited the request (429). `retry_after` carries the
+    provider's Retry-After header value, when present, so clients can back off."""
+
+    def __init__(self, message: str, retry_after: str | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+class UpstreamUnavailable(UpstreamError):
+    """The provider returned a 5xx or could not be reached."""
+
+
+class UpstreamTimeout(UpstreamError):
+    """The provider did not respond within the configured timeout."""

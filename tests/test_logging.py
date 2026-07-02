@@ -12,7 +12,7 @@ def _settings(environment: str) -> Settings:
     return Settings(
         database_url="sqlite+aiosqlite:///:memory:",
         admin_email="admin@example.com",
-        master_key="m",
+        master_key="m" * 32,
         jwt_secret="x" * 40,
         salt_key="s" * 32,
         environment=environment,
