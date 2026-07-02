@@ -311,3 +311,13 @@ async def test_reset_password_rejects_weak_password(service: UserService) -> Non
     issued = await service.create_password_reset(admin, "u@b.com")
     with pytest.raises(WeakPassword):
         await service.reset_password(issued.token, "weak")
+
+
+async def test_async_password_wrappers_roundtrip() -> None:
+    """The a* variants offload Argon2 to a thread but must match the sync hasher."""
+    from litestar_test.domain.password import ahash_password, averify_password, verify_password
+
+    hashed = await ahash_password("Passw0rd!")
+    assert verify_password("Passw0rd!", hashed)
+    assert await averify_password("Passw0rd!", hashed)
+    assert not await averify_password("wrong-password", hashed)

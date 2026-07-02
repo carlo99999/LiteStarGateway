@@ -33,7 +33,7 @@ from litestar_test.domain.exceptions import (
     WeakPassword,
 )
 from litestar_test.domain.key_generator import hash_key
-from litestar_test.domain.password import hash_password, verify_password
+from litestar_test.domain.password import ahash_password, averify_password
 from litestar_test.domain.ports import (
     InviteRepository,
     PasswordResetRepository,
@@ -76,7 +76,7 @@ class UserService:
         admin = User(
             id=uuid4(),
             email=_normalize_email(admin_email),
-            password_hash=hash_password(master_key),
+            password_hash=await ahash_password(master_key),
             is_admin=True,
             created_at=_now(),
         )
@@ -134,7 +134,7 @@ class UserService:
             User(
                 id=uuid4(),
                 email=email,
-                password_hash=hash_password(password),
+                password_hash=await ahash_password(password),
                 is_admin=False,
                 created_at=_now(),
             )
@@ -143,7 +143,7 @@ class UserService:
     async def authenticate(self, email: str, password: str) -> User:
         """Verify login credentials. Raises InvalidCredentials on any mismatch."""
         user = await self._users.get_by_email(_normalize_email(email))
-        if user is None or not verify_password(password, user.password_hash):
+        if user is None or not await averify_password(password, user.password_hash):
             raise InvalidCredentials("Invalid email or password")
         # A disabled account cannot log in; same generic error (don't reveal state).
         if not user.is_active:
@@ -194,7 +194,7 @@ class UserService:
                 User(
                     id=uuid4(),
                     email=normalized_email,
-                    password_hash=hash_password(secrets.token_urlsafe(_INVITE_TOKEN_BYTES)),
+                    password_hash=await ahash_password(secrets.token_urlsafe(_INVITE_TOKEN_BYTES)),
                     is_admin=is_admin,
                     created_at=_now(),
                     sso_subject=identity.subject,
@@ -267,4 +267,4 @@ class UserService:
         if not await self._password_resets.mark_used(reset.id, _now()):
             raise InvalidPasswordReset("Reset token is invalid, used, or expired")
 
-        await self._users.set_password(reset.user_id, hash_password(new_password))
+        await self._users.set_password(reset.user_id, await ahash_password(new_password))
