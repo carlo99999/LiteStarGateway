@@ -80,7 +80,13 @@ class UserService:
             is_admin=True,
             created_at=_now(),
         )
-        await self._users.add(admin)
+        try:
+            await self._users.add(admin)
+        except EmailAlreadyRegistered:
+            # Multi-replica startup race: another replica bootstrapped between our
+            # count() and add(). The unique email constraint is the arbiter — the
+            # admin exists, which is all this hook guarantees.
+            return
 
     async def create_invite(self) -> IssuedInvite:
         token = secrets.token_urlsafe(_INVITE_TOKEN_BYTES)
