@@ -49,7 +49,7 @@ class FakeModels:
 
 class FakeCredentials:
     async def get_values(self, credential_id: UUID) -> dict[str, str] | None:
-        return {"api_key": "sk-x"}
+        return {"api_key": "sk-x"}  # pragma: allowlist secret
 
 
 class FakeUsage:

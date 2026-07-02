@@ -205,9 +205,7 @@ class VertexAdapter:
     ) -> dict[str, Any]:
         client = self._client(credentials)
         try:
-            response = await client.aio.models.generate_content(
-                **to_gemini_request(request, model)
-            )
+            response = await client.aio.models.generate_content(**to_gemini_request(request, model))
             return from_gemini_response(response.model_dump())
         finally:
             await client.aio.aclose()
