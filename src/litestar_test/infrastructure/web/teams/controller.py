@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from litestar import Controller, delete, get, patch, post
+from litestar import Controller, Request, delete, get, patch, post
 from litestar.di import NamedDependency, Provide
 from litestar.params import FromPath, FromQuery
 
@@ -16,7 +16,8 @@ from litestar_test.application.service import APIKeyService
 from litestar_test.application.team_service import TeamService
 from litestar_test.domain.entities import User
 from litestar_test.domain.pagination import resolve_page
-from litestar_test.domain.ports import UsageRepository
+from litestar_test.domain.ports import AuditLog, UsageRepository
+from litestar_test.infrastructure.web.audit.recorder import record_audit
 from litestar_test.infrastructure.web.session.dependencies import provide_current_user
 from litestar_test.infrastructure.web.teams.schemas import (
     AddMemberRequest,
@@ -49,48 +50,92 @@ class TeamController(Controller):
     @post("/{team_id:uuid}/members")
     async def add_member(
         self,
+        request: Request,
         team_id: FromPath[UUID],
         data: AddMemberRequest,
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
+        audit_log: NamedDependency[AuditLog],
     ) -> MembershipResponse:
         membership = await team_service.add_member(current_user, team_id, data.email, data.role)
+        await record_audit(
+            audit_log,
+            request,
+            current_user,
+            "team.member.add",
+            target_type="team",
+            target_id=team_id,
+            detail=f"{data.email} as {data.role}",
+        )
         return MembershipResponse.from_entity(membership)
 
     @patch("/{team_id:uuid}/members/{user_id:uuid}")
     async def set_member_role(
         self,
+        request: Request,
         team_id: FromPath[UUID],
         user_id: FromPath[UUID],
         data: SetRoleRequest,
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
+        audit_log: NamedDependency[AuditLog],
     ) -> MembershipResponse:
         membership = await team_service.set_role(current_user, team_id, user_id, data.role)
+        await record_audit(
+            audit_log,
+            request,
+            current_user,
+            "team.member.set_role",
+            target_type="team",
+            target_id=team_id,
+            detail=f"user {user_id} -> {data.role}",
+        )
         return MembershipResponse.from_entity(membership)
 
     @delete("/{team_id:uuid}/members/{user_id:uuid}")
     async def remove_member(
         self,
+        request: Request,
         team_id: FromPath[UUID],
         user_id: FromPath[UUID],
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
+        audit_log: NamedDependency[AuditLog],
     ) -> None:
         await team_service.remove_member(current_user, team_id, user_id)
+        await record_audit(
+            audit_log,
+            request,
+            current_user,
+            "team.member.remove",
+            target_type="team",
+            target_id=team_id,
+            detail=f"user {user_id}",
+        )
 
     @post("/{team_id:uuid}/keys")
     async def create_key(
         self,
+        request: Request,
         team_id: FromPath[UUID],
         data: CreateKeyRequest,
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
         api_key_service: NamedDependency[APIKeyService],
+        audit_log: NamedDependency[AuditLog],
     ) -> CreatedKeyResponse:
         await team_service.ensure_can_manage_team(current_user, team_id)
         issued = await api_key_service.issue(
             team_id=team_id, created_by=current_user.id, name=data.name
+        )
+        await record_audit(
+            audit_log,
+            request,
+            current_user,
+            "api_key.create",
+            target_type="api_key",
+            target_id=issued.key.id,
+            detail=f"team {team_id}",
         )
         return CreatedKeyResponse.from_issued(issued)
 
@@ -131,14 +176,25 @@ class TeamController(Controller):
     @delete("/{team_id:uuid}/keys/{key_id:uuid}")
     async def revoke_key(
         self,
+        request: Request,
         team_id: FromPath[UUID],
         key_id: FromPath[UUID],
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
         api_key_service: NamedDependency[APIKeyService],
+        audit_log: NamedDependency[AuditLog],
     ) -> None:
         await team_service.ensure_can_manage_team(current_user, team_id)
         await api_key_service.revoke_for_team(team_id, key_id)
+        await record_audit(
+            audit_log,
+            request,
+            current_user,
+            "api_key.revoke",
+            target_type="api_key",
+            target_id=key_id,
+            detail=f"team {team_id}",
+        )
 
     @get("/{team_id:uuid}/usage")
     async def usage(

@@ -28,6 +28,8 @@ from litestar_test.infrastructure.web.api_router.dependencies import (
     provide_usage_repository,
 )
 from litestar_test.infrastructure.web.api_router.router import create_api_router
+from litestar_test.infrastructure.web.audit.controller import AuditController
+from litestar_test.infrastructure.web.audit.dependencies import provide_audit_log
 from litestar_test.infrastructure.web.credentials import CredentialController
 from litestar_test.infrastructure.web.credentials.dependencies import (
     provide_credential_service,
@@ -78,6 +80,7 @@ def create_app(
         TeamController,  # team-admin: members + team-scoped API keys
         ModelController,  # team-admin: team-scoped model deployments
         CredentialController,  # platform-admin: encrypted provider credentials
+        AuditController,  # platform-admin: read the audit trail
     ]
     dependencies = {
         "api_key_service": Provide(provide_api_key_service, sync_to_thread=False),
@@ -88,6 +91,7 @@ def create_app(
         "credential_service": Provide(provide_credential_service, sync_to_thread=False),
         "completion_service": Provide(provide_completion_service, sync_to_thread=False),
         "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
+        "audit_log": Provide(provide_audit_log, sync_to_thread=False),
         "trace_dispatcher": Provide(lambda: trace_dispatcher, sync_to_thread=False),
         "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
         "keyring": Provide(provide_keyring, sync_to_thread=False),

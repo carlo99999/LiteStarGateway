@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from litestar_test.domain.entities import (
     APIKey,
+    AuditEvent,
     Credential,
     Invite,
     KeyPurpose,
@@ -51,6 +52,31 @@ class UserModel(base.UUIDAuditBase):
             token_version=self.token_version,
             sso_subject=self.sso_subject,
             is_active=self.is_active,
+        )
+
+
+class AuditEventModel(base.UUIDAuditBase):
+    __tablename__ = "audit_event"
+
+    action: Mapped[str] = mapped_column(index=True)
+    actor_id: Mapped[UUID | None] = mapped_column(default=None, index=True)
+    actor_email: Mapped[str | None] = mapped_column(default=None)
+    target_type: Mapped[str | None] = mapped_column(default=None)
+    target_id: Mapped[str | None] = mapped_column(default=None, index=True)
+    ip: Mapped[str | None] = mapped_column(default=None)
+    detail: Mapped[str | None] = mapped_column(default=None)
+
+    def to_entity(self) -> AuditEvent:
+        return AuditEvent(
+            id=self.id,
+            action=self.action,
+            actor_id=self.actor_id,
+            actor_email=self.actor_email,
+            target_type=self.target_type,
+            target_id=self.target_id,
+            ip=self.ip,
+            detail=self.detail,
+            created_at=self.created_at,
         )
 
 

@@ -225,6 +225,13 @@ Tracked items not yet implemented (see also the code review notes):
 
 ### Resolved
 
+- **Audit log** — privileged actions are recorded to an append-only `audit_event`
+  table (who / what / target / from where / when) and read via `GET /audit`
+  (platform-admin, paginated, newest first). Written synchronously and durably
+  off the inference hot path. Covered so far: credential create/delete, API-key
+  create/revoke, team member add/remove/role change, user enable/disable.
+  _Follow-ups: login/SSO events, team/org creation, and recording failed
+  (permission-denied) attempts._
 - **Unvalidated request passthrough** — the client's OpenAI-shaped body is now
   sanitized against a per-operation allowlist before it reaches the provider SDK
   (`domain/request_policy.py`), so SDK-special kwargs (`extra_headers`,

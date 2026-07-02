@@ -51,6 +51,23 @@ class UsageAggregate:
 
 
 @dataclass(frozen=True)
+class AuditEvent:
+    """An append-only record of a privileged action: who did what, to what, from
+    where, and when. `actor_email` is denormalized so the log stays readable even
+    if the user is later removed. Never store secrets in `detail`."""
+
+    id: UUID
+    action: str  # "<resource>.<verb>", e.g. "credential.create", "api_key.revoke"
+    actor_id: UUID | None
+    actor_email: str | None
+    target_type: str | None
+    target_id: str | None
+    ip: str | None
+    detail: str | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class ApiKeySpend:
     """Accumulated usage/cost for one API key across all of its calls."""
 
