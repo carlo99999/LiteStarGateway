@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from litestar import Controller, delete, get, patch, post
+from litestar import Controller, Request, delete, get, patch, post
 from litestar.di import NamedDependency, Provide
 from litestar.params import FromPath, FromQuery
 
@@ -17,6 +17,8 @@ from litestar_test.application.model_service import ModelService
 from litestar_test.application.team_service import TeamService
 from litestar_test.domain.entities import User
 from litestar_test.domain.pagination import resolve_page
+from litestar_test.domain.ports import AuditLog
+from litestar_test.infrastructure.web.audit.recorder import record_audit
 from litestar_test.infrastructure.web.models.schemas import (
     CreateModelRequest,
     ModelResponse,
@@ -41,11 +43,13 @@ class ModelController(Controller):
     )
     async def create_model(
         self,
+        request: Request,
         team_id: FromPath[UUID],
         data: CreateModelRequest,
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
         model_service: NamedDependency[ModelService],
+        audit_log: NamedDependency[AuditLog],
     ) -> ModelResponse:
         await team_service.ensure_can_manage_team(current_user, team_id)
         model = await model_service.create(
@@ -60,6 +64,15 @@ class ModelController(Controller):
             input_cost_per_token=data.input_cost_per_token,
             output_cost_per_token=data.output_cost_per_token,
             enabled=data.enabled,
+        )
+        await record_audit(
+            audit_log,
+            request,
+            current_user,
+            "model.create",
+            target_type="model",
+            target_id=model.id,
+            detail=f"{data.name} ({data.provider}/{data.provider_model_id}) in team {team_id}",
         )
         return ModelResponse.from_entity(model)
 
@@ -85,12 +98,14 @@ class ModelController(Controller):
     )
     async def update_model(
         self,
+        request: Request,
         team_id: FromPath[UUID],
         model_id: FromPath[UUID],
         data: UpdateModelRequest,
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
         model_service: NamedDependency[ModelService],
+        audit_log: NamedDependency[AuditLog],
     ) -> ModelResponse:
         await team_service.ensure_can_manage_team(current_user, team_id)
         model = await model_service.update(
@@ -103,16 +118,36 @@ class ModelController(Controller):
             output_cost_per_token=data.output_cost_per_token,
             enabled=data.enabled,
         )
+        await record_audit(
+            audit_log,
+            request,
+            current_user,
+            "model.update",
+            target_type="model",
+            target_id=model_id,
+            detail=f"team {team_id}",
+        )
         return ModelResponse.from_entity(model)
 
     @delete("/{team_id:uuid}/models/{model_id:uuid}", summary="Delete a model")
     async def delete_model(
         self,
+        request: Request,
         team_id: FromPath[UUID],
         model_id: FromPath[UUID],
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
         model_service: NamedDependency[ModelService],
+        audit_log: NamedDependency[AuditLog],
     ) -> None:
         await team_service.ensure_can_manage_team(current_user, team_id)
         await model_service.delete(team_id, model_id)
+        await record_audit(
+            audit_log,
+            request,
+            current_user,
+            "model.delete",
+            target_type="model",
+            target_id=model_id,
+            detail=f"team {team_id}",
+        )
