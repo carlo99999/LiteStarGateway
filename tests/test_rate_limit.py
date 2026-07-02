@@ -75,3 +75,35 @@ def test_inference_identifier_keys_by_api_key() -> None:
 def test_inference_identifier_falls_back_to_ip() -> None:
     assert _inference_identifier(_request(None)).startswith("ip::")
     assert _inference_identifier(_request("Bearer ")).startswith("ip::")
+
+
+def test_rate_limit_uses_memory_store_by_default(tmp_path: Path) -> None:
+    from litestar.stores.memory import MemoryStore
+
+    settings = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'rl.db'}",
+        admin_email="admin@example.com",
+        master_key="master-secret",
+        jwt_secret="test-secret-key-0123456789-abcdefghij",
+        salt_key="test-salt-key",
+    )
+    app = create_app(settings)
+    assert isinstance(app.stores.get("rate_limit_auth"), MemoryStore)
+
+
+def test_rate_limit_uses_redis_store_when_configured(tmp_path: Path) -> None:
+    # A configured REDIS_URL backs the limiter with a (lazily-connected) RedisStore,
+    # so limits hold across replicas. No live Redis is needed to build the app.
+    from litestar.stores.redis import RedisStore
+
+    settings = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'rl.db'}",
+        admin_email="admin@example.com",
+        master_key="master-secret",
+        jwt_secret="test-secret-key-0123456789-abcdefghij",
+        salt_key="test-salt-key",
+        redis_url="redis://localhost:6379",
+    )
+    app = create_app(settings)
+    assert isinstance(app.stores.get("rate_limit_auth"), RedisStore)
+    assert isinstance(app.stores.get("rate_limit_inference"), RedisStore)
