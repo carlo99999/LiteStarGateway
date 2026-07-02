@@ -134,7 +134,12 @@ class ChatToResponsesAdapter:
         }
 
         parts: list[str] = []
+        usage: dict[str, Any] = {}
         async for chunk in self._inner.astream_chat_completion(chat_request, model, credentials):
+            # Inner chat streams end with a usage-bearing chunk (adapters force
+            # it); carry it into response.completed so the call can be metered.
+            if chunk.get("usage"):
+                usage = chunk["usage"]
             content = (chunk.get("choices") or [{}])[0].get("delta", {}).get("content")
             if content:
                 parts.append(content)
@@ -155,6 +160,11 @@ class ChatToResponsesAdapter:
                     }
                 ],
                 "output_text": text,
+                "usage": {
+                    "input_tokens": usage.get("prompt_tokens"),
+                    "output_tokens": usage.get("completion_tokens"),
+                    "total_tokens": usage.get("total_tokens"),
+                },
             },
         }
 
