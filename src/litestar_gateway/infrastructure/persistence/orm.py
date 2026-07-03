@@ -18,6 +18,7 @@ from litestar_gateway.domain.entities import (
     Credential,
     Invite,
     KeyPurpose,
+    KeyScope,
     Model,
     ModelType,
     Organization,
@@ -66,6 +67,7 @@ class AuditEventModel(base.UUIDAuditBase):
 
     action: Mapped[str] = mapped_column(index=True)
     actor_id: Mapped[UUID | None] = mapped_column(default=None, index=True)
+    actor_type: Mapped[str | None] = mapped_column(default=None)
     actor_email: Mapped[str | None] = mapped_column(default=None)
     target_type: Mapped[str | None] = mapped_column(default=None)
     target_id: Mapped[str | None] = mapped_column(default=None, index=True)
@@ -77,6 +79,7 @@ class AuditEventModel(base.UUIDAuditBase):
             id=self.id,
             action=self.action,
             actor_id=self.actor_id,
+            actor_type=self.actor_type,
             actor_email=self.actor_email,
             target_type=self.target_type,
             target_id=self.target_id,
@@ -315,6 +318,7 @@ class APIKeyModel(base.UUIDAuditBase):
     key_hash: Mapped[str] = mapped_column(unique=True, index=True)
     revoked_at: Mapped[datetime | None] = mapped_column(default=None)
     last_used_at: Mapped[datetime | None] = mapped_column(default=None)
+    scope: Mapped[str] = mapped_column(default=KeyScope.INFERENCE.value)
 
     def to_entity(self) -> APIKey:
         return APIKey(
@@ -327,4 +331,5 @@ class APIKeyModel(base.UUIDAuditBase):
             created_at=self.created_at,
             revoked_at=self.revoked_at,
             last_used_at=self.last_used_at,
+            scope=KeyScope(self.scope),
         )

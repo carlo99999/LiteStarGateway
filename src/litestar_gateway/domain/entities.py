@@ -21,6 +21,23 @@ class KeyPurpose(StrEnum):
     JWT = "jwt"  # signs login JWTs
 
 
+class KeyScope(StrEnum):
+    """What an API key may do. The key is a team-owned service principal;
+    its scope bounds it to inference, team management, or both."""
+
+    INFERENCE = "inference"  # the /v1/* endpoints only (default)
+    MANAGEMENT = "management"  # team-scoped management, own team only
+    ALL = "all"
+
+    @property
+    def allows_inference(self) -> bool:
+        return self in (KeyScope.INFERENCE, KeyScope.ALL)
+
+    @property
+    def allows_management(self) -> bool:
+        return self in (KeyScope.MANAGEMENT, KeyScope.ALL)
+
+
 class BudgetWindow(StrEnum):
     """Spend window a budget applies to. Calendar-based, UTC."""
 
@@ -81,6 +98,9 @@ class AuditEvent:
     id: UUID
     action: str  # "<resource>.<verb>", e.g. "credential.create", "api_key.revoke"
     actor_id: UUID | None
+    # Disambiguates actor_id ("user" | "api_key"): user ids and key ids share
+    # the column, and a reader must never join a key id against users.
+    actor_type: str | None
     actor_email: str | None
     target_type: str | None
     target_id: str | None
@@ -232,7 +252,9 @@ class TeamMembership:
 
 @dataclass(frozen=True)
 class APIKey:
-    """An issued API key, always owned by a team. Only the hash is persisted."""
+    """An issued API key: a team-owned service principal. Only the hash is
+    persisted. `created_by` is provenance metadata (who minted it) — the key
+    belongs to the team, never to a user."""
 
     id: UUID
     team_id: UUID
@@ -243,6 +265,7 @@ class APIKey:
     created_at: datetime
     revoked_at: datetime | None
     last_used_at: datetime | None
+    scope: KeyScope = KeyScope.INFERENCE
 
     @property
     def is_active(self) -> bool:
@@ -278,6 +301,40 @@ class User:
     # temporary lock once the threshold is hit. Reset on successful login.
     failed_login_attempts: int = 0
     locked_until: datetime | None = None
+
+
+@dataclass(frozen=True)
+class Principal:
+    """The acting identity behind a request: a human user (JWT) or a team
+    service principal (API key with management scope). Exactly one is set.
+
+    A key principal is bounded to its own team and is never a platform admin —
+    platform surfaces (credentials, organizations, audit, invites, key
+    minting) require a human JWT."""
+
+    user: User | None = None
+    api_key: APIKey | None = None
+
+    @property
+    def is_platform_admin(self) -> bool:
+        return self.user is not None and self.user.is_admin
+
+    @property
+    def audit_label(self) -> str:
+        """Attribution for the audit trail (email, or the key's public prefix)."""
+        if self.user is not None:
+            return self.user.email
+        return f"api-key:{self.api_key.prefix}" if self.api_key else "unknown"
+
+    @property
+    def audit_actor_id(self) -> UUID | None:
+        if self.user is not None:
+            return self.user.id
+        return self.api_key.id if self.api_key else None
+
+    @property
+    def audit_actor_type(self) -> str:
+        return "user" if self.user is not None else "api_key"
 
 
 @dataclass(frozen=True)

@@ -16,11 +16,12 @@ from litestar.params import FromPath, FromQuery
 from litestar_gateway.application.service import APIKeyService
 from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.domain.budget import window_start
-from litestar_gateway.domain.entities import Budget, BudgetWindow, User
-from litestar_gateway.domain.exceptions import BudgetNotFound, InvalidBudget
+from litestar_gateway.domain.entities import Budget, BudgetWindow, KeyScope, Principal, User
+from litestar_gateway.domain.exceptions import BudgetNotFound, InvalidBudget, InvalidKeyScope
 from litestar_gateway.domain.pagination import resolve_page
 from litestar_gateway.domain.ports import AuditLog, BudgetRepository, UsageRepository
 from litestar_gateway.infrastructure.web.audit.recorder import record_audit
+from litestar_gateway.infrastructure.web.principal import provide_principal
 from litestar_gateway.infrastructure.web.session.dependencies import (
     provide_current_admin,
     provide_current_user,
@@ -155,8 +156,13 @@ class TeamController(Controller):
         audit_log: NamedDependency[AuditLog],
     ) -> CreatedKeyResponse:
         await team_service.ensure_can_manage_team(current_user, team_id)
+        try:
+            scope = KeyScope(data.scope)
+        except ValueError:
+            valid = ", ".join(s.value for s in KeyScope)
+            raise InvalidKeyScope(f"scope must be one of: {valid}") from None
         issued = await api_key_service.issue(
-            team_id=team_id, created_by=current_user.id, name=data.name
+            team_id=team_id, created_by=current_user.id, name=data.name, scope=scope
         )
         await record_audit(
             audit_log,
@@ -184,11 +190,15 @@ class TeamController(Controller):
         keys = await api_key_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
         return [KeyResponse.from_entity(k) for k in keys]
 
-    @get("/{team_id:uuid}/keys/spending", summary="API keys (incl. revoked) with their spend")
+    @get(
+        "/{team_id:uuid}/keys/spending",
+        summary="API keys (incl. revoked) with their spend",
+        dependencies={"principal": Provide(provide_principal)},
+    )
     async def keys_spending(
         self,
         team_id: FromPath[UUID],
-        current_user: NamedDependency[User],
+        principal: NamedDependency[Principal],
         team_service: NamedDependency[TeamService],
         api_key_service: NamedDependency[APIKeyService],
         usage_repository: NamedDependency[UsageRepository],
@@ -196,8 +206,9 @@ class TeamController(Controller):
         offset: FromQuery[int | None] = None,
     ) -> list[KeySpendingResponse]:
         """Every API key of the team — active and revoked — with its accumulated
-        token/cost totals, so past keys and their spend stay visible."""
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        token/cost totals, so past keys and their spend stay visible.
+        Accepts a JWT or a management-scoped API key (own team only)."""
+        await team_service.ensure_principal_can_manage_team(principal, team_id)
         page_limit, page_offset = resolve_page(limit, offset)
         keys = await api_key_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
         spend = {s.api_key_id: s for s in await usage_repository.spend_by_api_key(team_id)}
@@ -226,17 +237,18 @@ class TeamController(Controller):
             detail=f"team {team_id}",
         )
 
-    @get("/{team_id:uuid}/budget")
+    @get("/{team_id:uuid}/budget", dependencies={"principal": Provide(provide_principal)})
     async def get_budget(
         self,
         team_id: FromPath[UUID],
-        current_user: NamedDependency[User],
+        principal: NamedDependency[Principal],
         team_service: NamedDependency[TeamService],
         budget_repository: NamedDependency[BudgetRepository],
         usage_repository: NamedDependency[UsageRepository],
     ) -> BudgetResponse:
-        """The team's spend cap plus its current-window spend and remainder."""
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        """The team's spend cap plus its current-window spend and remainder.
+        Accepts a JWT or a management-scoped API key (own team only)."""
+        await team_service.ensure_principal_can_manage_team(principal, team_id)
         budget = await budget_repository.get(team_id)
         if budget is None:
             raise BudgetNotFound(f"Team {team_id} has no budget configured")
@@ -303,11 +315,11 @@ class TeamController(Controller):
             target_id=team_id,
         )
 
-    @get("/{team_id:uuid}/usage")
+    @get("/{team_id:uuid}/usage", dependencies={"principal": Provide(provide_principal)})
     async def usage(
         self,
         team_id: FromPath[UUID],
-        current_user: NamedDependency[User],
+        principal: NamedDependency[Principal],
         team_service: NamedDependency[TeamService],
         usage_repository: NamedDependency[UsageRepository],
         model: FromQuery[str | None] = None,
@@ -316,8 +328,9 @@ class TeamController(Controller):
         offset: FromQuery[int | None] = None,
     ) -> list[UsageResponse]:
         """Per-model token/cost totals for the team. Optional `?model=` and
-        `?api_key_id=` query filters; unfiltered returns every model, paged."""
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        `?api_key_id=` query filters; unfiltered returns every model, paged.
+        Accepts a JWT or a management-scoped API key (own team only)."""
+        await team_service.ensure_principal_can_manage_team(principal, team_id)
         page_limit, page_offset = resolve_page(limit, offset)
         aggregates = await usage_repository.aggregate(
             team_id,

@@ -21,6 +21,7 @@ class AuditEventResponse:
     id: UUID
     action: str
     actor_id: UUID | None
+    actor_type: str | None
     actor_email: str | None
     target_type: str | None
     target_id: str | None
@@ -34,6 +35,7 @@ class AuditEventResponse:
             id=e.id,
             action=e.action,
             actor_id=e.actor_id,
+            actor_type=e.actor_type,
             actor_email=e.actor_email,
             target_type=e.target_type,
             target_id=e.target_id,

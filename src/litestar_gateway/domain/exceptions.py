@@ -128,6 +128,10 @@ class ModelTypeMismatch(DomainError):
     """The model's type does not match the requested operation (e.g. chat vs embeddings)."""
 
 
+class InvalidKeyScope(DomainError):
+    """The requested API-key scope is not one of inference/management/all."""
+
+
 class BudgetExceeded(DomainError):
     """The team's spend cap for the current window is exhausted (→ 402)."""
 

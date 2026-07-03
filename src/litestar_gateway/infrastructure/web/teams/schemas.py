@@ -122,6 +122,7 @@ class MembershipResponse:
 @dataclass(frozen=True)
 class CreateKeyRequest:
     name: str | None = None
+    scope: str = "inference"  # inference | management | all
 
 
 @dataclass(frozen=True)
@@ -133,6 +134,7 @@ class CreatedKeyResponse:
     name: str | None
     prefix: str
     plaintext: str
+    scope: str
     created_at: datetime
 
     @classmethod
@@ -144,6 +146,7 @@ class CreatedKeyResponse:
             name=k.name,
             prefix=k.prefix,
             plaintext=issued.plaintext,
+            scope=k.scope.value,
             created_at=k.created_at,
         )
 
@@ -156,6 +159,7 @@ class KeyResponse:
     name: str | None
     prefix: str
     is_active: bool
+    scope: str
     created_at: datetime
     last_used_at: datetime | None
     revoked_at: datetime | None
@@ -169,6 +173,7 @@ class KeyResponse:
             name=key.name,
             prefix=key.prefix,
             is_active=key.is_active,
+            scope=key.scope.value,
             created_at=key.created_at,
             last_used_at=key.last_used_at,
             revoked_at=key.revoked_at,

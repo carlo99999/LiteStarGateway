@@ -15,7 +15,7 @@ from litestar.params import FromPath, FromQuery
 
 from litestar_gateway.application.model_service import ModelService
 from litestar_gateway.application.team_service import TeamService
-from litestar_gateway.domain.entities import User
+from litestar_gateway.domain.entities import Principal
 from litestar_gateway.domain.pagination import resolve_page
 from litestar_gateway.domain.ports import AuditLog
 from litestar_gateway.infrastructure.web.audit.recorder import record_audit
@@ -24,13 +24,14 @@ from litestar_gateway.infrastructure.web.models.schemas import (
     ModelResponse,
     UpdateModelRequest,
 )
-from litestar_gateway.infrastructure.web.session.dependencies import provide_current_user
+from litestar_gateway.infrastructure.web.principal import provide_principal
 
 
 class ModelController(Controller):
     path = "/teams"
     tags = ["models"]
-    dependencies = {"current_user": Provide(provide_current_user)}
+    # JWT (human) or API key with management scope (team service principal).
+    dependencies = {"principal": Provide(provide_principal)}
 
     @post(
         "/{team_id:uuid}/models",
@@ -46,12 +47,12 @@ class ModelController(Controller):
         request: Request,
         team_id: FromPath[UUID],
         data: CreateModelRequest,
-        current_user: NamedDependency[User],
+        principal: NamedDependency[Principal],
         team_service: NamedDependency[TeamService],
         model_service: NamedDependency[ModelService],
         audit_log: NamedDependency[AuditLog],
     ) -> ModelResponse:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_principal_can_manage_team(principal, team_id)
         model = await model_service.create(
             team_id=team_id,
             name=data.name,
@@ -68,7 +69,7 @@ class ModelController(Controller):
         await record_audit(
             audit_log,
             request,
-            current_user,
+            principal,
             "model.create",
             target_type="model",
             target_id=model.id,
@@ -80,13 +81,13 @@ class ModelController(Controller):
     async def list_models(
         self,
         team_id: FromPath[UUID],
-        current_user: NamedDependency[User],
+        principal: NamedDependency[Principal],
         team_service: NamedDependency[TeamService],
         model_service: NamedDependency[ModelService],
         limit: FromQuery[int | None] = None,
         offset: FromQuery[int | None] = None,
     ) -> list[ModelResponse]:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_principal_can_manage_team(principal, team_id)
         page_limit, page_offset = resolve_page(limit, offset)
         models = await model_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
         return [ModelResponse.from_entity(m) for m in models]
@@ -102,12 +103,12 @@ class ModelController(Controller):
         team_id: FromPath[UUID],
         model_id: FromPath[UUID],
         data: UpdateModelRequest,
-        current_user: NamedDependency[User],
+        principal: NamedDependency[Principal],
         team_service: NamedDependency[TeamService],
         model_service: NamedDependency[ModelService],
         audit_log: NamedDependency[AuditLog],
     ) -> ModelResponse:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_principal_can_manage_team(principal, team_id)
         model = await model_service.update(
             team_id,
             model_id,
@@ -121,7 +122,7 @@ class ModelController(Controller):
         await record_audit(
             audit_log,
             request,
-            current_user,
+            principal,
             "model.update",
             target_type="model",
             target_id=model_id,
@@ -135,17 +136,17 @@ class ModelController(Controller):
         request: Request,
         team_id: FromPath[UUID],
         model_id: FromPath[UUID],
-        current_user: NamedDependency[User],
+        principal: NamedDependency[Principal],
         team_service: NamedDependency[TeamService],
         model_service: NamedDependency[ModelService],
         audit_log: NamedDependency[AuditLog],
     ) -> None:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_principal_can_manage_team(principal, team_id)
         await model_service.delete(team_id, model_id)
         await record_audit(
             audit_log,
             request,
-            current_user,
+            principal,
             "model.delete",
             target_type="model",
             target_id=model_id,

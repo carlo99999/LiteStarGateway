@@ -28,6 +28,7 @@ class SQLAlchemyAPIKeyRepository:
             key_hash=key.key_hash,
             revoked_at=key.revoked_at,
             last_used_at=key.last_used_at,
+            scope=key.scope.value,
         )
         self._session.add(model)
         await self._session.commit()
