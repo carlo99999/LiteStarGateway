@@ -10,7 +10,7 @@ import dataclasses
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from litestar_gateway.domain.entities import APIKey, IssuedKey
+from litestar_gateway.domain.entities import APIKey, IssuedKey, KeyScope
 from litestar_gateway.domain.exceptions import APIKeyNotFound, InvalidAPIKey
 from litestar_gateway.domain.key_generator import generate_key, hash_key
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
@@ -33,7 +33,13 @@ class APIKeyService:
     def __init__(self, repository: APIKeyRepository) -> None:
         self._repo = repository
 
-    async def issue(self, team_id: UUID, created_by: UUID, name: str | None = None) -> IssuedKey:
+    async def issue(
+        self,
+        team_id: UUID,
+        created_by: UUID,
+        name: str | None = None,
+        scope: KeyScope = KeyScope.INFERENCE,
+    ) -> IssuedKey:
         material = generate_key()
         key = APIKey(
             id=uuid4(),
@@ -45,6 +51,7 @@ class APIKeyService:
             created_at=_now(),
             revoked_at=None,
             last_used_at=None,
+            scope=scope,
         )
         stored = await self._repo.add(key)
         return IssuedKey(key=stored, plaintext=material.plaintext)

@@ -22,7 +22,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from litestar_gateway.domain.entities import Team, TeamMembership, TeamRole, User
+from litestar_gateway.domain.entities import Principal, Team, TeamMembership, TeamRole, User
 from litestar_gateway.domain.exceptions import (
     AlreadyMember,
     LastTeamAdmin,
@@ -100,6 +100,22 @@ class TeamService:
         membership = await self._memberships.get(team_id, actor.id)
         if membership is None or not membership.is_admin:
             raise PermissionDenied("Team admin privileges required")
+        return team
+
+    async def ensure_principal_can_manage_team(self, principal: Principal, team_id: UUID) -> Team:
+        """Principal-aware variant: a human goes through the user rules; a key
+        (team service principal) manages its own team only, and only with a
+        management-capable scope. A key is never a platform admin."""
+        if principal.user is not None:
+            return await self.ensure_can_manage_team(principal.user, team_id)
+        key = principal.api_key
+        if key is None:  # pragma: no cover - Principal always carries one side
+            raise PermissionDenied("Unauthenticated principal")
+        team = await self._teams.get(team_id)
+        if team is None:
+            raise TeamNotFound(str(team_id))
+        if not key.scope.allows_management or key.team_id != team_id:
+            raise PermissionDenied("API key cannot manage this team")
         return team
 
     async def create_team(

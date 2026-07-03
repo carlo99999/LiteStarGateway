@@ -25,6 +25,7 @@ class SQLAlchemyAuditLog:
                 id=event.id,
                 action=event.action,
                 actor_id=event.actor_id,
+                actor_type=event.actor_type,
                 actor_email=event.actor_email,
                 target_type=event.target_type,
                 target_id=event.target_id,

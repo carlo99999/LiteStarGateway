@@ -46,4 +46,8 @@ class APIKeyAuthMiddleware(AbstractAuthenticationMiddleware):
                 key = await service.authenticate(plaintext)
             except InvalidAPIKey as exc:
                 raise NotAuthorizedException(str(exc)) from exc
+            # A management-only key is a service principal for the admin
+            # surface — it must not spend on the inference endpoints.
+            if not key.scope.allows_inference:
+                raise NotAuthorizedException("API key lacks inference scope")
             return AuthenticationResult(user=str(key.team_id), auth=key)
