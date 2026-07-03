@@ -120,7 +120,11 @@ async def test_midstream_failure_emits_error_trace_not_ok() -> None:
 
     assert [t.status for t in traces] == ["error"]
     assert traces[0].error_type == "RuntimeError"
-    assert usage.events == []
+    # The 2 chars streamed before the failure were paid upstream: billed as an
+    # estimate (1 token), while the trace honestly stays 'error' and carries it.
+    assert len(usage.events) == 1
+    assert usage.events[0].completion_tokens == 1
+    assert traces[0].completion_tokens == 1
 
 
 async def test_successful_call_still_records_ok_trace_and_usage() -> None:

@@ -17,6 +17,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import anyio
+import pytest
 
 from litestar_gateway.application.completion_service import CompletionService
 from litestar_gateway.domain.entities import Model, ModelType, Provider, TraceRecord, UsageEvent
@@ -285,3 +286,32 @@ async def test_responses_stream_disconnect_records_estimated_usage() -> None:
     assert usage.events[0].prompt_tokens == 1
     assert usage.events[0].completion_tokens == 2
     assert [t.status for t in traces] == ["ok"]
+
+
+class FailingMidStreamGateway(StreamGateway):
+    """Streams its chunks, then dies like a provider dropping mid-stream."""
+
+    async def _stream(self) -> AsyncIterator[dict[str, Any]]:
+        for chunk in self._chunks:
+            yield chunk
+        raise RuntimeError("provider died")
+
+
+async def test_provider_error_mid_stream_bills_streamed_usage() -> None:
+    # Tokens streamed before a provider failure were paid upstream: a provider
+    # dying at 95% of a long stream must not zero out the bill. The estimate
+    # machinery used for disconnects applies; the trace stays status='error'.
+    traces: list[TraceRecord] = []
+    usage = FakeUsage()
+    service = _service(FailingMidStreamGateway(_chat_chunks()), usage, traces)
+
+    stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(CHAT_REQUEST))
+    with pytest.raises(RuntimeError):
+        async for _ in stream:
+            pass
+
+    assert len(usage.events) == 1
+    assert usage.events[0].prompt_tokens == 1
+    assert usage.events[0].completion_tokens == 3  # 12 streamed chars → 3 tokens
+    assert [t.status for t in traces] == ["error"]  # no fake 'ok' trace
+    assert traces[0].completion_tokens == 3  # the error trace carries the bill
