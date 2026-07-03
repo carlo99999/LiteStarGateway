@@ -21,6 +21,7 @@ from litestar_gateway.domain.entities import (
     Organization,
     PasswordReset,
     SecretKey,
+    ServicePrincipal,
     Team,
     TeamMembership,
     TraceRecord,
@@ -45,6 +46,17 @@ class APIKeyRepository(Protocol):
     ) -> list[APIKey]: ...
 
     async def update(self, key: APIKey) -> APIKey: ...
+
+    async def revoke_personal_keys_for_user(self, user_id: UUID, revoked_at: datetime) -> None:
+        """Revoke all active *personal* keys (no service principal) created by
+        the user — called when the account is deactivated."""
+        ...
+
+    async def revoke_for_service_principal(
+        self, service_principal_id: UUID, revoked_at: datetime
+    ) -> None:
+        """Revoke all of a service principal's active keys (on SP deletion)."""
+        ...
 
 
 class CredentialRepository(Protocol):
@@ -281,6 +293,22 @@ class UsageRepository(Protocol):
         """Move up to `limit` dead-lettered usage events into the ledger (idempotent
         by event id), removing settled ones. Returns how many were settled."""
         ...
+
+
+class ServicePrincipalRepository(Protocol):
+    """Persistence port for team service principals."""
+
+    async def add(self, sp: ServicePrincipal) -> ServicePrincipal: ...
+
+    async def get(self, sp_id: UUID) -> ServicePrincipal | None: ...
+
+    async def list_by_team(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[ServicePrincipal]: ...
+
+    async def set_enabled(self, sp_id: UUID, enabled: bool) -> ServicePrincipal: ...
+
+    async def remove(self, sp_id: UUID) -> None: ...
 
 
 @runtime_checkable

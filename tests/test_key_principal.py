@@ -81,10 +81,27 @@ async def _setup_team(client: AsyncTestClient, admin: str, name: str = "Core") -
 
 
 async def _issue_key(client: AsyncTestClient, admin: str, team: str, scope: str | None) -> str:
-    body: dict = {"name": f"k-{scope or 'default'}"}
-    if scope is not None:
-        body["scope"] = scope
-    resp = await client.post(f"/teams/{team}/keys", json=body, headers=_bearer(admin))
+    """Inference (or default) → a personal key; management/all → a key under a
+    service principal (the only kind allowed to hold management scope)."""
+    if scope in (None, "inference"):
+        body: dict = {"name": "k"}
+        if scope is not None:
+            body["scope"] = scope
+        resp = await client.post(f"/teams/{team}/keys", json=body, headers=_bearer(admin))
+        assert resp.status_code in (200, 201), resp.text
+        return resp.json()["plaintext"]
+    sp = (
+        await client.post(
+            f"/teams/{team}/service-principals",
+            json={"name": f"sp-{scope}"},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    resp = await client.post(
+        f"/teams/{team}/service-principals/{sp}/keys",
+        json={"name": f"k-{scope}", "scope": scope},
+        headers=_bearer(admin),
+    )
     assert resp.status_code in (200, 201), resp.text
     return resp.json()["plaintext"]
 
@@ -242,10 +259,10 @@ async def test_audit_attributes_the_key_principal(client: AsyncTestClient) -> No
     assert audit.status_code == HTTP_200_OK
     entries = [e for e in audit.json() if e["action"] == "model.create"]
     assert entries, audit.text
-    assert entries[0]["actor_email"].startswith("api-key:")
-    # actor_id holds the KEY's id here, not a user id — actor_type is the
-    # discriminator that stops a reader from joining it against users.
-    assert entries[0]["actor_type"] == "api_key"
+    # A management key belongs to a service principal → attributed to that
+    # identity, with actor_type as the discriminator (never joined vs users).
+    assert entries[0]["actor_email"].startswith("sp:")
+    assert entries[0]["actor_type"] == "service_principal"
     human = [e for e in audit.json() if e["action"] == "team.create"]
     assert human and human[0]["actor_type"] == "user"
 
@@ -277,8 +294,13 @@ async def test_revoked_management_key_is_rejected_on_management_endpoints(
 ) -> None:
     admin = await _admin(client)
     team, cred = await _setup_team(client, admin)
+    sp = (
+        await client.post(
+            f"/teams/{team}/service-principals", json={"name": "sp"}, headers=_bearer(admin)
+        )
+    ).json()["id"]
     resp = await client.post(
-        f"/teams/{team}/keys",
+        f"/teams/{team}/service-principals/{sp}/keys",
         json={"name": "k", "scope": "management"},
         headers=_bearer(admin),
     )

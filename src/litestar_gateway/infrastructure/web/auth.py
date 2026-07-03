@@ -19,6 +19,9 @@ from litestar_gateway.domain.exceptions import InvalidAPIKey
 from litestar_gateway.infrastructure.persistence.repository import (
     SQLAlchemyAPIKeyRepository,
 )
+from litestar_gateway.infrastructure.persistence.service_principal_repository import (
+    SQLAlchemyServicePrincipalRepository,
+)
 
 
 def _extract_key(connection: ASGIConnection) -> str | None:
@@ -41,7 +44,10 @@ class APIKeyAuthMiddleware(AbstractAuthenticationMiddleware):
 
         session_maker = connection.app.state[self._config.session_maker_app_state_key]
         async with session_maker() as session:
-            service = APIKeyService(SQLAlchemyAPIKeyRepository(session))
+            service = APIKeyService(
+                SQLAlchemyAPIKeyRepository(session),
+                SQLAlchemyServicePrincipalRepository(session),
+            )
             try:
                 key = await service.authenticate(plaintext)
             except InvalidAPIKey as exc:

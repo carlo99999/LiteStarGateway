@@ -14,6 +14,7 @@ from litestar.di import NamedDependency
 from litestar.exceptions import NotAuthorizedException
 
 from litestar_gateway.application.service import APIKeyService
+from litestar_gateway.application.service_principal_service import ServicePrincipalService
 from litestar_gateway.application.user_service import UserService
 from litestar_gateway.domain.entities import Principal
 from litestar_gateway.domain.exceptions import InvalidAPIKey
@@ -26,6 +27,7 @@ async def provide_principal(
     keyring: NamedDependency[Keyring],
     user_service: NamedDependency[UserService],
     api_key_service: NamedDependency[APIKeyService],
+    service_principal_service: NamedDependency[ServicePrincipalService],
 ) -> Principal:
     auth = request.headers.get("Authorization")
     if not auth:
@@ -42,4 +44,9 @@ async def provide_principal(
         key = await api_key_service.authenticate(token)
     except InvalidAPIKey as exc:
         raise NotAuthorizedException(str(exc)) from exc
-    return Principal(api_key=key)
+    # Load the owning service principal (if any) — it is the acting identity for
+    # authorization (must be enabled) and audit attribution.
+    sp = None
+    if key.service_principal_id is not None:
+        sp = await service_principal_service.get(key.team_id, key.service_principal_id)
+    return Principal(api_key=key, service_principal=sp)

@@ -5,6 +5,8 @@ Demonstrates the ports/adapters split: the service is tested with no database.
 
 from __future__ import annotations
 
+import dataclasses
+from datetime import datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -44,6 +46,18 @@ class FakeAPIKeyRepository:
         self.update_calls += 1
         self._store[key.id] = key
         return key
+
+    async def revoke_personal_keys_for_user(self, user_id: UUID, revoked_at: datetime) -> None:
+        for key_id, key in list(self._store.items()):
+            if key.created_by == user_id and key.service_principal_id is None:
+                self._store[key_id] = dataclasses.replace(key, revoked_at=revoked_at)
+
+    async def revoke_for_service_principal(
+        self, service_principal_id: UUID, revoked_at: datetime
+    ) -> None:
+        for key_id, key in list(self._store.items()):
+            if key.service_principal_id == service_principal_id:
+                self._store[key_id] = dataclasses.replace(key, revoked_at=revoked_at)
 
 
 @pytest.fixture

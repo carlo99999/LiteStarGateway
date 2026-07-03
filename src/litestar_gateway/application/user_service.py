@@ -37,6 +37,7 @@ from litestar_gateway.domain.exceptions import (
 from litestar_gateway.domain.key_generator import hash_key
 from litestar_gateway.domain.password import ahash_password, averify_password
 from litestar_gateway.domain.ports import (
+    APIKeyRepository,
     InviteRepository,
     PasswordResetRepository,
     Transaction,
@@ -81,11 +82,13 @@ class UserService:
         invites: InviteRepository,
         password_resets: PasswordResetRepository,
         transaction: Transaction,
+        api_keys: APIKeyRepository | None = None,
     ) -> None:
         self._users = users
         self._invites = invites
         self._password_resets = password_resets
         self._transaction = transaction
+        self._api_keys = api_keys
 
     @asynccontextmanager
     async def _unit_of_work(self) -> AsyncGenerator[None]:
@@ -282,6 +285,15 @@ class UserService:
             raise PermissionDenied("Cannot change your own active status")
         if await self._users.get(user_id) is None:
             raise UserNotFound(str(user_id))
+        # Disabling revokes the user's personal keys too: like their JWT
+        # sessions, credentials that represent the person must not outlive their
+        # access. Service-principal keys are untouched (a machine identity
+        # doesn't belong to this user). Revoke the keys BEFORE flipping the
+        # account (the two are separate commits): should the process die between
+        # them, the higher-risk credential — the leaked/forgotten key — is
+        # already dead, rather than left live against a still-active account.
+        if not is_active and self._api_keys is not None:
+            await self._api_keys.revoke_personal_keys_for_user(user_id, _now())
         await self._users.set_active(user_id, is_active)
         updated = await self._users.get(user_id)
         if updated is None:  # pragma: no cover - just set it

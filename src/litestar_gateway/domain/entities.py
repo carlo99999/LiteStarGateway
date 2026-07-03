@@ -251,10 +251,26 @@ class TeamMembership:
 
 
 @dataclass(frozen=True)
+class ServicePrincipal:
+    """A team-owned, named machine identity (Databricks-style). Its keys carry
+    management scope; disabling it stops all of them. Administered via a human
+    JWT — a key can never create or manage service principals."""
+
+    id: UUID
+    team_id: UUID
+    name: str
+    enabled: bool
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class APIKey:
-    """An issued API key: a team-owned service principal. Only the hash is
-    persisted. `created_by` is provenance metadata (who minted it) — the key
-    belongs to the team, never to a user."""
+    """An issued API key. Only the hash is persisted.
+
+    A key is either **personal** (`service_principal_id is None`) — owned by and
+    attributed to its `created_by` user, inference-only, revoked when that user
+    is deactivated — or a **service-principal key** (`service_principal_id` set),
+    which is the only kind that may hold management/all scope."""
 
     id: UUID
     team_id: UUID
@@ -266,6 +282,11 @@ class APIKey:
     revoked_at: datetime | None
     last_used_at: datetime | None
     scope: KeyScope = KeyScope.INFERENCE
+    service_principal_id: UUID | None = None
+
+    @property
+    def is_service_principal(self) -> bool:
+        return self.service_principal_id is not None
 
     @property
     def is_active(self) -> bool:
@@ -314,6 +335,9 @@ class Principal:
 
     user: User | None = None
     api_key: APIKey | None = None
+    # Loaded when api_key belongs to a service principal — the acting identity
+    # for authorization (must be enabled) and audit attribution.
+    service_principal: ServicePrincipal | None = None
 
     @property
     def is_platform_admin(self) -> bool:
@@ -321,20 +345,28 @@ class Principal:
 
     @property
     def audit_label(self) -> str:
-        """Attribution for the audit trail (email, or the key's public prefix)."""
+        """Attribution for the audit trail: user email, the service-principal
+        name, or (personal key) the key's public prefix."""
         if self.user is not None:
             return self.user.email
+        if self.service_principal is not None:
+            return f"sp:{self.service_principal.name}"
         return f"api-key:{self.api_key.prefix}" if self.api_key else "unknown"
 
     @property
     def audit_actor_id(self) -> UUID | None:
         if self.user is not None:
             return self.user.id
+        # Attribute to the identity, not the credential: the SP if there is one.
+        if self.service_principal is not None:
+            return self.service_principal.id
         return self.api_key.id if self.api_key else None
 
     @property
     def audit_actor_type(self) -> str:
-        return "user" if self.user is not None else "api_key"
+        if self.user is not None:
+            return "user"
+        return "service_principal" if self.service_principal is not None else "api_key"
 
 
 @dataclass(frozen=True)
