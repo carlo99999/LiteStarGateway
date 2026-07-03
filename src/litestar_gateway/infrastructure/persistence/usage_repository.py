@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import ApiKeySpend, UsageAggregate, UsageEvent
@@ -15,12 +15,20 @@ from litestar_gateway.infrastructure.persistence.orm import PendingUsageEventMod
 
 logger = logging.getLogger("litestar_gateway.usage")
 
+# After this many failed reconcile attempts a pending row is quarantined: it
+# stays in the table for inspection but is no longer selected, so a poisoned
+# row (e.g. its team/key was deleted while it sat in the queue) can't occupy
+# the oldest-first batch forever and starve newer events.
+MAX_RECONCILE_ATTEMPTS = 10
+
 
 class SQLAlchemyUsageRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def record(self, event: UsageEvent) -> None:
+        # Stamp the event's own timestamp, not the insert default: budget
+        # windows and monthly aggregates must reflect when the spend happened.
         self._session.add(
             UsageEventModel(
                 id=event.id,
@@ -32,6 +40,7 @@ class SQLAlchemyUsageRepository:
                 prompt_tokens=event.prompt_tokens,
                 completion_tokens=event.completion_tokens,
                 cost=event.cost,
+                created_at=event.created_at,
             )
         )
         await self._session.commit()
@@ -113,7 +122,19 @@ class SQLAlchemyUsageRepository:
                 UsageEventModel.created_at >= since,
             )
         )
-        return float(total or 0.0)
+        # Dead-lettered spend is real cost (already billed upstream) that the
+        # reconciler hasn't drained yet — the gate must see it, or a ledger
+        # write degradation doubles as a budget-cap bypass window. An event
+        # lives in exactly one of the two tables at any commit point (the
+        # reconciler inserts + deletes in one transaction), so this never
+        # double-counts.
+        pending = await self._session.scalar(
+            select(func.coalesce(func.sum(PendingUsageEventModel.cost), 0.0)).where(
+                PendingUsageEventModel.team_id == team_id,
+                PendingUsageEventModel.event_created_at >= since,
+            )
+        )
+        return float(total or 0.0) + float(pending or 0.0)
 
     async def enqueue_pending(self, event: UsageEvent) -> None:
         # The request session may be in a failed state after the ledger commit
@@ -139,12 +160,16 @@ class SQLAlchemyUsageRepository:
         pending = (
             await self._session.scalars(
                 select(PendingUsageEventModel)
+                .where(PendingUsageEventModel.attempts < MAX_RECONCILE_ATTEMPTS)
                 .order_by(PendingUsageEventModel.created_at)
                 .limit(limit)
             )
         ).all()
         settled = 0
         for row in pending:
+            # Captured up front: after a rollback the ORM row may be expired and
+            # refreshing it would need IO of its own.
+            row_id, event_id, attempts = row.id, row.event_id, row.attempts
             try:
                 # Idempotent: skip the ledger insert if the event already landed.
                 if await self._session.get(UsageEventModel, row.event_id) is None:
@@ -159,12 +184,49 @@ class SQLAlchemyUsageRepository:
                             prompt_tokens=row.prompt_tokens,
                             completion_tokens=row.completion_tokens,
                             cost=row.cost,
+                            # The time the event happened, not the reconcile
+                            # time — a drain must not shift spend into the
+                            # next budget window.
+                            created_at=row.event_created_at,
                         )
                     )
                 await self._session.delete(row)
                 await self._session.commit()
                 settled += 1
-            except Exception:  # leave it queued for the next cycle
+            except Exception as exc:  # leave it queued for the next cycle
                 await self._session.rollback()
-                logger.warning("failed to reconcile pending usage event", exc_info=True)
+                await self._mark_failed_attempt(row_id, event_id, attempts + 1, exc)
         return settled
+
+    async def _mark_failed_attempt(
+        self, row_id: UUID, event_id: UUID, attempts: int, exc: Exception
+    ) -> None:
+        """Failure bookkeeping for one pending row: count the attempt and keep
+        the last error. At MAX_RECONCILE_ATTEMPTS the row stops being selected
+        (quarantined) — escalate to ERROR so an operator resolves it by hand."""
+        try:
+            await self._session.execute(
+                update(PendingUsageEventModel)
+                .where(PendingUsageEventModel.id == row_id)
+                .values(attempts=attempts, last_error=repr(exc)[:500])
+            )
+            await self._session.commit()
+        except Exception:  # bookkeeping is best-effort; the row stays selectable
+            await self._session.rollback()
+            logger.warning("failed to record reconcile attempt", exc_info=True)
+            return
+        if attempts >= MAX_RECONCILE_ATTEMPTS:
+            logger.error(
+                "pending usage event quarantined after %d failed attempts: event=%s",
+                attempts,
+                event_id,
+                exc_info=exc,
+            )
+        else:
+            logger.warning(
+                "failed to reconcile pending usage event (attempt %d/%d): event=%s",
+                attempts,
+                MAX_RECONCILE_ATTEMPTS,
+                event_id,
+                exc_info=exc,
+            )

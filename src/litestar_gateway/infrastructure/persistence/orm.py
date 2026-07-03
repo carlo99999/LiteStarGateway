@@ -47,6 +47,7 @@ class UserModel(base.UUIDAuditBase):
     is_active: Mapped[bool] = mapped_column(default=True)
     failed_login_attempts: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[datetime | None] = mapped_column(default=None)
+    lockout_cycles: Mapped[int] = mapped_column(default=0)
 
     def to_entity(self) -> User:
         return User(
@@ -60,6 +61,7 @@ class UserModel(base.UUIDAuditBase):
             is_active=self.is_active,
             failed_login_attempts=self.failed_login_attempts,
             locked_until=self.locked_until,
+            lockout_cycles=self.lockout_cycles,
         )
 
 
@@ -214,6 +216,10 @@ class PendingUsageEventModel(base.UUIDAuditBase):
     completion_tokens: Mapped[int] = mapped_column(default=0)
     cost: Mapped[float] = mapped_column(default=0.0)
     event_created_at: Mapped[datetime] = mapped_column()
+    # Poison-message bookkeeping: rows that keep failing the ledger insert are
+    # quarantined after MAX_RECONCILE_ATTEMPTS instead of starving the batch.
+    attempts: Mapped[int] = mapped_column(default=0)
+    last_error: Mapped[str | None] = mapped_column(default=None)
 
 
 class TeamBudgetModel(base.UUIDAuditBase):

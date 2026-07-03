@@ -15,6 +15,8 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
 
+import anyio
+
 from litestar_gateway.domain.budget import window_start
 from litestar_gateway.domain.entities import Model, ModelType, TraceRecord, UsageEvent
 from litestar_gateway.domain.exceptions import (
@@ -87,6 +89,56 @@ def _has_tokens(usage: dict[str, Any]) -> bool:
     )
 
 
+def _max_output_tokens(request: dict[str, Any]) -> int:
+    # Chat uses max_tokens (legacy) / max_completion_tokens; Responses uses
+    # max_output_tokens. First positive one wins.
+    for key in ("max_tokens", "max_completion_tokens", "max_output_tokens"):
+        value = request.get(key)
+        if isinstance(value, int) and value > 0:
+            return value
+    return 0
+
+
+def _reservation_cost(model: Model, request: dict[str, Any]) -> float:
+    """Pessimistic pre-dispatch cost of a request: the estimated prompt plus
+    the requested output ceiling. A request without a max-tokens field (or on
+    an unpriced model) reserves only what can be known — those bursts stay
+    bounded by the prompt estimate alone."""
+    prompt = _estimate_tokens(len(_request_text(request))) * (model.input_cost_per_token or 0.0)
+    output = _max_output_tokens(request) * (model.output_cost_per_token or 0.0)
+    return prompt + output
+
+
+class InFlightSpend:
+    """Estimated cost of admitted-but-unsettled requests, per team.
+
+    The budget gate adds this to committed spend, so a burst of concurrent
+    requests (streams especially — they settle minutes after admission) can't
+    all slip under a nearly-exhausted limit: each admission immediately
+    reserves its pessimistic cost until settlement releases it. In-memory and
+    per-process — replicas don't see each other's in-flight spend, so the
+    overshoot bound is per replica, not global."""
+
+    def __init__(self) -> None:
+        self._by_team: dict[UUID, float] = {}
+
+    def total(self, team_id: UUID) -> float:
+        return self._by_team.get(team_id, 0.0)
+
+    def add(self, team_id: UUID, amount: float) -> None:
+        if amount > 0:
+            self._by_team[team_id] = self._by_team.get(team_id, 0.0) + amount
+
+    def remove(self, team_id: UUID, amount: float) -> None:
+        if amount <= 0:
+            return
+        remaining = self._by_team.get(team_id, 0.0) - amount
+        if remaining <= 0:
+            self._by_team.pop(team_id, None)
+        else:
+            self._by_team[team_id] = remaining
+
+
 class CompletionService:
     def __init__(
         self,
@@ -96,6 +148,7 @@ class CompletionService:
         usage: UsageRepository,
         emit_trace: Callable[[TraceRecord], None],
         budgets: BudgetRepository | None = None,
+        in_flight: InFlightSpend | None = None,
     ) -> None:
         self._models = models
         self._credentials = credentials
@@ -103,6 +156,9 @@ class CompletionService:
         self._usage = usage
         self._emit_trace = emit_trace
         self._budgets = budgets
+        # Library use may omit it; the web wiring passes one shared instance so
+        # request-scoped services see each other's reservations.
+        self._in_flight = in_flight if in_flight is not None else InFlightSpend()
 
     async def _record_usage(self, event: UsageEvent) -> None:
         """Persist the billing record. A failed write must never fail the request,
@@ -225,42 +281,59 @@ class CompletionService:
         model: Model,
         operation: str,
         call: Callable[[], Awaitable[dict[str, Any]]],
+        reservation: float = 0.0,
     ) -> dict[str, Any]:
         """Run one gateway call, observing success (usage + trace) and failure
-        (error trace) before the exception propagates to the HTTP layer."""
+        (error trace) before the exception propagates to the HTTP layer. The
+        budget reservation taken at admission is released either way."""
         start = perf_counter()
         try:
-            response = await call()
-        except Exception as exc:
-            self._emit_error_trace(
-                team_id, api_key_id, model, operation, (perf_counter() - start) * 1000, exc
-            )
-            raise
-        latency_ms = (perf_counter() - start) * 1000
-        await self._observe(team_id, api_key_id, model, operation, response, latency_ms)
-        return response
+            try:
+                response = await call()
+            except Exception as exc:
+                self._emit_error_trace(
+                    team_id, api_key_id, model, operation, (perf_counter() - start) * 1000, exc
+                )
+                raise
+            latency_ms = (perf_counter() - start) * 1000
+            await self._observe(team_id, api_key_id, model, operation, response, latency_ms)
+            return response
+        finally:
+            self._in_flight.remove(team_id, reservation)
 
-    async def _enforce_budget(self, team_id: UUID) -> None:
-        """Pre-call spend gate: reject once the team's accumulated cost in the
-        current window reaches its budget limit. Enforcement reads recorded
-        usage, so requests already in flight when the limit is crossed still
-        complete (bounded overshoot — same semantics as other gateways)."""
+    async def _enforce_budget(self, team_id: UUID, model: Model, request: dict[str, Any]) -> float:
+        """Pre-call spend gate: reject once committed spend plus the estimated
+        cost already reserved by in-flight requests reaches the budget limit.
+        An admitted request immediately reserves its own pessimistic cost
+        (prompt estimate + requested output ceiling) and returns it — callers
+        release it at settlement. This bounds burst overshoot per replica:
+        without the reservation, any number of concurrent requests could pass
+        the gate before the first one settles (streams widen that blind spot
+        to minutes)."""
         if self._budgets is None:
-            return
+            return 0.0
         budget = await self._budgets.get(team_id)
         if budget is None:
-            return
+            return 0.0
         since = window_start(budget.window, datetime.now(UTC))
         spent = await self._usage.spend_since(team_id, since)
-        if spent >= budget.limit_cost:
+        # No await between reading the in-flight total and adding the new
+        # reservation: concurrent gates interleave only at checkpoints, so
+        # two requests can't both read the same total and slip through.
+        reserved = self._in_flight.total(team_id)
+        if spent + reserved >= budget.limit_cost:
             raise BudgetExceeded(
-                f"Team budget exceeded: spent {spent:.4f} of {budget.limit_cost:.4f} USD "
+                f"Team budget exceeded: spent {spent:.4f} (+{reserved:.4f} USD reserved "
+                f"by in-flight requests) of {budget.limit_cost:.4f} USD "
                 f"in the current {budget.window} window"
             )
+        reservation = _reservation_cost(model, request)
+        self._in_flight.add(team_id, reservation)
+        return reservation
 
     async def _prepare(
         self, team_id: UUID, request: dict[str, Any], expected_type: ModelType
-    ) -> tuple[Model, dict[str, str]]:
+    ) -> tuple[Model, dict[str, str], float]:
         alias = request.get("model")
         model = await self._models.get_by_name(team_id, alias) if alias else None
         if model is None:
@@ -271,16 +344,20 @@ class CompletionService:
             raise ModelTypeMismatch(
                 f"Model '{model.name}' is type '{model.type}', not '{expected_type}'"
             )
-        await self._enforce_budget(team_id)
-        values = await self._credentials.get_values(model.credential_id)
-        if values is None:
-            raise CredentialNotFound(str(model.credential_id))
-        return model, values
+        reservation = await self._enforce_budget(team_id, model, request)
+        try:
+            values = await self._credentials.get_values(model.credential_id)
+            if values is None:
+                raise CredentialNotFound(str(model.credential_id))
+        except BaseException:
+            self._in_flight.remove(team_id, reservation)
+            raise
+        return model, values, reservation
 
     async def chat_completion(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
-        model, values = await self._prepare(team_id, request, ModelType.CHAT)
+        model, values, reservation = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("chat.completions", request)
         return await self._dispatch(
             team_id,
@@ -288,12 +365,13 @@ class CompletionService:
             model,
             "chat.completions",
             lambda: self._gateway.achat_completion(clean, model, values),
+            reservation,
         )
 
     async def responses(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
-        model, values = await self._prepare(team_id, request, ModelType.CHAT)
+        model, values, reservation = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("responses", request)
         return await self._dispatch(
             team_id,
@@ -301,6 +379,7 @@ class CompletionService:
             model,
             "responses",
             lambda: self._gateway.aresponses(clean, model, values),
+            reservation,
         )
 
     async def _metered_stream(
@@ -311,14 +390,18 @@ class CompletionService:
         operation: str,
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
+        reservation: float = 0.0,
     ) -> AsyncIterator[dict[str, Any]]:
         """Relay chunks unchanged while capturing usage as it flows, then record a
         UsageEvent + emit a trace once the stream finishes (or the client
         disconnects — the `finally` runs on generator close). Without this,
         streamed calls were neither billed nor observed. A provider error
         mid-stream emits a status='error' trace instead of a fake 'ok' one
-        (a client disconnect — GeneratorExit — still records as 'ok': bill
-        what was seen). If no authoritative usage arrived by then (disconnect
+        (a client disconnect still records as 'ok': bill what was seen).
+        A real disconnect arrives as scope cancellation at the provider await,
+        so the settlement is shielded — otherwise its first checkpoint would
+        re-raise CancelledError and the billing write would silently vanish.
+        If no authoritative usage arrived by then (disconnect
         before the usage chunk, or a provider that never reported one), usage
         is estimated from the request text + streamed output rather than
         silently billed as zero."""
@@ -339,31 +422,39 @@ class CompletionService:
             error = exc
             raise
         finally:
-            latency_ms = (perf_counter() - start) * 1000
-            if error is not None:
-                self._emit_error_trace(team_id, api_key_id, model, operation, latency_ms, error)
-            else:
-                # Even with zero streamed output (disconnect before the first
-                # content chunk) the provider consumed the prompt — bill it.
-                if not _has_tokens(usage):
-                    estimate = {
-                        "prompt_tokens": _estimate_tokens(len(_request_text(request))),
-                        "completion_tokens": _estimate_tokens(streamed_chars),
-                    }
-                    if _has_tokens(estimate):
-                        usage = estimate
-                        logger.warning(
-                            "stream ended without authoritative usage; billing estimate: "
-                            "team=%s model=%s op=%s prompt=%s completion=%s",
-                            team_id,
-                            model.name,
-                            operation,
-                            usage["prompt_tokens"],
-                            usage["completion_tokens"],
-                        )
-                await self._observe(
-                    team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
-                )
+            # Synchronous and first, so the budget reservation is released even
+            # when a client disconnect cancelled this scope (a cancelled frame
+            # runs sync code fine; it's the next checkpoint that re-raises).
+            self._in_flight.remove(team_id, reservation)
+            # Shielded: on a client disconnect this frame is already cancelled,
+            # and the settlement's first checkpoint (the DB commit) would
+            # re-raise CancelledError — no ledger row, no outbox, no trace.
+            with anyio.CancelScope(shield=True):
+                latency_ms = (perf_counter() - start) * 1000
+                if error is not None:
+                    self._emit_error_trace(team_id, api_key_id, model, operation, latency_ms, error)
+                else:
+                    # Even with zero streamed output (disconnect before the first
+                    # content chunk) the provider consumed the prompt — bill it.
+                    if not _has_tokens(usage):
+                        estimate = {
+                            "prompt_tokens": _estimate_tokens(len(_request_text(request))),
+                            "completion_tokens": _estimate_tokens(streamed_chars),
+                        }
+                        if _has_tokens(estimate):
+                            usage = estimate
+                            logger.warning(
+                                "stream ended without authoritative usage; billing estimate: "
+                                "team=%s model=%s op=%s prompt=%s completion=%s",
+                                team_id,
+                                model.name,
+                                operation,
+                                usage["prompt_tokens"],
+                                usage["completion_tokens"],
+                            )
+                    await self._observe(
+                        team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
+                    )
 
     async def open_chat_stream(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
@@ -371,25 +462,37 @@ class CompletionService:
         """Resolve the model + credentials (may raise → HTTP error) and return an
         async iterator of OpenAI chunk dicts, metered for usage. Awaited before
         streaming starts so resolution errors surface as HTTP status codes."""
-        model, values = await self._prepare(team_id, request, ModelType.CHAT)
+        model, values, reservation = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("chat.completions", request)
-        stream = await self._gateway.astream_chat_completion(clean, model, values)
-        return self._metered_stream(team_id, api_key_id, model, "chat.completions", stream, clean)
+        try:
+            stream = await self._gateway.astream_chat_completion(clean, model, values)
+        except BaseException:
+            self._in_flight.remove(team_id, reservation)
+            raise
+        return self._metered_stream(
+            team_id, api_key_id, model, "chat.completions", stream, clean, reservation
+        )
 
     async def open_responses_stream(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> AsyncIterator[dict[str, Any]]:
         """Resolve (may raise → HTTP error) and return an async iterator of
         Responses-API stream events, metered for usage."""
-        model, values = await self._prepare(team_id, request, ModelType.CHAT)
+        model, values, reservation = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("responses", request)
-        stream = await self._gateway.astream_responses(clean, model, values)
-        return self._metered_stream(team_id, api_key_id, model, "responses", stream, clean)
+        try:
+            stream = await self._gateway.astream_responses(clean, model, values)
+        except BaseException:
+            self._in_flight.remove(team_id, reservation)
+            raise
+        return self._metered_stream(
+            team_id, api_key_id, model, "responses", stream, clean, reservation
+        )
 
     async def embeddings(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
-        model, values = await self._prepare(team_id, request, ModelType.EMBEDDINGS)
+        model, values, reservation = await self._prepare(team_id, request, ModelType.EMBEDDINGS)
         clean = sanitize_request("embeddings", request)
         return await self._dispatch(
             team_id,
@@ -397,12 +500,13 @@ class CompletionService:
             model,
             "embeddings",
             lambda: self._gateway.aembeddings(clean, model, values),
+            reservation,
         )
 
     async def images(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
-        model, values = await self._prepare(team_id, request, ModelType.IMAGE)
+        model, values, reservation = await self._prepare(team_id, request, ModelType.IMAGE)
         clean = sanitize_request("images", request)
         return await self._dispatch(
             team_id,
@@ -410,4 +514,5 @@ class CompletionService:
             model,
             "images",
             lambda: self._gateway.aimages(clean, model, values),
+            reservation,
         )
