@@ -38,12 +38,15 @@ class SQLAlchemyPasswordResetRepository:
 
     async def mark_used(self, reset_id: UUID, used_at: datetime) -> bool:
         """Atomically consume the reset. Returns False if it was already used
-        (conditional UPDATE), so one token can't set the password twice."""
+        (conditional UPDATE), so one token can't set the password twice.
+
+        Stages only (no commit): redeeming a reset is a unit of work with the
+        password write, committed once by the service — a failure after the
+        token is consumed must roll the consumption back too."""
         # Any: async execute() is typed Result, but at runtime is a CursorResult.
         result: Any = await self._session.execute(
             update(PasswordResetModel)
             .where(PasswordResetModel.id == reset_id, PasswordResetModel.used_at.is_(None))
             .values(used_at=used_at)
         )
-        await self._session.commit()
         return result.rowcount == 1

@@ -36,6 +36,7 @@ def make_bootstrap_admin(
                 users=SQLAlchemyUserRepository(session),
                 invites=SQLAlchemyInviteRepository(session),
                 password_resets=SQLAlchemyPasswordResetRepository(session),
+                transaction=session,
             )
             await service.ensure_admin(settings.admin_email, settings.master_key)
 

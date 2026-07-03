@@ -9,6 +9,8 @@ Use cases:
 from __future__ import annotations
 
 import secrets
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -37,6 +39,7 @@ from litestar_gateway.domain.password import ahash_password, averify_password
 from litestar_gateway.domain.ports import (
     InviteRepository,
     PasswordResetRepository,
+    Transaction,
     UserRepository,
 )
 
@@ -77,10 +80,22 @@ class UserService:
         users: UserRepository,
         invites: InviteRepository,
         password_resets: PasswordResetRepository,
+        transaction: Transaction,
     ) -> None:
         self._users = users
         self._invites = invites
         self._password_resets = password_resets
+        self._transaction = transaction
+
+    @asynccontextmanager
+    async def _unit_of_work(self) -> AsyncGenerator[None]:
+        """Commit staged writes once on success; roll back on any failure."""
+        try:
+            yield
+            await self._transaction.commit()
+        except Exception:
+            await self._transaction.rollback()
+            raise
 
     async def ensure_admin(self, admin_email: str, master_key: str | None) -> None:
         """Bootstrap the first user. Raises if the table is empty and no key is set."""
@@ -145,7 +160,9 @@ class UserService:
         # Consume the invite atomically *before* the email check, so two
         # concurrent signups can never reuse one invite AND so probing whether an
         # email exists costs a single-use, admin-issued invite per attempt
-        # (account-enumeration is bounded by invite scarcity).
+        # (account-enumeration is bounded by invite scarcity). Deliberately NOT
+        # a unit of work with the user insert: rolling the consumption back on
+        # failure would make that probing free.
         if not await self._invites.mark_used(invite.id, _now()):
             raise InvalidInvite("Invite token is invalid or already used")
 
@@ -308,8 +325,13 @@ class UserService:
         except ValueError as e:
             raise WeakPassword(str(e)) from e
 
-        # Consume atomically before applying, so a token can't be used twice.
-        if not await self._password_resets.mark_used(reset.id, _now()):
-            raise InvalidPasswordReset("Reset token is invalid, used, or expired")
-
-        await self._users.set_password(reset.user_id, await ahash_password(new_password))
+        # One unit of work: consuming the token and writing the password
+        # persist together or not at all — a failure after the token was
+        # consumed must not strand the user with a burned token. The
+        # conditional UPDATE still guards double-redemption (the row stays
+        # locked until commit).
+        password_hash = await ahash_password(new_password)
+        async with self._unit_of_work():
+            if not await self._password_resets.mark_used(reset.id, _now()):
+                raise InvalidPasswordReset("Reset token is invalid, used, or expired")
+            await self._users.set_password(reset.user_id, password_hash)
