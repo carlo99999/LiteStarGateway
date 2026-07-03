@@ -108,7 +108,13 @@ class CompletionService:
         """Persist the billing record. A failed write must never fail the request,
         but it must not vanish either: on failure the event is dead-lettered to a
         durable outbox and retried by the background reconciler. Only if that also
-        fails do we fall back to an ERROR log with the full event (no secrets)."""
+        fails do we fall back to an ERROR log with the full event (no secrets).
+
+        Guarantee level: at-most-once on crash. The outbox is a dead-letter for
+        *failed* writes, not a write-ahead intent — a process kill between the
+        upstream response and this call leaves no durable artifact of the spend.
+        Closing that window would take a pre-dispatch intent row reconciled at
+        settlement; accepted as out of scope for now."""
         try:
             await self._usage.record(event)
             return
