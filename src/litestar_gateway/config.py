@@ -150,6 +150,16 @@ class Settings:
         # or a brute-forceable short key.
         if self.is_local:
             return
+        # Production runs on PostgreSQL, full stop. SQLite is single-writer,
+        # per-container storage: with N replicas each one gets its own silently
+        # diverging database, and an unmounted volume loses everything on
+        # restart. The image ships no DATABASE_URL default, so forgetting to
+        # set it fails here instead of booting broken storage.
+        if self.is_production and not self.is_postgres:
+            raise InsecureConfigurationError(
+                "Production requires PostgreSQL: set DATABASE_URL to a "
+                "postgresql+asyncpg:// URL (SQLite is for local development only)"
+            )
         if not self.jwt_secret or self.jwt_secret == DEFAULT_JWT_SECRET:
             raise InsecureConfigurationError(
                 "JWT_SECRET must be set to a strong, non-default value outside local environments"

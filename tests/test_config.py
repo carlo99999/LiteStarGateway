@@ -14,6 +14,7 @@ from litestar_gateway.config import (
 )
 
 STRONG_SECRET = "a-strong-random-production-secret-0123456789"
+POSTGRES_URL = "postgresql+asyncpg://gateway:pw@db:5432/gateway"  # pragma: allowlist secret
 
 # A valid development baseline; tests derive variants via dataclasses.replace,
 # which re-runs the same __post_init__ validation.
@@ -38,8 +39,30 @@ def test_production_rejects_empty_jwt_secret() -> None:
 
 
 def test_production_accepts_strong_jwt_secret() -> None:
-    settings = dataclasses.replace(_BASE, environment="production", jwt_secret=STRONG_SECRET)
+    settings = dataclasses.replace(
+        _BASE, environment="production", jwt_secret=STRONG_SECRET, database_url=POSTGRES_URL
+    )
     assert settings.is_production is True
+
+
+def test_production_rejects_sqlite_database_url() -> None:
+    # The container image no longer defaults DATABASE_URL to SQLite: a "prod"
+    # deployment that forgot to point at Postgres must fail at startup, not
+    # boot single-writer per-container storage that diverges across replicas.
+    with pytest.raises(InsecureConfigurationError, match="DATABASE_URL"):
+        dataclasses.replace(_BASE, environment="production")
+
+
+def test_production_accepts_postgres_database_url() -> None:
+    settings = dataclasses.replace(_BASE, environment="production", database_url=POSTGRES_URL)
+    assert settings.is_postgres is True
+
+
+def test_staging_still_allows_sqlite() -> None:
+    # The Postgres requirement is scoped to production/prod; other non-local
+    # environments keep SQLite available (secrets are still validated there).
+    settings = dataclasses.replace(_BASE, environment="staging")
+    assert settings.is_postgres is False
 
 
 def test_development_allows_default_jwt_secret() -> None:
@@ -71,7 +94,11 @@ def test_non_local_env_rejects_short_salt_key() -> None:
 def test_production_allows_no_salt_key() -> None:
     # SALT_KEY is optional (credential encryption is opt-in).
     settings = dataclasses.replace(
-        _BASE, environment="production", jwt_secret=STRONG_SECRET, salt_key=None
+        _BASE,
+        environment="production",
+        jwt_secret=STRONG_SECRET,
+        salt_key=None,
+        database_url=POSTGRES_URL,
     )
     assert settings.is_production is True
 
@@ -117,7 +144,9 @@ def test_non_local_env_rejects_short_master_key() -> None:
 
 def test_production_allows_no_master_key() -> None:
     # MASTER_KEY is only needed to bootstrap an empty users table.
-    settings = dataclasses.replace(_BASE, environment="production", master_key=None)
+    settings = dataclasses.replace(
+        _BASE, environment="production", master_key=None, database_url=POSTGRES_URL
+    )
     assert settings.is_production is True
 
 

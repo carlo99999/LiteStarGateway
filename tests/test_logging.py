@@ -9,8 +9,9 @@ from litestar_gateway.infrastructure.logging import build_logging_config
 
 
 def _settings(environment: str) -> Settings:
+    # Postgres URL: production settings refuse SQLite (no connection is opened).
     return Settings(
-        database_url="sqlite+aiosqlite:///:memory:",
+        database_url="postgresql+asyncpg://gateway:pw@db:5432/gateway",  # pragma: allowlist secret
         admin_email="admin@example.com",
         master_key="m" * 32,
         jwt_secret="x" * 40,
