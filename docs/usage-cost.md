@@ -1,6 +1,12 @@
 # Design doc — Usage & cost accounting + budgets
 
-> **Status:** Draft / parked (pre-v1). Branch `adding-usage-cost`. No code yet.
+> **Status:** Implemented. Part 2a (accounting) shipped with the `UsageEvent`
+> ledger + outbox reconciler and `GET /teams/{id}/usage`. Part 2b (budgets)
+> shipped as a per-team `Budget` (monthly/daily calendar window, UTC) enforced
+> pre-call in `CompletionService` → `402 Payment Required`, managed via
+> `GET/PUT/DELETE /teams/{id}/budget` (set/remove is platform-admin only).
+> Open item from §4: the enforcement read is an indexed SUM per request, not
+> yet a running counter; per-key budgets and block-vs-alert are not implemented.
 
 ## 1. Goal
 

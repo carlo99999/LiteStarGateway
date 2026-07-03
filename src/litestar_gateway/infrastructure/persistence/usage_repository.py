@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -102,6 +103,17 @@ class SQLAlchemyUsageRepository:
             )
             for row in rows
         ]
+
+    async def spend_since(self, team_id: UUID, since: datetime) -> float:
+        # Hot-path read for the budget gate: an indexed team_id filter + SUM.
+        # If this ever gets hot enough to matter, move to a running counter.
+        total = await self._session.scalar(
+            select(func.coalesce(func.sum(UsageEventModel.cost), 0.0)).where(
+                UsageEventModel.team_id == team_id,
+                UsageEventModel.created_at >= since,
+            )
+        )
+        return float(total or 0.0)
 
     async def enqueue_pending(self, event: UsageEvent) -> None:
         # The request session may be in a failed state after the ledger commit

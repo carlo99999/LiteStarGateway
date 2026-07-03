@@ -128,6 +128,18 @@ class ModelTypeMismatch(DomainError):
     """The model's type does not match the requested operation (e.g. chat vs embeddings)."""
 
 
+class BudgetExceeded(DomainError):
+    """The team's spend cap for the current window is exhausted (→ 402)."""
+
+
+class BudgetNotFound(DomainError):
+    """The team has no budget configured."""
+
+
+class InvalidBudget(DomainError):
+    """The budget definition is invalid (non-positive limit or unknown window)."""
+
+
 class UpstreamError(DomainError):
     """Base for provider-side failures surfaced by the gateway (not gateway bugs)."""
 

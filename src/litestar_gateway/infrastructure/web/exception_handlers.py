@@ -6,6 +6,7 @@ from litestar import Request, Response
 from litestar.status_codes import (
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
+    HTTP_402_PAYMENT_REQUIRED,
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
     HTTP_409_CONFLICT,
@@ -19,6 +20,8 @@ from litestar.status_codes import (
 from litestar_gateway.domain.exceptions import (
     AlreadyMember,
     APIKeyNotFound,
+    BudgetExceeded,
+    BudgetNotFound,
     CredentialMisconfigured,
     CredentialNameExists,
     CredentialNotFound,
@@ -58,6 +61,8 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     (UserNotFound, HTTP_404_NOT_FOUND),
     (MembershipNotFound, HTTP_404_NOT_FOUND),
     (APIKeyNotFound, HTTP_404_NOT_FOUND),
+    (BudgetNotFound, HTTP_404_NOT_FOUND),
+    (BudgetExceeded, HTTP_402_PAYMENT_REQUIRED),
     (CredentialNotFound, HTTP_404_NOT_FOUND),
     (ModelNotFound, HTTP_404_NOT_FOUND),
     (AlreadyMember, HTTP_409_CONFLICT),
