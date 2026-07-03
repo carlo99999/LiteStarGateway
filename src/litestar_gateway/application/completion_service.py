@@ -15,6 +15,8 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
 
+import anyio
+
 from litestar_gateway.domain.budget import window_start
 from litestar_gateway.domain.entities import Model, ModelType, TraceRecord, UsageEvent
 from litestar_gateway.domain.exceptions import (
@@ -317,8 +319,11 @@ class CompletionService:
         disconnects — the `finally` runs on generator close). Without this,
         streamed calls were neither billed nor observed. A provider error
         mid-stream emits a status='error' trace instead of a fake 'ok' one
-        (a client disconnect — GeneratorExit — still records as 'ok': bill
-        what was seen). If no authoritative usage arrived by then (disconnect
+        (a client disconnect still records as 'ok': bill what was seen).
+        A real disconnect arrives as scope cancellation at the provider await,
+        so the settlement is shielded — otherwise its first checkpoint would
+        re-raise CancelledError and the billing write would silently vanish.
+        If no authoritative usage arrived by then (disconnect
         before the usage chunk, or a provider that never reported one), usage
         is estimated from the request text + streamed output rather than
         silently billed as zero."""
@@ -339,31 +344,35 @@ class CompletionService:
             error = exc
             raise
         finally:
-            latency_ms = (perf_counter() - start) * 1000
-            if error is not None:
-                self._emit_error_trace(team_id, api_key_id, model, operation, latency_ms, error)
-            else:
-                # Even with zero streamed output (disconnect before the first
-                # content chunk) the provider consumed the prompt — bill it.
-                if not _has_tokens(usage):
-                    estimate = {
-                        "prompt_tokens": _estimate_tokens(len(_request_text(request))),
-                        "completion_tokens": _estimate_tokens(streamed_chars),
-                    }
-                    if _has_tokens(estimate):
-                        usage = estimate
-                        logger.warning(
-                            "stream ended without authoritative usage; billing estimate: "
-                            "team=%s model=%s op=%s prompt=%s completion=%s",
-                            team_id,
-                            model.name,
-                            operation,
-                            usage["prompt_tokens"],
-                            usage["completion_tokens"],
-                        )
-                await self._observe(
-                    team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
-                )
+            # Shielded: on a client disconnect this frame is already cancelled,
+            # and the settlement's first checkpoint (the DB commit) would
+            # re-raise CancelledError — no ledger row, no outbox, no trace.
+            with anyio.CancelScope(shield=True):
+                latency_ms = (perf_counter() - start) * 1000
+                if error is not None:
+                    self._emit_error_trace(team_id, api_key_id, model, operation, latency_ms, error)
+                else:
+                    # Even with zero streamed output (disconnect before the first
+                    # content chunk) the provider consumed the prompt — bill it.
+                    if not _has_tokens(usage):
+                        estimate = {
+                            "prompt_tokens": _estimate_tokens(len(_request_text(request))),
+                            "completion_tokens": _estimate_tokens(streamed_chars),
+                        }
+                        if _has_tokens(estimate):
+                            usage = estimate
+                            logger.warning(
+                                "stream ended without authoritative usage; billing estimate: "
+                                "team=%s model=%s op=%s prompt=%s completion=%s",
+                                team_id,
+                                model.name,
+                                operation,
+                                usage["prompt_tokens"],
+                                usage["completion_tokens"],
+                            )
+                    await self._observe(
+                        team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
+                    )
 
     async def open_chat_stream(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
