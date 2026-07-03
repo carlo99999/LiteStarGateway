@@ -12,7 +12,7 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from litestar_test.domain.entities import (
+from litestar_gateway.domain.entities import (
     ExternalIdentity,
     Invite,
     IssuedInvite,
@@ -20,7 +20,7 @@ from litestar_test.domain.entities import (
     PasswordReset,
     User,
 )
-from litestar_test.domain.exceptions import (
+from litestar_gateway.domain.exceptions import (
     EmailAlreadyRegistered,
     InvalidCredentials,
     InvalidInvite,
@@ -32,9 +32,9 @@ from litestar_test.domain.exceptions import (
     UserNotFound,
     WeakPassword,
 )
-from litestar_test.domain.key_generator import hash_key
-from litestar_test.domain.password import ahash_password, averify_password
-from litestar_test.domain.ports import (
+from litestar_gateway.domain.key_generator import hash_key
+from litestar_gateway.domain.password import ahash_password, averify_password
+from litestar_gateway.domain.ports import (
     InviteRepository,
     PasswordResetRepository,
     UserRepository,

@@ -23,7 +23,7 @@ from litestar.response import ServerSentEvent
 from litestar.response.sse import ServerSentEventMessage
 from litestar.status_codes import HTTP_200_OK
 
-from litestar_test.application.completion_service import CompletionService
+from litestar_gateway.application.completion_service import CompletionService
 
 
 async def _sse_response_events(

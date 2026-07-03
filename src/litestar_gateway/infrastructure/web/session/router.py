@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from litestar.router import Router
 
-from litestar_test.infrastructure.web.session.login import login
-from litestar_test.infrastructure.web.session.logout import logout
-from litestar_test.infrastructure.web.session.me import me
+from litestar_gateway.infrastructure.web.session.login import login
+from litestar_gateway.infrastructure.web.session.logout import logout
+from litestar_gateway.infrastructure.web.session.me import me
 
 
 def create_session_router() -> Router:

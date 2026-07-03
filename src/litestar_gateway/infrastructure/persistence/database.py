@@ -14,7 +14,7 @@ from advanced_alchemy.extensions.litestar import (
     SQLAlchemyPlugin,
 )
 
-from litestar_test.config import Settings
+from litestar_gateway.config import Settings
 
 # Recycle pooled connections periodically to avoid stale ones (idle timeouts,
 # failovers). Postgres only — SQLite/aiosqlite does not use a sized pool.

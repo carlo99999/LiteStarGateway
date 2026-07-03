@@ -16,7 +16,7 @@ from litestar.status_codes import (
     HTTP_504_GATEWAY_TIMEOUT,
 )
 
-from litestar_test.domain.exceptions import (
+from litestar_gateway.domain.exceptions import (
     AlreadyMember,
     APIKeyNotFound,
     CredentialMisconfigured,

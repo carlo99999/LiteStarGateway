@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from litestar_test.domain.entities import Model, ModelType, Provider
+from litestar_gateway.domain.entities import Model, ModelType, Provider
 
 
 @dataclass(frozen=True)

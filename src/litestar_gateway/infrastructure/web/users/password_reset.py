@@ -12,12 +12,12 @@ from litestar.di import NamedDependency, Provide
 from litestar.exceptions import ClientException
 from litestar.status_codes import HTTP_204_NO_CONTENT
 
-from litestar_test.application.user_service import UserService
-from litestar_test.domain.entities import User
-from litestar_test.domain.exceptions import InvalidPasswordReset, WeakPassword
-from litestar_test.infrastructure.web.rate_limit import build_auth_rate_limit
-from litestar_test.infrastructure.web.session.dependencies import provide_current_admin
-from litestar_test.infrastructure.web.users.schemas import (
+from litestar_gateway.application.user_service import UserService
+from litestar_gateway.domain.entities import User
+from litestar_gateway.domain.exceptions import InvalidPasswordReset, WeakPassword
+from litestar_gateway.infrastructure.web.rate_limit import build_auth_rate_limit
+from litestar_gateway.infrastructure.web.session.dependencies import provide_current_admin
+from litestar_gateway.infrastructure.web.users.schemas import (
     PasswordResetCreateRequest,
     PasswordResetResponse,
     ResetPasswordRequest,

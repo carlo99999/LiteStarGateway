@@ -11,7 +11,7 @@ from __future__ import annotations
 from litestar.logging import LoggingConfig, StructLoggingConfig
 from litestar.logging.config import BaseLoggingConfig, default_structlog_processors
 
-from litestar_test.config import Settings
+from litestar_gateway.config import Settings
 
 
 def build_logging_config(settings: Settings) -> BaseLoggingConfig:

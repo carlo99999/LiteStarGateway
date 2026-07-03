@@ -8,9 +8,9 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.domain.entities import User
-from litestar_test.domain.exceptions import EmailAlreadyRegistered, UserNotFound
-from litestar_test.infrastructure.persistence.orm import UserModel
+from litestar_gateway.domain.entities import User
+from litestar_gateway.domain.exceptions import EmailAlreadyRegistered, UserNotFound
+from litestar_gateway.infrastructure.persistence.orm import UserModel
 
 
 class SQLAlchemyUserRepository:

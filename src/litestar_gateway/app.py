@@ -10,47 +10,47 @@ from litestar.stores.redis import RedisStore
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.config import Settings
-from litestar_test.domain.exceptions import DomainError
-from litestar_test.domain.ports import IdentityProvider
-from litestar_test.infrastructure.bootstrap import make_bootstrap_admin
-from litestar_test.infrastructure.keyring import Keyring
-from litestar_test.infrastructure.logging import build_logging_config
-from litestar_test.infrastructure.observability.dispatcher import TraceDispatcher
-from litestar_test.infrastructure.observability.factory import build_trace_sink
-from litestar_test.infrastructure.persistence.database import create_database
-from litestar_test.infrastructure.persistence.secret_key_repository import (
+from litestar_gateway.config import Settings
+from litestar_gateway.domain.exceptions import DomainError
+from litestar_gateway.domain.ports import IdentityProvider
+from litestar_gateway.infrastructure.bootstrap import make_bootstrap_admin
+from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.logging import build_logging_config
+from litestar_gateway.infrastructure.observability.dispatcher import TraceDispatcher
+from litestar_gateway.infrastructure.observability.factory import build_trace_sink
+from litestar_gateway.infrastructure.persistence.database import create_database
+from litestar_gateway.infrastructure.persistence.secret_key_repository import (
     SQLAlchemySecretKeyRepository,
 )
-from litestar_test.infrastructure.rotation import make_rotation_scheduler
-from litestar_test.infrastructure.sso.oidc import OIDCIdentityProvider
-from litestar_test.infrastructure.usage_reconciler import make_usage_reconciler
-from litestar_test.infrastructure.web.api_router.dependencies import (
+from litestar_gateway.infrastructure.rotation import make_rotation_scheduler
+from litestar_gateway.infrastructure.sso.oidc import OIDCIdentityProvider
+from litestar_gateway.infrastructure.usage_reconciler import make_usage_reconciler
+from litestar_gateway.infrastructure.web.api_router.dependencies import (
     build_llm_gateway,
     provide_completion_service,
     provide_usage_repository,
 )
-from litestar_test.infrastructure.web.api_router.router import create_api_router
-from litestar_test.infrastructure.web.audit.controller import AuditController
-from litestar_test.infrastructure.web.audit.dependencies import provide_audit_log
-from litestar_test.infrastructure.web.credentials import CredentialController
-from litestar_test.infrastructure.web.credentials.dependencies import (
+from litestar_gateway.infrastructure.web.api_router.router import create_api_router
+from litestar_gateway.infrastructure.web.audit.controller import AuditController
+from litestar_gateway.infrastructure.web.audit.dependencies import provide_audit_log
+from litestar_gateway.infrastructure.web.credentials import CredentialController
+from litestar_gateway.infrastructure.web.credentials.dependencies import (
     provide_credential_service,
 )
-from litestar_test.infrastructure.web.dependencies import provide_api_key_service
-from litestar_test.infrastructure.web.exception_handlers import domain_exception_handler
-from litestar_test.infrastructure.web.models import ModelController
-from litestar_test.infrastructure.web.models.dependencies import provide_model_service
-from litestar_test.infrastructure.web.organizations import OrganizationController
-from litestar_test.infrastructure.web.organizations.dependencies import (
+from litestar_gateway.infrastructure.web.dependencies import provide_api_key_service
+from litestar_gateway.infrastructure.web.exception_handlers import domain_exception_handler
+from litestar_gateway.infrastructure.web.models import ModelController
+from litestar_gateway.infrastructure.web.models.dependencies import provide_model_service
+from litestar_gateway.infrastructure.web.organizations import OrganizationController
+from litestar_gateway.infrastructure.web.organizations.dependencies import (
     provide_organization_service,
     provide_team_service,
 )
-from litestar_test.infrastructure.web.session import create_session_router
-from litestar_test.infrastructure.web.session.sso import create_sso_router
-from litestar_test.infrastructure.web.teams import TeamController
-from litestar_test.infrastructure.web.users import create_users_router
-from litestar_test.infrastructure.web.users.dependencies import provide_user_service
+from litestar_gateway.infrastructure.web.session import create_session_router
+from litestar_gateway.infrastructure.web.session.sso import create_sso_router
+from litestar_gateway.infrastructure.web.teams import TeamController
+from litestar_gateway.infrastructure.web.users import create_users_router
+from litestar_gateway.infrastructure.web.users.dependencies import provide_user_service
 
 
 def create_app(

@@ -53,7 +53,7 @@ and `ENVIRONMENT` (`development` default; `production` enables startup config
 checks — a missing/default `JWT_SECRET` then aborts startup).
 
 ```bash
-uv run litestar --app litestar_test.app:app run
+uv run litestar --app litestar_gateway.app:app run
 uv run pytest
 ```
 
@@ -103,7 +103,7 @@ Notes:
 - **Migrations**: production uses Alembic (`create_all` is dev/test only). The
   container applies pending migrations on start (`litestar … database upgrade`,
   idempotent). After changing the ORM models, generate a migration in dev with
-  `uv run litestar --app litestar_test.app:app database make-migrations`, review
+  `uv run litestar --app litestar_gateway.app:app database make-migrations`, review
   it, and commit it. (With many replicas, prefer a one-shot migration job over
   migrate-on-start to avoid concurrent upgrades.)
 - **Observability**: set `MLFLOW_TRACKING_URI` to enable request tracing (classic
@@ -148,12 +148,12 @@ on their own branch (linked). Order within a phase is a recommendation.
    ([design](docs/provider-resilience.md)).
 6. ✅ **Request parameter allowlist** _(shipped)_ — deny-by-default sanitizing of
    client params before the provider SDKs
-   ([`request_policy.py`](src/litestar_test/domain/request_policy.py),
+   ([`request_policy.py`](src/litestar_gateway/domain/request_policy.py),
    [design](docs/param-allowlist.md)).
 7. ✅ **Structured logging** _(shipped)_ — an environment-aware logging factory:
    human-readable console logs in development, structured **JSON** (structlog) in
    production; exceptions logged server-side, no stack traces leaked to clients
-   ([`logging.py`](src/litestar_test/infrastructure/logging.py),
+   ([`logging.py`](src/litestar_gateway/infrastructure/logging.py),
    [design](docs/logging.md)). _Request-id correlation is a further step._
 8. ✅ **Secrets management & key rotation** _(shipped)_ — envelope encryption: the
    env keys are fixed **masters** (`SALT_KEY` wraps credential keys, `JWT_SECRET`

@@ -13,9 +13,9 @@ from typing import Any
 
 from openai import AsyncOpenAI, OpenAI
 
-from litestar_test.domain.entities import Model
-from litestar_test.domain.exceptions import CredentialMisconfigured
-from litestar_test.infrastructure.llm.resilience import ResilienceConfig
+from litestar_gateway.domain.entities import Model
+from litestar_gateway.domain.exceptions import CredentialMisconfigured
+from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 
 
 def require_api_key(credentials: dict[str, str]) -> str:

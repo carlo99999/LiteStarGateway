@@ -17,10 +17,10 @@ from contextlib import asynccontextmanager
 import anyio
 from litestar import Litestar
 
-from litestar_test.domain.entities import TraceRecord
-from litestar_test.domain.ports import TraceSink
+from litestar_gateway.domain.entities import TraceRecord
+from litestar_gateway.domain.ports import TraceSink
 
-logger = logging.getLogger("litestar_test.observability")
+logger = logging.getLogger("litestar_gateway.observability")
 
 
 class TraceDispatcher:

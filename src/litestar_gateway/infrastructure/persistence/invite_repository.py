@@ -9,8 +9,8 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.domain.entities import Invite
-from litestar_test.infrastructure.persistence.orm import InviteModel
+from litestar_gateway.domain.entities import Invite
+from litestar_gateway.infrastructure.persistence.orm import InviteModel
 
 
 class SQLAlchemyInviteRepository:

@@ -20,12 +20,12 @@ from litestar.params import FromQuery, QueryParameter
 from litestar.response import Redirect
 from litestar.router import Router
 
-from litestar_test.application.user_service import UserService
-from litestar_test.domain.ports import IdentityProvider
-from litestar_test.infrastructure.keyring import Keyring
-from litestar_test.infrastructure.web.rate_limit import build_auth_rate_limit
-from litestar_test.infrastructure.web.session.jwt import issue_access_token
-from litestar_test.infrastructure.web.session.schemas import TokenResponse
+from litestar_gateway.application.user_service import UserService
+from litestar_gateway.domain.ports import IdentityProvider
+from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.web.rate_limit import build_auth_rate_limit
+from litestar_gateway.infrastructure.web.session.jwt import issue_access_token
+from litestar_gateway.infrastructure.web.session.schemas import TokenResponse
 
 _STATE_COOKIE = "sso_state"
 _NONCE_COOKIE = "sso_nonce"

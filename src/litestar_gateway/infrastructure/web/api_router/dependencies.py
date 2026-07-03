@@ -5,20 +5,20 @@ from __future__ import annotations
 from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.application.completion_service import CompletionService
-from litestar_test.config import Settings
-from litestar_test.domain.ports import LLMGateway, UsageRepository
-from litestar_test.infrastructure.keyring import Keyring
-from litestar_test.infrastructure.llm.gateway import LLMGatewayImpl
-from litestar_test.infrastructure.llm.resilience import ResilienceConfig
-from litestar_test.infrastructure.observability.dispatcher import TraceDispatcher
-from litestar_test.infrastructure.persistence.credential_repository import (
+from litestar_gateway.application.completion_service import CompletionService
+from litestar_gateway.config import Settings
+from litestar_gateway.domain.ports import LLMGateway, UsageRepository
+from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
+from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
+from litestar_gateway.infrastructure.observability.dispatcher import TraceDispatcher
+from litestar_gateway.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
 )
-from litestar_test.infrastructure.persistence.model_repository import (
+from litestar_gateway.infrastructure.persistence.model_repository import (
     SQLAlchemyModelRepository,
 )
-from litestar_test.infrastructure.persistence.usage_repository import (
+from litestar_gateway.infrastructure.persistence.usage_repository import (
     SQLAlchemyUsageRepository,
 )
 

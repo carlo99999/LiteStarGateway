@@ -3,7 +3,7 @@
 # Requires: just (https://github.com/casey/just) and uv (https://docs.astral.sh/uv/).
 
 # App entrypoint used by the Litestar CLI (migrations, dev server).
-app := "litestar_test.app:app"
+app := "litestar_gateway.app:app"
 
 # Show the list of recipes (default when running `just` with no args).
 default:

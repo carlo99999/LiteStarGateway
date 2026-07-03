@@ -1,6 +1,6 @@
 # Code Review — Findings (`ISSUES.md`)
 
-Whole-codebase security & quality review of `src/litestar_test` (≈6,300 LOC, hexagonal
+Whole-codebase security & quality review of `src/litestar_gateway` (≈6,300 LOC, hexagonal
 architecture). Findings below were surfaced by layer-focused reviewers and then
 **verified against the actual code** — each cites `file:line`, the concrete impact, and a
 suggested fix. Severity reflects verified exploitability/impact, not the raw finder claim.

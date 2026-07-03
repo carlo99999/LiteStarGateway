@@ -11,9 +11,9 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from litestar_test.domain.entities import KeyPurpose, SecretKey
-from litestar_test.domain.ports import SecretKeyRepository
-from litestar_test.infrastructure.crypto import (
+from litestar_gateway.domain.entities import KeyPurpose, SecretKey
+from litestar_gateway.domain.ports import SecretKeyRepository
+from litestar_gateway.infrastructure.crypto import (
     DataCipher,
     MasterCipher,
     build_master_cipher,

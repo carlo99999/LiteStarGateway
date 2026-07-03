@@ -8,10 +8,10 @@ from litestar import Request
 from litestar.di import NamedDependency
 from litestar.exceptions import NotAuthorizedException, PermissionDeniedException
 
-from litestar_test.application.user_service import UserService
-from litestar_test.domain.entities import User
-from litestar_test.infrastructure.keyring import Keyring
-from litestar_test.infrastructure.web.session.jwt import decode_token
+from litestar_gateway.application.user_service import UserService
+from litestar_gateway.domain.entities import User
+from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.web.session.jwt import decode_token
 
 
 async def provide_current_user(

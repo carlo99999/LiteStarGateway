@@ -12,14 +12,14 @@ from litestar import Controller, Request, delete, get, patch, post
 from litestar.di import NamedDependency, Provide
 from litestar.params import FromPath, FromQuery
 
-from litestar_test.application.service import APIKeyService
-from litestar_test.application.team_service import TeamService
-from litestar_test.domain.entities import User
-from litestar_test.domain.pagination import resolve_page
-from litestar_test.domain.ports import AuditLog, UsageRepository
-from litestar_test.infrastructure.web.audit.recorder import record_audit
-from litestar_test.infrastructure.web.session.dependencies import provide_current_user
-from litestar_test.infrastructure.web.teams.schemas import (
+from litestar_gateway.application.service import APIKeyService
+from litestar_gateway.application.team_service import TeamService
+from litestar_gateway.domain.entities import User
+from litestar_gateway.domain.pagination import resolve_page
+from litestar_gateway.domain.ports import AuditLog, UsageRepository
+from litestar_gateway.infrastructure.web.audit.recorder import record_audit
+from litestar_gateway.infrastructure.web.session.dependencies import provide_current_user
+from litestar_gateway.infrastructure.web.teams.schemas import (
     AddMemberRequest,
     CreatedKeyResponse,
     CreateKeyRequest,

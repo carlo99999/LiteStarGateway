@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from litestar_test.domain.entities import IssuedInvite, IssuedPasswordReset, User
+from litestar_gateway.domain.entities import IssuedInvite, IssuedPasswordReset, User
 
 
 @dataclass(frozen=True)

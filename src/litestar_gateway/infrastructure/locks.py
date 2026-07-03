@@ -15,10 +15,10 @@ from datetime import timedelta
 
 from redis.asyncio import Redis
 
-from litestar_test.config import Settings
-from litestar_test.domain.ports import DistributedLock
+from litestar_gateway.config import Settings
+from litestar_gateway.domain.ports import DistributedLock
 
-logger = logging.getLogger("litestar_test.locks")
+logger = logging.getLogger("litestar_gateway.locks")
 
 
 class NoOpDistributedLock:

@@ -9,7 +9,7 @@ from uuid import UUID
 
 from litestar.params import Parameter
 
-from litestar_test.domain.entities import Credential, Provider
+from litestar_gateway.domain.entities import Credential, Provider
 
 
 @dataclass(frozen=True)

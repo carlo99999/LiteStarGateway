@@ -16,9 +16,9 @@ from typing import Any
 
 from anthropic import Anthropic, AsyncAnthropic
 
-from litestar_test.domain.entities import Model
-from litestar_test.infrastructure.llm.openai_adapter import require_api_key
-from litestar_test.infrastructure.llm.resilience import ResilienceConfig
+from litestar_gateway.domain.entities import Model
+from litestar_gateway.infrastructure.llm.openai_adapter import require_api_key
+from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 
 # Anthropic requires max_tokens; use this when the request omits it.
 DEFAULT_MAX_TOKENS = 1024

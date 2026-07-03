@@ -5,8 +5,8 @@ from __future__ import annotations
 from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.application.service import APIKeyService
-from litestar_test.infrastructure.persistence.repository import (
+from litestar_gateway.application.service import APIKeyService
+from litestar_gateway.infrastructure.persistence.repository import (
     SQLAlchemyAPIKeyRepository,
 )
 

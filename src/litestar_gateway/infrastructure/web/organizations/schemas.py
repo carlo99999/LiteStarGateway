@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from litestar_test.domain.entities import Organization
+from litestar_gateway.domain.entities import Organization
 
 
 @dataclass(frozen=True)

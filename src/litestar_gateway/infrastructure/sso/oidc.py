@@ -24,8 +24,8 @@ from joserfc import jwt
 from joserfc.errors import InvalidKeyIdError, JoseError
 from joserfc.jwk import KeySet
 
-from litestar_test.domain.entities import ExternalIdentity
-from litestar_test.domain.exceptions import SSOExchangeError
+from litestar_gateway.domain.entities import ExternalIdentity
+from litestar_gateway.domain.exceptions import SSOExchangeError
 
 # id_tokens are signed with the provider's asymmetric JWKS keys.
 _ID_TOKEN_ALGS = ["RS256", "RS384", "RS512", "ES256", "ES384", "ES512"]

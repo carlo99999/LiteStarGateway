@@ -18,7 +18,7 @@ import anthropic
 import httpx
 import openai
 
-from litestar_test.domain.exceptions import (
+from litestar_gateway.domain.exceptions import (
     DomainError,
     UpstreamError,
     UpstreamRateLimited,

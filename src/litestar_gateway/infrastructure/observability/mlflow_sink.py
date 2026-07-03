@@ -17,7 +17,7 @@ from __future__ import annotations
 import mlflow
 from mlflow import MlflowClient
 
-from litestar_test.domain.entities import TraceRecord
+from litestar_gateway.domain.entities import TraceRecord
 
 
 class MLflowTraceSink:

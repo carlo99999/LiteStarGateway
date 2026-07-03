@@ -10,7 +10,7 @@ from advanced_alchemy.extensions.litestar import base
 from sqlalchemy import JSON, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from litestar_test.domain.entities import (
+from litestar_gateway.domain.entities import (
     APIKey,
     AuditEvent,
     Credential,

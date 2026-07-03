@@ -6,14 +6,14 @@ from litestar import post
 from litestar.di import NamedDependency
 from litestar.exceptions import ClientException
 
-from litestar_test.application.user_service import UserService
-from litestar_test.domain.exceptions import (
+from litestar_gateway.application.user_service import UserService
+from litestar_gateway.domain.exceptions import (
     EmailAlreadyRegistered,
     InvalidInvite,
     WeakPassword,
 )
-from litestar_test.infrastructure.web.rate_limit import build_auth_rate_limit
-from litestar_test.infrastructure.web.users.schemas import SignupRequest, UserResponse
+from litestar_gateway.infrastructure.web.rate_limit import build_auth_rate_limit
+from litestar_gateway.infrastructure.web.users.schemas import SignupRequest, UserResponse
 
 
 @post("/signup", middleware=[build_auth_rate_limit().middleware])

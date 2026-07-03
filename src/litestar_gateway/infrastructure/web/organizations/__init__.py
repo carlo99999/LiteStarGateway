@@ -1,4 +1,4 @@
-from litestar_test.infrastructure.web.organizations.controller import (
+from litestar_gateway.infrastructure.web.organizations.controller import (
     OrganizationController,
 )
 

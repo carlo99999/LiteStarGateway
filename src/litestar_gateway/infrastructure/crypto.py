@@ -14,7 +14,7 @@ import json
 
 from cryptography.fernet import Fernet
 
-from litestar_test.domain.exceptions import SaltKeyMissing
+from litestar_gateway.domain.exceptions import SaltKeyMissing
 
 
 def _derive_fernet_key(master_key: str) -> bytes:

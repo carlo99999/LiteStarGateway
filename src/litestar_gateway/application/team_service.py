@@ -20,8 +20,8 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from litestar_test.domain.entities import Team, TeamMembership, TeamRole, User
-from litestar_test.domain.exceptions import (
+from litestar_gateway.domain.entities import Team, TeamMembership, TeamRole, User
+from litestar_gateway.domain.exceptions import (
     AlreadyMember,
     LastTeamAdmin,
     MembershipNotFound,
@@ -30,8 +30,8 @@ from litestar_test.domain.exceptions import (
     TeamNotFound,
     UserNotFound,
 )
-from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_test.domain.ports import (
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.domain.ports import (
     OrganizationRepository,
     TeamMembershipRepository,
     TeamRepository,

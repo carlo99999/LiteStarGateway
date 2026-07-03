@@ -9,11 +9,11 @@ from __future__ import annotations
 from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.application.model_service import ModelService
-from litestar_test.infrastructure.persistence.credential_repository import (
+from litestar_gateway.application.model_service import ModelService
+from litestar_gateway.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
 )
-from litestar_test.infrastructure.persistence.model_repository import (
+from litestar_gateway.infrastructure.persistence.model_repository import (
     SQLAlchemyModelRepository,
 )
 

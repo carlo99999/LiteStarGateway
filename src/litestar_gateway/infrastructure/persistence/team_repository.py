@@ -7,8 +7,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.domain.entities import Team
-from litestar_test.infrastructure.persistence.orm import TeamModel
+from litestar_gateway.domain.entities import Team
+from litestar_gateway.infrastructure.persistence.orm import TeamModel
 
 
 class SQLAlchemyTeamRepository:

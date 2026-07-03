@@ -15,22 +15,22 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
 
-from litestar_test.domain.entities import Model, ModelType, TraceRecord, UsageEvent
-from litestar_test.domain.exceptions import (
+from litestar_gateway.domain.entities import Model, ModelType, TraceRecord, UsageEvent
+from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
     ModelDisabled,
     ModelNotFound,
     ModelTypeMismatch,
 )
-from litestar_test.domain.ports import (
+from litestar_gateway.domain.ports import (
     CredentialRepository,
     LLMGateway,
     ModelRepository,
     UsageRepository,
 )
-from litestar_test.domain.request_policy import sanitize_request
+from litestar_gateway.domain.request_policy import sanitize_request
 
-logger = logging.getLogger("litestar_test.usage")
+logger = logging.getLogger("litestar_gateway.usage")
 
 # Coarse industry heuristic, used only when no authoritative usage arrives
 # (client disconnect mid-stream, or a provider stream that never reports it).

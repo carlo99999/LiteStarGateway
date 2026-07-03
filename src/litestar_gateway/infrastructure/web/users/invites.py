@@ -5,11 +5,11 @@ from __future__ import annotations
 from litestar import post
 from litestar.di import NamedDependency, Provide
 
-from litestar_test.application.user_service import UserService
-from litestar_test.domain.entities import User
-from litestar_test.infrastructure.web.rate_limit import build_auth_rate_limit
-from litestar_test.infrastructure.web.session.dependencies import provide_current_admin
-from litestar_test.infrastructure.web.users.schemas import InviteResponse
+from litestar_gateway.application.user_service import UserService
+from litestar_gateway.domain.entities import User
+from litestar_gateway.infrastructure.web.rate_limit import build_auth_rate_limit
+from litestar_gateway.infrastructure.web.session.dependencies import provide_current_admin
+from litestar_gateway.infrastructure.web.users.schemas import InviteResponse
 
 
 # Admin-gated, but rate-limited like the other auth-surface endpoints for consistency.

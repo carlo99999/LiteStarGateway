@@ -8,8 +8,8 @@ from uuid import UUID
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.domain.entities import KeyPurpose, SecretKey
-from litestar_test.infrastructure.persistence.orm import SecretKeyModel
+from litestar_gateway.domain.entities import KeyPurpose, SecretKey
+from litestar_gateway.infrastructure.persistence.orm import SecretKeyModel
 
 
 class SQLAlchemySecretKeyRepository:

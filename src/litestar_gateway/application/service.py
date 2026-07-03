@@ -10,11 +10,11 @@ import dataclasses
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from litestar_test.domain.entities import APIKey, IssuedKey
-from litestar_test.domain.exceptions import APIKeyNotFound, InvalidAPIKey
-from litestar_test.domain.key_generator import generate_key, hash_key
-from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_test.domain.ports import APIKeyRepository
+from litestar_gateway.domain.entities import APIKey, IssuedKey
+from litestar_gateway.domain.exceptions import APIKeyNotFound, InvalidAPIKey
+from litestar_gateway.domain.key_generator import generate_key, hash_key
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.domain.ports import APIKeyRepository
 
 # Only persist last_used_at this often, to avoid a DB write on every request.
 _LAST_USED_THROTTLE = timedelta(minutes=1)

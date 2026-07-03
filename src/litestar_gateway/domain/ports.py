@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
-from litestar_test.domain.entities import (
+from litestar_gateway.domain.entities import (
     APIKey,
     ApiKeySpend,
     AuditEvent,
@@ -27,7 +27,7 @@ from litestar_test.domain.entities import (
     UsageEvent,
     User,
 )
-from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 
 
 class APIKeyRepository(Protocol):

@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
-from litestar_test.domain.entities import Model
+from litestar_gateway.domain.entities import Model
 
 # Chat sampling params we carry over verbatim from a Responses request.
 _PASSTHROUGH = frozenset(

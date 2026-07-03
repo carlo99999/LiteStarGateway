@@ -6,9 +6,9 @@ from litestar import post
 from litestar.di import NamedDependency, Provide
 from litestar.status_codes import HTTP_204_NO_CONTENT
 
-from litestar_test.application.user_service import UserService
-from litestar_test.domain.entities import User
-from litestar_test.infrastructure.web.session.dependencies import provide_current_user
+from litestar_gateway.application.user_service import UserService
+from litestar_gateway.domain.entities import User
+from litestar_gateway.infrastructure.web.session.dependencies import provide_current_user
 
 
 @post(

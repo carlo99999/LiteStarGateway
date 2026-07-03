@@ -10,14 +10,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from litestar_test.domain.entities import Credential, Provider, User
-from litestar_test.domain.exceptions import (
+from litestar_gateway.domain.entities import Credential, Provider, User
+from litestar_gateway.domain.exceptions import (
     CredentialNameExists,
     CredentialNotFound,
     PermissionDenied,
 )
-from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_test.domain.ports import CredentialRepository
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.domain.ports import CredentialRepository
 
 
 def _now() -> datetime:

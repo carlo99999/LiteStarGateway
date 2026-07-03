@@ -41,4 +41,4 @@ jobs:
 
       # Coverage gate: the project's stated bar is 80% (currently ~94%).
       - name: Tests (pytest + coverage gate)
-        run: uv run pytest -q --cov=src/litestar_test --cov-report=term --cov-fail-under=80
+        run: uv run pytest -q --cov=src/litestar_gateway --cov-report=term --cov-fail-under=80

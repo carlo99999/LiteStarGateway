@@ -10,19 +10,19 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
-from litestar_test.domain.entities import Model, Provider
-from litestar_test.domain.exceptions import UnsupportedOperation
-from litestar_test.infrastructure.llm.anthropic_adapter import AnthropicAdapter
-from litestar_test.infrastructure.llm.azure_adapter import AzureOpenAIAdapter
-from litestar_test.infrastructure.llm.errors import (
+from litestar_gateway.domain.entities import Model, Provider
+from litestar_gateway.domain.exceptions import UnsupportedOperation
+from litestar_gateway.infrastructure.llm.anthropic_adapter import AnthropicAdapter
+from litestar_gateway.infrastructure.llm.azure_adapter import AzureOpenAIAdapter
+from litestar_gateway.infrastructure.llm.errors import (
     arun_translated,
     run_translated,
     translate_stream,
 )
-from litestar_test.infrastructure.llm.openai_adapter import OpenAIAdapter
-from litestar_test.infrastructure.llm.resilience import ResilienceConfig
-from litestar_test.infrastructure.llm.responses_emulation import ChatToResponsesAdapter
-from litestar_test.infrastructure.llm.vertex_adapter import VertexAdapter
+from litestar_gateway.infrastructure.llm.openai_adapter import OpenAIAdapter
+from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
+from litestar_gateway.infrastructure.llm.responses_emulation import ChatToResponsesAdapter
+from litestar_gateway.infrastructure.llm.vertex_adapter import VertexAdapter
 
 _CHAT = "chat.completions"
 _RESPONSES = "responses"

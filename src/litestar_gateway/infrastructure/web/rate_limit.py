@@ -16,7 +16,7 @@ from typing import Any, Literal
 from litestar.connection import Request
 from litestar.middleware.rate_limit import RateLimitConfig, get_remote_address
 
-from litestar_test.domain.key_generator import hash_key
+from litestar_gateway.domain.key_generator import hash_key
 
 RateUnit = Literal["second", "minute", "hour", "day"]
 

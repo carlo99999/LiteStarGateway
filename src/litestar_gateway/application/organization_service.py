@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from litestar_test.domain.entities import Organization, User
-from litestar_test.domain.exceptions import PermissionDenied
-from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_test.domain.ports import OrganizationRepository
+from litestar_gateway.domain.entities import Organization, User
+from litestar_gateway.domain.exceptions import PermissionDenied
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.domain.ports import OrganizationRepository
 
 
 def _now() -> datetime:

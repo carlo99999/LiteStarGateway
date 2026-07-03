@@ -10,10 +10,10 @@ from litestar import Controller, get
 from litestar.di import NamedDependency, Provide
 from litestar.params import FromQuery
 
-from litestar_test.domain.entities import AuditEvent, User
-from litestar_test.domain.pagination import resolve_page
-from litestar_test.domain.ports import AuditLog
-from litestar_test.infrastructure.web.session.dependencies import provide_current_admin
+from litestar_gateway.domain.entities import AuditEvent, User
+from litestar_gateway.domain.pagination import resolve_page
+from litestar_gateway.domain.ports import AuditLog
+from litestar_gateway.infrastructure.web.session.dependencies import provide_current_admin
 
 
 @dataclass(frozen=True)

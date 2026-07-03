@@ -8,11 +8,11 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.domain.entities import ApiKeySpend, UsageAggregate, UsageEvent
-from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_test.infrastructure.persistence.orm import PendingUsageEventModel, UsageEventModel
+from litestar_gateway.domain.entities import ApiKeySpend, UsageAggregate, UsageEvent
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.infrastructure.persistence.orm import PendingUsageEventModel, UsageEventModel
 
-logger = logging.getLogger("litestar_test.usage")
+logger = logging.getLogger("litestar_gateway.usage")
 
 
 class SQLAlchemyUsageRepository:

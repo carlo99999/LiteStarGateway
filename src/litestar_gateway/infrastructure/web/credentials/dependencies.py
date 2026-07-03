@@ -5,9 +5,9 @@ from __future__ import annotations
 from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.application.credential_service import CredentialService
-from litestar_test.infrastructure.keyring import Keyring
-from litestar_test.infrastructure.persistence.credential_repository import (
+from litestar_gateway.application.credential_service import CredentialService
+from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
 )
 

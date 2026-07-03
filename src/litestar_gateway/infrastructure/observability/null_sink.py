@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from litestar_test.domain.entities import TraceRecord
+from litestar_gateway.domain.entities import TraceRecord
 
 
 class NullTraceSink:

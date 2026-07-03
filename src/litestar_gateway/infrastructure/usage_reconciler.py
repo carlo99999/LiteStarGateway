@@ -16,11 +16,11 @@ from contextlib import asynccontextmanager
 
 from litestar import Litestar
 
-from litestar_test.config import Settings
-from litestar_test.infrastructure.persistence.database import Database
-from litestar_test.infrastructure.persistence.usage_repository import SQLAlchemyUsageRepository
+from litestar_gateway.config import Settings
+from litestar_gateway.infrastructure.persistence.database import Database
+from litestar_gateway.infrastructure.persistence.usage_repository import SQLAlchemyUsageRepository
 
-logger = logging.getLogger("litestar_test.usage")
+logger = logging.getLogger("litestar_gateway.usage")
 
 _RECONCILE_INTERVAL_SECONDS = 60
 _RECONCILE_BATCH = 200

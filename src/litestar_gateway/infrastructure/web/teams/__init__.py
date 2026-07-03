@@ -1,3 +1,3 @@
-from litestar_test.infrastructure.web.teams.controller import TeamController
+from litestar_gateway.infrastructure.web.teams.controller import TeamController
 
 __all__ = ["TeamController"]

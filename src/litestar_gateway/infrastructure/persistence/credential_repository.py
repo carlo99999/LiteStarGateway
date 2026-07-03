@@ -12,11 +12,11 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.domain.entities import Credential
-from litestar_test.domain.exceptions import CredentialMisconfigured, SaltKeyMissing
-from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_test.infrastructure.keyring import Keyring
-from litestar_test.infrastructure.persistence.orm import CredentialModel
+from litestar_gateway.domain.entities import Credential
+from litestar_gateway.domain.exceptions import CredentialMisconfigured, SaltKeyMissing
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.persistence.orm import CredentialModel
 
 
 class SQLAlchemyCredentialRepository:

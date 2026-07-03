@@ -10,9 +10,9 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.domain.entities import AuditEvent
-from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_test.infrastructure.persistence.orm import AuditEventModel
+from litestar_gateway.domain.entities import AuditEvent
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.infrastructure.persistence.orm import AuditEventModel
 
 
 class SQLAlchemyAuditLog:

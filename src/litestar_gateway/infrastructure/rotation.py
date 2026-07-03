@@ -21,20 +21,20 @@ from datetime import UTC, datetime, timedelta
 
 from litestar import Litestar
 
-from litestar_test.config import Settings
-from litestar_test.domain.ports import DistributedLock
-from litestar_test.infrastructure.keyring import Keyring
-from litestar_test.infrastructure.locks import build_distributed_lock
-from litestar_test.infrastructure.persistence.credential_repository import (
+from litestar_gateway.config import Settings
+from litestar_gateway.domain.ports import DistributedLock
+from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.locks import build_distributed_lock
+from litestar_gateway.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
 )
-from litestar_test.infrastructure.persistence.database import Database
-from litestar_test.infrastructure.persistence.secret_key_repository import (
+from litestar_gateway.infrastructure.persistence.database import Database
+from litestar_gateway.infrastructure.persistence.secret_key_repository import (
     SQLAlchemySecretKeyRepository,
 )
-from litestar_test.infrastructure.web.session.jwt import ACCESS_TOKEN_TTL
+from litestar_gateway.infrastructure.web.session.jwt import ACCESS_TOKEN_TTL
 
-logger = logging.getLogger("litestar_test.rotation")
+logger = logging.getLogger("litestar_gateway.rotation")
 
 # Only one replica should rotate at a time; hold a cross-replica lock while doing
 # so. TTL comfortably exceeds a normal rotation but stays well under the daily

@@ -13,15 +13,15 @@ from advanced_alchemy.extensions.litestar import SQLAlchemyAsyncConfig
 from litestar.middleware.base import DefineMiddleware
 from litestar.router import Router
 
-from litestar_test.infrastructure.web.api_router.completions import (
+from litestar_gateway.infrastructure.web.api_router.completions import (
     chat_completions,
     embeddings,
     images,
     responses,
 )
-from litestar_test.infrastructure.web.api_router.wo_am_i import whoami
-from litestar_test.infrastructure.web.auth import APIKeyAuthMiddleware
-from litestar_test.infrastructure.web.rate_limit import build_inference_rate_limit
+from litestar_gateway.infrastructure.web.api_router.wo_am_i import whoami
+from litestar_gateway.infrastructure.web.auth import APIKeyAuthMiddleware
+from litestar_gateway.infrastructure.web.rate_limit import build_inference_rate_limit
 
 API_PREFIX = "/"
 

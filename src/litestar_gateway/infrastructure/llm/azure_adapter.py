@@ -10,8 +10,8 @@ from typing import Any
 
 from openai import AsyncAzureOpenAI, AzureOpenAI
 
-from litestar_test.domain.entities import Model
-from litestar_test.infrastructure.llm.openai_adapter import (
+from litestar_gateway.domain.entities import Model
+from litestar_gateway.infrastructure.llm.openai_adapter import (
     OpenAICompatibleAdapter,
     require_api_key,
 )

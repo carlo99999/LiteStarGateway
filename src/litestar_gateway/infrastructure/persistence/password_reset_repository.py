@@ -9,8 +9,8 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_test.domain.entities import PasswordReset
-from litestar_test.infrastructure.persistence.orm import PasswordResetModel
+from litestar_gateway.domain.entities import PasswordReset
+from litestar_gateway.infrastructure.persistence.orm import PasswordResetModel
 
 
 class SQLAlchemyPasswordResetRepository:

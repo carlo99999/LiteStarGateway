@@ -7,12 +7,12 @@ from litestar.di import NamedDependency
 from litestar.exceptions import NotAuthorizedException
 from litestar.status_codes import HTTP_200_OK
 
-from litestar_test.application.user_service import UserService
-from litestar_test.domain.exceptions import InvalidCredentials
-from litestar_test.infrastructure.keyring import Keyring
-from litestar_test.infrastructure.web.rate_limit import build_auth_rate_limit
-from litestar_test.infrastructure.web.session.jwt import issue_access_token
-from litestar_test.infrastructure.web.session.schemas import LoginRequest, TokenResponse
+from litestar_gateway.application.user_service import UserService
+from litestar_gateway.domain.exceptions import InvalidCredentials
+from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.web.rate_limit import build_auth_rate_limit
+from litestar_gateway.infrastructure.web.session.jwt import issue_access_token
+from litestar_gateway.infrastructure.web.session.schemas import LoginRequest, TokenResponse
 
 
 @post("/login", status_code=HTTP_200_OK, middleware=[build_auth_rate_limit().middleware])

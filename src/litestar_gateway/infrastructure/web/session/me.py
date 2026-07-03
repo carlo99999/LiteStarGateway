@@ -5,9 +5,9 @@ from __future__ import annotations
 from litestar import get
 from litestar.di import NamedDependency, Provide
 
-from litestar_test.domain.entities import User
-from litestar_test.infrastructure.web.session.dependencies import provide_current_user
-from litestar_test.infrastructure.web.users.schemas import UserResponse
+from litestar_gateway.domain.entities import User
+from litestar_gateway.infrastructure.web.session.dependencies import provide_current_user
+from litestar_gateway.infrastructure.web.users.schemas import UserResponse
 
 
 @get("/me", dependencies={"current_user": Provide(provide_current_user)})

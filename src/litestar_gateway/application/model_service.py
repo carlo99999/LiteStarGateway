@@ -12,15 +12,15 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from litestar_test.domain.entities import Model, ModelType, Provider
-from litestar_test.domain.exceptions import (
+from litestar_gateway.domain.entities import Model, ModelType, Provider
+from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
     ModelNameExists,
     ModelNotFound,
     ProviderMismatch,
 )
-from litestar_test.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_test.domain.ports import CredentialRepository, ModelRepository
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.domain.ports import CredentialRepository, ModelRepository
 
 
 def _now() -> datetime:

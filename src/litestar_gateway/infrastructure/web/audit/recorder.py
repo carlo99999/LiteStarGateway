@@ -11,8 +11,8 @@ from uuid import UUID, uuid4
 
 from litestar import Request
 
-from litestar_test.domain.entities import AuditEvent, User
-from litestar_test.domain.ports import AuditLog
+from litestar_gateway.domain.entities import AuditEvent, User
+from litestar_gateway.domain.ports import AuditLog
 
 
 async def record_audit(

@@ -14,9 +14,9 @@ from litestar.exceptions import NotAuthorizedException
 from litestar.middleware import AbstractAuthenticationMiddleware, AuthenticationResult
 from litestar.types import ASGIApp
 
-from litestar_test.application.service import APIKeyService
-from litestar_test.domain.exceptions import InvalidAPIKey
-from litestar_test.infrastructure.persistence.repository import (
+from litestar_gateway.application.service import APIKeyService
+from litestar_gateway.domain.exceptions import InvalidAPIKey
+from litestar_gateway.infrastructure.persistence.repository import (
     SQLAlchemyAPIKeyRepository,
 )
 

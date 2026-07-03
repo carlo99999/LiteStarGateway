@@ -24,9 +24,9 @@ from google import genai
 from google.genai.types import HttpOptions
 from google.oauth2 import service_account
 
-from litestar_test.domain.entities import Model
-from litestar_test.domain.exceptions import CredentialMisconfigured
-from litestar_test.infrastructure.llm.resilience import ResilienceConfig
+from litestar_gateway.domain.entities import Model
+from litestar_gateway.domain.exceptions import CredentialMisconfigured
+from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 
