@@ -8,6 +8,7 @@ Use cases:
 
 from __future__ import annotations
 
+import logging
 import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -44,17 +45,32 @@ from litestar_gateway.domain.ports import (
     UserRepository,
 )
 
+logger = logging.getLogger("litestar_gateway.auth")
+
 _INVITE_TOKEN_BYTES = 32
 _RESET_TOKEN_BYTES = 32
 _RESET_TTL = timedelta(hours=24)
 _INVITE_TTL = timedelta(hours=72)
 
 # Per-account brute-force lockout: after MAX_FAILED_LOGINS consecutive wrong
-# passwords, password logins are rejected for LOCKOUT_DURATION (temporary, so
-# an attacker can't permanently deny the victim access). Complements the
-# per-IP rate limit, which a distributed attack (many IPs) slips under.
+# passwords, password logins are rejected for a window that doubles on every
+# consecutive lock cycle (capped at MAX_LOCKOUT_DURATION). An attacker who
+# keeps re-locking the account can still deny password login, but each cycle
+# gets rarer and noisier (a WARNING per lock), SSO is unaffected, and a
+# platform admin can lift the lock at any time (DELETE /users/{id}/lock).
+# A quiet LOCKOUT_DECAY after the last lock expires resets the escalation.
+# Complements the per-IP rate limit, which a distributed attack slips under.
 MAX_FAILED_LOGINS = 5
 LOCKOUT_DURATION = timedelta(minutes=15)
+MAX_LOCKOUT_DURATION = timedelta(hours=24)
+LOCKOUT_DECAY = timedelta(hours=24)
+
+
+def lockout_duration(cycles: int) -> timedelta:
+    """Lock duration after `cycles` prior consecutive lock cycles: the base
+    doubled per cycle, hard-capped so a victim is never locked out for days."""
+    return min(LOCKOUT_DURATION * (2 ** min(cycles, 16)), MAX_LOCKOUT_DURATION)
+
 
 # Decoy Argon2 hash (of a discarded random string — not a secret). Verified on
 # the failure branches that would otherwise skip password hashing entirely
@@ -200,7 +216,7 @@ class UserService:
             await averify_password(password, _DECOY_PASSWORD_HASH)
             raise InvalidCredentials("Invalid email or password")
         if not await averify_password(password, user.password_hash):
-            await self._register_login_failure(user.id)
+            await self._register_login_failure(user)
             raise InvalidCredentials("Invalid email or password")
         # A disabled account cannot log in; same generic error (don't reveal state).
         if not user.is_active:
@@ -209,11 +225,40 @@ class UserService:
             await self._users.clear_login_failures(user.id)
         return user
 
-    async def _register_login_failure(self, user_id: UUID) -> None:
-        """Count a wrong password; lock the account once the threshold is hit."""
-        count = await self._users.register_failed_login(user_id)
-        if count >= MAX_FAILED_LOGINS:
-            await self._users.set_login_lock(user_id, _now() + LOCKOUT_DURATION)
+    async def _register_login_failure(self, user: User) -> None:
+        """Count a wrong password; lock the account once the threshold is hit.
+
+        Consecutive lock cycles escalate: the duration doubles per cycle
+        (capped), so re-locking the victim the moment a lock expires costs the
+        attacker progressively more waiting per denial-of-service hour. A
+        quiet LOCKOUT_DECAY since the last lock expired resets the curve."""
+        count = await self._users.register_failed_login(user.id)
+        if count < MAX_FAILED_LOGINS:
+            return
+        now = _now()
+        cycles = user.lockout_cycles
+        if user.locked_until is not None and now - user.locked_until > LOCKOUT_DECAY:
+            cycles = 0
+        duration = lockout_duration(cycles)
+        await self._users.set_login_lock(user.id, now + duration, cycles + 1)
+        # Escalating cycles on one account are the signature of a sustained
+        # lockout attack — make each one visible to operators.
+        logger.warning(
+            "account locked after %d failed logins: user=%s cycle=%d duration=%s",
+            count,
+            user.id,
+            cycles + 1,
+            duration,
+        )
+
+    async def unlock_user(self, actor: User, user_id: UUID) -> None:
+        """Platform-admin lifts a login lock (and resets the escalation) — the
+        recovery lever when an attacker keeps re-locking a victim's account."""
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        if await self._users.get(user_id) is None:
+            raise UserNotFound(str(user_id))
+        await self._users.clear_login_failures(user_id)
 
     async def get_by_id(self, user_id: UUID) -> User | None:
         return await self._users.get(user_id)

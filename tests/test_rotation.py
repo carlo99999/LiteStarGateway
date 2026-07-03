@@ -154,3 +154,36 @@ async def test_noop_lock_always_acquires() -> None:
 
     async with NoOpDistributedLock().hold("x", ttl=timedelta(seconds=1)) as acquired:
         assert acquired is True
+
+
+async def test_redis_lock_outage_skips_without_leaking_the_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # acquire() raising (Redis down) must yield acquired=False and still close
+    # the client — previously the exception bubbled before the try, leaking the
+    # connection pool and killing that day's guarded run with a traceback.
+    import litestar_gateway.infrastructure.locks as locks_module
+    from litestar_gateway.infrastructure.locks import RedisDistributedLock
+
+    closed: list[bool] = []
+
+    class FakeLock:
+        async def acquire(self) -> bool:
+            raise ConnectionError("redis down")
+
+    class FakeRedis:
+        @classmethod
+        def from_url(cls, url: str) -> FakeRedis:
+            return cls()
+
+        def lock(self, name: str, **kwargs: object) -> FakeLock:
+            return FakeLock()
+
+        async def aclose(self) -> None:
+            closed.append(True)
+
+    monkeypatch.setattr(locks_module, "Redis", FakeRedis)
+
+    async with RedisDistributedLock("redis://x").hold("k", ttl=timedelta(seconds=1)) as acquired:
+        assert acquired is False  # skip the guarded section, don't crash it
+    assert closed == [True]

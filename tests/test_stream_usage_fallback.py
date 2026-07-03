@@ -16,6 +16,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+import anyio
+
 from litestar_gateway.application.completion_service import CompletionService
 from litestar_gateway.domain.entities import Model, ModelType, Provider, TraceRecord, UsageEvent
 
@@ -62,6 +64,9 @@ class FakeUsage:
         self.events: list[UsageEvent] = []
 
     async def record(self, event: UsageEvent) -> None:
+        # The real repository's first await is a DB roundtrip — a cancellation
+        # checkpoint. Mirror it so a cancelled scope re-raises here like in prod.
+        await anyio.lowlevel.checkpoint()
         self.events.append(event)
 
     async def enqueue_pending(self, event: UsageEvent) -> None:  # pragma: no cover
@@ -209,6 +214,49 @@ async def test_all_zero_usage_chunk_falls_back_to_estimation() -> None:
     assert len(usage.events) == 1
     assert usage.events[0].prompt_tokens == 1
     assert usage.events[0].completion_tokens == 3
+
+
+class BlockingStreamGateway(StreamGateway):
+    """Streams its chunks, then blocks forever at the provider await — the
+    consumer task is left suspended inside `async for chunk in stream`, which
+    is exactly where a real client disconnect delivers its cancellation."""
+
+    def __init__(self, chunks: list[dict[str, Any]], blocked: anyio.Event) -> None:
+        super().__init__(chunks)
+        self._blocked = blocked
+
+    async def _stream(self) -> AsyncIterator[dict[str, Any]]:
+        for chunk in self._chunks:
+            yield chunk
+        self._blocked.set()
+        await anyio.sleep_forever()
+
+
+async def test_cancellation_mid_stream_still_records_usage() -> None:
+    # A real client disconnect cancels the streaming response's scope, raising
+    # CancelledError at the provider await — unlike the benign aclose() path
+    # above, the settlement then runs inside an already-cancelled scope. The
+    # billing write must be shielded so the event still lands (H13).
+    traces: list[TraceRecord] = []
+    usage = FakeUsage()
+    blocked = anyio.Event()
+    service = _service(BlockingStreamGateway(_chat_chunks(), blocked), usage, traces)
+
+    stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(CHAT_REQUEST))
+
+    async def consume() -> None:
+        async for _ in stream:
+            pass
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(consume)
+        await blocked.wait()  # all chunks streamed; consumer parked at provider await
+        tg.cancel_scope.cancel()
+
+    assert len(usage.events) == 1
+    assert usage.events[0].prompt_tokens == 1
+    assert usage.events[0].completion_tokens == 3  # 12 streamed chars → 3 tokens
+    assert [t.status for t in traces] == ["ok"]
 
 
 async def test_responses_stream_disconnect_records_estimated_usage() -> None:

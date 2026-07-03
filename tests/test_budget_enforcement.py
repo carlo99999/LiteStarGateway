@@ -207,3 +207,66 @@ async def test_streaming_is_gated_too() -> None:
         await service.open_chat_stream(TEAM_ID, KEY_ID, {**REQUEST, "stream": True})
 
     assert gateway.calls == 0
+
+
+# max_tokens=100 at 0.01 USD/token reserves 1.0 USD of pessimistic output cost.
+MAX_TOKENS_REQUEST = {**REQUEST, "max_tokens": 100}
+
+
+async def test_inflight_reservation_blocks_a_concurrent_stream_burst() -> None:
+    # Budget 1.0, spent 0.5: the first stream is admitted and reserves its
+    # requested output ceiling. A second stream opened while the first is
+    # still in flight must be rejected — the old gate read only committed
+    # spend, so any number of streams could be admitted in that blind spot.
+    gateway = CountingGateway()
+    service = _service(gateway, FakeUsage(spent=0.5), FakeBudgets(_budget(1.0)))
+
+    stream = await service.open_chat_stream(TEAM_ID, KEY_ID, {**MAX_TOKENS_REQUEST, "stream": True})
+    with pytest.raises(BudgetExceeded):
+        await service.open_chat_stream(TEAM_ID, KEY_ID, {**MAX_TOKENS_REQUEST, "stream": True})
+    assert gateway.calls == 1
+
+    async for _ in stream:  # settle the admitted stream
+        pass
+
+
+async def test_reservation_is_released_at_stream_settlement() -> None:
+    # Once a stream settles, its reservation is gone: the next request is
+    # admitted again (committed spend alone still fits the budget).
+    gateway = CountingGateway()
+    service = _service(gateway, FakeUsage(spent=0.5), FakeBudgets(_budget(1.0)))
+
+    first = await service.open_chat_stream(TEAM_ID, KEY_ID, {**MAX_TOKENS_REQUEST, "stream": True})
+    async for _ in first:
+        pass
+
+    second = await service.open_chat_stream(TEAM_ID, KEY_ID, {**MAX_TOKENS_REQUEST, "stream": True})
+    async for _ in second:
+        pass
+    assert gateway.calls == 2
+
+
+async def test_reservation_is_released_after_a_non_stream_call() -> None:
+    gateway = CountingGateway()
+    service = _service(gateway, FakeUsage(spent=0.5), FakeBudgets(_budget(1.0)))
+
+    await service.chat_completion(TEAM_ID, KEY_ID, dict(MAX_TOKENS_REQUEST))
+    await service.chat_completion(TEAM_ID, KEY_ID, dict(MAX_TOKENS_REQUEST))
+    assert gateway.calls == 2
+
+
+async def test_reservation_is_released_when_opening_the_stream_fails() -> None:
+    # A failed provider connect must not leave its reservation behind, or the
+    # team would be locked out until the process restarts.
+    class FailingGateway(CountingGateway):
+        async def astream_chat_completion(self, request, model, credentials):
+            raise RuntimeError("connect failed")
+
+    gateway = FailingGateway()
+    service = _service(gateway, FakeUsage(spent=0.5), FakeBudgets(_budget(1.0)))
+
+    with pytest.raises(RuntimeError):
+        await service.open_chat_stream(TEAM_ID, KEY_ID, {**MAX_TOKENS_REQUEST, "stream": True})
+
+    await service.chat_completion(TEAM_ID, KEY_ID, dict(MAX_TOKENS_REQUEST))
+    assert gateway.calls == 1
