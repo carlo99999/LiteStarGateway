@@ -132,6 +132,10 @@ class ServicePrincipalNotFound(DomainError):
     """No such service principal in this team."""
 
 
+class InvalidServicePrincipal(DomainError):
+    """The service-principal definition is invalid (e.g. empty/too-long name)."""
+
+
 class ManagementScopeRequiresServicePrincipal(DomainError):
     """A personal key cannot hold management/all scope — use a service principal."""
 

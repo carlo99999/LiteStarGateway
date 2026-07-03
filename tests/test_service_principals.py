@@ -201,8 +201,49 @@ async def test_disabled_sp_key_cannot_manage(client: AsyncTestClient) -> None:
         json={"enabled": False},
         headers=_bearer(admin),
     )
+    # A disabled SP is a kill switch: its keys fail at authentication (401),
+    # before any per-endpoint authorization is even reached.
     denied = await client.post(f"/teams/{team}/models", json=_model(cred), headers=_bearer(key))
-    assert denied.status_code == HTTP_403_FORBIDDEN
+    assert denied.status_code == HTTP_401_UNAUTHORIZED
+
+
+async def test_disabling_sp_is_a_kill_switch_for_inference_too(client: AsyncTestClient) -> None:
+    # Disabling an SP must stop ALL its keys, not just management — an inference
+    # key keeps spending otherwise, defeating the emergency kill switch.
+    admin = await _admin(client)
+    team, cred = await _team(client, admin)
+    sp = await _sp(client, admin, team)
+    key = await _sp_key(client, admin, team, sp, "inference")
+    await client.post(f"/teams/{team}/models", json=_model(cred), headers=_bearer(admin))
+
+    ok = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+        headers=_bearer(key),
+    )
+    assert ok.status_code not in (HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN)
+
+    await client.patch(
+        f"/teams/{team}/service-principals/{sp}",
+        json={"enabled": False},
+        headers=_bearer(admin),
+    )
+    denied = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+        headers=_bearer(key),
+    )
+    assert denied.status_code == HTTP_401_UNAUTHORIZED
+
+
+async def test_sp_name_is_validated(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    team, _ = await _team(client, admin)
+    for bad in ("", "   ", "x" * 201):
+        resp = await client.post(
+            f"/teams/{team}/service-principals", json={"name": bad}, headers=_bearer(admin)
+        )
+        assert resp.status_code == HTTP_400_BAD_REQUEST, bad
 
 
 async def test_sp_is_scoped_to_its_own_team(client: AsyncTestClient) -> None:

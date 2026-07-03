@@ -18,7 +18,7 @@ from litestar_gateway.domain.exceptions import (
 )
 from litestar_gateway.domain.key_generator import generate_key, hash_key
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_gateway.domain.ports import APIKeyRepository
+from litestar_gateway.domain.ports import APIKeyRepository, ServicePrincipalRepository
 
 # Only persist last_used_at this often, to avoid a DB write on every request.
 _LAST_USED_THROTTLE = timedelta(minutes=1)
@@ -34,8 +34,15 @@ def _as_utc(dt: datetime) -> datetime:
 
 
 class APIKeyService:
-    def __init__(self, repository: APIKeyRepository) -> None:
+    def __init__(
+        self,
+        repository: APIKeyRepository,
+        service_principals: ServicePrincipalRepository | None = None,
+    ) -> None:
         self._repo = repository
+        # Optional: only the auth path needs it (to enforce SP.enabled). Callers
+        # that merely issue/revoke keys leave it None.
+        self._sps = service_principals
 
     async def issue(
         self,
@@ -72,6 +79,13 @@ class APIKeyService:
         key = await self._repo.get_by_hash(hash_key(plaintext))
         if key is None or not key.is_active:
             raise InvalidAPIKey("Invalid or revoked API key")
+        # An SP key is only valid while its service principal is enabled:
+        # disabling the SP is a kill switch for ALL its keys — inference too,
+        # not just management. (Deletion revokes the keys outright.)
+        if key.service_principal_id is not None and self._sps is not None:
+            sp = await self._sps.get(key.service_principal_id)
+            if sp is None or not sp.enabled:
+                raise InvalidAPIKey("Invalid or revoked API key")
         now = _now()
         # Throttle the last_used_at write: skip it (and the DB commit) if it was
         # updated recently, so the auth hot path isn't a write on every request.

@@ -12,7 +12,10 @@ from uuid import UUID, uuid4
 
 from litestar_gateway.application.service import APIKeyService
 from litestar_gateway.domain.entities import IssuedKey, KeyScope, ServicePrincipal
-from litestar_gateway.domain.exceptions import ServicePrincipalNotFound
+from litestar_gateway.domain.exceptions import (
+    InvalidServicePrincipal,
+    ServicePrincipalNotFound,
+)
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.domain.ports import ServicePrincipalRepository
 
@@ -30,7 +33,12 @@ class ServicePrincipalService:
         self._sps = service_principals
         self._keys = api_keys
 
+    _MAX_NAME = 200
+
     async def create(self, team_id: UUID, name: str) -> ServicePrincipal:
+        name = name.strip()
+        if not name or len(name) > self._MAX_NAME:
+            raise InvalidServicePrincipal(f"name must be 1..{self._MAX_NAME} characters")
         return await self._sps.add(
             ServicePrincipal(
                 id=uuid4(), team_id=team_id, name=name, enabled=True, created_at=_now()
