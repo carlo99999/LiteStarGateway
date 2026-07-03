@@ -82,6 +82,25 @@ async def test_reconcile_is_idempotent_if_event_already_recorded(session: AsyncS
     assert rows[0].calls == 1  # not 2
 
 
+async def test_spend_since_counts_dead_lettered_cost(session: AsyncSession) -> None:
+    # Dead-lettered spend is real cost (already billed upstream): the budget
+    # gate must see it while it waits in the outbox, not only after the
+    # reconciler drains it — otherwise a write degradation window doubles as
+    # a budget-cap bypass window.
+    repo = SQLAlchemyUsageRepository(session)
+    event = _event()
+    await repo.enqueue_pending(event)
+
+    assert await repo.spend_since(event.team_id, event.created_at - timedelta(minutes=1)) == 0.12
+    # Window filtering applies to the outbox too (by the event's own time).
+    assert await repo.spend_since(event.team_id, event.created_at + timedelta(minutes=1)) == 0.0
+
+    # After the drain the event lives in the ledger instead — same total,
+    # never double-counted.
+    assert await repo.reconcile_pending() == 1
+    assert await repo.spend_since(event.team_id, event.created_at - timedelta(minutes=1)) == 0.12
+
+
 def _poison_get(session: AsyncSession, poison_event_id) -> None:
     """Make the ledger lookup fail permanently for one event — the outbox
     equivalent of a row whose insert violates an FK (team/key deleted while

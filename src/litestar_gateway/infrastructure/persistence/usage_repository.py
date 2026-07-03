@@ -122,7 +122,19 @@ class SQLAlchemyUsageRepository:
                 UsageEventModel.created_at >= since,
             )
         )
-        return float(total or 0.0)
+        # Dead-lettered spend is real cost (already billed upstream) that the
+        # reconciler hasn't drained yet — the gate must see it, or a ledger
+        # write degradation doubles as a budget-cap bypass window. An event
+        # lives in exactly one of the two tables at any commit point (the
+        # reconciler inserts + deletes in one transaction), so this never
+        # double-counts.
+        pending = await self._session.scalar(
+            select(func.coalesce(func.sum(PendingUsageEventModel.cost), 0.0)).where(
+                PendingUsageEventModel.team_id == team_id,
+                PendingUsageEventModel.event_created_at >= since,
+            )
+        )
+        return float(total or 0.0) + float(pending or 0.0)
 
     async def enqueue_pending(self, event: UsageEvent) -> None:
         # The request session may be in a failed state after the ledger commit
