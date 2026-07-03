@@ -202,7 +202,11 @@ class UsageEventModel(base.UUIDAuditBase):
 class PendingUsageEventModel(base.UUIDAuditBase):
     """Dead-letter outbox for usage events whose ledger write failed. A background
     reconciler retries these into `usage_event` (idempotent by `event_id`), so a
-    transient failure never silently loses a billing record."""
+    transient failure never silently loses a billing record.
+
+    Not a write-ahead log: rows are written only after a ledger write has
+    failed, so a crash before either write still loses the event (at-most-once
+    on crash — see CompletionService._record_usage)."""
 
     __tablename__ = "pending_usage_event"
 
