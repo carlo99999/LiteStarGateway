@@ -96,18 +96,21 @@ class FakeUserRepository:
                 return updated.failed_login_attempts
         return 0
 
-    async def set_login_lock(self, user_id: UUID, locked_until: datetime) -> None:
+    async def set_login_lock(self, user_id: UUID, locked_until: datetime, cycles: int) -> None:
         for email, user in self._by_email.items():
             if user.id == user_id:
                 self._by_email[email] = dataclasses.replace(
-                    user, locked_until=locked_until, failed_login_attempts=0
+                    user,
+                    locked_until=locked_until,
+                    failed_login_attempts=0,
+                    lockout_cycles=cycles,
                 )
 
     async def clear_login_failures(self, user_id: UUID) -> None:
         for email, user in self._by_email.items():
             if user.id == user_id:
                 self._by_email[email] = dataclasses.replace(
-                    user, failed_login_attempts=0, locked_until=None
+                    user, failed_login_attempts=0, locked_until=None, lockout_cycles=0
                 )
 
 
