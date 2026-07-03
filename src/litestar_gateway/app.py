@@ -16,8 +16,11 @@ from litestar_gateway.domain.ports import IdentityProvider
 from litestar_gateway.infrastructure.bootstrap import make_bootstrap_admin
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.logging import build_logging_config
+from litestar_gateway.infrastructure.observability.aggregator import MetricsAggregator
+from litestar_gateway.infrastructure.observability.composite import CompositeTraceSink
 from litestar_gateway.infrastructure.observability.dispatcher import TraceDispatcher
 from litestar_gateway.infrastructure.observability.factory import build_trace_sink
+from litestar_gateway.infrastructure.observability.mlflow_metrics import make_metrics_publisher
 from litestar_gateway.infrastructure.persistence.database import create_database
 from litestar_gateway.infrastructure.persistence.secret_key_repository import (
     SQLAlchemySecretKeyRepository,
@@ -62,7 +65,18 @@ def create_app(
     settings = settings or Settings.from_env()
     database = create_database(settings)
     llm_gateway = build_llm_gateway(settings)  # shared, stateless; built once
-    trace_dispatcher = TraceDispatcher(build_trace_sink(settings))  # observability, off-path
+    # Observability lives on MLflow (MLFLOW_TRACKING_URI: the compose server or
+    # any external one): per-call traces via the MLflow sink, fleet-level ops
+    # metrics via an in-process aggregator published to a "gateway-metrics" run.
+    metrics_enabled = bool(settings.mlflow_tracking_uri and settings.mlflow_metrics_interval)
+    metrics_aggregator = MetricsAggregator() if metrics_enabled else None
+    trace_sink = build_trace_sink(settings)
+    if metrics_aggregator is not None:
+        trace_sink = CompositeTraceSink([metrics_aggregator, trace_sink])
+    trace_dispatcher = TraceDispatcher(  # observability, off-path
+        trace_sink,
+        on_drop=metrics_aggregator.record_dropped_trace if metrics_aggregator else None,
+    )
     swagger_plugin = SwaggerRenderPlugin(version="5.18.2", path="/")
     scalar_plugin = ScalarRenderPlugin(version="1.19.5", path="/scalar")
     stoplight_plugin = StoplightRenderPlugin(version="7.7.18", path="/elements")
@@ -169,6 +183,18 @@ def create_app(
             make_rotation_scheduler(database, settings),
             make_usage_reconciler(database, settings),
             trace_dispatcher.run,
+            *(
+                [
+                    make_metrics_publisher(
+                        metrics_aggregator,
+                        tracking_uri=settings.mlflow_tracking_uri,  # type: ignore[arg-type]
+                        experiment_name=settings.mlflow_experiment,
+                        interval_seconds=settings.mlflow_metrics_interval,
+                    )
+                ]
+                if metrics_aggregator is not None
+                else []
+            ),
         ],
         dependencies=dependencies,
         stores=stores,

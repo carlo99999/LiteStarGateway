@@ -1,8 +1,22 @@
 # Design doc — Observability via MLflow
 
-> **Status:** Draft / parked for future development. Lives on branch
-> `adding-observability-via-mlflow`. No code yet — this is the agreed design to
-> resume from when we pick the work up.
+> **Status:** Implemented (metadata-only v1). MLflow is the gateway's
+> observability backend — the compose-provided server or any
+> `MLFLOW_TRACKING_URI` (classic or Databricks). What shipped:
+>
+> - **Per-call traces** (`MLflowTraceSink`, §3-§6): ok *and* error traces with
+>   tokens/cost/latency/status, written off the hot path via a bounded-queue
+>   `TraceDispatcher` (not a per-response BackgroundTask as originally
+>   sketched) with a worker thread; fail-safe throughout.
+> - **Fleet-level ops metrics** (`MetricsAggregator` + `MlflowMetricsPublisher`):
+>   requests/errors (total and per provider), latency avg/max, tokens, cost and
+>   dropped traces, logged every `MLFLOW_METRICS_INTERVAL` seconds (default 60,
+>   0 = off) as time-series metrics to a long-lived `gateway-metrics-<host>`
+>   run in the same experiment — charted natively by the MLflow UI. MLflow
+>   being down never blocks startup or requests.
+>
+> Not implemented (still design intent): per-team experiments, payload
+> logging opt-in (§7-§8) — v1 is metadata-only everywhere.
 
 ## 1. Goal
 
