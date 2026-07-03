@@ -19,7 +19,8 @@ RUN uv sync --frozen --no-dev
 # ---- Runtime: slim image with just the venv + source ----
 FROM python:3.14-slim-bookworm AS runtime
 
-# Non-root user + a writable data dir (used by the SQLite default; Postgres needs none).
+# Non-root user + a writable data dir (only used if a non-production run opts
+# into SQLite explicitly; production requires Postgres and needs no volume).
 RUN useradd --create-home --uid 1000 app \
     && mkdir /data \
     && chown app:app /data
@@ -27,12 +28,13 @@ RUN useradd --create-home --uid 1000 app \
 WORKDIR /app
 COPY --from=builder --chown=app:app /app /app
 
+# No DATABASE_URL default on purpose: production requires PostgreSQL, and the
+# app fails fast at startup unless DATABASE_URL points at postgresql+asyncpg://
+# (a SQLite default here would silently give every replica its own database).
 ENV PATH="/app/.venv/bin:$PATH" \
     # Containers are production: enables the fail-fast config checks and switches
     # schema management from create_all to Alembic migrations (run on start).
-    ENVIRONMENT="production" \
-    # Default to SQLite on the writable /data volume; override for Postgres.
-    DATABASE_URL="sqlite+aiosqlite:////data/gateway.db"
+    ENVIRONMENT="production"
 
 USER app
 EXPOSE 8000

@@ -96,10 +96,11 @@ Notes:
   `SESSION_COOKIE_SECURE=true` so the SSO state cookie is still marked `Secure`
   (it defaults on outside local envs), and set `OIDC_REDIRECT_URI` to the public
   callback URL so the IdP redirect matches what's registered.
-- **Database**: `docker-compose.yml` runs Postgres (`postgresql+asyncpg://…`,
-  the recommended production backend) and the app connects to it. Pool sizing is
+- **Database**: production requires Postgres. `docker-compose.yml` runs it
+  (`postgresql+asyncpg://…`) and the app connects to it. Pool sizing is
   configurable via `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` (Postgres only). The image
-  alone still defaults to SQLite on the `/data` volume for a zero-dependency run.
+  ships no `DATABASE_URL` default: it must point at Postgres or the app refuses
+  to start (a SQLite default would give every replica its own database).
 - **Migrations**: production uses Alembic (`create_all` is dev/test only). The
   container applies pending migrations on start (`litestar … database upgrade`,
   idempotent). After changing the ORM models, generate a migration in dev with
@@ -216,9 +217,10 @@ Tracked items not yet implemented (see also the code review notes):
   cannot read its secret). This is intentional for now; tie credentials to a
   team/org if per-team isolation becomes a requirement.
 - **SQLite is the dev/test default** — the zero-config default is file SQLite
-  (single-writer, weak concurrency); the test suite runs on it. Production should
-  use the supported Postgres backend (`postgresql+asyncpg://…`, the compose
-  default). Running the test suite itself on Postgres in CI is still a follow-up.
+  (single-writer, weak concurrency); the test suite runs on it. Production
+  **requires** the Postgres backend (`postgresql+asyncpg://…`, the compose
+  default) — the app fails fast at startup on SQLite there. Running the test
+  suite itself on Postgres in CI is still a follow-up.
 - **No branch protection / CI merge gate (single maintainer)** — `main` is not
   protected and there is no required CI check on merge. This is an accepted limit
   while the project has a single contributor: every change is still developed on a
