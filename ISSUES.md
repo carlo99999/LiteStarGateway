@@ -62,13 +62,36 @@ built to provide.
 
 New counts: **0 CRITICAL · 1 HIGH · 5 MEDIUM · 8 LOW**.
 
-## Resolution status (Round 3, updated during remediation)
+## Resolution status (Round 3, updated after remediation)
 
-**Fixed (PRs open/merged):**
+**Fixed & merged to `main`:**
 
 | Finding | Fix PR |
 |---|---|
 | H13 — streaming settlement shielded from disconnect cancellation | #91 |
+| M22 — outbox preserves the original event time | #92 |
+| M23 — poison-message quarantine (attempts/last_error + migration) | #93 |
+| M21 — budget gate counts spend sitting in the outbox | #94 |
+| M24 — in-flight cost reservation bounds burst overshoot | #95 |
+| M25 — exponential lockout + decay + admin unlock endpoint | #96 |
+| L12 — Redis-outage lock no longer leaks the client | #97 |
+| L17 — stale `_as_utc` comment corrected | #98 |
+| L18 — `MLFLOW_METRICS_INTERVAL` validation coverage | #99 |
+| L16 — README updated on shipped money controls | #100 |
+| L13 — outbox guarantee level documented (at-most-once on crash) | #101 |
+| L14 — unguarded reconciler documented as intentional | #102 |
+| L11 — usage streamed before a provider failure is billed | #103 |
+
+**M24** shipped as the deliberately simpler option (owner's call): an in-memory per-replica
+reservation (prompt estimate + requested max-tokens ceiling) instead of a durable reservation
+table; the honest residual bound is documented in `docs/usage-cost.md`. **M25** shipped as
+exponential lock + decay with a platform-admin unlock (`DELETE /users/{id}/lock`) per the
+owner's direction.
+
+**Not changed (deliberate):**
+
+- **L15** — budget compared as floats: per the finding, flag again only if invoice-grade
+  accounting becomes a goal (integer micro-USD then).
 
 ## HIGH (Round 3)
 
