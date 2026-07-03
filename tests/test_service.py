@@ -9,9 +9,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from litestar_test.application.service import APIKeyService
-from litestar_test.domain.entities import APIKey
-from litestar_test.domain.exceptions import APIKeyNotFound, InvalidAPIKey
+from litestar_gateway.application.service import APIKeyService
+from litestar_gateway.domain.entities import APIKey
+from litestar_gateway.domain.exceptions import APIKeyNotFound, InvalidAPIKey
 
 TEAM_ID = uuid4()
 USER_ID = uuid4()

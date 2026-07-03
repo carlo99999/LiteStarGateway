@@ -14,8 +14,8 @@ from litestar.status_codes import (
 )
 from litestar.testing import AsyncTestClient
 
-from litestar_test.app import create_app
-from litestar_test.config import Settings
+from litestar_gateway.app import create_app
+from litestar_gateway.config import Settings
 
 MASTER_KEY = "master-secret"
 ADMIN_EMAIL = "admin@example.com"

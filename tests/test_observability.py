@@ -6,11 +6,11 @@ import asyncio
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from litestar_test.config import Settings
-from litestar_test.domain.entities import TraceRecord
-from litestar_test.infrastructure.observability.dispatcher import TraceDispatcher
-from litestar_test.infrastructure.observability.factory import build_trace_sink
-from litestar_test.infrastructure.observability.null_sink import NullTraceSink
+from litestar_gateway.config import Settings
+from litestar_gateway.domain.entities import TraceRecord
+from litestar_gateway.infrastructure.observability.dispatcher import TraceDispatcher
+from litestar_gateway.infrastructure.observability.factory import build_trace_sink
+from litestar_gateway.infrastructure.observability.null_sink import NullTraceSink
 
 
 def _record() -> TraceRecord:

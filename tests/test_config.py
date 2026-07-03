@@ -6,7 +6,7 @@ import dataclasses
 
 import pytest
 
-from litestar_test.config import (
+from litestar_gateway.config import (
     DEFAULT_JWT_SECRET,
     SAMPLE_MASTER_KEY,
     InsecureConfigurationError,

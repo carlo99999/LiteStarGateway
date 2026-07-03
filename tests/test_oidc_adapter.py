@@ -14,8 +14,8 @@ from authlib.integrations.httpx_client import AsyncOAuth2Client
 from joserfc import jwt
 from joserfc.jwk import KeySet, RSAKey
 
-from litestar_test.domain.exceptions import SSOExchangeError
-from litestar_test.infrastructure.sso.oidc import OIDCIdentityProvider, _claim_is_true
+from litestar_gateway.domain.exceptions import SSOExchangeError
+from litestar_gateway.infrastructure.sso.oidc import OIDCIdentityProvider, _claim_is_true
 
 _ISSUER = "https://idp.example"
 _CLIENT_ID = "client-abc"

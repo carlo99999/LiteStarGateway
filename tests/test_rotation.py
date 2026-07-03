@@ -12,16 +12,16 @@ import pytest
 from advanced_alchemy.extensions.litestar import base
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from litestar_test.domain.entities import Credential, KeyPurpose, Provider
-from litestar_test.infrastructure.keyring import Keyring
-from litestar_test.infrastructure.persistence.credential_repository import (
+from litestar_gateway.domain.entities import Credential, KeyPurpose, Provider
+from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
 )
-from litestar_test.infrastructure.persistence.orm import CredentialModel
-from litestar_test.infrastructure.persistence.secret_key_repository import (
+from litestar_gateway.infrastructure.persistence.orm import CredentialModel
+from litestar_gateway.infrastructure.persistence.secret_key_repository import (
     SQLAlchemySecretKeyRepository,
 )
-from litestar_test.infrastructure.rotation import RotationService, seconds_until
+from litestar_gateway.infrastructure.rotation import RotationService, seconds_until
 
 MASTER = "unit-test-salt"
 JWT_MASTER = "unit-test-jwt-secret"
@@ -97,7 +97,7 @@ class _FakeLock:
 
 
 async def test_guarded_rotate_runs_when_lock_acquired() -> None:
-    from litestar_test.infrastructure.rotation import guarded_rotate
+    from litestar_gateway.infrastructure.rotation import guarded_rotate
 
     ran: list[bool] = []
 
@@ -110,7 +110,7 @@ async def test_guarded_rotate_runs_when_lock_acquired() -> None:
 
 
 async def test_guarded_rotate_skips_when_lock_held_elsewhere() -> None:
-    from litestar_test.infrastructure.rotation import guarded_rotate
+    from litestar_gateway.infrastructure.rotation import guarded_rotate
 
     ran: list[bool] = []
 
@@ -123,7 +123,7 @@ async def test_guarded_rotate_skips_when_lock_held_elsewhere() -> None:
 
 
 def _lock_settings(redis_url: str | None):  # noqa: ANN202
-    from litestar_test.config import Settings
+    from litestar_gateway.config import Settings
 
     return Settings(
         database_url="sqlite+aiosqlite:///:memory:",
@@ -137,7 +137,7 @@ def _lock_settings(redis_url: str | None):  # noqa: ANN202
 
 
 def test_build_distributed_lock_selects_backend() -> None:
-    from litestar_test.infrastructure.locks import (
+    from litestar_gateway.infrastructure.locks import (
         NoOpDistributedLock,
         RedisDistributedLock,
         build_distributed_lock,
@@ -150,7 +150,7 @@ def test_build_distributed_lock_selects_backend() -> None:
 
 
 async def test_noop_lock_always_acquires() -> None:
-    from litestar_test.infrastructure.locks import NoOpDistributedLock
+    from litestar_gateway.infrastructure.locks import NoOpDistributedLock
 
     async with NoOpDistributedLock().hold("x", ttl=timedelta(seconds=1)) as acquired:
         assert acquired is True

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from litestar.logging import LoggingConfig, StructLoggingConfig
 
-from litestar_test.config import Settings
-from litestar_test.infrastructure.logging import build_logging_config
+from litestar_gateway.config import Settings
+from litestar_gateway.infrastructure.logging import build_logging_config
 
 
 def _settings(environment: str) -> Settings:

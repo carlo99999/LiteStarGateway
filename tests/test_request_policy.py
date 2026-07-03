@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from litestar_test.domain.request_policy import MAX_N, MAX_TOKENS, sanitize_request
+from litestar_gateway.domain.request_policy import MAX_N, MAX_TOKENS, sanitize_request
 
 
 def test_drops_transport_and_unknown_keys() -> None:

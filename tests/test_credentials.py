@@ -15,8 +15,8 @@ from litestar.status_codes import (
 )
 from litestar.testing import AsyncTestClient
 
-from litestar_test.app import create_app
-from litestar_test.config import Settings
+from litestar_gateway.app import create_app
+from litestar_gateway.config import Settings
 
 MASTER_KEY = "master-secret"
 ADMIN_EMAIL = "admin@example.com"
@@ -137,8 +137,8 @@ async def test_values_are_encrypted_at_rest_and_round_trip(tmp_path: Path) -> No
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import create_async_engine
 
-    from litestar_test.infrastructure.crypto import DataCipher, MasterCipher
-    from litestar_test.infrastructure.persistence.orm import CredentialModel, SecretKeyModel
+    from litestar_gateway.infrastructure.crypto import DataCipher, MasterCipher
+    from litestar_gateway.infrastructure.persistence.orm import CredentialModel, SecretKeyModel
 
     settings = _settings(tmp_path)
     async with AsyncTestClient(app=create_app(settings)) as client:

@@ -16,8 +16,8 @@ from litestar.status_codes import (
 )
 from litestar.testing import AsyncTestClient
 
-from litestar_test.app import create_app
-from litestar_test.config import Settings
+from litestar_gateway.app import create_app
+from litestar_gateway.config import Settings
 
 MASTER_KEY = "master-secret"
 
@@ -63,7 +63,7 @@ def _flatten(exc: BaseException) -> list[BaseException]:
 
 
 async def test_startup_fails_when_empty_and_no_master_key(tmp_path: Path) -> None:
-    from litestar_test.domain.exceptions import MasterKeyMissing
+    from litestar_gateway.domain.exceptions import MasterKeyMissing
 
     app = create_app(_settings(tmp_path, master=None))
     with pytest.raises(BaseException) as exc_info:
@@ -77,7 +77,7 @@ async def test_bootstrap_creates_admin(client: AsyncTestClient, tmp_path: Path) 
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import create_async_engine
 
-    from litestar_test.infrastructure.persistence.orm import UserModel
+    from litestar_gateway.infrastructure.persistence.orm import UserModel
 
     engine = create_async_engine(_db_url(tmp_path))
     try:

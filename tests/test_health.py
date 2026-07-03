@@ -9,8 +9,8 @@ import pytest
 from litestar.status_codes import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 from litestar.testing import AsyncTestClient
 
-from litestar_test.app import create_app
-from litestar_test.config import Settings
+from litestar_gateway.app import create_app
+from litestar_gateway.config import Settings
 
 
 @pytest.fixture

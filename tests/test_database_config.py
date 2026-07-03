@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from litestar_test.config import (
+from litestar_gateway.config import (
     DEFAULT_DB_MAX_OVERFLOW,
     DEFAULT_DB_POOL_SIZE,
     Settings,
 )
-from litestar_test.infrastructure.persistence.database import create_database
+from litestar_gateway.infrastructure.persistence.database import create_database
 
 
 def _settings(url: str) -> Settings:

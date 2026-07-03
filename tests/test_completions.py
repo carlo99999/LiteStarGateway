@@ -19,10 +19,10 @@ from litestar.status_codes import (
 )
 from litestar.testing import AsyncTestClient
 
-from litestar_test.app import create_app
-from litestar_test.config import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, Settings
-from litestar_test.domain.request_policy import MAX_N
-from litestar_test.infrastructure.llm import (
+from litestar_gateway.app import create_app
+from litestar_gateway.config import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT, Settings
+from litestar_gateway.domain.request_policy import MAX_N
+from litestar_gateway.infrastructure.llm import (
     anthropic_adapter,
     azure_adapter,
     openai_adapter,
@@ -502,7 +502,7 @@ async def test_usage_record_failure_dead_letters_to_outbox(
     import sqlite3
 
     _patch(monkeypatch)
-    from litestar_test.infrastructure.persistence import usage_repository
+    from litestar_gateway.infrastructure.persistence import usage_repository
 
     async def boom(self: object, event: object) -> None:
         raise RuntimeError("db down")

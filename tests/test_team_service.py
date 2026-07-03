@@ -7,15 +7,15 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from litestar_test.application.team_service import TeamService
-from litestar_test.domain.entities import (
+from litestar_gateway.application.team_service import TeamService
+from litestar_gateway.domain.entities import (
     Organization,
     Team,
     TeamMembership,
     TeamRole,
     User,
 )
-from litestar_test.domain.exceptions import (
+from litestar_gateway.domain.exceptions import (
     LastTeamAdmin,
     OrganizationNotFound,
     PermissionDenied,

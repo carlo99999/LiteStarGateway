@@ -11,8 +11,8 @@ import pytest
 from advanced_alchemy.extensions.litestar import base
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from litestar_test.domain.entities import UsageEvent
-from litestar_test.infrastructure.persistence.usage_repository import SQLAlchemyUsageRepository
+from litestar_gateway.domain.entities import UsageEvent
+from litestar_gateway.infrastructure.persistence.usage_repository import SQLAlchemyUsageRepository
 
 
 @pytest.fixture

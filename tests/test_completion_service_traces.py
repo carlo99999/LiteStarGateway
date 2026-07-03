@@ -14,8 +14,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from litestar_test.application.completion_service import CompletionService
-from litestar_test.domain.entities import Model, ModelType, Provider, TraceRecord, UsageEvent
+from litestar_gateway.application.completion_service import CompletionService
+from litestar_gateway.domain.entities import Model, ModelType, Provider, TraceRecord, UsageEvent
 
 TEAM_ID = uuid4()
 KEY_ID = uuid4()

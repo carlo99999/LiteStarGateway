@@ -21,16 +21,16 @@ from litestar.status_codes import (
 )
 from litestar.testing import AsyncTestClient
 
-from litestar_test.app import create_app
-from litestar_test.config import Settings
-from litestar_test.domain.exceptions import (
+from litestar_gateway.app import create_app
+from litestar_gateway.config import Settings
+from litestar_gateway.domain.exceptions import (
     ModelNotFound,
     UpstreamRateLimited,
     UpstreamTimeout,
     UpstreamUnavailable,
 )
-from litestar_test.infrastructure.llm import openai_adapter
-from litestar_test.infrastructure.llm.errors import translate_stream, translate_upstream_error
+from litestar_gateway.infrastructure.llm import openai_adapter
+from litestar_gateway.infrastructure.llm.errors import translate_stream, translate_upstream_error
 
 MASTER_KEY = "master-secret"
 ADMIN_EMAIL = "admin@example.com"

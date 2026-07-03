@@ -8,9 +8,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from litestar_test.application.user_service import UserService
-from litestar_test.domain.entities import Invite, PasswordReset, User
-from litestar_test.domain.exceptions import (
+from litestar_gateway.application.user_service import UserService
+from litestar_gateway.domain.entities import Invite, PasswordReset, User
+from litestar_gateway.domain.exceptions import (
     EmailAlreadyRegistered,
     InvalidCredentials,
     InvalidInvite,
@@ -123,7 +123,7 @@ def service() -> UserService:
 
 
 def _account(email: str, *, is_admin: bool = False) -> User:
-    from litestar_test.domain.password import hash_password
+    from litestar_gateway.domain.password import hash_password
 
     return User(
         id=uuid4(),
@@ -338,7 +338,7 @@ async def test_ensure_admin_tolerates_concurrent_replica_bootstrap() -> None:
 
 async def test_async_password_wrappers_roundtrip() -> None:
     """The a* variants offload Argon2 to a thread but must match the sync hasher."""
-    from litestar_test.domain.password import ahash_password, averify_password, verify_password
+    from litestar_gateway.domain.password import ahash_password, averify_password, verify_password
 
     hashed = await ahash_password("Passw0rd!")
     assert verify_password("Passw0rd!", hashed)
