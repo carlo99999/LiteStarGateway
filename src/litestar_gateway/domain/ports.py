@@ -212,6 +212,18 @@ class UserRepository(Protocol):
         """Set a new password hash and bump token_version (revoking old JWTs)."""
         ...
 
+    async def register_failed_login(self, user_id: UUID) -> int:
+        """Atomically increment the failed-login counter; returns the new count."""
+        ...
+
+    async def set_login_lock(self, user_id: UUID, locked_until: datetime) -> None:
+        """Temporarily lock password logins and reset the failure counter."""
+        ...
+
+    async def clear_login_failures(self, user_id: UUID) -> None:
+        """Reset the failure counter and any lock (after a successful login)."""
+        ...
+
 
 class InviteRepository(Protocol):
     """Persistence port for invites."""

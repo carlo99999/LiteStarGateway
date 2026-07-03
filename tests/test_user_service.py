@@ -72,6 +72,30 @@ class FakeUserRepository:
     async def get(self, user_id: UUID) -> User | None:
         return next((u for u in self._by_email.values() if u.id == user_id), None)
 
+    async def register_failed_login(self, user_id: UUID) -> int:
+        for email, user in self._by_email.items():
+            if user.id == user_id:
+                updated = dataclasses.replace(
+                    user, failed_login_attempts=user.failed_login_attempts + 1
+                )
+                self._by_email[email] = updated
+                return updated.failed_login_attempts
+        return 0
+
+    async def set_login_lock(self, user_id: UUID, locked_until: datetime) -> None:
+        for email, user in self._by_email.items():
+            if user.id == user_id:
+                self._by_email[email] = dataclasses.replace(
+                    user, locked_until=locked_until, failed_login_attempts=0
+                )
+
+    async def clear_login_failures(self, user_id: UUID) -> None:
+        for email, user in self._by_email.items():
+            if user.id == user_id:
+                self._by_email[email] = dataclasses.replace(
+                    user, failed_login_attempts=0, locked_until=None
+                )
+
 
 class FakeInviteRepository:
     def __init__(self) -> None:
