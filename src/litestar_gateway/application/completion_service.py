@@ -432,9 +432,7 @@ class CompletionService:
             with anyio.CancelScope(shield=True):
                 latency_ms = (perf_counter() - start) * 1000
                 if error is not None:
-                    self._emit_error_trace(
-                        team_id, api_key_id, model, operation, latency_ms, error
-                    )
+                    self._emit_error_trace(team_id, api_key_id, model, operation, latency_ms, error)
                 else:
                     # Even with zero streamed output (disconnect before the first
                     # content chunk) the provider consumed the prompt — bill it.
