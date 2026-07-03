@@ -27,6 +27,7 @@ from litestar_gateway.infrastructure.sso.oidc import OIDCIdentityProvider
 from litestar_gateway.infrastructure.usage_reconciler import make_usage_reconciler
 from litestar_gateway.infrastructure.web.api_router.dependencies import (
     build_llm_gateway,
+    provide_budget_repository,
     provide_completion_service,
     provide_usage_repository,
 )
@@ -95,6 +96,7 @@ def create_app(
         "credential_service": Provide(provide_credential_service, sync_to_thread=False),
         "completion_service": Provide(provide_completion_service, sync_to_thread=False),
         "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
+        "budget_repository": Provide(provide_budget_repository, sync_to_thread=False),
         "audit_log": Provide(provide_audit_log, sync_to_thread=False),
         "trace_dispatcher": Provide(lambda: trace_dispatcher, sync_to_thread=False),
         "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),

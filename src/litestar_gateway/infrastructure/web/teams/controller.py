@@ -6,29 +6,54 @@ admin or team admin). Domain errors are mapped to HTTP by the central handler.
 
 from __future__ import annotations
 
-from uuid import UUID
+from datetime import UTC, datetime
+from uuid import UUID, uuid4
 
-from litestar import Controller, Request, delete, get, patch, post
+from litestar import Controller, Request, delete, get, patch, post, put
 from litestar.di import NamedDependency, Provide
 from litestar.params import FromPath, FromQuery
 
 from litestar_gateway.application.service import APIKeyService
 from litestar_gateway.application.team_service import TeamService
-from litestar_gateway.domain.entities import User
+from litestar_gateway.domain.budget import window_start
+from litestar_gateway.domain.entities import Budget, BudgetWindow, User
+from litestar_gateway.domain.exceptions import BudgetNotFound, InvalidBudget
 from litestar_gateway.domain.pagination import resolve_page
-from litestar_gateway.domain.ports import AuditLog, UsageRepository
+from litestar_gateway.domain.ports import AuditLog, BudgetRepository, UsageRepository
 from litestar_gateway.infrastructure.web.audit.recorder import record_audit
-from litestar_gateway.infrastructure.web.session.dependencies import provide_current_user
+from litestar_gateway.infrastructure.web.session.dependencies import (
+    provide_current_admin,
+    provide_current_user,
+)
 from litestar_gateway.infrastructure.web.teams.schemas import (
     AddMemberRequest,
+    BudgetResponse,
     CreatedKeyResponse,
     CreateKeyRequest,
     KeyResponse,
     KeySpendingResponse,
     MembershipResponse,
+    SetBudgetRequest,
     SetRoleRequest,
     UsageResponse,
 )
+
+
+def _parse_budget(data: SetBudgetRequest, team_id: UUID) -> Budget:
+    if data.limit_cost <= 0:
+        raise InvalidBudget("limit_cost must be a positive USD amount")
+    try:
+        window = BudgetWindow(data.window)
+    except ValueError:
+        valid = ", ".join(w.value for w in BudgetWindow)
+        raise InvalidBudget(f"window must be one of: {valid}") from None
+    return Budget(
+        id=uuid4(),
+        team_id=team_id,
+        limit_cost=data.limit_cost,
+        window=window,
+        created_at=datetime.now(UTC),
+    )
 
 
 class TeamController(Controller):
@@ -199,6 +224,83 @@ class TeamController(Controller):
             target_type="api_key",
             target_id=key_id,
             detail=f"team {team_id}",
+        )
+
+    @get("/{team_id:uuid}/budget")
+    async def get_budget(
+        self,
+        team_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        budget_repository: NamedDependency[BudgetRepository],
+        usage_repository: NamedDependency[UsageRepository],
+    ) -> BudgetResponse:
+        """The team's spend cap plus its current-window spend and remainder."""
+        await team_service.ensure_can_manage_team(current_user, team_id)
+        budget = await budget_repository.get(team_id)
+        if budget is None:
+            raise BudgetNotFound(f"Team {team_id} has no budget configured")
+        spent = await usage_repository.spend_since(
+            team_id, window_start(budget.window, datetime.now(UTC))
+        )
+        return BudgetResponse.from_budget(budget, spent)
+
+    @put(
+        "/{team_id:uuid}/budget",
+        dependencies={"current_admin": Provide(provide_current_admin)},
+    )
+    async def set_budget(
+        self,
+        request: Request,
+        team_id: FromPath[UUID],
+        data: SetBudgetRequest,
+        current_admin: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        budget_repository: NamedDependency[BudgetRepository],
+        usage_repository: NamedDependency[UsageRepository],
+        audit_log: NamedDependency[AuditLog],
+    ) -> BudgetResponse:
+        """Create or replace the team's spend cap. Platform-admin only — a team
+        admin must not be able to raise their own limit."""
+        await team_service.ensure_can_manage_team(current_admin, team_id)  # team must exist
+        budget = await budget_repository.set(_parse_budget(data, team_id))
+        await record_audit(
+            audit_log,
+            request,
+            current_admin,
+            "team.budget.set",
+            target_type="team",
+            target_id=team_id,
+            detail=f"{budget.limit_cost} USD / {budget.window.value}",
+        )
+        spent = await usage_repository.spend_since(
+            team_id, window_start(budget.window, datetime.now(UTC))
+        )
+        return BudgetResponse.from_budget(budget, spent)
+
+    @delete(
+        "/{team_id:uuid}/budget",
+        dependencies={"current_admin": Provide(provide_current_admin)},
+    )
+    async def delete_budget(
+        self,
+        request: Request,
+        team_id: FromPath[UUID],
+        current_admin: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        budget_repository: NamedDependency[BudgetRepository],
+        audit_log: NamedDependency[AuditLog],
+    ) -> None:
+        """Remove the team's spend cap. Platform-admin only."""
+        await team_service.ensure_can_manage_team(current_admin, team_id)
+        await budget_repository.remove(team_id)
+        await record_audit(
+            audit_log,
+            request,
+            current_admin,
+            "team.budget.remove",
+            target_type="team",
+            target_id=team_id,
         )
 
     @get("/{team_id:uuid}/usage")

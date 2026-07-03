@@ -7,11 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.application.completion_service import CompletionService
 from litestar_gateway.config import Settings
-from litestar_gateway.domain.ports import LLMGateway, UsageRepository
+from litestar_gateway.domain.ports import BudgetRepository, LLMGateway, UsageRepository
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.observability.dispatcher import TraceDispatcher
+from litestar_gateway.infrastructure.persistence.budget_repository import (
+    SQLAlchemyBudgetRepository,
+)
 from litestar_gateway.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
 )
@@ -36,6 +39,10 @@ def provide_usage_repository(db_session: NamedDependency[AsyncSession]) -> Usage
     return SQLAlchemyUsageRepository(db_session)
 
 
+def provide_budget_repository(db_session: NamedDependency[AsyncSession]) -> BudgetRepository:
+    return SQLAlchemyBudgetRepository(db_session)
+
+
 def provide_completion_service(
     db_session: NamedDependency[AsyncSession],
     keyring: NamedDependency[Keyring],
@@ -48,4 +55,5 @@ def provide_completion_service(
         gateway=llm_gateway,
         usage=SQLAlchemyUsageRepository(db_session),
         emit_trace=trace_dispatcher.enqueue,
+        budgets=SQLAlchemyBudgetRepository(db_session),
     )

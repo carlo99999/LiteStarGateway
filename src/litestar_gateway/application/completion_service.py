@@ -15,14 +15,17 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
 
+from litestar_gateway.domain.budget import window_start
 from litestar_gateway.domain.entities import Model, ModelType, TraceRecord, UsageEvent
 from litestar_gateway.domain.exceptions import (
+    BudgetExceeded,
     CredentialNotFound,
     ModelDisabled,
     ModelNotFound,
     ModelTypeMismatch,
 )
 from litestar_gateway.domain.ports import (
+    BudgetRepository,
     CredentialRepository,
     LLMGateway,
     ModelRepository,
@@ -92,12 +95,14 @@ class CompletionService:
         gateway: LLMGateway,
         usage: UsageRepository,
         emit_trace: Callable[[TraceRecord], None],
+        budgets: BudgetRepository | None = None,
     ) -> None:
         self._models = models
         self._credentials = credentials
         self._gateway = gateway
         self._usage = usage
         self._emit_trace = emit_trace
+        self._budgets = budgets
 
     async def _record_usage(self, event: UsageEvent) -> None:
         """Persist the billing record. A failed write must never fail the request,
@@ -235,6 +240,24 @@ class CompletionService:
         await self._observe(team_id, api_key_id, model, operation, response, latency_ms)
         return response
 
+    async def _enforce_budget(self, team_id: UUID) -> None:
+        """Pre-call spend gate: reject once the team's accumulated cost in the
+        current window reaches its budget limit. Enforcement reads recorded
+        usage, so requests already in flight when the limit is crossed still
+        complete (bounded overshoot — same semantics as other gateways)."""
+        if self._budgets is None:
+            return
+        budget = await self._budgets.get(team_id)
+        if budget is None:
+            return
+        since = window_start(budget.window, datetime.now(UTC))
+        spent = await self._usage.spend_since(team_id, since)
+        if spent >= budget.limit_cost:
+            raise BudgetExceeded(
+                f"Team budget exceeded: spent {spent:.4f} of {budget.limit_cost:.4f} USD "
+                f"in the current {budget.window} window"
+            )
+
     async def _prepare(
         self, team_id: UUID, request: dict[str, Any], expected_type: ModelType
     ) -> tuple[Model, dict[str, str]]:
@@ -248,6 +271,7 @@ class CompletionService:
             raise ModelTypeMismatch(
                 f"Model '{model.name}' is type '{model.type}', not '{expected_type}'"
             )
+        await self._enforce_budget(team_id)
         values = await self._credentials.get_values(model.credential_id)
         if values is None:
             raise CredentialNotFound(str(model.credential_id))

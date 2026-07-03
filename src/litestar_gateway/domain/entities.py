@@ -21,6 +21,28 @@ class KeyPurpose(StrEnum):
     JWT = "jwt"  # signs login JWTs
 
 
+class BudgetWindow(StrEnum):
+    """Spend window a budget applies to. Calendar-based, UTC."""
+
+    MONTHLY = "monthly"
+    DAILY = "daily"
+
+
+@dataclass(frozen=True)
+class Budget:
+    """A hard spend cap (USD) for a team over a recurring calendar window.
+
+    Enforcement is pre-call: once the window's accumulated cost reaches
+    `limit_cost`, further inference calls are rejected. Requests already in
+    flight when the limit is crossed may still complete (bounded overshoot)."""
+
+    id: UUID
+    team_id: UUID
+    limit_cost: float
+    window: BudgetWindow
+    created_at: datetime
+
+
 @dataclass(frozen=True)
 class UsageEvent:
     """One recorded model call: token counts and estimated cost, tagged with the

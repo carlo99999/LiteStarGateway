@@ -7,12 +7,14 @@ from typing import Any
 from uuid import UUID
 
 from advanced_alchemy.extensions.litestar import base
-from sqlalchemy import JSON, ForeignKey, UniqueConstraint
+from sqlalchemy import JSON, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from litestar_gateway.domain.entities import (
     APIKey,
     AuditEvent,
+    Budget,
+    BudgetWindow,
     Credential,
     Invite,
     KeyPurpose,
@@ -160,6 +162,8 @@ class TeamMembershipModel(base.UUIDAuditBase):
 
 class UsageEventModel(base.UUIDAuditBase):
     __tablename__ = "usage_event"
+    # Covers the budget gate's hot-path read (team_id + created_at range SUM).
+    __table_args__ = (Index("ix_usage_event_team_id_created_at", "team_id", "created_at"),)
 
     team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
     api_key_id: Mapped[UUID] = mapped_column(ForeignKey("api_key.id"), index=True)
@@ -202,6 +206,25 @@ class PendingUsageEventModel(base.UUIDAuditBase):
     completion_tokens: Mapped[int] = mapped_column(default=0)
     cost: Mapped[float] = mapped_column(default=0.0)
     event_created_at: Mapped[datetime] = mapped_column()
+
+
+class TeamBudgetModel(base.UUIDAuditBase):
+    """A team's hard spend cap (at most one row per team)."""
+
+    __tablename__ = "team_budget"
+
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), unique=True, index=True)
+    limit_cost: Mapped[float] = mapped_column()
+    window: Mapped[str] = mapped_column()
+
+    def to_entity(self) -> Budget:
+        return Budget(
+            id=self.id,
+            team_id=self.team_id,
+            limit_cost=self.limit_cost,
+            window=BudgetWindow(self.window),
+            created_at=self.created_at,
+        )
 
 
 class SecretKeyModel(base.UUIDAuditBase):

@@ -9,12 +9,38 @@ from uuid import UUID
 from litestar_gateway.domain.entities import (
     APIKey,
     ApiKeySpend,
+    Budget,
     IssuedKey,
     Team,
     TeamMembership,
     TeamRole,
     UsageAggregate,
 )
+
+
+@dataclass(frozen=True)
+class SetBudgetRequest:
+    limit_cost: float  # USD, must be > 0
+    window: str  # "monthly" | "daily"
+
+
+@dataclass(frozen=True)
+class BudgetResponse:
+    team_id: UUID
+    limit_cost: float
+    window: str
+    spent: float  # accumulated cost in the current window
+    remaining: float  # never negative
+
+    @classmethod
+    def from_budget(cls, budget: Budget, spent: float) -> BudgetResponse:
+        return cls(
+            team_id=budget.team_id,
+            limit_cost=budget.limit_cost,
+            window=budget.window.value,
+            spent=spent,
+            remaining=max(0.0, budget.limit_cost - spent),
+        )
 
 
 @dataclass(frozen=True)

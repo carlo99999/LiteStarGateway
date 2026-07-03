@@ -12,6 +12,7 @@ from litestar_gateway.domain.entities import (
     APIKey,
     ApiKeySpend,
     AuditEvent,
+    Budget,
     Credential,
     ExternalIdentity,
     Invite,
@@ -258,6 +259,11 @@ class UsageRepository(Protocol):
         are now revoked, as long as they have recorded usage)."""
         ...
 
+    async def spend_since(self, team_id: UUID, since: datetime) -> float:
+        """Total cost recorded for the team from `since` onwards. Read on the
+        hot path by the budget gate — must stay a cheap indexed aggregate."""
+        ...
+
     async def enqueue_pending(self, event: UsageEvent) -> None:
         """Durable dead-letter for a usage event whose ledger write failed, so a
         background reconciler can retry it instead of the event being lost."""
@@ -267,6 +273,20 @@ class UsageRepository(Protocol):
         """Move up to `limit` dead-lettered usage events into the ledger (idempotent
         by event id), removing settled ones. Returns how many were settled."""
         ...
+
+
+# runtime_checkable: injected directly into a handler, so Litestar isinstance-checks it.
+@runtime_checkable
+class BudgetRepository(Protocol):
+    """Persistence port for per-team spend caps (at most one budget per team)."""
+
+    async def get(self, team_id: UUID) -> Budget | None: ...
+
+    async def set(self, budget: Budget) -> Budget:
+        """Create the team's budget, or replace it if one exists (upsert)."""
+        ...
+
+    async def remove(self, team_id: UUID) -> None: ...
 
 
 # runtime_checkable: injected directly into a handler, so Litestar isinstance-checks it.
