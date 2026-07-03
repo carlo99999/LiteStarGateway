@@ -62,6 +62,14 @@ built to provide.
 
 New counts: **0 CRITICAL · 1 HIGH · 5 MEDIUM · 8 LOW**.
 
+## Resolution status (Round 3, updated during remediation)
+
+**Fixed (PRs open/merged):**
+
+| Finding | Fix PR |
+|---|---|
+| H13 — streaming settlement shielded from disconnect cancellation | #91 |
+
 ## HIGH (Round 3)
 
 ### H13 — Client disconnect mid-stream cancels the billing write: unbilled, untraced, unlogged
