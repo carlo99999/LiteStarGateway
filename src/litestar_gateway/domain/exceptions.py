@@ -153,6 +153,16 @@ class UpstreamRateLimited(UpstreamError):
         self.retry_after = retry_after
 
 
+class UpstreamAuthFailed(UpstreamError):
+    """The provider rejected the gateway's credential (401/403): expired or
+    rotated upstream key. An ops problem (-> 502), never the client's fault."""
+
+
+class UpstreamRequestRejected(UpstreamError):
+    """The provider refused the request itself (other 4xx, e.g. an
+    out-of-range parameter passed through the allowlist) -> 400."""
+
+
 class UpstreamUnavailable(UpstreamError):
     """The provider returned a 5xx or could not be reached."""
 

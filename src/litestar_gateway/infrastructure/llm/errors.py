@@ -20,8 +20,10 @@ import openai
 
 from litestar_gateway.domain.exceptions import (
     DomainError,
+    UpstreamAuthFailed,
     UpstreamError,
     UpstreamRateLimited,
+    UpstreamRequestRejected,
     UpstreamTimeout,
     UpstreamUnavailable,
 )
@@ -62,6 +64,18 @@ def translate_upstream_error(exc: Exception) -> UpstreamError | None:
         )
     if status is not None and status >= 500:
         return UpstreamUnavailable(f"upstream provider unavailable (status {status})")
+    # Remaining 4xx: classify instead of falling through to an opaque 500.
+    # 401/403 mean the gateway's own upstream credential is bad (expired or
+    # rotated key) - an ops incident, surfaced as 502; other 4xx mean the
+    # provider refused this particular request (e.g. an out-of-range param the
+    # allowlist passed through) - the client's 400. Status only, no provider
+    # body (never echo upstream messages that could carry internals).
+    if status in (401, 403):
+        return UpstreamAuthFailed(
+            f"upstream provider rejected the gateway credential (status {status})"
+        )
+    if status is not None and 400 <= status < 500:
+        return UpstreamRequestRejected(f"upstream provider rejected the request (status {status})")
     if isinstance(exc, _CONNECTION_TYPES):
         return UpstreamUnavailable("could not reach upstream provider")
     return None

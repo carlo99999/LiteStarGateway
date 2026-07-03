@@ -105,8 +105,10 @@ Notes:
   container applies pending migrations on start (`litestar … database upgrade`,
   idempotent). After changing the ORM models, generate a migration in dev with
   `uv run litestar --app litestar_gateway.app:app database make-migrations`, review
-  it, and commit it. (With many replicas, prefer a one-shot migration job over
-  migrate-on-start to avoid concurrent upgrades.)
+  it, and commit it. **With many replicas**, set `MIGRATE_ON_START=false` on the
+  app containers and run the upgrade as a dedicated one-shot job / init
+  container instead, so N replicas don't race the same upgrade:
+  `docker run --rm <image> litestar --app litestar_gateway.app:app database upgrade --no-prompt`.
 - **Observability**: set `MLFLOW_TRACKING_URI` to enable request tracing (classic
   MLflow or `databricks`). The compose stack runs a classic MLflow server (UI at
   `http://localhost:5000`) and points the app at it; unset the URI to disable.

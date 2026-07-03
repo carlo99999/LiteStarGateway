@@ -15,6 +15,7 @@ import openai
 import pytest
 from google.genai import errors as genai_errors
 from litestar.status_codes import (
+    HTTP_400_BAD_REQUEST,
     HTTP_429_TOO_MANY_REQUESTS,
     HTTP_502_BAD_GATEWAY,
     HTTP_504_GATEWAY_TIMEOUT,
@@ -25,7 +26,9 @@ from litestar_gateway.app import create_app
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.exceptions import (
     ModelNotFound,
+    UpstreamAuthFailed,
     UpstreamRateLimited,
+    UpstreamRequestRejected,
     UpstreamTimeout,
     UpstreamUnavailable,
 )
@@ -77,6 +80,30 @@ def test_timeouts_map_to_upstream_timeout() -> None:
 def test_connection_error_maps_to_unavailable() -> None:
     exc = httpx.ConnectError("refused")
     assert isinstance(translate_upstream_error(exc), UpstreamUnavailable)
+
+
+def test_upstream_401_maps_to_auth_failed() -> None:
+    # An expired/rotated provider key is the gateway's misconfiguration, not the
+    # client's fault: 502, never an opaque 500.
+    exc = openai.AuthenticationError("bad key", response=_http_response(401), body=None)
+    assert isinstance(translate_upstream_error(exc), UpstreamAuthFailed)
+
+
+def test_upstream_403_maps_to_auth_failed() -> None:
+    exc = anthropic.PermissionDeniedError("forbidden", response=_http_response(403), body=None)
+    assert isinstance(translate_upstream_error(exc), UpstreamAuthFailed)
+
+
+def test_upstream_400_maps_to_request_rejected() -> None:
+    # The provider refused the request itself (e.g. an out-of-range param the
+    # allowlist passed through) — classify as 400, not a gateway bug.
+    exc = openai.BadRequestError("bad param", response=_http_response(400), body=None)
+    assert isinstance(translate_upstream_error(exc), UpstreamRequestRejected)
+
+
+def test_upstream_404_maps_to_request_rejected() -> None:
+    exc = openai.NotFoundError("no such model", response=_http_response(404), body=None)
+    assert isinstance(translate_upstream_error(exc), UpstreamRequestRejected)
 
 
 def test_unrelated_errors_pass_through() -> None:
@@ -186,6 +213,14 @@ async def _setup(client: AsyncTestClient) -> str:
         (
             openai.APITimeoutError(request=httpx.Request("POST", "https://x")),
             HTTP_504_GATEWAY_TIMEOUT,
+        ),
+        (
+            openai.AuthenticationError("invalid api key", response=_http_response(401), body=None),
+            HTTP_502_BAD_GATEWAY,
+        ),
+        (
+            openai.BadRequestError("bad param", response=_http_response(400), body=None),
+            HTTP_400_BAD_REQUEST,
         ),
     ],
 )
