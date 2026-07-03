@@ -226,12 +226,14 @@ class UserRepository(Protocol):
         """Atomically increment the failed-login counter; returns the new count."""
         ...
 
-    async def set_login_lock(self, user_id: UUID, locked_until: datetime) -> None:
-        """Temporarily lock password logins and reset the failure counter."""
+    async def set_login_lock(self, user_id: UUID, locked_until: datetime, cycles: int) -> None:
+        """Temporarily lock password logins, reset the failure counter, and
+        record the consecutive lock-cycle count (drives escalation)."""
         ...
 
     async def clear_login_failures(self, user_id: UUID) -> None:
-        """Reset the failure counter and any lock (after a successful login)."""
+        """Reset the failure counter, any lock, and the lock-cycle escalation
+        (after a successful login or an admin unlock)."""
         ...
 
 

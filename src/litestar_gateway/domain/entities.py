@@ -322,6 +322,10 @@ class User:
     # temporary lock once the threshold is hit. Reset on successful login.
     failed_login_attempts: int = 0
     locked_until: datetime | None = None
+    # Consecutive lock cycles: each one doubles the next lock's duration
+    # (capped), so re-locking the account the moment a lock expires gets
+    # progressively costlier. Reset on successful login or after a quiet decay.
+    lockout_cycles: int = 0
 
 
 @dataclass(frozen=True)

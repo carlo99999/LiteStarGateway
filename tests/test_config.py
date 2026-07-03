@@ -115,6 +115,22 @@ def test_from_env_rejects_negative_pool_size(monkeypatch: pytest.MonkeyPatch) ->
         Settings.from_env()
 
 
+def test_from_env_zero_metrics_interval_disables_the_publisher(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # 0 is the documented "off" switch (app.py gates the publisher on a truthy
+    # interval) — it must parse, not be rejected as below-minimum.
+    monkeypatch.setenv("MLFLOW_METRICS_INTERVAL", "0")
+    assert Settings.from_env().mlflow_metrics_interval == 0
+
+
+def test_from_env_rejects_negative_metrics_interval(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The only numeric env var that had no validation coverage (ISSUES.md L18).
+    monkeypatch.setenv("MLFLOW_METRICS_INTERVAL", "-5")
+    with pytest.raises(InsecureConfigurationError):
+        Settings.from_env()
+
+
 def test_sso_enabled_requires_discovery_client_id_and_secret() -> None:
     # All three are needed; missing any one keeps SSO off (routes unregistered)
     # rather than booting a broken or secret-less public-client flow.

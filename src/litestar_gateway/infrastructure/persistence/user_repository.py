@@ -80,11 +80,11 @@ class SQLAlchemyUserRepository:
         await self._session.commit()
         return int(count or 0)
 
-    async def set_login_lock(self, user_id: UUID, locked_until: datetime) -> None:
+    async def set_login_lock(self, user_id: UUID, locked_until: datetime, cycles: int) -> None:
         await self._session.execute(
             update(UserModel)
             .where(UserModel.id == user_id)
-            .values(locked_until=locked_until, failed_login_attempts=0)
+            .values(locked_until=locked_until, failed_login_attempts=0, lockout_cycles=cycles)
         )
         await self._session.commit()
 
@@ -92,7 +92,7 @@ class SQLAlchemyUserRepository:
         await self._session.execute(
             update(UserModel)
             .where(UserModel.id == user_id)
-            .values(failed_login_attempts=0, locked_until=None)
+            .values(failed_login_attempts=0, locked_until=None, lockout_cycles=0)
         )
         await self._session.commit()
 
