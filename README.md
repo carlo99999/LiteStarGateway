@@ -1,5 +1,9 @@
 # LiteStar Gateway
 
+[![CI](https://github.com/carlo99999/LiteStarGateway/actions/workflows/ci.yml/badge.svg)](https://github.com/carlo99999/LiteStarGateway/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](pyproject.toml)
+
 **A straightforward, OpenAI-compatible LLM gateway — one clean, direct path from
 your application to any provider. Focused, predictable, and free of accumulated
 complexity: it does one job and does it well.**
@@ -31,6 +35,53 @@ client.chat.completions.create(model="<team-model-alias>", messages=[...])
 The alias resolves to a team `Model`, which selects the provider and a
 platform-managed, encrypted `Credential`. Providers: OpenAI, Azure OpenAI,
 Databricks, Anthropic, Vertex/Gemini.
+
+## How it works
+
+Every inference call goes through the same pipeline — authentication, spend
+control, and request sanitizing happen **before** the provider is reached;
+metering and tracing happen right after, off the hot path:
+
+```mermaid
+flowchart LR
+    Client["OpenAI SDK<br/>api_key = lsk_…"] --> Auth
+
+    subgraph Gateway["LiteStar Gateway"]
+        direction LR
+        Auth["API-key auth<br/>+ scope check"] --> RateLimit["Rate limit<br/>per key"]
+        RateLimit --> Budget["Budget gate<br/>per-team cap → 402"]
+        Budget --> Policy["Param allowlist<br/>sanitize + clamp"]
+        Policy --> Adapter["Provider adapter<br/>official SDK"]
+    end
+
+    Adapter <--> Providers["OpenAI · Azure OpenAI<br/>Anthropic · Vertex · Databricks"]
+
+    Adapter --> Meter["Usage metering<br/>tokens + cost, streams included"]
+    Meter --> Ledger[("usage_event ledger<br/>+ durable outbox")]
+    Meter --> Trace["MLflow trace<br/>latency · cost · status"]
+```
+
+Around that data plane sits a multi-tenant management plane — who can
+configure what:
+
+```mermaid
+flowchart TD
+    PlatformAdmin["Platform admin"] --> Credentials["Provider credentials<br/>encrypted at rest, key-rotated"]
+    PlatformAdmin --> Orgs["Organizations → teams<br/>→ memberships"]
+    PlatformAdmin --> Budgets["Team budgets<br/>daily / monthly cap"]
+    PlatformAdmin --> Audit["Audit log<br/>append-only"]
+
+    TeamAdmin["Team admin"] --> Models["Team models<br/>alias → provider + credential"]
+    TeamAdmin --> Keys["API keys<br/>inference scope"]
+    TeamAdmin --> ServicePrincipals["Service principals<br/>management-scoped keys"]
+
+    Models -.->|reference, never read| Credentials
+    Keys --> Apps["Customer applications<br/>stock OpenAI client"]
+```
+
+Teams never see provider secrets: models *reference* a credential, the
+gateway decrypts it per call, and usage is attributed back to the team and
+key for billing.
 
 ## Endpoints
 
@@ -211,7 +262,9 @@ on their own branch (linked). Order within a phase is a recommendation.
   [`adding-smart-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-smart-routing/docs/smart-routing.md)
 - **Web UI** — SPA over the JSON API for login + admin + usage dashboards.
   [`adding-web-ui`](https://github.com/carlo99999/LiteStarGateway/blob/adding-web-ui/docs/web-ui.md)
-- **LICENSE & repo hygiene** — add a LICENSE, `CONTRIBUTING`, and a security policy _(no branch yet)_.
+- 🟡 **LICENSE & repo hygiene** _(license + contributing shipped)_ — Apache 2.0
+  [`LICENSE`](LICENSE) and [`CONTRIBUTING.md`](CONTRIBUTING.md) (DCO sign-off) are
+  in place; a `SECURITY.md` policy is still to do.
 - **Test coverage gate** — enforce 80% (`--cov-fail-under`) in CI _(no branch yet)_.
 - **Minor hardening** — `GET /v1/models`, request body-size limits, security headers, DB backups, dependency scanning (pip-audit / Dependabot), admin audit log, API-key expiry _(no branch yet)_.
 
@@ -293,3 +346,13 @@ Tracked items not yet implemented (see also the code review notes):
   fails fast at startup if `JWT_SECRET` is unset or left at the insecure dev
   default, so a misconfigured production deploy can't sign tokens with a known
   key. Outside production the dev default is still allowed for convenience.
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+development setup, the quality gate, and the DCO sign-off required on every
+commit.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
