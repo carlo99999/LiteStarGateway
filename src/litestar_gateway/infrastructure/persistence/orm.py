@@ -47,6 +47,7 @@ class UserModel(base.UUIDAuditBase):
     is_active: Mapped[bool] = mapped_column(default=True)
     failed_login_attempts: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[datetime | None] = mapped_column(default=None)
+    lockout_cycles: Mapped[int] = mapped_column(default=0)
 
     def to_entity(self) -> User:
         return User(
@@ -60,6 +61,7 @@ class UserModel(base.UUIDAuditBase):
             is_active=self.is_active,
             failed_login_attempts=self.failed_login_attempts,
             locked_until=self.locked_until,
+            lockout_cycles=self.lockout_cycles,
         )
 
 
@@ -200,7 +202,11 @@ class UsageEventModel(base.UUIDAuditBase):
 class PendingUsageEventModel(base.UUIDAuditBase):
     """Dead-letter outbox for usage events whose ledger write failed. A background
     reconciler retries these into `usage_event` (idempotent by `event_id`), so a
-    transient failure never silently loses a billing record."""
+    transient failure never silently loses a billing record.
+
+    Not a write-ahead log: rows are written only after a ledger write has
+    failed, so a crash before either write still loses the event (at-most-once
+    on crash — see CompletionService._record_usage)."""
 
     __tablename__ = "pending_usage_event"
 
@@ -214,6 +220,10 @@ class PendingUsageEventModel(base.UUIDAuditBase):
     completion_tokens: Mapped[int] = mapped_column(default=0)
     cost: Mapped[float] = mapped_column(default=0.0)
     event_created_at: Mapped[datetime] = mapped_column()
+    # Poison-message bookkeeping: rows that keep failing the ledger insert are
+    # quarantined after MAX_RECONCILE_ATTEMPTS instead of starving the batch.
+    attempts: Mapped[int] = mapped_column(default=0)
+    last_error: Mapped[str | None] = mapped_column(default=None)
 
 
 class TeamBudgetModel(base.UUIDAuditBase):

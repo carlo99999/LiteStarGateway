@@ -39,18 +39,30 @@ class RedisDistributedLock:
         # A short-lived client per use — guarded sections are rare (e.g. daily
         # rotation), so a long-lived connection isn't worth it.
         client: Redis = Redis.from_url(self._url)
-        lock = client.lock(
-            name,
-            timeout=ttl.total_seconds(),
-            blocking=False,
-            raise_on_release_error=False,
-        )
-        acquired = await lock.acquire()
         try:
-            yield acquired
+            lock = client.lock(
+                name,
+                timeout=ttl.total_seconds(),
+                blocking=False,
+                raise_on_release_error=False,
+            )
+            try:
+                acquired = await lock.acquire()
+            except Exception:
+                # A Redis outage must not leak the client or bubble into the
+                # guarded loop: report "not acquired" and log at ERROR — every
+                # replica skipping its guarded section (e.g. a day's rotation)
+                # is an operational event worth alerting on.
+                logger.exception(
+                    "distributed lock %r unavailable; guarded section will be skipped", name
+                )
+                acquired = False
+            try:
+                yield acquired
+            finally:
+                if acquired:
+                    await lock.release()
         finally:
-            if acquired:
-                await lock.release()
             await client.aclose()
 
 

@@ -29,7 +29,11 @@ def _now() -> datetime:
 
 
 def _as_utc(dt: datetime) -> datetime:
-    # SQLite reads timestamps back naive; treat naive values as UTC for comparison.
+    # Defensive only: every mapped datetime column goes through Advanced
+    # Alchemy's DateTimeUTC, which re-attaches UTC on read (SQLite included),
+    # so persisted values arrive aware. This guards non-ORM callers (library
+    # use, hand-built entities) from a naive-vs-aware TypeError — do not
+    # "fix" other aware comparisons on the assumption reads can be naive.
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
