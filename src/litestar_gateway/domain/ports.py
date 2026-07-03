@@ -68,8 +68,6 @@ class CredentialRepository(Protocol):
     async def remove(self, credential_id: UUID) -> None: ...
 
 
-# runtime_checkable: this port is injected as a dependency, and Litestar/msgspec
-# runs isinstance() on the resolved value during signature validation.
 @runtime_checkable
 class LLMGateway(Protocol):
     """Port for calling LLM providers in an OpenAI-compatible way.
@@ -245,8 +243,6 @@ class PasswordResetRepository(Protocol):
     async def mark_used(self, reset_id: UUID, used_at: datetime) -> bool: ...
 
 
-# runtime_checkable: injected directly into a handler, so Litestar runs
-# isinstance() on the resolved value during signature validation.
 @runtime_checkable
 class UsageRepository(Protocol):
     """Persistence port for recorded usage events + aggregation."""
@@ -287,7 +283,6 @@ class UsageRepository(Protocol):
         ...
 
 
-# runtime_checkable: injected directly into a handler, so Litestar isinstance-checks it.
 @runtime_checkable
 class BudgetRepository(Protocol):
     """Persistence port for per-team spend caps (at most one budget per team)."""
@@ -301,7 +296,6 @@ class BudgetRepository(Protocol):
     async def remove(self, team_id: UUID) -> None: ...
 
 
-# runtime_checkable: injected directly into a handler, so Litestar isinstance-checks it.
 @runtime_checkable
 class AuditLog(Protocol):
     """Append-only audit trail of privileged actions."""
@@ -315,7 +309,6 @@ class AuditLog(Protocol):
         ...
 
 
-# runtime_checkable: injected directly into a handler, so Litestar isinstance-checks it.
 @runtime_checkable
 class IdentityProvider(Protocol):
     """SSO provider: build the login redirect and resolve the callback code.
