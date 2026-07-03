@@ -41,9 +41,11 @@ Databricks, Anthropic, Vertex/Gemini.
 | `POST /v1/embeddings` | ✅ | ✅ | ✅ | 501 | ✅ |
 | `POST /v1/images/generations` | ✅ | ✅ | 501 | 501 | ✅ |
 
-Plus: users/invites, JWT login, organizations → teams → memberships, team-scoped
-API keys, encrypted provider credentials (admin-managed), and per-key/per-model
-usage accounting (`GET /teams/{id}/usage`).
+Plus: users/invites, JWT login (with per-account login lockout), organizations →
+teams → memberships, team-scoped API keys, service principals with
+management-scoped keys, encrypted provider credentials (admin-managed),
+per-key/per-model usage accounting (`GET /teams/{id}/usage`), and per-team
+budgets enforced before every call.
 
 ## Configuration
 
@@ -170,13 +172,16 @@ on their own branch (linked). Order within a phase is a recommendation.
    path: a bounded queue + background worker (`mlflow-skinny` client; traces via
    an explicit `experiment_id`, no global state). Unset URI ⇒ disabled. The compose
    stack includes a classic MLflow server ([design](docs/observability.md)).
-   _Per-team experiments + payload opt-in, and error/streaming traces, are
-   follow-ups._
-10. ✅ **Usage accounting** _(shipped)_ — every model call records input/output
-    tokens + estimated cost, tagged with the API key and model.
-    `GET /teams/{id}/usage` returns per-model totals, filterable by `?model=` and
-    `?api_key_id=` ([design](docs/usage-cost.md)). _Pre-call budget enforcement is
-    still a follow-up; streaming calls aren't token-counted yet._
+   Error and streaming traces are recorded too. _Per-team experiments +
+   payload opt-in are follow-ups._
+10. ✅ **Usage accounting & budgets** _(shipped)_ — every model call (streams
+    included — metered chunk by chunk, with estimation when the provider
+    reports no usage) records input/output tokens + cost, tagged with the API
+    key and model. `GET /teams/{id}/usage` returns per-model totals, filterable
+    by `?model=` and `?api_key_id=`. Per-team budgets (daily/monthly window)
+    are enforced **before** every call — over-limit ⇒ `402` — with a durable
+    outbox so billing survives transient DB failures
+    ([design](docs/usage-cost.md)).
 11. ✅ **Account recovery** _(shipped)_ — admin-issued password reset: a platform
     admin creates a single-use, expiring token (`POST /password-resets`, like an
     invite) that the user redeems to set their **own** new password
