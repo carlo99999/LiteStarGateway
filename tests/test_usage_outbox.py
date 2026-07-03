@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -31,7 +31,7 @@ async def session(tmp_path: Path) -> AsyncIterator[AsyncSession]:
     await engine.dispose()
 
 
-def _event() -> UsageEvent:
+def _event(created_at: datetime | None = None) -> UsageEvent:
     return UsageEvent(
         id=uuid4(),
         team_id=uuid4(),
@@ -42,7 +42,7 @@ def _event() -> UsageEvent:
         prompt_tokens=5,
         completion_tokens=7,
         cost=0.12,
-        created_at=datetime.now(UTC),
+        created_at=created_at or datetime.now(UTC),
     )
 
 
@@ -137,3 +137,33 @@ async def test_transient_failure_is_retried_and_settles(session: AsyncSession) -
     assert await repo.reconcile_pending() == 1
     assert len(await repo.aggregate(event.team_id)) == 1
     assert (await session.scalars(select(PendingUsageEventModel))).all() == []
+
+
+async def test_reconcile_preserves_original_event_time(session: AsyncSession) -> None:
+    # An event dead-lettered in one budget window and drained in the next must
+    # count against the window it happened in, not the reconcile time — else
+    # July's spend lands in August's budget and monthly aggregates.
+    repo = SQLAlchemyUsageRepository(session)
+    happened_at = datetime.now(UTC) - timedelta(days=30)
+    event = _event(created_at=happened_at)
+
+    await repo.enqueue_pending(event)
+    assert await repo.reconcile_pending() == 1
+
+    # Same query the budget gate runs: a window containing the original time
+    # sees the cost; a window that starts after it must not.
+    assert await repo.spend_since(event.team_id, happened_at - timedelta(days=1)) == 0.12
+    assert await repo.spend_since(event.team_id, happened_at + timedelta(days=1)) == 0.0
+
+
+async def test_record_preserves_event_time(session: AsyncSession) -> None:
+    # The ledger insert must stamp the event's own timestamp too, so direct
+    # writes and reconciled writes agree on when the spend happened.
+    repo = SQLAlchemyUsageRepository(session)
+    happened_at = datetime.now(UTC) - timedelta(days=30)
+    event = _event(created_at=happened_at)
+
+    await repo.record(event)
+
+    assert await repo.spend_since(event.team_id, happened_at - timedelta(days=1)) == 0.12
+    assert await repo.spend_since(event.team_id, happened_at + timedelta(days=1)) == 0.0

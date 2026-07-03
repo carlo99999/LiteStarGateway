@@ -27,6 +27,8 @@ class SQLAlchemyUsageRepository:
         self._session = session
 
     async def record(self, event: UsageEvent) -> None:
+        # Stamp the event's own timestamp, not the insert default: budget
+        # windows and monthly aggregates must reflect when the spend happened.
         self._session.add(
             UsageEventModel(
                 id=event.id,
@@ -38,6 +40,7 @@ class SQLAlchemyUsageRepository:
                 prompt_tokens=event.prompt_tokens,
                 completion_tokens=event.completion_tokens,
                 cost=event.cost,
+                created_at=event.created_at,
             )
         )
         await self._session.commit()
@@ -169,6 +172,10 @@ class SQLAlchemyUsageRepository:
                             prompt_tokens=row.prompt_tokens,
                             completion_tokens=row.completion_tokens,
                             cost=row.cost,
+                            # The time the event happened, not the reconcile
+                            # time — a drain must not shift spend into the
+                            # next budget window.
+                            created_at=row.event_created_at,
                         )
                     )
                 await self._session.delete(row)
