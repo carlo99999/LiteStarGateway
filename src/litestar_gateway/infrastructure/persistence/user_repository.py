@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select, update
@@ -63,6 +64,34 @@ class SQLAlchemyUserRepository:
             update(UserModel)
             .where(UserModel.id == user_id)
             .values(password_hash=password_hash, token_version=UserModel.token_version + 1)
+        )
+        await self._session.commit()
+
+    async def register_failed_login(self, user_id: UUID) -> int:
+        # Atomic in-database increment (no read-modify-write), so concurrent
+        # failed attempts across workers are all counted.
+        count = await self._session.scalar(
+            update(UserModel)
+            .where(UserModel.id == user_id)
+            .values(failed_login_attempts=UserModel.failed_login_attempts + 1)
+            .returning(UserModel.failed_login_attempts)
+        )
+        await self._session.commit()
+        return int(count or 0)
+
+    async def set_login_lock(self, user_id: UUID, locked_until: datetime) -> None:
+        await self._session.execute(
+            update(UserModel)
+            .where(UserModel.id == user_id)
+            .values(locked_until=locked_until, failed_login_attempts=0)
+        )
+        await self._session.commit()
+
+    async def clear_login_failures(self, user_id: UUID) -> None:
+        await self._session.execute(
+            update(UserModel)
+            .where(UserModel.id == user_id)
+            .values(failed_login_attempts=0, locked_until=None)
         )
         await self._session.commit()
 

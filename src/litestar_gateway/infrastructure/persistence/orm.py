@@ -43,6 +43,8 @@ class UserModel(base.UUIDAuditBase):
     # accounts). Unique so two identities can't bind to the same local account.
     sso_subject: Mapped[str | None] = mapped_column(default=None, unique=True, index=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    failed_login_attempts: Mapped[int] = mapped_column(default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(default=None)
 
     def to_entity(self) -> User:
         return User(
@@ -54,6 +56,8 @@ class UserModel(base.UUIDAuditBase):
             token_version=self.token_version,
             sso_subject=self.sso_subject,
             is_active=self.is_active,
+            failed_login_attempts=self.failed_login_attempts,
+            locked_until=self.locked_until,
         )
 
 

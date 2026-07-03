@@ -45,6 +45,23 @@ _RESET_TOKEN_BYTES = 32
 _RESET_TTL = timedelta(hours=24)
 _INVITE_TTL = timedelta(hours=72)
 
+# Per-account brute-force lockout: after MAX_FAILED_LOGINS consecutive wrong
+# passwords, password logins are rejected for LOCKOUT_DURATION (temporary, so
+# an attacker can't permanently deny the victim access). Complements the
+# per-IP rate limit, which a distributed attack (many IPs) slips under.
+MAX_FAILED_LOGINS = 5
+LOCKOUT_DURATION = timedelta(minutes=15)
+
+# Decoy Argon2 hash (of a discarded random string — not a secret). Verified on
+# the failure branches that would otherwise skip password hashing entirely
+# (unknown email, locked account), so response timing doesn't reveal whether
+# an email is registered or an account is locked.
+# pragma: allowlist nextline secret
+_DECOY_PASSWORD_HASH = (
+    "$argon2id$v=19$m=65536,t=3,p=4"
+    "$TmkXiElHRqSn0xJMTpMPtw$ILw5P96j7Z+FJLdu0mmefGvqBZ2e7nWXLh6QGavdq88"
+)
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -147,14 +164,36 @@ class UserService:
         )
 
     async def authenticate(self, email: str, password: str) -> User:
-        """Verify login credentials. Raises InvalidCredentials on any mismatch."""
+        """Verify login credentials. Raises InvalidCredentials on any mismatch.
+
+        Every failure path returns the same generic error: whether the email is
+        unknown, the password wrong, the account disabled or temporarily locked
+        must not be observable from the response."""
         user = await self._users.get_by_email(_normalize_email(email))
-        if user is None or not await averify_password(password, user.password_hash):
+        if user is None:
+            # Burn the same Argon2 cost as a real verification (timing parity).
+            await averify_password(password, _DECOY_PASSWORD_HASH)
+            raise InvalidCredentials("Invalid email or password")
+        # A locked account rejects even the correct password until the lock
+        # expires — otherwise the lock would be a password oracle.
+        if user.locked_until is not None and _now() < user.locked_until:
+            await averify_password(password, _DECOY_PASSWORD_HASH)
+            raise InvalidCredentials("Invalid email or password")
+        if not await averify_password(password, user.password_hash):
+            await self._register_login_failure(user.id)
             raise InvalidCredentials("Invalid email or password")
         # A disabled account cannot log in; same generic error (don't reveal state).
         if not user.is_active:
             raise InvalidCredentials("Invalid email or password")
+        if user.failed_login_attempts or user.locked_until is not None:
+            await self._users.clear_login_failures(user.id)
         return user
+
+    async def _register_login_failure(self, user_id: UUID) -> None:
+        """Count a wrong password; lock the account once the threshold is hit."""
+        count = await self._users.register_failed_login(user_id)
+        if count >= MAX_FAILED_LOGINS:
+            await self._users.set_login_lock(user_id, _now() + LOCKOUT_DURATION)
 
     async def get_by_id(self, user_id: UUID) -> User | None:
         return await self._users.get(user_id)

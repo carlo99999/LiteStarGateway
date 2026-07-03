@@ -274,6 +274,10 @@ class User:
     # A disabled account cannot authenticate (login JWTs are rejected). Toggled by
     # a platform admin; disabling also revokes existing sessions (token_version bump).
     is_active: bool = True
+    # Per-account brute-force defense: consecutive failed password logins, and a
+    # temporary lock once the threshold is hit. Reset on successful login.
+    failed_login_attempts: int = 0
+    locked_until: datetime | None = None
 
 
 @dataclass(frozen=True)
