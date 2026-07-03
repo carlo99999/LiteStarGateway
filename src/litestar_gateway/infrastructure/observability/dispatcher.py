@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 
 import anyio
@@ -24,14 +24,24 @@ logger = logging.getLogger("litestar_gateway.observability")
 
 
 class TraceDispatcher:
-    def __init__(self, sink: TraceSink, maxsize: int = 2000) -> None:
+    def __init__(
+        self,
+        sink: TraceSink,
+        maxsize: int = 2000,
+        on_drop: Callable[[], None] | None = None,
+    ) -> None:
         self._sink = sink
         self._queue: asyncio.Queue[TraceRecord] = asyncio.Queue(maxsize=maxsize)
+        self._on_drop = on_drop
 
     def enqueue(self, record: TraceRecord) -> None:
         try:
             self._queue.put_nowait(record)
         except asyncio.QueueFull:
+            # Observable, not just logged: on_drop feeds the dropped-traces
+            # metric so silent trace loss shows up on a dashboard.
+            if self._on_drop is not None:
+                self._on_drop()
             logger.warning("trace queue full; dropping trace")
 
     async def _worker(self) -> None:

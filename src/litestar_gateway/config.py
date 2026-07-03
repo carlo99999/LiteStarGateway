@@ -103,6 +103,9 @@ class Settings:
     # Observability: MLflow tracking URI (None ⇒ tracing disabled) + general experiment.
     mlflow_tracking_uri: str | None = None
     mlflow_experiment: str = DEFAULT_MLFLOW_EXPERIMENT
+    # Fleet-level ops metrics logged to an MLflow "gateway-metrics" run every N
+    # seconds (requires the tracking URI; 0 disables the publisher).
+    mlflow_metrics_interval: int = 60
     # Serve the interactive OpenAPI docs (Swagger/Scalar/Stoplight + /openapi.json).
     # Public and unauthenticated when on — disable in production to avoid exposing
     # the full admin/credential API surface.
@@ -207,6 +210,7 @@ class Settings:
             rotation_time=os.environ.get("KEY_ROTATION_TIME", DEFAULT_ROTATION_TIME),
             mlflow_tracking_uri=os.environ.get("MLFLOW_TRACKING_URI"),
             mlflow_experiment=os.environ.get("MLFLOW_EXPERIMENT", DEFAULT_MLFLOW_EXPERIMENT),
+            mlflow_metrics_interval=_env_int("MLFLOW_METRICS_INTERVAL", 60, minimum=0),
             openapi_enabled=_env_bool("OPENAPI_ENABLED", True),
             # Secure cookies on by default outside local envs; overridable for
             # proxy topologies where the request scheme is HTTP behind TLS.
