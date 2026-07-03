@@ -4,6 +4,14 @@ Usage events whose ledger write failed are dead-lettered to `pending_usage_event
 This periodic task retries them into `usage_event` (idempotent), so a transient
 failure under load never silently drops a billing record. Fail-safe: an error is
 logged and the loop continues.
+
+Deliberately NOT guarded by the `DistributedLock` port (unlike the rotation
+loop): each row settles as check-insert-delete in one transaction, so two
+replicas racing the same row are safe — the loser hits the primary-key
+conflict, rolls back, and moves on. Running on every replica costs only
+redundant work and a little DB contention, in exchange for zero dependence on
+Redis for billing convergence. Reach for the lock only if replica count makes
+that redundancy measurable.
 """
 
 from __future__ import annotations
