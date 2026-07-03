@@ -27,8 +27,10 @@ from litestar_gateway.infrastructure.llm import openai_adapter
 
 MASTER_KEY = "master-secret"
 ADMIN_EMAIL = "admin@example.com"
-JWT_SECRET = "test-secret-key-0123456789-abcdefghij"
+JWT_SECRET = "test-secret-key-0123456789-abcdefghij"  # pragma: allowlist secret
 SALT_KEY = "unit-test-salt-key"
+OPENAI_VALUES = {"api_key": "sk-x"}  # pragma: allowlist secret
+DEV_PASSWORD = "S3cure-pass-123"  # pragma: allowlist secret
 
 
 class _Result:
@@ -100,7 +102,7 @@ async def _setup_team(client: AsyncTestClient) -> tuple[str, str, str]:
     cred = (
         await client.post(
             "/credentials",
-            json={"name": "c", "provider": "openai", "values": {"api_key": "sk-x"}},
+            json={"name": "c", "provider": "openai", "values": OPENAI_VALUES},
             headers=_bearer(admin),
         )
     ).json()["id"]
@@ -229,7 +231,7 @@ async def test_only_platform_admin_can_set_or_remove_budget(client: AsyncTestCli
         json={
             "invite_token": invite,
             "email": "dev@example.com",
-            "password": "S3cure-pass-123",
+            "password": DEV_PASSWORD,
         },
     )
     await client.post(
@@ -238,7 +240,7 @@ async def test_only_platform_admin_can_set_or_remove_budget(client: AsyncTestCli
         headers=_bearer(admin),
     )
     dev_login = await client.post(
-        "/login", json={"email": "dev@example.com", "password": "S3cure-pass-123"}
+        "/login", json={"email": "dev@example.com", "password": DEV_PASSWORD}
     )
     dev = dev_login.json()["access_token"]
 
