@@ -9,10 +9,15 @@ from uuid import uuid4
 
 import pytest
 from advanced_alchemy.extensions.litestar import base
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from litestar_gateway.domain.entities import UsageEvent
-from litestar_gateway.infrastructure.persistence.usage_repository import SQLAlchemyUsageRepository
+from litestar_gateway.infrastructure.persistence.orm import PendingUsageEventModel
+from litestar_gateway.infrastructure.persistence.usage_repository import (
+    MAX_RECONCILE_ATTEMPTS,
+    SQLAlchemyUsageRepository,
+)
 
 
 @pytest.fixture
@@ -75,3 +80,60 @@ async def test_reconcile_is_idempotent_if_event_already_recorded(session: AsyncS
     rows = await repo.aggregate(event.team_id)
     assert len(rows) == 1
     assert rows[0].calls == 1  # not 2
+
+
+def _poison_get(session: AsyncSession, poison_event_id) -> None:
+    """Make the ledger lookup fail permanently for one event — the outbox
+    equivalent of a row whose insert violates an FK (team/key deleted while
+    the event sat in the queue)."""
+    real_get = session.get
+
+    async def failing_get(entity, pk, *args, **kwargs):
+        if pk == poison_event_id:
+            raise RuntimeError("permanently failing row")
+        return await real_get(entity, pk, *args, **kwargs)
+
+    session.get = failing_get  # type: ignore[method-assign]
+
+
+async def test_poisoned_row_cannot_starve_newer_events(session: AsyncSession) -> None:
+    # A permanently-failing row at the head of the oldest-first batch must not
+    # monopolize reconciliation forever: after MAX_RECONCILE_ATTEMPTS it is
+    # quarantined (skipped) and newer events settle again.
+    repo = SQLAlchemyUsageRepository(session)
+    poison = _event()
+    fresh = _event()
+    await repo.enqueue_pending(poison)
+    await repo.enqueue_pending(fresh)
+    _poison_get(session, poison.id)
+
+    # limit=1 → the poison row is the whole batch until it runs out of attempts.
+    for _ in range(MAX_RECONCILE_ATTEMPTS):
+        assert await repo.reconcile_pending(limit=1) == 0
+
+    # Quarantined: the next cycle selects past it and settles the fresh event.
+    assert await repo.reconcile_pending(limit=1) == 1
+    assert len(await repo.aggregate(fresh.team_id)) == 1
+
+    # The poison row is kept for inspection, with its failure bookkeeping.
+    remaining = (await session.scalars(select(PendingUsageEventModel))).all()
+    assert [r.event_id for r in remaining] == [poison.id]
+    assert remaining[0].attempts == MAX_RECONCILE_ATTEMPTS
+    assert "permanently failing row" in (remaining[0].last_error or "")
+
+
+async def test_transient_failure_is_retried_and_settles(session: AsyncSession) -> None:
+    # A row that fails once (transient DB blip) is not lost: its attempt is
+    # counted, and the next cycle settles it normally.
+    repo = SQLAlchemyUsageRepository(session)
+    event = _event()
+    await repo.enqueue_pending(event)
+
+    real_get = session.get
+    _poison_get(session, event.id)
+    assert await repo.reconcile_pending() == 0
+
+    session.get = real_get  # type: ignore[method-assign]
+    assert await repo.reconcile_pending() == 1
+    assert len(await repo.aggregate(event.team_id)) == 1
+    assert (await session.scalars(select(PendingUsageEventModel))).all() == []
