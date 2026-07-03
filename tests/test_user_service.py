@@ -22,6 +22,20 @@ from litestar_gateway.domain.exceptions import (
 )
 
 
+class FakeTransaction:
+    """Counts commits/rollbacks; the fakes apply writes immediately."""
+
+    def __init__(self) -> None:
+        self.commits = 0
+        self.rollbacks = 0
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+    async def rollback(self) -> None:
+        self.rollbacks += 1
+
+
 class FakeUserRepository:
     def __init__(self) -> None:
         self._by_email: dict[str, User] = {}
@@ -140,6 +154,7 @@ class FakePasswordResetRepository:
 @pytest.fixture
 def service() -> UserService:
     return UserService(
+        transaction=FakeTransaction(),
         users=FakeUserRepository(),
         invites=FakeInviteRepository(),
         password_resets=FakePasswordResetRepository(),
@@ -234,6 +249,7 @@ async def test_register_consumes_invite(service: UserService) -> None:
 async def test_register_rejects_expired_invite() -> None:
     invites = FakeInviteRepository()
     svc = UserService(
+        transaction=FakeTransaction(),
         users=FakeUserRepository(),
         invites=invites,
         password_resets=FakePasswordResetRepository(),
@@ -352,7 +368,10 @@ async def test_ensure_admin_tolerates_concurrent_replica_bootstrap() -> None:
 
     users = RacedUserRepository()
     service = UserService(
-        users=users, invites=FakeInviteRepository(), password_resets=FakePasswordResetRepository()
+        transaction=FakeTransaction(),
+        users=users,
+        invites=FakeInviteRepository(),
+        password_resets=FakePasswordResetRepository(),
     )
     await service.ensure_admin("admin@example.com", master_key="secret")
     # Second replica loses the insert race; ensure_admin must swallow the conflict.

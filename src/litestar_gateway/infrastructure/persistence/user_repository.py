@@ -60,12 +60,13 @@ class SQLAlchemyUserRepository:
 
     async def set_password(self, user_id: UUID, password_hash: str) -> None:
         # Bump token_version in the same update so a reset revokes existing JWTs.
+        # Stages only (no commit): committed by the service together with the
+        # reset-token consumption (one unit of work).
         await self._session.execute(
             update(UserModel)
             .where(UserModel.id == user_id)
             .values(password_hash=password_hash, token_version=UserModel.token_version + 1)
         )
-        await self._session.commit()
 
     async def register_failed_login(self, user_id: UUID) -> int:
         # Atomic in-database increment (no read-modify-write), so concurrent

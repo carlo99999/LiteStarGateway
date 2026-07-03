@@ -7,15 +7,17 @@ Only platform admins may create teams. On creation the platform admin becomes
 the team's first admin, plus a named team-admin (by email); a freshly created
 team therefore has two admins (one, if the named lead IS the platform admin).
 
-Each write use-case is a unit of work: repositories only stage (flush), and the
-service commits once via the `Transaction` port, so multi-step operations
-(e.g. team + memberships) persist atomically.
+Each write use-case is a unit of work: the team/membership repositories used
+here only stage (flush), and the service commits once via the `Transaction`
+port, so multi-step operations (e.g. team + memberships) persist atomically.
+(This is the project-wide rule for multi-write use cases — see the
+`Transaction` port; single-write repositories may self-commit.)
 """
 
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -64,7 +66,7 @@ class TeamService:
         self._transaction = transaction
 
     @asynccontextmanager
-    async def _unit_of_work(self) -> AsyncIterator[None]:
+    async def _unit_of_work(self) -> AsyncGenerator[None]:
         """Commit staged writes once on success; roll back on any failure."""
         try:
             yield

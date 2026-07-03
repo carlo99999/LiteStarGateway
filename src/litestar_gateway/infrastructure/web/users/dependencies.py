@@ -18,8 +18,11 @@ from litestar_gateway.infrastructure.persistence.user_repository import (
 
 
 def provide_user_service(db_session: NamedDependency[AsyncSession]) -> UserService:
+    # Repositories and the unit-of-work share one request-scoped session, so
+    # the service's single commit covers every staged write.
     return UserService(
         users=SQLAlchemyUserRepository(db_session),
         invites=SQLAlchemyInviteRepository(db_session),
         password_resets=SQLAlchemyPasswordResetRepository(db_session),
+        transaction=db_session,
     )

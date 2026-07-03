@@ -224,6 +224,45 @@ async def test_admin_password_reset_flow(client: AsyncTestClient) -> None:
     ).status_code == HTTP_401_UNAUTHORIZED
 
 
+async def test_reset_password_failure_does_not_burn_the_token(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Redeeming a reset is one unit of work: if the password write fails after
+    # the token was consumed, the whole transaction rolls back — the user can
+    # retry with the same token instead of being stranded (token burned, old
+    # password still in place) until an admin issues a new one.
+    admin = await _admin_token(client)
+    await _register(client, "u@b.com", "OldPassw0rd!")
+    token = (
+        await client.post(
+            "/password-resets",
+            json={"email": "u@b.com"},
+            headers={"Authorization": f"Bearer {admin}"},
+        )
+    ).json()["token"]
+
+    from litestar_gateway.infrastructure.persistence import user_repository
+
+    async def boom(self: object, user_id: object, password_hash: str) -> None:
+        raise RuntimeError("db hiccup")
+
+    monkeypatch.setattr(user_repository.SQLAlchemyUserRepository, "set_password", boom)
+    failed = await client.post(
+        "/reset-password", json={"reset_token": token, "new_password": "NewPassw0rd!"}
+    )
+    assert failed.status_code == 500
+    monkeypatch.undo()
+
+    # Same token, second attempt: must still be redeemable.
+    redeemed = await client.post(
+        "/reset-password", json={"reset_token": token, "new_password": "NewPassw0rd!"}
+    )
+    assert redeemed.status_code in (200, 204)
+    assert (
+        await client.post("/login", json={"email": "u@b.com", "password": "NewPassw0rd!"})
+    ).status_code == HTTP_200_OK
+
+
 async def test_password_reset_requires_admin(client: AsyncTestClient) -> None:
     await _register(client, "u@b.com", "Passw0rd!")
     user = (await client.post("/login", json={"email": "u@b.com", "password": "Passw0rd!"})).json()[
