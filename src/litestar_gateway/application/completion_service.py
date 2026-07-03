@@ -99,6 +99,25 @@ def _max_output_tokens(request: dict[str, Any]) -> int:
     return 0
 
 
+def _parse_usage(model: Model, usage: dict[str, Any]) -> tuple[int, int, float]:
+    """Token counts + cost from a provider usage dict. Chat completions report
+    prompt/completion_tokens; the Responses API reports input/output_tokens.
+    Bill either shape. Explicit key-presence checks (not `or`-chaining) so a
+    legitimate 0 is never overridden."""
+    if "prompt_tokens" in usage:
+        prompt = int(usage.get("prompt_tokens") or 0)
+    else:
+        prompt = int(usage.get("input_tokens") or 0)
+    if "completion_tokens" in usage:
+        completion = int(usage.get("completion_tokens") or 0)
+    else:
+        completion = int(usage.get("output_tokens") or 0)
+    cost = prompt * (model.input_cost_per_token or 0.0) + completion * (
+        model.output_cost_per_token or 0.0
+    )
+    return prompt, completion, cost
+
+
 def _reservation_cost(model: Model, request: dict[str, Any]) -> float:
     """Pessimistic pre-dispatch cost of a request: the estimated prompt plus
     the requested output ceiling. A request without a max-tokens field (or on
@@ -204,35 +223,9 @@ class CompletionService:
     ) -> None:
         """Record usage (billing) + emit an observability trace. Fail-safe."""
         usage = response.get("usage") or {}
-        # Chat completions report prompt/completion_tokens; the Responses API
-        # reports input/output_tokens. Bill either shape. Explicit key-presence
-        # checks (not `or`-chaining) so a legitimate 0 is never overridden.
-        if "prompt_tokens" in usage:
-            prompt = int(usage.get("prompt_tokens") or 0)
-        else:
-            prompt = int(usage.get("input_tokens") or 0)
-        if "completion_tokens" in usage:
-            completion = int(usage.get("completion_tokens") or 0)
-        else:
-            completion = int(usage.get("output_tokens") or 0)
-        cost = prompt * (model.input_cost_per_token or 0.0) + completion * (
-            model.output_cost_per_token or 0.0
-        )
+        prompt, completion, cost = _parse_usage(model, usage)
         now = datetime.now(UTC)
-        # Usage = authoritative billing record (persisted).
-        event = UsageEvent(
-            id=uuid4(),
-            team_id=team_id,
-            api_key_id=api_key_id,
-            model_id=model.id,
-            model_name=model.name,
-            operation=operation,
-            prompt_tokens=prompt,
-            completion_tokens=completion,
-            cost=cost,
-            created_at=now,
-        )
-        await self._record_usage(event)
+        await self._bill(team_id, api_key_id, model, operation, prompt, completion, cost, now)
         # Trace = observability (latency/analytics), fire-and-forget off the path.
         self._emit_trace(
             TraceRecord(
@@ -250,6 +243,34 @@ class CompletionService:
             )
         )
 
+    async def _bill(
+        self,
+        team_id: UUID,
+        api_key_id: UUID,
+        model: Model,
+        operation: str,
+        prompt: int,
+        completion: int,
+        cost: float,
+        now: datetime,
+    ) -> None:
+        """Persist the authoritative billing record (no trace — callers emit
+        their own 'ok' or 'error' trace alongside)."""
+        await self._record_usage(
+            UsageEvent(
+                id=uuid4(),
+                team_id=team_id,
+                api_key_id=api_key_id,
+                model_id=model.id,
+                model_name=model.name,
+                operation=operation,
+                prompt_tokens=prompt,
+                completion_tokens=completion,
+                cost=cost,
+                created_at=now,
+            )
+        )
+
     def _emit_error_trace(
         self,
         team_id: UUID,
@@ -258,11 +279,16 @@ class CompletionService:
         operation: str,
         latency_ms: float,
         exc: BaseException,
+        *,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        cost: float = 0.0,
     ) -> None:
         """Emit a status='error' trace for a failed gateway call. Without this,
         provider outages/timeouts/rate-limits are invisible in tracing — exactly
-        the events operators most need to see. No UsageEvent: there is no usage
-        to bill (the provider reported none)."""
+        the events operators most need to see. Non-stream failures carry zero
+        usage (the provider reported none); a mid-stream failure passes the
+        usage billed for what streamed before the error."""
         self._emit_trace(
             TraceRecord(
                 team_id=team_id,
@@ -270,9 +296,9 @@ class CompletionService:
                 model_name=model.name,
                 provider=model.provider.value,
                 operation=operation,
-                prompt_tokens=0,
-                completion_tokens=0,
-                cost=0.0,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cost=cost,
                 latency_ms=latency_ms,
                 status="error",
                 created_at=datetime.now(UTC),
@@ -402,8 +428,9 @@ class CompletionService:
         UsageEvent + emit a trace once the stream finishes (or the client
         disconnects — the `finally` runs on generator close). Without this,
         streamed calls were neither billed nor observed. A provider error
-        mid-stream emits a status='error' trace instead of a fake 'ok' one
-        (a client disconnect still records as 'ok': bill what was seen).
+        mid-stream still bills what streamed before the failure (those tokens
+        were paid upstream) but emits a status='error' trace instead of a fake
+        'ok' one (a client disconnect records as 'ok': bill what was seen).
         A real disconnect arrives as scope cancellation at the provider await,
         so the settlement is shielded — otherwise its first checkpoint would
         re-raise CancelledError and the billing write would silently vanish.
@@ -437,27 +464,52 @@ class CompletionService:
             # re-raise CancelledError — no ledger row, no outbox, no trace.
             with anyio.CancelScope(shield=True):
                 latency_ms = (perf_counter() - start) * 1000
+                # Even with zero streamed output (disconnect or failure before
+                # the first content chunk) the provider consumed the prompt —
+                # bill it. This applies to the error path too: tokens streamed
+                # before a mid-stream provider failure were paid upstream.
+                if not _has_tokens(usage):
+                    estimate = {
+                        "prompt_tokens": _estimate_tokens(len(_request_text(request))),
+                        "completion_tokens": _estimate_tokens(streamed_chars),
+                    }
+                    if _has_tokens(estimate):
+                        usage = estimate
+                        logger.warning(
+                            "stream ended without authoritative usage; billing estimate: "
+                            "team=%s model=%s op=%s prompt=%s completion=%s",
+                            team_id,
+                            model.name,
+                            operation,
+                            usage["prompt_tokens"],
+                            usage["completion_tokens"],
+                        )
                 if error is not None:
-                    self._emit_error_trace(team_id, api_key_id, model, operation, latency_ms, error)
+                    # Bill what was seen, but keep the honest error trace
+                    # (carrying the billed usage) instead of a fake 'ok' one.
+                    prompt, completion, cost = _parse_usage(model, usage)
+                    await self._bill(
+                        team_id,
+                        api_key_id,
+                        model,
+                        operation,
+                        prompt,
+                        completion,
+                        cost,
+                        datetime.now(UTC),
+                    )
+                    self._emit_error_trace(
+                        team_id,
+                        api_key_id,
+                        model,
+                        operation,
+                        latency_ms,
+                        error,
+                        prompt_tokens=prompt,
+                        completion_tokens=completion,
+                        cost=cost,
+                    )
                 else:
-                    # Even with zero streamed output (disconnect before the first
-                    # content chunk) the provider consumed the prompt — bill it.
-                    if not _has_tokens(usage):
-                        estimate = {
-                            "prompt_tokens": _estimate_tokens(len(_request_text(request))),
-                            "completion_tokens": _estimate_tokens(streamed_chars),
-                        }
-                        if _has_tokens(estimate):
-                            usage = estimate
-                            logger.warning(
-                                "stream ended without authoritative usage; billing estimate: "
-                                "team=%s model=%s op=%s prompt=%s completion=%s",
-                                team_id,
-                                model.name,
-                                operation,
-                                usage["prompt_tokens"],
-                                usage["completion_tokens"],
-                            )
                     await self._observe(
                         team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
                     )
