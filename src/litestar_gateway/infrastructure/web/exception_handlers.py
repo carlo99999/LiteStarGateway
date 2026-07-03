@@ -46,7 +46,9 @@ from litestar_gateway.domain.exceptions import (
     SSOIdentityConflict,
     TeamNotFound,
     UnsupportedOperation,
+    UpstreamAuthFailed,
     UpstreamRateLimited,
+    UpstreamRequestRejected,
     UpstreamTimeout,
     UpstreamUnavailable,
     UserNotFound,
@@ -87,6 +89,8 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     (UpstreamRateLimited, HTTP_429_TOO_MANY_REQUESTS),
     (UpstreamTimeout, HTTP_504_GATEWAY_TIMEOUT),
     (UpstreamUnavailable, HTTP_502_BAD_GATEWAY),
+    (UpstreamAuthFailed, HTTP_502_BAD_GATEWAY),
+    (UpstreamRequestRejected, HTTP_400_BAD_REQUEST),
 ]
 
 

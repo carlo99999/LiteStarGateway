@@ -1,5 +1,7 @@
 """Composition root: wires settings, persistence, services and the web layer."""
 
+import logging
+
 from litestar import Litestar, Response, get
 from litestar.di import NamedDependency, Provide
 from litestar.openapi.config import OpenAPIConfig
@@ -55,6 +57,8 @@ from litestar_gateway.infrastructure.web.session.sso import create_sso_router
 from litestar_gateway.infrastructure.web.teams import TeamController
 from litestar_gateway.infrastructure.web.users import create_users_router
 from litestar_gateway.infrastructure.web.users.dependencies import provide_user_service
+
+logger = logging.getLogger("litestar_gateway.app")
 
 
 def create_app(
@@ -166,6 +170,16 @@ def create_app(
     # per name (per-process). With REDIS_URL, back them with a shared Redis store so
     # limits hold across replicas. Namespaced per limiter, one client.
     stores: dict[str, Store] = {}
+    if settings.is_production and not settings.redis_url:
+        # A single instance is legitimate, so this is a warning, not an error -
+        # but it must be impossible to miss: with N workers/replicas every
+        # configured limit silently becomes N x the intended one.
+        logger.warning(
+            "REDIS_URL is not set: rate limits are enforced in-memory PER "
+            "PROCESS. With multiple workers or replicas every limit is "
+            "effectively multiplied by the instance count - set REDIS_URL to "
+            "share the stores."
+        )
     if settings.redis_url:
         redis = RedisStore.with_client(url=settings.redis_url)
         stores = {
