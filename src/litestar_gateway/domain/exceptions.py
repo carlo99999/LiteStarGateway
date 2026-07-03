@@ -128,6 +128,14 @@ class ModelTypeMismatch(DomainError):
     """The model's type does not match the requested operation (e.g. chat vs embeddings)."""
 
 
+class ServicePrincipalNotFound(DomainError):
+    """No such service principal in this team."""
+
+
+class ManagementScopeRequiresServicePrincipal(DomainError):
+    """A personal key cannot hold management/all scope — use a service principal."""
+
+
 class InvalidKeyScope(DomainError):
     """The requested API-key scope is not one of inference/management/all."""
 

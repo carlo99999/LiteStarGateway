@@ -52,6 +52,10 @@ from litestar_gateway.infrastructure.web.organizations.dependencies import (
     provide_organization_service,
     provide_team_service,
 )
+from litestar_gateway.infrastructure.web.service_principals import ServicePrincipalController
+from litestar_gateway.infrastructure.web.service_principals.dependencies import (
+    provide_service_principal_service,
+)
 from litestar_gateway.infrastructure.web.session import create_session_router
 from litestar_gateway.infrastructure.web.session.sso import create_sso_router
 from litestar_gateway.infrastructure.web.teams import TeamController
@@ -102,6 +106,7 @@ def create_app(
         OrganizationController,  # platform-admin: orgs + team creation
         TeamController,  # team-admin: members + team-scoped API keys
         ModelController,  # team-admin: team-scoped model deployments
+        ServicePrincipalController,  # team-admin: service principals + their keys
         CredentialController,  # platform-admin: encrypted provider credentials
         AuditController,  # platform-admin: read the audit trail
     ]
@@ -113,6 +118,9 @@ def create_app(
         "model_service": Provide(provide_model_service, sync_to_thread=False),
         "credential_service": Provide(provide_credential_service, sync_to_thread=False),
         "completion_service": Provide(provide_completion_service, sync_to_thread=False),
+        "service_principal_service": Provide(
+            provide_service_principal_service, sync_to_thread=False
+        ),
         "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
         "budget_repository": Provide(provide_budget_repository, sync_to_thread=False),
         "audit_log": Provide(provide_audit_log, sync_to_thread=False),

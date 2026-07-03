@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import APIKey
@@ -29,6 +30,7 @@ class SQLAlchemyAPIKeyRepository:
             revoked_at=key.revoked_at,
             last_used_at=key.last_used_at,
             scope=key.scope.value,
+            service_principal_id=key.service_principal_id,
         )
         self._session.add(model)
         await self._session.commit()
@@ -66,3 +68,28 @@ class SQLAlchemyAPIKeyRepository:
         await self._session.commit()
         await self._session.refresh(model)
         return model.to_entity()
+
+    async def revoke_personal_keys_for_user(self, user_id: UUID, revoked_at: datetime) -> None:
+        await self._session.execute(
+            update(APIKeyModel)
+            .where(
+                APIKeyModel.created_by == user_id,
+                APIKeyModel.service_principal_id.is_(None),
+                APIKeyModel.revoked_at.is_(None),
+            )
+            .values(revoked_at=revoked_at)
+        )
+        await self._session.commit()
+
+    async def revoke_for_service_principal(
+        self, service_principal_id: UUID, revoked_at: datetime
+    ) -> None:
+        await self._session.execute(
+            update(APIKeyModel)
+            .where(
+                APIKeyModel.service_principal_id == service_principal_id,
+                APIKeyModel.revoked_at.is_(None),
+            )
+            .values(revoked_at=revoked_at)
+        )
+        await self._session.commit()

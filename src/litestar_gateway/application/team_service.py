@@ -114,7 +114,16 @@ class TeamService:
         team = await self._teams.get(team_id)
         if team is None:
             raise TeamNotFound(str(team_id))
-        if not key.scope.allows_management or key.team_id != team_id:
+        # Management is reserved for a key that belongs to an *enabled* service
+        # principal of this team. A personal key (no SP) or a disabled SP's key
+        # can never manage — regardless of the key's stored scope.
+        sp = principal.service_principal
+        if (
+            not key.scope.allows_management
+            or key.team_id != team_id
+            or sp is None
+            or not sp.enabled
+        ):
             raise PermissionDenied("API key cannot manage this team")
         return team
 

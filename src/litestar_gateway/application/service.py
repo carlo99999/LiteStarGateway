@@ -11,7 +11,11 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from litestar_gateway.domain.entities import APIKey, IssuedKey, KeyScope
-from litestar_gateway.domain.exceptions import APIKeyNotFound, InvalidAPIKey
+from litestar_gateway.domain.exceptions import (
+    APIKeyNotFound,
+    InvalidAPIKey,
+    ManagementScopeRequiresServicePrincipal,
+)
 from litestar_gateway.domain.key_generator import generate_key, hash_key
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.domain.ports import APIKeyRepository
@@ -39,7 +43,14 @@ class APIKeyService:
         created_by: UUID,
         name: str | None = None,
         scope: KeyScope = KeyScope.INFERENCE,
+        service_principal_id: UUID | None = None,
     ) -> IssuedKey:
+        # Management/all scope is reserved for service-principal keys: a personal
+        # key (no SP) can only ever do inference. A human manages via their JWT.
+        if scope.allows_management and service_principal_id is None:
+            raise ManagementScopeRequiresServicePrincipal(
+                "Only a service-principal key can hold management scope"
+            )
         material = generate_key()
         key = APIKey(
             id=uuid4(),
@@ -52,6 +63,7 @@ class APIKeyService:
             revoked_at=None,
             last_used_at=None,
             scope=scope,
+            service_principal_id=service_principal_id,
         )
         stored = await self._repo.add(key)
         return IssuedKey(key=stored, plaintext=material.plaintext)
@@ -66,6 +78,12 @@ class APIKeyService:
         if key.last_used_at is None or now - _as_utc(key.last_used_at) >= _LAST_USED_THROTTLE:
             return await self._repo.update(dataclasses.replace(key, last_used_at=now))
         return key
+
+    async def revoke_for_service_principal(self, sp_id: UUID, revoked_at) -> None:  # noqa: ANN001
+        await self._repo.revoke_for_service_principal(sp_id, revoked_at)
+
+    async def revoke_personal_keys_for_user(self, user_id: UUID, revoked_at) -> None:  # noqa: ANN001
+        await self._repo.revoke_personal_keys_for_user(user_id, revoked_at)
 
     async def revoke_for_team(self, team_id: UUID, key_id: UUID) -> None:
         key = await self._repo.get(key_id)

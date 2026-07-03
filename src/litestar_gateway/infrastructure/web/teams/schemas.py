@@ -11,6 +11,7 @@ from litestar_gateway.domain.entities import (
     ApiKeySpend,
     Budget,
     IssuedKey,
+    ServicePrincipal,
     Team,
     TeamMembership,
     TeamRole,
@@ -212,4 +213,33 @@ class KeySpendingResponse:
             total_tokens=prompt + completion,
             cost=spend.cost if spend else 0.0,
             calls=spend.calls if spend else 0,
+        )
+
+
+@dataclass(frozen=True)
+class CreateServicePrincipalRequest:
+    name: str
+
+
+@dataclass(frozen=True)
+class SetServicePrincipalEnabledRequest:
+    enabled: bool
+
+
+@dataclass(frozen=True)
+class ServicePrincipalResponse:
+    id: UUID
+    team_id: UUID
+    name: str
+    enabled: bool
+    created_at: datetime
+
+    @classmethod
+    def from_entity(cls, sp: ServicePrincipal) -> ServicePrincipalResponse:
+        return cls(
+            id=sp.id,
+            team_id=sp.team_id,
+            name=sp.name,
+            enabled=sp.enabled,
+            created_at=sp.created_at,
         )

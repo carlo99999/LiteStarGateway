@@ -25,6 +25,7 @@ from litestar_gateway.domain.entities import (
     PasswordReset,
     Provider,
     SecretKey,
+    ServicePrincipal,
     Team,
     TeamMembership,
     TeamRole,
@@ -306,6 +307,25 @@ class ModelRecord(base.UUIDAuditBase):
         )
 
 
+class ServicePrincipalModel(base.UUIDAuditBase):
+    """A team-owned machine identity; its keys carry management scope."""
+
+    __tablename__ = "service_principal"
+
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    name: Mapped[str] = mapped_column()
+    enabled: Mapped[bool] = mapped_column(default=True)
+
+    def to_entity(self) -> ServicePrincipal:
+        return ServicePrincipal(
+            id=self.id,
+            team_id=self.team_id,
+            name=self.name,
+            enabled=self.enabled,
+            created_at=self.created_at,
+        )
+
+
 class APIKeyModel(base.UUIDAuditBase):
     """`UUIDAuditBase` provides `id`, `created_at`, `updated_at`."""
 
@@ -319,6 +339,9 @@ class APIKeyModel(base.UUIDAuditBase):
     revoked_at: Mapped[datetime | None] = mapped_column(default=None)
     last_used_at: Mapped[datetime | None] = mapped_column(default=None)
     scope: Mapped[str] = mapped_column(default=KeyScope.INFERENCE.value)
+    service_principal_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("service_principal.id"), default=None, index=True
+    )
 
     def to_entity(self) -> APIKey:
         return APIKey(
@@ -332,4 +355,5 @@ class APIKeyModel(base.UUIDAuditBase):
             revoked_at=self.revoked_at,
             last_used_at=self.last_used_at,
             scope=KeyScope(self.scope),
+            service_principal_id=self.service_principal_id,
         )
