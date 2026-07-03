@@ -39,6 +39,9 @@ jobs:
       - name: Type check (pyrefly)
         run: uv run pyrefly check
 
+      - name: Dependency CVE scan (pip-audit)
+        run: uv run --with pip-audit pip-audit
+
       # Coverage gate: the project's stated bar is 80% (currently ~94%).
       - name: Tests (pytest + coverage gate)
         run: uv run pytest -q --cov=src/litestar_gateway --cov-report=term --cov-fail-under=80
