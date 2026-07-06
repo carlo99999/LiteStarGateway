@@ -315,3 +315,30 @@ async def test_provider_error_mid_stream_bills_streamed_usage() -> None:
     assert usage.events[0].completion_tokens == 3  # 12 streamed chars → 3 tokens
     assert [t.status for t in traces] == ["error"]  # no fake 'ok' trace
     assert traces[0].completion_tokens == 3  # the error trace carries the bill
+
+
+class FailingUpfrontGateway(StreamGateway):
+    """Rejects the request before emitting any chunk (an upfront 429/401/400)."""
+
+    async def _stream(self) -> AsyncIterator[dict[str, Any]]:
+        raise RuntimeError("provider rejected the request")
+        yield {}  # pragma: no cover - unreachable; makes _stream an async generator
+
+
+async def test_provider_reject_before_output_bills_nothing() -> None:
+    # M26: a provider that rejects the request before producing anything consumed
+    # nothing upstream — bill nothing (don't fabricate a prompt estimate), but
+    # still emit an honest status='error' trace with zeroed usage.
+    traces: list[TraceRecord] = []
+    usage = FakeUsage()
+    service = _service(FailingUpfrontGateway(_chat_chunks()), usage, traces)
+
+    stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(CHAT_REQUEST))
+    with pytest.raises(RuntimeError):
+        async for _ in stream:
+            pass
+
+    assert usage.events == []  # nothing billed for a zero-consumption rejection
+    assert [t.status for t in traces] == ["error"]
+    assert traces[0].prompt_tokens == 0
+    assert traces[0].completion_tokens == 0
