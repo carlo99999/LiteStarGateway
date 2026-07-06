@@ -1,0 +1,987 @@
+{
+  ".claude-plugin/marketplace.json": {
+    "mtime": 1782813196.0,
+    "ast_hash": "caa8f7d40351fc927339cd3ab383b391",
+    "semantic_hash": "caa8f7d40351fc927339cd3ab383b391"
+  },
+  ".claude-plugin/plugin.json": {
+    "mtime": 1782813196.0,
+    "ast_hash": "5d0c2e4e60fadad7013639e11011b627",
+    "semantic_hash": "5d0c2e4e60fadad7013639e11011b627"
+  },
+  ".claude/settings.json": {
+    "mtime": 1783334315.9893236,
+    "ast_hash": "e51077b6a7f1f67afc748f1a32a1557d",
+    "semantic_hash": "e51077b6a7f1f67afc748f1a32a1557d"
+  },
+  "docker-entrypoint.sh": {
+    "mtime": 1783080126.3141444,
+    "ast_hash": "e55c82258d43502553c68e3addee99a1",
+    "semantic_hash": "e55c82258d43502553c68e3addee99a1"
+  },
+  "migrations/__init__.py": {
+    "mtime": 1782917510.1497886,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "migrations/env.py": {
+    "mtime": 1782917510.1502059,
+    "ast_hash": "7076321232b298b98ec10c61748019f1",
+    "semantic_hash": "7076321232b298b98ec10c61748019f1"
+  },
+  "migrations/versions/2026-07-01_add_invite_expires_at_d2b3c4e5f6a7.py": {
+    "mtime": 1782942943.9979522,
+    "ast_hash": "d1c230ec9479b9ebc74a368c3686c391",
+    "semantic_hash": "d1c230ec9479b9ebc74a368c3686c391"
+  },
+  "migrations/versions/2026-07-01_add_password_reset_table_3bde5e9b6c0a.py": {
+    "mtime": 1782917510.1508114,
+    "ast_hash": "7e77863701d1b84a4a9e4e9523677f32",
+    "semantic_hash": "7e77863701d1b84a4a9e4e9523677f32"
+  },
+  "migrations/versions/2026-07-01_add_secret_key_keyring_credential_key_id_f7df7d9dca05.py": {
+    "mtime": 1782917510.1511762,
+    "ast_hash": "96f8f3f56a44bd92f2dd2c219622da32",
+    "semantic_hash": "96f8f3f56a44bd92f2dd2c219622da32"
+  },
+  "migrations/versions/2026-07-01_add_usage_event_table_b84683c8f499.py": {
+    "mtime": 1782917510.1515129,
+    "ast_hash": "8e2b01b64c393d599ce7b6d3d48df186",
+    "semantic_hash": "8e2b01b64c393d599ce7b6d3d48df186"
+  },
+  "migrations/versions/2026-07-01_add_user_sso_subject_c1a2b3d4e5f6.py": {
+    "mtime": 1782940295.378086,
+    "ast_hash": "fd7d7001b1dddc13d1cf4956e966883a",
+    "semantic_hash": "fd7d7001b1dddc13d1cf4956e966883a"
+  },
+  "migrations/versions/2026-07-01_baseline_schema_b5fb4086b1e7.py": {
+    "mtime": 1782917510.1519806,
+    "ast_hash": "4449726da854899f3b1b89708d56c3c4",
+    "semantic_hash": "4449726da854899f3b1b89708d56c3c4"
+  },
+  "migrations/versions/2026-07-02_add_audit_event_table_f4d5e6a7b8c9.py": {
+    "mtime": 1782980076.6254368,
+    "ast_hash": "c3222f007041af30494197b9ed324b54",
+    "semantic_hash": "c3222f007041af30494197b9ed324b54"
+  },
+  "migrations/versions/2026-07-02_add_pending_usage_event_a5b6c7d8e9fa.py": {
+    "mtime": 1782981297.0271354,
+    "ast_hash": "aacf324d5206626edb2b1f33e052111c",
+    "semantic_hash": "aacf324d5206626edb2b1f33e052111c"
+  },
+  "migrations/versions/2026-07-02_add_user_is_active_e3c4d5f6a7b8.py": {
+    "mtime": 1782946458.1972463,
+    "ast_hash": "5e5e6684c2718320a5100317b7dede93",
+    "semantic_hash": "5e5e6684c2718320a5100317b7dede93"
+  },
+  "migrations/versions/2026-07-03_add_api_key_scope_d9e0f1a2b3c4.py": {
+    "mtime": 1783082605.2175124,
+    "ast_hash": "b6e5dbb0ec32c404412beb164a00aa75",
+    "semantic_hash": "b6e5dbb0ec32c404412beb164a00aa75"
+  },
+  "migrations/versions/2026-07-03_add_login_lockout_columns_c8d9e0f1a2b3.py": {
+    "mtime": 1783073398.1238453,
+    "ast_hash": "172dcd0624a618b2d074de504d5071b0",
+    "semantic_hash": "172dcd0624a618b2d074de504d5071b0"
+  },
+  "migrations/versions/2026-07-03_add_pending_usage_event_attempts_f1a2b3c4d5e6.py": {
+    "mtime": 1783095672.4551795,
+    "ast_hash": "dec16eff16b9cbd533243a237ce6471e",
+    "semantic_hash": "dec16eff16b9cbd533243a237ce6471e"
+  },
+  "migrations/versions/2026-07-03_add_service_principals_e0f1a2b3c4d5.py": {
+    "mtime": 1783084668.0721986,
+    "ast_hash": "96d651c6bb66feb7f3ad7b9d5100dca3",
+    "semantic_hash": "96d651c6bb66feb7f3ad7b9d5100dca3"
+  },
+  "migrations/versions/2026-07-03_add_team_budget_table_b7c8d9e0f1a2.py": {
+    "mtime": 1783067003.4585507,
+    "ast_hash": "cb2c041e42483523c77700af6eacd4ef",
+    "semantic_hash": "cb2c041e42483523c77700af6eacd4ef"
+  },
+  "migrations/versions/2026-07-03_add_user_lockout_cycles_a2b3c4d5e6f7.py": {
+    "mtime": 1783095672.4555306,
+    "ast_hash": "775546ad62661f38a6b9af2ceea66d3c",
+    "semantic_hash": "775546ad62661f38a6b9af2ceea66d3c"
+  },
+  "migrations/versions/__init__.py": {
+    "mtime": 1782917510.1520286,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "pyproject.toml": {
+    "mtime": 1783096750.0989392,
+    "ast_hash": "e95cb6090e17ea255db2fa834a240720",
+    "semantic_hash": "e95cb6090e17ea255db2fa834a240720"
+  },
+  "src/litestar_gateway/__init__.py": {
+    "mtime": 1782824568.269026,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "src/litestar_gateway/app.py": {
+    "mtime": 1783084668.073094,
+    "ast_hash": "eeb544341f933dbc016d2135a6b5826f",
+    "semantic_hash": "eeb544341f933dbc016d2135a6b5826f"
+  },
+  "src/litestar_gateway/application/__init__.py": {
+    "mtime": 1782816253.0819275,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "src/litestar_gateway/application/completion_service.py": {
+    "mtime": 1783334480.2680724,
+    "ast_hash": "e8cc703e5979810e0448e134296d9003",
+    "semantic_hash": "e8cc703e5979810e0448e134296d9003"
+  },
+  "src/litestar_gateway/application/model_service.py": {
+    "mtime": 1783064387.3311458,
+    "ast_hash": "a76d32bb33894830eb49dd8f2575b603",
+    "semantic_hash": "a76d32bb33894830eb49dd8f2575b603"
+  },
+  "src/litestar_gateway/application/organization_service.py": {
+    "mtime": 1783064387.3347344,
+    "ast_hash": "94620bec368f3715d885a3f533d49db3",
+    "semantic_hash": "94620bec368f3715d885a3f533d49db3"
+  },
+  "src/litestar_gateway/application/service.py": {
+    "mtime": 1783095672.4560819,
+    "ast_hash": "881252ee987a6146056a048b6865c2f0",
+    "semantic_hash": "881252ee987a6146056a048b6865c2f0"
+  },
+  "src/litestar_gateway/application/service_principal_service.py": {
+    "mtime": 1783084668.0739002,
+    "ast_hash": "41ab94fad70c1a2721e1c5159f3cf0aa",
+    "semantic_hash": "41ab94fad70c1a2721e1c5159f3cf0aa"
+  },
+  "src/litestar_gateway/application/team_service.py": {
+    "mtime": 1783084668.074255,
+    "ast_hash": "73c06eecf4d06c9013c9225573a7e401",
+    "semantic_hash": "73c06eecf4d06c9013c9225573a7e401"
+  },
+  "src/litestar_gateway/application/usage_meter.py": {
+    "mtime": 1783334480.2682905,
+    "ast_hash": "a3df0bf2d7b1de445fdd336f349c6036",
+    "semantic_hash": "a3df0bf2d7b1de445fdd336f349c6036"
+  },
+  "src/litestar_gateway/application/user_service.py": {
+    "mtime": 1783095672.456317,
+    "ast_hash": "16e13facec2873857a5fa5ebab93c9ab",
+    "semantic_hash": "16e13facec2873857a5fa5ebab93c9ab"
+  },
+  "src/litestar_gateway/config.py": {
+    "mtime": 1783079141.812249,
+    "ast_hash": "084bdd3a6704085bf07859f11ac86eea",
+    "semantic_hash": "084bdd3a6704085bf07859f11ac86eea"
+  },
+  "src/litestar_gateway/domain/__init__.py": {
+    "mtime": 1782816224.3455954,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "src/litestar_gateway/domain/budget.py": {
+    "mtime": 1783067003.4635534,
+    "ast_hash": "0347b0fc09eb0e99ca6d5ef34f9ff106",
+    "semantic_hash": "0347b0fc09eb0e99ca6d5ef34f9ff106"
+  },
+  "src/litestar_gateway/domain/entities.py": {
+    "mtime": 1783095672.4567351,
+    "ast_hash": "e784d3fd36269394c1e42b97f7c17e7e",
+    "semantic_hash": "e784d3fd36269394c1e42b97f7c17e7e"
+  },
+  "src/litestar_gateway/domain/exceptions.py": {
+    "mtime": 1783084668.0754228,
+    "ast_hash": "f02d9d74cc05d8fe6b32a531303a5876",
+    "semantic_hash": "f02d9d74cc05d8fe6b32a531303a5876"
+  },
+  "src/litestar_gateway/domain/key_generator.py": {
+    "mtime": 1782816245.42906,
+    "ast_hash": "5466303f153233119637d0de68884703",
+    "semantic_hash": "5466303f153233119637d0de68884703"
+  },
+  "src/litestar_gateway/domain/pagination.py": {
+    "mtime": 1782945441.4263513,
+    "ast_hash": "08dd28d23c851cb0fa04d293fdfc154d",
+    "semantic_hash": "08dd28d23c851cb0fa04d293fdfc154d"
+  },
+  "src/litestar_gateway/domain/ports.py": {
+    "mtime": 1783095672.4570446,
+    "ast_hash": "d60b76194bc9655c440af35578eae867",
+    "semantic_hash": "d60b76194bc9655c440af35578eae867"
+  },
+  "src/litestar_gateway/domain/request_policy.py": {
+    "mtime": 1782917510.1552312,
+    "ast_hash": "25929867171557d14ede6143d9204f0f",
+    "semantic_hash": "25929867171557d14ede6143d9204f0f"
+  },
+  "src/litestar_gateway/infrastructure/__init__.py": {
+    "mtime": 1782816264.5683947,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "src/litestar_gateway/infrastructure/bootstrap.py": {
+    "mtime": 1783081153.5129793,
+    "ast_hash": "d6b601484eedd7eb46f3cd2cf87edde4",
+    "semantic_hash": "d6b601484eedd7eb46f3cd2cf87edde4"
+  },
+  "src/litestar_gateway/infrastructure/crypto.py": {
+    "mtime": 1783064387.3350174,
+    "ast_hash": "0878526f78f80b15d24cffb6319ae7cb",
+    "semantic_hash": "0878526f78f80b15d24cffb6319ae7cb"
+  },
+  "src/litestar_gateway/infrastructure/keyring.py": {
+    "mtime": 1783064387.3306873,
+    "ast_hash": "a31dde7c592f9e155a62d50868977207",
+    "semantic_hash": "a31dde7c592f9e155a62d50868977207"
+  },
+  "src/litestar_gateway/infrastructure/llm/__init__.py": {
+    "mtime": 1782833792.4992588,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "src/litestar_gateway/infrastructure/llm/anthropic_adapter.py": {
+    "mtime": 1783064387.3350818,
+    "ast_hash": "1213d01aea8a2f5a9ccc1de23b82b695",
+    "semantic_hash": "1213d01aea8a2f5a9ccc1de23b82b695"
+  },
+  "src/litestar_gateway/infrastructure/llm/azure_adapter.py": {
+    "mtime": 1783064387.330578,
+    "ast_hash": "f2dc3130c4387021c19e4b1e433768ea",
+    "semantic_hash": "f2dc3130c4387021c19e4b1e433768ea"
+  },
+  "src/litestar_gateway/infrastructure/llm/errors.py": {
+    "mtime": 1783080126.3158326,
+    "ast_hash": "86dc9c7c71c8d2aa848e2edfe852193c",
+    "semantic_hash": "86dc9c7c71c8d2aa848e2edfe852193c"
+  },
+  "src/litestar_gateway/infrastructure/llm/gateway.py": {
+    "mtime": 1783064387.330214,
+    "ast_hash": "9a6fa072ed60343e812c6b6a6dac8677",
+    "semantic_hash": "9a6fa072ed60343e812c6b6a6dac8677"
+  },
+  "src/litestar_gateway/infrastructure/llm/openai_adapter.py": {
+    "mtime": 1783064387.3334727,
+    "ast_hash": "a9675c8f41ff82440d3768c3d4618c2f",
+    "semantic_hash": "a9675c8f41ff82440d3768c3d4618c2f"
+  },
+  "src/litestar_gateway/infrastructure/llm/resilience.py": {
+    "mtime": 1782917510.157936,
+    "ast_hash": "5f68cb3efc165b43b67975855a4e3a24",
+    "semantic_hash": "5f68cb3efc165b43b67975855a4e3a24"
+  },
+  "src/litestar_gateway/infrastructure/llm/responses_emulation.py": {
+    "mtime": 1783064387.3335063,
+    "ast_hash": "b9c1aab6875117691d0500e5f8e52740",
+    "semantic_hash": "b9c1aab6875117691d0500e5f8e52740"
+  },
+  "src/litestar_gateway/infrastructure/llm/vertex_adapter.py": {
+    "mtime": 1783064387.3303556,
+    "ast_hash": "fb3ec426af2e799e64cf481263bb5d11",
+    "semantic_hash": "fb3ec426af2e799e64cf481263bb5d11"
+  },
+  "src/litestar_gateway/infrastructure/locks.py": {
+    "mtime": 1783095672.4572878,
+    "ast_hash": "18f4d5b849ab585b86741ab0ae057ec8",
+    "semantic_hash": "18f4d5b849ab585b86741ab0ae057ec8"
+  },
+  "src/litestar_gateway/infrastructure/logging.py": {
+    "mtime": 1783064387.330584,
+    "ast_hash": "7817b3dc32ae03758ba5869376da2cdb",
+    "semantic_hash": "7817b3dc32ae03758ba5869376da2cdb"
+  },
+  "src/litestar_gateway/infrastructure/observability/__init__.py": {
+    "mtime": 1782917510.1587682,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "src/litestar_gateway/infrastructure/observability/aggregator.py": {
+    "mtime": 1783079141.8126736,
+    "ast_hash": "933628e2b2f1a82051cb9f7686f6de65",
+    "semantic_hash": "933628e2b2f1a82051cb9f7686f6de65"
+  },
+  "src/litestar_gateway/infrastructure/observability/composite.py": {
+    "mtime": 1783079141.8129308,
+    "ast_hash": "f68b784352e0f667152e0d31fad3d72c",
+    "semantic_hash": "f68b784352e0f667152e0d31fad3d72c"
+  },
+  "src/litestar_gateway/infrastructure/observability/dispatcher.py": {
+    "mtime": 1783079141.8133328,
+    "ast_hash": "3abb4f18fc7993a9dd6beee4f8475d3b",
+    "semantic_hash": "3abb4f18fc7993a9dd6beee4f8475d3b"
+  },
+  "src/litestar_gateway/infrastructure/observability/factory.py": {
+    "mtime": 1783064387.33022,
+    "ast_hash": "325628a5a86adf2d86876f4cbff775fb",
+    "semantic_hash": "325628a5a86adf2d86876f4cbff775fb"
+  },
+  "src/litestar_gateway/infrastructure/observability/mlflow_metrics.py": {
+    "mtime": 1783079141.8137646,
+    "ast_hash": "5db21e579525a26defac737998cba2f2",
+    "semantic_hash": "5db21e579525a26defac737998cba2f2"
+  },
+  "src/litestar_gateway/infrastructure/observability/mlflow_sink.py": {
+    "mtime": 1783064387.3293853,
+    "ast_hash": "44be3fdb8b5f3170647ad48d54736cce",
+    "semantic_hash": "44be3fdb8b5f3170647ad48d54736cce"
+  },
+  "src/litestar_gateway/infrastructure/observability/null_sink.py": {
+    "mtime": 1783064387.335074,
+    "ast_hash": "7d37a09b8c4dc12e179515c3a4746d54",
+    "semantic_hash": "7d37a09b8c4dc12e179515c3a4746d54"
+  },
+  "src/litestar_gateway/infrastructure/persistence/__init__.py": {
+    "mtime": 1782858578.5095205,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "src/litestar_gateway/infrastructure/persistence/audit_repository.py": {
+    "mtime": 1783082605.2200897,
+    "ast_hash": "5102e409eaf78aa9d88baf66128fd5c0",
+    "semantic_hash": "5102e409eaf78aa9d88baf66128fd5c0"
+  },
+  "src/litestar_gateway/infrastructure/persistence/budget_repository.py": {
+    "mtime": 1783067003.469912,
+    "ast_hash": "e943ec6d34fe523bf145290452c60158",
+    "semantic_hash": "e943ec6d34fe523bf145290452c60158"
+  },
+  "src/litestar_gateway/infrastructure/persistence/database.py": {
+    "mtime": 1783064387.3337336,
+    "ast_hash": "7e439ed4d8d35510c613a00e338fbd6a",
+    "semantic_hash": "7e439ed4d8d35510c613a00e338fbd6a"
+  },
+  "src/litestar_gateway/infrastructure/persistence/invite_repository.py": {
+    "mtime": 1783064387.3283193,
+    "ast_hash": "bf1012c2e1e80870f67e4b60a53c0c8b",
+    "semantic_hash": "bf1012c2e1e80870f67e4b60a53c0c8b"
+  },
+  "src/litestar_gateway/infrastructure/persistence/membership_repository.py": {
+    "mtime": 1783064387.3350866,
+    "ast_hash": "f1ae9905d3cf6e5f9602fd1e3e914696",
+    "semantic_hash": "f1ae9905d3cf6e5f9602fd1e3e914696"
+  },
+  "src/litestar_gateway/infrastructure/persistence/model_repository.py": {
+    "mtime": 1783064387.334316,
+    "ast_hash": "a6aac76cd07a7329989d274fa7528822",
+    "semantic_hash": "a6aac76cd07a7329989d274fa7528822"
+  },
+  "src/litestar_gateway/infrastructure/persistence/organization_repository.py": {
+    "mtime": 1783064387.3300314,
+    "ast_hash": "379275a1dd5d5612ecd1943f3d0c0c8a",
+    "semantic_hash": "379275a1dd5d5612ecd1943f3d0c0c8a"
+  },
+  "src/litestar_gateway/infrastructure/persistence/orm.py": {
+    "mtime": 1783095672.4575572,
+    "ast_hash": "14e3c6c3dfb09ef88b42a5ef85eaafb3",
+    "semantic_hash": "14e3c6c3dfb09ef88b42a5ef85eaafb3"
+  },
+  "src/litestar_gateway/infrastructure/persistence/password_reset_repository.py": {
+    "mtime": 1783081153.513191,
+    "ast_hash": "6b142537b4ace8e391874cb7950ac314",
+    "semantic_hash": "6b142537b4ace8e391874cb7950ac314"
+  },
+  "src/litestar_gateway/infrastructure/persistence/repository.py": {
+    "mtime": 1783084668.0764637,
+    "ast_hash": "bddff6ce564107b79f23296996074463",
+    "semantic_hash": "bddff6ce564107b79f23296996074463"
+  },
+  "src/litestar_gateway/infrastructure/persistence/secret_key_repository.py": {
+    "mtime": 1783064387.331141,
+    "ast_hash": "c920121799250d2f929ad8a941afd9ed",
+    "semantic_hash": "c920121799250d2f929ad8a941afd9ed"
+  },
+  "src/litestar_gateway/infrastructure/persistence/service_principal_repository.py": {
+    "mtime": 1783084668.0767791,
+    "ast_hash": "dc9032ef52a96641ed6a5b99b79fd878",
+    "semantic_hash": "dc9032ef52a96641ed6a5b99b79fd878"
+  },
+  "src/litestar_gateway/infrastructure/persistence/team_repository.py": {
+    "mtime": 1783064387.3300161,
+    "ast_hash": "92eced715e06e94a5285f05c9d1e9daf",
+    "semantic_hash": "92eced715e06e94a5285f05c9d1e9daf"
+  },
+  "src/litestar_gateway/infrastructure/persistence/usage_repository.py": {
+    "mtime": 1783095672.4578526,
+    "ast_hash": "d0bc58349993a930b2be9473d73ea936",
+    "semantic_hash": "d0bc58349993a930b2be9473d73ea936"
+  },
+  "src/litestar_gateway/infrastructure/persistence/user_repository.py": {
+    "mtime": 1783095672.458107,
+    "ast_hash": "a0f154b527e100f712fad8bd83e5d9c8",
+    "semantic_hash": "a0f154b527e100f712fad8bd83e5d9c8"
+  },
+  "src/litestar_gateway/infrastructure/rotation.py": {
+    "mtime": 1783064387.330951,
+    "ast_hash": "4516403a4aa12a71ef3097457836371e",
+    "semantic_hash": "4516403a4aa12a71ef3097457836371e"
+  },
+  "src/litestar_gateway/infrastructure/sso/__init__.py": {
+    "mtime": 1782919639.8046944,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "src/litestar_gateway/infrastructure/sso/oidc.py": {
+    "mtime": 1783064387.3312228,
+    "ast_hash": "2540423cbfd93fa187e5c9785b9dbac0",
+    "semantic_hash": "2540423cbfd93fa187e5c9785b9dbac0"
+  },
+  "src/litestar_gateway/infrastructure/usage_reconciler.py": {
+    "mtime": 1783095720.5933552,
+    "ast_hash": "7ee7c0d154a1155d8a5b175f3203068d",
+    "semantic_hash": "7ee7c0d154a1155d8a5b175f3203068d"
+  },
+  "src/litestar_gateway/infrastructure/web/__init__.py": {
+    "mtime": 1782816304.8616023,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "src/litestar_gateway/infrastructure/web/api_router/__init__.py": {
+    "mtime": 1783064387.3348818,
+    "ast_hash": "88948498ff0167d17c1d971c838aa7cb",
+    "semantic_hash": "88948498ff0167d17c1d971c838aa7cb"
+  },
+  "src/litestar_gateway/infrastructure/web/api_router/completions.py": {
+    "mtime": 1783064387.330444,
+    "ast_hash": "99f5fca952c6086257c461005e98b82c",
+    "semantic_hash": "99f5fca952c6086257c461005e98b82c"
+  },
+  "src/litestar_gateway/infrastructure/web/api_router/dependencies.py": {
+    "mtime": 1783334480.2685614,
+    "ast_hash": "3491634857401fd0c5fa7be66a63f6f4",
+    "semantic_hash": "3491634857401fd0c5fa7be66a63f6f4"
+  },
+  "src/litestar_gateway/infrastructure/web/api_router/router.py": {
+    "mtime": 1783064387.33021,
+    "ast_hash": "2e5995af13175913ee91627fc522ae99",
+    "semantic_hash": "2e5995af13175913ee91627fc522ae99"
+  },
+  "src/litestar_gateway/infrastructure/web/api_router/wo_am_i.py": {
+    "mtime": 1782829131.4444098,
+    "ast_hash": "06cd3e19b314657f50f79f4fcc17cc0e",
+    "semantic_hash": "06cd3e19b314657f50f79f4fcc17cc0e"
+  },
+  "src/litestar_gateway/infrastructure/web/audit/__init__.py": {
+    "mtime": 1782980076.626746,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "src/litestar_gateway/infrastructure/web/audit/controller.py": {
+    "mtime": 1783082605.2219346,
+    "ast_hash": "37343051e238dd2ad7249feb7d073aae",
+    "semantic_hash": "37343051e238dd2ad7249feb7d073aae"
+  },
+  "src/litestar_gateway/infrastructure/web/audit/dependencies.py": {
+    "mtime": 1783064387.3348997,
+    "ast_hash": "629305c14f773a2311b760550b2c4dce",
+    "semantic_hash": "629305c14f773a2311b760550b2c4dce"
+  },
+  "src/litestar_gateway/infrastructure/web/audit/recorder.py": {
+    "mtime": 1783082605.2223194,
+    "ast_hash": "0a039e260803d91387f09c5b395136bf",
+    "semantic_hash": "0a039e260803d91387f09c5b395136bf"
+  },
+  "src/litestar_gateway/infrastructure/web/auth.py": {
+    "mtime": 1783084668.077055,
+    "ast_hash": "2de594d5bee7bbb872043d73155d0846",
+    "semantic_hash": "2de594d5bee7bbb872043d73155d0846"
+  },
+  "src/litestar_gateway/infrastructure/web/dependencies.py": {
+    "mtime": 1783084668.0773284,
+    "ast_hash": "3b189ee861382f51d25c8b4146787653",
+    "semantic_hash": "3b189ee861382f51d25c8b4146787653"
+  },
+  "src/litestar_gateway/infrastructure/web/exception_handlers.py": {
+    "mtime": 1783084668.0775566,
+    "ast_hash": "ae148a3f20e8b46e5f83997455bf796d",
+    "semantic_hash": "ae148a3f20e8b46e5f83997455bf796d"
+  },
+  "src/litestar_gateway/infrastructure/web/models/__init__.py": {
+    "mtime": 1783064387.331167,
+    "ast_hash": "89472d022d1e9c169265145df0d7be9f",
+    "semantic_hash": "89472d022d1e9c169265145df0d7be9f"
+  },
+  "src/litestar_gateway/infrastructure/web/models/controller.py": {
+    "mtime": 1783082605.223208,
+    "ast_hash": "8fe0c7431488f31072fe83a3aaa44ff7",
+    "semantic_hash": "8fe0c7431488f31072fe83a3aaa44ff7"
+  },
+  "src/litestar_gateway/infrastructure/web/models/dependencies.py": {
+    "mtime": 1783064387.331033,
+    "ast_hash": "03738a84aaf687c5f0b05e04f45acb65",
+    "semantic_hash": "03738a84aaf687c5f0b05e04f45acb65"
+  },
+  "src/litestar_gateway/infrastructure/web/models/schemas.py": {
+    "mtime": 1783064387.3302364,
+    "ast_hash": "409534f55a043672a9fb324760355f53",
+    "semantic_hash": "409534f55a043672a9fb324760355f53"
+  },
+  "src/litestar_gateway/infrastructure/web/organizations/__init__.py": {
+    "mtime": 1783064387.3309753,
+    "ast_hash": "8cc8a79a6fa9c0c8f8fd803e904206cd",
+    "semantic_hash": "8cc8a79a6fa9c0c8f8fd803e904206cd"
+  },
+  "src/litestar_gateway/infrastructure/web/organizations/controller.py": {
+    "mtime": 1783064387.329155,
+    "ast_hash": "5d8251f704d062b7e5390e35b674f2ad",
+    "semantic_hash": "5d8251f704d062b7e5390e35b674f2ad"
+  },
+  "src/litestar_gateway/infrastructure/web/organizations/dependencies.py": {
+    "mtime": 1783064387.3289008,
+    "ast_hash": "fa553efd868ddc399c1586135f5e07ab",
+    "semantic_hash": "fa553efd868ddc399c1586135f5e07ab"
+  },
+  "src/litestar_gateway/infrastructure/web/organizations/schemas.py": {
+    "mtime": 1783064387.3342695,
+    "ast_hash": "32b190404597ba32c6360d221030b357",
+    "semantic_hash": "32b190404597ba32c6360d221030b357"
+  },
+  "src/litestar_gateway/infrastructure/web/principal.py": {
+    "mtime": 1783084668.077879,
+    "ast_hash": "aaa5fd04213d914bd4dc6ee261f3e107",
+    "semantic_hash": "aaa5fd04213d914bd4dc6ee261f3e107"
+  },
+  "src/litestar_gateway/infrastructure/web/rate_limit.py": {
+    "mtime": 1783064387.330964,
+    "ast_hash": "aa4421953cb97978983af11b8fd4d2dd",
+    "semantic_hash": "aa4421953cb97978983af11b8fd4d2dd"
+  },
+  "src/litestar_gateway/infrastructure/web/service_principals/__init__.py": {
+    "mtime": 1783084668.078205,
+    "ast_hash": "348809a883e6f55e17dc05e601032aae",
+    "semantic_hash": "348809a883e6f55e17dc05e601032aae"
+  },
+  "src/litestar_gateway/infrastructure/web/service_principals/controller.py": {
+    "mtime": 1783084668.0784578,
+    "ast_hash": "a641ebd860c7be33102216be2568749b",
+    "semantic_hash": "a641ebd860c7be33102216be2568749b"
+  },
+  "src/litestar_gateway/infrastructure/web/service_principals/dependencies.py": {
+    "mtime": 1783084668.0787377,
+    "ast_hash": "0bebdbf6f8ec08d3e7d2d4a8e25ac3d2",
+    "semantic_hash": "0bebdbf6f8ec08d3e7d2d4a8e25ac3d2"
+  },
+  "src/litestar_gateway/infrastructure/web/session/__init__.py": {
+    "mtime": 1783064387.3343503,
+    "ast_hash": "72b0cf500cf34a3ff3a858c3642926cf",
+    "semantic_hash": "72b0cf500cf34a3ff3a858c3642926cf"
+  },
+  "src/litestar_gateway/infrastructure/web/session/dependencies.py": {
+    "mtime": 1783064387.3309739,
+    "ast_hash": "403367371c58f54378393688343794fd",
+    "semantic_hash": "403367371c58f54378393688343794fd"
+  },
+  "src/litestar_gateway/infrastructure/web/session/jwt.py": {
+    "mtime": 1782917510.1642442,
+    "ast_hash": "b85b421fa930359021417be133213dcc",
+    "semantic_hash": "b85b421fa930359021417be133213dcc"
+  },
+  "src/litestar_gateway/infrastructure/web/session/login.py": {
+    "mtime": 1783064387.3304236,
+    "ast_hash": "7cc74bbe2a988f055f89e61ad80fb8d1",
+    "semantic_hash": "7cc74bbe2a988f055f89e61ad80fb8d1"
+  },
+  "src/litestar_gateway/infrastructure/web/session/logout.py": {
+    "mtime": 1783064387.330041,
+    "ast_hash": "a05377eb960096df11b98e2285c39ac5",
+    "semantic_hash": "a05377eb960096df11b98e2285c39ac5"
+  },
+  "src/litestar_gateway/infrastructure/web/session/me.py": {
+    "mtime": 1783064387.3302636,
+    "ast_hash": "aba234edd1a270aecf8a420a1410d69c",
+    "semantic_hash": "aba234edd1a270aecf8a420a1410d69c"
+  },
+  "src/litestar_gateway/infrastructure/web/session/router.py": {
+    "mtime": 1783064387.333399,
+    "ast_hash": "9d725e16b3ca1c265382e871ecde359d",
+    "semantic_hash": "9d725e16b3ca1c265382e871ecde359d"
+  },
+  "src/litestar_gateway/infrastructure/web/session/schemas.py": {
+    "mtime": 1782825366.342094,
+    "ast_hash": "53c322ab8cb0b096415377cec15e6505",
+    "semantic_hash": "53c322ab8cb0b096415377cec15e6505"
+  },
+  "src/litestar_gateway/infrastructure/web/session/sso.py": {
+    "mtime": 1783064387.3305178,
+    "ast_hash": "627f8165939417867c7faa4f7d8b0419",
+    "semantic_hash": "627f8165939417867c7faa4f7d8b0419"
+  },
+  "src/litestar_gateway/infrastructure/web/teams/__init__.py": {
+    "mtime": 1783064387.3304775,
+    "ast_hash": "f3ca58b188f3c1f85825f1fb035ea081",
+    "semantic_hash": "f3ca58b188f3c1f85825f1fb035ea081"
+  },
+  "src/litestar_gateway/infrastructure/web/teams/controller.py": {
+    "mtime": 1783082605.224073,
+    "ast_hash": "0a59add572f216ad059302cc37495647",
+    "semantic_hash": "0a59add572f216ad059302cc37495647"
+  },
+  "src/litestar_gateway/infrastructure/web/teams/schemas.py": {
+    "mtime": 1783084668.0791001,
+    "ast_hash": "2971fad5918a9cf8cf79489566e0569a",
+    "semantic_hash": "2971fad5918a9cf8cf79489566e0569a"
+  },
+  "src/litestar_gateway/infrastructure/web/users/__init__.py": {
+    "mtime": 1783064387.330441,
+    "ast_hash": "5e9f459a5fb1266247d0311cd6581cfb",
+    "semantic_hash": "5e9f459a5fb1266247d0311cd6581cfb"
+  },
+  "src/litestar_gateway/infrastructure/web/users/dependencies.py": {
+    "mtime": 1783084668.0795112,
+    "ast_hash": "13f511909a3a665a97a8f76ba68961e6",
+    "semantic_hash": "13f511909a3a665a97a8f76ba68961e6"
+  },
+  "src/litestar_gateway/infrastructure/web/users/invites.py": {
+    "mtime": 1783064387.3344655,
+    "ast_hash": "086c9ae789907169cf4b422fb09d1d7c",
+    "semantic_hash": "086c9ae789907169cf4b422fb09d1d7c"
+  },
+  "src/litestar_gateway/infrastructure/web/users/router.py": {
+    "mtime": 1783095672.4588325,
+    "ast_hash": "a9ddf3532b2595fe30a7c61995e46166",
+    "semantic_hash": "a9ddf3532b2595fe30a7c61995e46166"
+  },
+  "src/litestar_gateway/infrastructure/web/users/schemas.py": {
+    "mtime": 1783064387.3299859,
+    "ast_hash": "b0d17a10eabb974e3a4d480c05768846",
+    "semantic_hash": "b0d17a10eabb974e3a4d480c05768846"
+  },
+  "src/litestar_gateway/infrastructure/web/users/set_active.py": {
+    "mtime": 1783064387.3304112,
+    "ast_hash": "43e2875535a92dea1d55e53382f874f9",
+    "semantic_hash": "43e2875535a92dea1d55e53382f874f9"
+  },
+  "src/litestar_gateway/infrastructure/web/users/signup.py": {
+    "mtime": 1783064387.3348618,
+    "ast_hash": "dda1079efbc21b74fb638f04eedb1159",
+    "semantic_hash": "dda1079efbc21b74fb638f04eedb1159"
+  },
+  "src/litestar_gateway/infrastructure/web/users/unlock.py": {
+    "mtime": 1783095672.4591863,
+    "ast_hash": "1caf5220cc948f80b2e33bf401cee2e1",
+    "semantic_hash": "1caf5220cc948f80b2e33bf401cee2e1"
+  },
+  "tests/test_api_keys.py": {
+    "mtime": 1783064151.3168948,
+    "ast_hash": "7280b9205ab93afd80fd343a778d616a",
+    "semantic_hash": "7280b9205ab93afd80fd343a778d616a"
+  },
+  "tests/test_audit.py": {
+    "mtime": 1783064151.317796,
+    "ast_hash": "c428bef8599f9338accdc040b0ff4d1f",
+    "semantic_hash": "c428bef8599f9338accdc040b0ff4d1f"
+  },
+  "tests/test_auth_realm.py": {
+    "mtime": 1783064151.3168085,
+    "ast_hash": "3fae035fda53b65110038ce64022035e",
+    "semantic_hash": "3fae035fda53b65110038ce64022035e"
+  },
+  "tests/test_budget_enforcement.py": {
+    "mtime": 1783334480.268789,
+    "ast_hash": "65a032fb9581e2830d32a7c8cb497d6b",
+    "semantic_hash": "65a032fb9581e2830d32a7c8cb497d6b"
+  },
+  "tests/test_budget_window.py": {
+    "mtime": 1783067003.4821827,
+    "ast_hash": "df6d9791108770cf859f4f803a9c54e3",
+    "semantic_hash": "df6d9791108770cf859f4f803a9c54e3"
+  },
+  "tests/test_budgets.py": {
+    "mtime": 1783067003.4853399,
+    "ast_hash": "55f7c0c8d505428b352ba56626e96766",
+    "semantic_hash": "55f7c0c8d505428b352ba56626e96766"
+  },
+  "tests/test_completion_service_traces.py": {
+    "mtime": 1783334480.2690258,
+    "ast_hash": "78c4b7b94c3e91e8843236f699513129",
+    "semantic_hash": "78c4b7b94c3e91e8843236f699513129"
+  },
+  "tests/test_completions.py": {
+    "mtime": 1783064151.3180213,
+    "ast_hash": "12c369e5e3f44937508d217fea08a3ed",
+    "semantic_hash": "12c369e5e3f44937508d217fea08a3ed"
+  },
+  "tests/test_config.py": {
+    "mtime": 1783095672.4598472,
+    "ast_hash": "177cee161860b8110aca1eb2c10bdf08",
+    "semantic_hash": "177cee161860b8110aca1eb2c10bdf08"
+  },
+  "tests/test_database_config.py": {
+    "mtime": 1783064151.317951,
+    "ast_hash": "910fffbbd3f054a60b4ceb5b24c4170f",
+    "semantic_hash": "910fffbbd3f054a60b4ceb5b24c4170f"
+  },
+  "tests/test_docs.py": {
+    "mtime": 1783064151.317381,
+    "ast_hash": "dc40e644e85e9f244187a7219bc7cb19",
+    "semantic_hash": "dc40e644e85e9f244187a7219bc7cb19"
+  },
+  "tests/test_health.py": {
+    "mtime": 1783064151.3168163,
+    "ast_hash": "10075379b2f338ce18c4b27d9610e9e9",
+    "semantic_hash": "10075379b2f338ce18c4b27d9610e9e9"
+  },
+  "tests/test_key_principal.py": {
+    "mtime": 1783084668.0799155,
+    "ast_hash": "b498ac6bf42ee4cffdb7f97e6efd31cb",
+    "semantic_hash": "b498ac6bf42ee4cffdb7f97e6efd31cb"
+  },
+  "tests/test_logging.py": {
+    "mtime": 1783074141.3132873,
+    "ast_hash": "83a4055635a2a2763a9e8b812f5f1d20",
+    "semantic_hash": "83a4055635a2a2763a9e8b812f5f1d20"
+  },
+  "tests/test_login_lockout.py": {
+    "mtime": 1783095672.4602506,
+    "ast_hash": "e366118f23eda1c17413f2b979311247",
+    "semantic_hash": "e366118f23eda1c17413f2b979311247"
+  },
+  "tests/test_mlflow_metrics.py": {
+    "mtime": 1783079141.8140588,
+    "ast_hash": "d900832c3b8329531e410e657fd7f0e5",
+    "semantic_hash": "d900832c3b8329531e410e657fd7f0e5"
+  },
+  "tests/test_models.py": {
+    "mtime": 1783064151.316972,
+    "ast_hash": "1c29494ac62d9037099c7c990761aff2",
+    "semantic_hash": "1c29494ac62d9037099c7c990761aff2"
+  },
+  "tests/test_observability.py": {
+    "mtime": 1783064151.3175035,
+    "ast_hash": "ae0e97ed9958dcf06eb904a8cd8adf3a",
+    "semantic_hash": "ae0e97ed9958dcf06eb904a8cd8adf3a"
+  },
+  "tests/test_oidc_adapter.py": {
+    "mtime": 1783064151.3175778,
+    "ast_hash": "05c95373ced789f0373aa3eb7cc317dc",
+    "semantic_hash": "05c95373ced789f0373aa3eb7cc317dc"
+  },
+  "tests/test_rate_limit.py": {
+    "mtime": 1783064151.3171353,
+    "ast_hash": "b3fbc6257171333f311cdd6de122a8d6",
+    "semantic_hash": "b3fbc6257171333f311cdd6de122a8d6"
+  },
+  "tests/test_request_policy.py": {
+    "mtime": 1783064151.3179958,
+    "ast_hash": "5c2447f6864ebcda960bd0fd6f4a4814",
+    "semantic_hash": "5c2447f6864ebcda960bd0fd6f4a4814"
+  },
+  "tests/test_rotation.py": {
+    "mtime": 1783095672.4606016,
+    "ast_hash": "850cda7d358fc0b01beed941b69d4abc",
+    "semantic_hash": "850cda7d358fc0b01beed941b69d4abc"
+  },
+  "tests/test_service.py": {
+    "mtime": 1783084668.0802073,
+    "ast_hash": "6101be0f0a97102d91839ab20bed106b",
+    "semantic_hash": "6101be0f0a97102d91839ab20bed106b"
+  },
+  "tests/test_service_principals.py": {
+    "mtime": 1783084668.0804183,
+    "ast_hash": "3e84b429ec30dd7dbf6060264d74dfd9",
+    "semantic_hash": "3e84b429ec30dd7dbf6060264d74dfd9"
+  },
+  "tests/test_session.py": {
+    "mtime": 1783064151.3180199,
+    "ast_hash": "fd8adb3895b6bd0f3e6be45fd2421e17",
+    "semantic_hash": "fd8adb3895b6bd0f3e6be45fd2421e17"
+  },
+  "tests/test_sso.py": {
+    "mtime": 1783064151.3173573,
+    "ast_hash": "8277d185987ca41555229146336e22cb",
+    "semantic_hash": "8277d185987ca41555229146336e22cb"
+  },
+  "tests/test_startup_warnings.py": {
+    "mtime": 1783080126.3165474,
+    "ast_hash": "f4abb223a0cea6407e51c58c1b2e4a7a",
+    "semantic_hash": "f4abb223a0cea6407e51c58c1b2e4a7a"
+  },
+  "tests/test_stream_usage_fallback.py": {
+    "mtime": 1783334480.2694755,
+    "ast_hash": "aba0271ea2dc7fc5b6b4ec1032d45ae5",
+    "semantic_hash": "aba0271ea2dc7fc5b6b4ec1032d45ae5"
+  },
+  "tests/test_team_service.py": {
+    "mtime": 1783064151.317824,
+    "ast_hash": "d1e7376371bb7d850a814fd15c73139a",
+    "semantic_hash": "d1e7376371bb7d850a814fd15c73139a"
+  },
+  "tests/test_teams.py": {
+    "mtime": 1783064151.3180046,
+    "ast_hash": "253aa82ce8c316eb4a4d7fa045086389",
+    "semantic_hash": "253aa82ce8c316eb4a4d7fa045086389"
+  },
+  "tests/test_upstream_errors.py": {
+    "mtime": 1783080126.3169367,
+    "ast_hash": "cbe46dcdc3dbab336474b55dc0a4fd2d",
+    "semantic_hash": "cbe46dcdc3dbab336474b55dc0a4fd2d"
+  },
+  "tests/test_usage_outbox.py": {
+    "mtime": 1783095672.4616363,
+    "ast_hash": "8cd6c4aca4f7fa4e20acac9b785c1d1d",
+    "semantic_hash": "8cd6c4aca4f7fa4e20acac9b785c1d1d"
+  },
+  "tests/test_user_service.py": {
+    "mtime": 1783095672.4628499,
+    "ast_hash": "c03d8c346a964e6acd2d4d37ce518ba0",
+    "semantic_hash": "c03d8c346a964e6acd2d4d37ce518ba0"
+  },
+  "tests/test_users.py": {
+    "mtime": 1783081153.5140958,
+    "ast_hash": "a20db4e53b5abb7fb88afce826096091",
+    "semantic_hash": "a20db4e53b5abb7fb88afce826096091"
+  },
+  ".claude/CLAUDE.md": {
+    "mtime": 1783334315.988702,
+    "ast_hash": "9b31786b637be3c13978bec4c2330752",
+    "semantic_hash": "9b31786b637be3c13978bec4c2330752"
+  },
+  ".claude/skills/graphify/SKILL.md": {
+    "mtime": 1783334315.988372,
+    "ast_hash": "1e48e0226c5b26741c54209a51c94454",
+    "semantic_hash": "1e48e0226c5b26741c54209a51c94454"
+  },
+  ".claude/skills/graphify/references/add-watch.md": {
+    "mtime": 1783334260.8156772,
+    "ast_hash": "d59d027fe449f06aa03905a01184e779",
+    "semantic_hash": "d59d027fe449f06aa03905a01184e779"
+  },
+  ".claude/skills/graphify/references/exports.md": {
+    "mtime": 1783334260.8157856,
+    "ast_hash": "9da2a2152e60a22f07f05fed5158f287",
+    "semantic_hash": "9da2a2152e60a22f07f05fed5158f287"
+  },
+  ".claude/skills/graphify/references/extraction-spec.md": {
+    "mtime": 1783334260.815919,
+    "ast_hash": "42fef56a01698118f7fd722acdadea34",
+    "semantic_hash": "42fef56a01698118f7fd722acdadea34"
+  },
+  ".claude/skills/graphify/references/github-and-merge.md": {
+    "mtime": 1783334260.8160322,
+    "ast_hash": "cde13df085e4c492aeb7ba298a996d0d",
+    "semantic_hash": "cde13df085e4c492aeb7ba298a996d0d"
+  },
+  ".claude/skills/graphify/references/hooks.md": {
+    "mtime": 1783334260.8161576,
+    "ast_hash": "3f545db6ce646650bb9de588f5512a27",
+    "semantic_hash": "3f545db6ce646650bb9de588f5512a27"
+  },
+  ".claude/skills/graphify/references/query.md": {
+    "mtime": 1783334260.8163807,
+    "ast_hash": "3c46f8ad006874260614ed8657d02307",
+    "semantic_hash": "3c46f8ad006874260614ed8657d02307"
+  },
+  ".claude/skills/graphify/references/transcribe.md": {
+    "mtime": 1783334260.8171325,
+    "ast_hash": "67b6a5fa6c0974e18f60db9f8932fbd8",
+    "semantic_hash": "67b6a5fa6c0974e18f60db9f8932fbd8"
+  },
+  ".claude/skills/graphify/references/update.md": {
+    "mtime": 1783334260.8174024,
+    "ast_hash": "c698309979460d0f02ba616417844399",
+    "semantic_hash": "c698309979460d0f02ba616417844399"
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1783084668.0718017,
+    "ast_hash": "2e5cd9145622b058d4df9746ec4431f7",
+    "semantic_hash": "2e5cd9145622b058d4df9746ec4431f7"
+  },
+  ".pre-commit-config.yaml": {
+    "mtime": 1782917510.1438167,
+    "ast_hash": "31e841d3216ca1618d02ba9fd8c4ead0",
+    "semantic_hash": "31e841d3216ca1618d02ba9fd8c4ead0"
+  },
+  "CLAUDE.md": {
+    "mtime": 1783334315.9891028,
+    "ast_hash": "450d34eb829d543d4a7b6ec3a7c093b4",
+    "semantic_hash": "450d34eb829d543d4a7b6ec3a7c093b4"
+  },
+  "CONTRIBUTING.md": {
+    "mtime": 1783096750.0973341,
+    "ast_hash": "0b89407b8db89997e14d52b20e054b45",
+    "semantic_hash": "0b89407b8db89997e14d52b20e054b45"
+  },
+  "EXAMPLES.md": {
+    "mtime": 1782917510.1449616,
+    "ast_hash": "92cbce09d36dd60749cde369620a010f",
+    "semantic_hash": "92cbce09d36dd60749cde369620a010f"
+  },
+  "ISSUES.md": {
+    "mtime": 1783334560.6353526,
+    "ast_hash": "072ce6914e4e0d88621967c0ff1e5b80",
+    "semantic_hash": "072ce6914e4e0d88621967c0ff1e5b80"
+  },
+  "README.md": {
+    "mtime": 1783325107.8237665,
+    "ast_hash": "19dfc321b8184930fdf945a577ec7909",
+    "semantic_hash": "19dfc321b8184930fdf945a577ec7909"
+  },
+  "SECURITY.md": {
+    "mtime": 1783325107.8240702,
+    "ast_hash": "be5b2a9489fca749f822f75299a7b090",
+    "semantic_hash": "be5b2a9489fca749f822f75299a7b090"
+  },
+  "docker-compose.yml": {
+    "mtime": 1782979197.396919,
+    "ast_hash": "6fe34d84d62f28529df6f616c5a26a3e",
+    "semantic_hash": "6fe34d84d62f28529df6f616c5a26a3e"
+  },
+  "docs/account-recovery.md": {
+    "mtime": 1782917510.1466177,
+    "ast_hash": "17b2737c7c1c0ddb12fff90b662c2dbc",
+    "semantic_hash": "17b2737c7c1c0ddb12fff90b662c2dbc"
+  },
+  "docs/ci.md": {
+    "mtime": 1782917510.1468563,
+    "ast_hash": "d7b76f319a0caa39fe2adfa77f37c14a",
+    "semantic_hash": "d7b76f319a0caa39fe2adfa77f37c14a"
+  },
+  "docs/db-migrations.md": {
+    "mtime": 1782917510.1471322,
+    "ast_hash": "c83ad311f1c5c0082eec23e26b676c0a",
+    "semantic_hash": "c83ad311f1c5c0082eec23e26b676c0a"
+  },
+  "docs/deployment.md": {
+    "mtime": 1782917510.147393,
+    "ast_hash": "43b0a95e8e74f64ee555965f97564529",
+    "semantic_hash": "43b0a95e8e74f64ee555965f97564529"
+  },
+  "docs/enterprise-sso.md": {
+    "mtime": 1782919639.7969327,
+    "ast_hash": "1c3a9632d23121935e56739ab4f68db9",
+    "semantic_hash": "1c3a9632d23121935e56739ab4f68db9"
+  },
+  "docs/logging.md": {
+    "mtime": 1782917510.1477675,
+    "ast_hash": "24e64b8bd228f2da05c72763b3bc2b83",
+    "semantic_hash": "24e64b8bd228f2da05c72763b3bc2b83"
+  },
+  "docs/observability.md": {
+    "mtime": 1783079141.8113253,
+    "ast_hash": "9f79c4ed6b459d41d07e02b3b7542fa0",
+    "semantic_hash": "9f79c4ed6b459d41d07e02b3b7542fa0"
+  },
+  "docs/param-allowlist.md": {
+    "mtime": 1782917510.1482894,
+    "ast_hash": "02593a2156fba23f2f1e0fd3b715d63c",
+    "semantic_hash": "02593a2156fba23f2f1e0fd3b715d63c"
+  },
+  "docs/postgres.md": {
+    "mtime": 1782917510.148602,
+    "ast_hash": "9214f389ab7e88a8f4fb3d40209e071e",
+    "semantic_hash": "9214f389ab7e88a8f4fb3d40209e071e"
+  },
+  "docs/provider-resilience.md": {
+    "mtime": 1782917510.1489143,
+    "ast_hash": "392a78c5a62d789dcd6f30acab916990",
+    "semantic_hash": "392a78c5a62d789dcd6f30acab916990"
+  },
+  "docs/usage-cost.md": {
+    "mtime": 1783334480.26771,
+    "ast_hash": "67981727b153bab7116245cf726df030",
+    "semantic_hash": "67981727b153bab7116245cf726df030"
+  },
+  "skills/karpathy-guidelines/SKILL.md": {
+    "mtime": 1782813196.0,
+    "ast_hash": "568fe33228692e85543530ce376f695f",
+    "semantic_hash": "568fe33228692e85543530ce376f695f"
+  }
+}
