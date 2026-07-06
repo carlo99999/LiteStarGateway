@@ -31,8 +31,15 @@ services:
       --artifacts-destination /mlflow/artifacts
     volumes:
       - mlflow-data:/mlflow
-    ports:
-      - "5000:5000"
+    # Not published to the host: MLflow ships no auth, and its read-write API
+    # would expose every team's per-call cost/token telemetry and allow tampering
+    # to anyone who can reach the port (L21). The app reaches it in-network via
+    # MLFLOW_TRACKING_URI=http://mlflow:5000. To view the UI locally in dev,
+    # uncomment the mapping below (dev-only, never in a prod-like deploy).
+    # ports:
+    #   - "127.0.0.1:5000:5000"
+    expose:
+      - "5000"
 
   # Shared rate-limit store. Only needed when running multiple app replicas so the
   # limits are enforced across them; a single instance works without it (in-memory).
