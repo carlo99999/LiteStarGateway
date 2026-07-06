@@ -27,7 +27,7 @@ from litestar_gateway.domain.ports import (
     LLMGateway,
     ModelRepository,
 )
-from litestar_gateway.domain.request_policy import sanitize_request
+from litestar_gateway.domain.request_policy import clamp_output_tokens, sanitize_request
 
 
 class CompletionService:
@@ -71,8 +71,8 @@ class CompletionService:
             self._meter.release(team_id, reservation)
 
     async def _prepare(
-        self, team_id: UUID, request: dict[str, Any], expected_type: ModelType
-    ) -> tuple[Model, dict[str, str], float]:
+        self, team_id: UUID, operation: str, request: dict[str, Any], expected_type: ModelType
+    ) -> tuple[Model, dict[str, str], float, dict[str, Any]]:
         alias = request.get("model")
         model = await self._models.get_by_name(team_id, alias) if alias else None
         if model is None:
@@ -83,7 +83,10 @@ class CompletionService:
             raise ModelTypeMismatch(
                 f"Model '{model.name}' is type '{model.type}', not '{expected_type}'"
             )
-        reservation = await self._meter.admit(team_id, model, request)
+        # Per-model output ceiling: clamp/inject now that the model is known, and
+        # reserve from the clamped request so admission and the provider call agree.
+        clean = clamp_output_tokens(operation, request, model.max_output_tokens)
+        reservation = await self._meter.admit(team_id, model, clean)
         try:
             values = await self._credentials.get_values(model.credential_id)
             if values is None:
@@ -91,13 +94,15 @@ class CompletionService:
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        return model, values, reservation
+        return model, values, reservation, clean
 
     async def chat_completion(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
         clean = sanitize_request("chat.completions", request)
-        model, values, reservation = await self._prepare(team_id, clean, ModelType.CHAT)
+        model, values, reservation, clean = await self._prepare(
+            team_id, "chat.completions", clean, ModelType.CHAT
+        )
         return await self._dispatch(
             team_id,
             api_key_id,
@@ -111,7 +116,9 @@ class CompletionService:
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
         clean = sanitize_request("responses", request)
-        model, values, reservation = await self._prepare(team_id, clean, ModelType.CHAT)
+        model, values, reservation, clean = await self._prepare(
+            team_id, "responses", clean, ModelType.CHAT
+        )
         return await self._dispatch(
             team_id,
             api_key_id,
@@ -128,7 +135,9 @@ class CompletionService:
         async iterator of OpenAI chunk dicts, metered for usage. Awaited before
         streaming starts so resolution errors surface as HTTP status codes."""
         clean = sanitize_request("chat.completions", request)
-        model, values, reservation = await self._prepare(team_id, clean, ModelType.CHAT)
+        model, values, reservation, clean = await self._prepare(
+            team_id, "chat.completions", clean, ModelType.CHAT
+        )
         try:
             stream = await self._gateway.astream_chat_completion(clean, model, values)
         except BaseException:
@@ -144,7 +153,9 @@ class CompletionService:
         """Resolve (may raise → HTTP error) and return an async iterator of
         Responses-API stream events, metered for usage."""
         clean = sanitize_request("responses", request)
-        model, values, reservation = await self._prepare(team_id, clean, ModelType.CHAT)
+        model, values, reservation, clean = await self._prepare(
+            team_id, "responses", clean, ModelType.CHAT
+        )
         try:
             stream = await self._gateway.astream_responses(clean, model, values)
         except BaseException:
@@ -158,7 +169,9 @@ class CompletionService:
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
         clean = sanitize_request("embeddings", request)
-        model, values, reservation = await self._prepare(team_id, clean, ModelType.EMBEDDINGS)
+        model, values, reservation, clean = await self._prepare(
+            team_id, "embeddings", clean, ModelType.EMBEDDINGS
+        )
         return await self._dispatch(
             team_id,
             api_key_id,
@@ -172,7 +185,9 @@ class CompletionService:
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
         clean = sanitize_request("images", request)
-        model, values, reservation = await self._prepare(team_id, clean, ModelType.IMAGE)
+        model, values, reservation, clean = await self._prepare(
+            team_id, "images", clean, ModelType.IMAGE
+        )
         return await self._dispatch(
             team_id,
             api_key_id,

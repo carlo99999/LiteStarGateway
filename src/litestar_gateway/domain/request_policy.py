@@ -86,6 +86,14 @@ MAX_N = 8
 MAX_TOKENS = 32_000
 _TOKEN_FIELDS = ("max_tokens", "max_completion_tokens", "max_output_tokens")
 
+# Canonical output-token field to inject per operation when a per-model ceiling
+# is set but the client sent none. Operations without an output-token concept
+# (embeddings, images) are absent and get no injection.
+_OUTPUT_TOKEN_FIELD = {
+    "chat.completions": "max_tokens",
+    "responses": "max_output_tokens",
+}
+
 
 def _clamp_int(value: Any, ceiling: int) -> Any:
     # bool is an int subclass; leave non-ints for the provider to validate.
@@ -107,4 +115,28 @@ def sanitize_request(operation: str, request: dict[str, Any]) -> dict[str, Any]:
     for field in _TOKEN_FIELDS:
         if field in cleaned:
             cleaned[field] = _clamp_int(cleaned[field], MAX_TOKENS)
+    return cleaned
+
+
+def clamp_output_tokens(
+    operation: str, request: dict[str, Any], ceiling: int | None
+) -> dict[str, Any]:
+    """Enforce a per-model output-token `ceiling` with `min` (clamp) semantics.
+
+    Any output-token field the client sent is lowered to `min(value, ceiling)`;
+    if the client sent none, the operation's canonical field is injected at the
+    ceiling so omission cannot bypass the cap. A `None` ceiling (the default for
+    every model) is a no-op — the request passes through unchanged. Returns a
+    copy; never mutates the input. Runs after `sanitize_request`, once the model
+    is resolved, so the reservation and the provider call see the same numbers."""
+    if ceiling is None:
+        return request
+    cleaned = dict(request)
+    present = [field for field in _TOKEN_FIELDS if field in cleaned]
+    for field in present:
+        cleaned[field] = _clamp_int(cleaned[field], ceiling)
+    if not present:
+        field = _OUTPUT_TOKEN_FIELD.get(operation)
+        if field is not None:
+            cleaned[field] = ceiling
     return cleaned

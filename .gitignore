@@ -8,3 +8,6 @@ __pycache__/
 .coverage
 .coverage.*
 htmlcov/
+
+# graphify knowledge-graph output (generated; regenerate with /graphify)
+graphify-out/

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from litestar_gateway.domain.request_policy import MAX_N, MAX_TOKENS, sanitize_request
+from litestar_gateway.domain.request_policy import (
+    MAX_N,
+    MAX_TOKENS,
+    clamp_output_tokens,
+    sanitize_request,
+)
 
 
 def test_drops_transport_and_unknown_keys() -> None:
@@ -63,3 +68,35 @@ def test_does_not_mutate_input() -> None:
     request = {"model": "m", "messages": [], "extra_headers": {"x": "1"}}
     sanitize_request("chat.completions", request)
     assert "extra_headers" in request  # original untouched
+
+
+def test_clamp_output_tokens_lowers_client_value() -> None:
+    assert clamp_output_tokens("chat.completions", {"max_tokens": 5000}, 1000)["max_tokens"] == 1000
+
+
+def test_clamp_output_tokens_leaves_smaller_client_value() -> None:
+    # min semantics: the client may ask for less than the ceiling.
+    assert clamp_output_tokens("chat.completions", {"max_tokens": 200}, 1000)["max_tokens"] == 200
+
+
+def test_clamp_output_tokens_injects_when_client_omits() -> None:
+    # Omission must not bypass the cap: inject the operation's canonical field.
+    assert clamp_output_tokens("chat.completions", {"messages": []}, 1000)["max_tokens"] == 1000
+    assert clamp_output_tokens("responses", {"input": "hi"}, 1000)["max_output_tokens"] == 1000
+
+
+def test_clamp_output_tokens_noop_without_ceiling() -> None:
+    request = {"max_tokens": 10**9}
+    assert clamp_output_tokens("chat.completions", request, None) is request
+
+
+def test_clamp_output_tokens_skips_operations_without_output_tokens() -> None:
+    # embeddings/images have no output-token concept: nothing injected.
+    assert clamp_output_tokens("embeddings", {"input": "x"}, 1000) == {"input": "x"}
+    assert "max_tokens" not in clamp_output_tokens("images", {"prompt": "a cat"}, 1000)
+
+
+def test_clamp_output_tokens_does_not_mutate_input() -> None:
+    request = {"max_tokens": 5000}
+    clamp_output_tokens("chat.completions", request, 1000)
+    assert request["max_tokens"] == 5000  # original untouched

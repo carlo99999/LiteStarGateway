@@ -49,7 +49,7 @@ def _text(content: Any) -> str:
 
 
 def to_gemini_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
-    effective = {**model.params, **request}
+    effective = model.merge_params(request)
 
     system_parts: list[str] = []
     contents: list[dict[str, Any]] = []
@@ -118,7 +118,7 @@ def gemini_chunk_to_delta(chunk: dict[str, Any]) -> tuple[dict[str, Any] | None,
 
 
 def to_gemini_embed_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
-    effective = {**model.params, **request}
+    effective = model.merge_params(request)
     return {"model": model.provider_model_id, "contents": effective.get("input")}
 
 
@@ -141,7 +141,7 @@ def from_gemini_embeddings(response: dict[str, Any], model_id: str) -> dict[str,
 
 
 def to_imagen_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
-    effective = {**model.params, **request}
+    effective = model.merge_params(request)
     return {"model": model.provider_model_id, "prompt": effective.get("prompt")}
 
 

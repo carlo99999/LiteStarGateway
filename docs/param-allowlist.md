@@ -36,12 +36,26 @@ Keep it a **pure function** in the domain (no I/O) → trivially unit-testable.
   - embeddings: `input, model, dimensions, encoding_format, user`.
   - images: `prompt, model, size, quality, style, n, response_format, user`.
 - **Numeric caps** (configurable): cap `n`, `max_tokens`/`max_completion_tokens`
-  to a server maximum.
+  to a server maximum (global `MAX_TOKENS`, plus an optional per-model ceiling —
+  see below).
 - **Always stripped/blocked**: transport overrides — `extra_headers`,
   `extra_query`, `extra_body`, `base_url`, `api_key`, `organization`. (These are
   how a caller could exfiltrate the credential or inject headers.)
-- **Precedence**: `model.params` (trusted admin config) is applied **after** the
-  sanitized client request, so admin settings can't be overridden by clients.
+- **Precedence** — a model's admin config governs the request in three ways, by
+  field, because different params want different semantics:
+  - `model.params` are **defaults the client may override** (generation knobs
+    like `temperature`/`top_p`): merged *before* the client request.
+  - `model.params_enforced` is **admin policy the client cannot override** (a
+    forced `response_format`, a locked `tool_choice`): merged *after* the client
+    request. Frequently empty.
+  - The effective request is `{**params, **client_request, **params_enforced}`
+    (see `Model.merge_params`).
+  - Cost ceilings are **not** governed by this merge: `model.max_output_tokens`
+    (when set) clamps the client's output-token field down with `min` semantics
+    and is injected when the client omits one, so it is a real cap the client
+    cannot exceed or bypass by omission. It is applied in the completion service
+    *before* the budget reservation, so admission and the provider call agree.
+    Keep token/`n` fields out of `params_enforced` — the ceiling owns them.
 - `model` is always forced to the resolved `provider_model_id` (already the case).
 
 ## 4. Open decisions

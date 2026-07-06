@@ -30,8 +30,9 @@ SUPPORTED = frozenset({"chat.completions", "responses"})
 
 
 def _kwargs(request: dict[str, Any], model: Model) -> dict[str, Any]:
-    # Model params are defaults; the incoming request overrides them.
-    merged = {**model.params, **request}
+    # `params` are defaults the client may override; `params_enforced` is admin
+    # policy applied last (client cannot override). See Model.merge_params.
+    merged = model.merge_params(request)
     merged["model"] = model.provider_model_id  # alias -> upstream model id (or deployment)
     return merged
 
