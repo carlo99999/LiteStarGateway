@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from uuid import UUID
 
 from dotenv import load_dotenv
+
+from litestar_gateway.domain.entities import TeamRole
 
 DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///gateway.db"
 DEFAULT_ADMIN_EMAIL = "admin@example.com"
@@ -48,6 +52,49 @@ MIN_SECRET_LENGTH = 32
 
 class InsecureConfigurationError(RuntimeError):
     """Raised at startup when a non-local deploy uses an insecure default."""
+
+
+@dataclass(frozen=True)
+class TeamGrant:
+    """One (team, role) an IdP group confers via SSO_TEAM_MAPPING."""
+
+    team_id: UUID
+    role: TeamRole
+
+
+def _env_team_mapping(name: str) -> dict[str, tuple[TeamGrant, ...]]:
+    """Parse SSO_TEAM_MAPPING: a JSON object mapping each IdP group to a list of
+    ``{"team": "<team-uuid>", "role": "admin"|"member"}`` grants (role defaults
+    to member). Absent/empty ⇒ no mapping (SSO sets only the platform-admin
+    flag). Malformed input fails fast at startup rather than silently dropping
+    grants."""
+    raw = os.environ.get(name)
+    if not raw or not raw.strip():
+        return {}
+    try:
+        data = json.loads(raw)
+    except ValueError as exc:
+        raise InsecureConfigurationError(f"{name} must be valid JSON") from exc
+    if not isinstance(data, dict):
+        raise InsecureConfigurationError(f"{name} must be a JSON object of group -> grants")
+    mapping: dict[str, tuple[TeamGrant, ...]] = {}
+    for group, grants in data.items():
+        if not isinstance(grants, list):
+            raise InsecureConfigurationError(f"{name}[{group!r}] must be a list of grants")
+        parsed: list[TeamGrant] = []
+        for grant in grants:
+            if not isinstance(grant, dict) or "team" not in grant:
+                raise InsecureConfigurationError(f"{name}[{group!r}] entries need a 'team' UUID")
+            try:
+                team_id = UUID(str(grant["team"]))
+                role = TeamRole(grant.get("role", TeamRole.MEMBER))
+            except ValueError as exc:
+                raise InsecureConfigurationError(
+                    f"{name}[{group!r}] has an invalid team or role: {exc}"
+                ) from exc
+            parsed.append(TeamGrant(team_id=team_id, role=role))
+        mapping[group] = tuple(parsed)
+    return mapping
 
 
 def _env_int(name: str, default: int, *, minimum: int) -> int:
@@ -124,6 +171,10 @@ class Settings:
     oidc_client_secret: str | None = None
     oidc_scopes: str = DEFAULT_OIDC_SCOPES
     oidc_admin_groups: tuple[str, ...] = ()
+    # SSO_TEAM_MAPPING: IdP group -> teams+roles (see _env_team_mapping). Teams
+    # named here are "SSO-governed": the user's membership tracks their IdP groups
+    # on every login. Teams absent from the mapping are left to manual management.
+    oidc_team_mapping: dict[str, tuple[TeamGrant, ...]] = field(default_factory=dict)
     # Public callback URL registered at the IdP. Set this when the app runs behind
     # a reverse proxy/ingress, where the request's own host/scheme is the internal
     # one. When None, the callback URL is derived from the incoming request.
@@ -234,4 +285,5 @@ class Settings:
                 g.strip() for g in os.environ.get("OIDC_ADMIN_GROUPS", "").split(",") if g.strip()
             ),
             oidc_redirect_uri=os.environ.get("OIDC_REDIRECT_URI"),
+            oidc_team_mapping=_env_team_mapping("SSO_TEAM_MAPPING"),
         )

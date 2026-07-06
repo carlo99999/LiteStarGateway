@@ -145,6 +145,9 @@ def create_app(
         dependencies["sso_admin_groups"] = Provide(
             lambda: settings.oidc_admin_groups, sync_to_thread=False
         )
+        dependencies["sso_team_mapping"] = Provide(
+            lambda: settings.oidc_team_mapping, sync_to_thread=False
+        )
         dependencies["sso_redirect_uri"] = Provide(
             lambda: settings.oidc_redirect_uri, sync_to_thread=False
         )

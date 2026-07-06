@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import dataclasses
+import json
+from uuid import UUID
 
 import pytest
 
@@ -11,7 +13,10 @@ from litestar_gateway.config import (
     SAMPLE_MASTER_KEY,
     InsecureConfigurationError,
     Settings,
+    TeamGrant,
+    _env_team_mapping,
 )
+from litestar_gateway.domain.entities import TeamRole
 
 STRONG_SECRET = "a-strong-random-production-secret-0123456789"
 POSTGRES_URL = "postgresql+asyncpg://gateway:pw@db:5432/gateway"  # pragma: allowlist secret
@@ -199,3 +204,40 @@ def test_production_allows_no_master_key() -> None:
 def test_development_allows_weak_master_key() -> None:
     settings = dataclasses.replace(_BASE, environment="development", master_key="master")
     assert settings.is_production is False
+
+
+_TEAM_ID = "11111111-1111-1111-1111-111111111111"
+
+
+def test_team_mapping_absent_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SSO_TEAM_MAPPING", raising=False)
+    assert _env_team_mapping("SSO_TEAM_MAPPING") == {}
+
+
+def test_team_mapping_parses_groups_and_defaults_role_to_member(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "SSO_TEAM_MAPPING",
+        json.dumps({"eng": [{"team": _TEAM_ID, "role": "admin"}], "qa": [{"team": _TEAM_ID}]}),
+    )
+    mapping = _env_team_mapping("SSO_TEAM_MAPPING")
+    assert mapping["eng"] == (TeamGrant(UUID(_TEAM_ID), TeamRole.ADMIN),)
+    assert mapping["qa"] == (TeamGrant(UUID(_TEAM_ID), TeamRole.MEMBER),)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "{not json",  # malformed JSON
+        json.dumps(["eng"]),  # not an object
+        json.dumps({"eng": {"team": _TEAM_ID}}),  # grants must be a list
+        json.dumps({"eng": [{"team": "not-a-uuid"}]}),  # bad UUID
+        json.dumps({"eng": [{"role": "admin"}]}),  # missing 'team'
+        json.dumps({"eng": [{"team": _TEAM_ID, "role": "owner"}]}),  # unknown role
+    ],
+)
+def test_team_mapping_rejects_malformed_input(monkeypatch: pytest.MonkeyPatch, raw: str) -> None:
+    monkeypatch.setenv("SSO_TEAM_MAPPING", raw)
+    with pytest.raises(InsecureConfigurationError):
+        _env_team_mapping("SSO_TEAM_MAPPING")
