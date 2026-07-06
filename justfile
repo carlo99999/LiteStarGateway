@@ -51,6 +51,13 @@ pre-commit:
 test *args:
     uv run pytest -q {{args}}
 
+# Runs all the pr coverage checks (pre-commit, typecheck, pip-audit, pytest coverage).
+pr-coverage:
+    uv run pre-commit run --all-files
+    uv run pyrefly check
+    uv run --with pip-audit pip-audit
+    uv run pytest --cov=src/litestar_gateway --cov-fail-under=80
+
 # ── Migrations (advanced-alchemy / Alembic via the Litestar CLI) ────────────────
 
 # Apply all pending migrations (idempotent; no-op when already at head).
