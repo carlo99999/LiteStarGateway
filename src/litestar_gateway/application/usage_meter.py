@@ -399,11 +399,16 @@ class UsageMeter:
             # re-raise CancelledError — no ledger row, no outbox, no trace.
             with anyio.CancelScope(shield=True):
                 latency_ms = (perf_counter() - start) * 1000
-                # Even with zero streamed output (disconnect or failure before
-                # the first content chunk) the provider consumed the prompt —
-                # bill it. This applies to the error path too: tokens streamed
-                # before a mid-stream provider failure were paid upstream.
-                if not _has_tokens(usage):
+                # A provider that rejects the request before emitting anything
+                # (error, zero streamed output, no usage reported) consumed
+                # nothing upstream — don't fabricate a prompt estimate to bill it
+                # (M26). A client disconnect (no error) still estimates and bills:
+                # there the provider did consume the prompt. A mid-stream failure
+                # after some output also bills — those tokens were paid upstream.
+                produced_nothing = (
+                    error is not None and streamed_chars == 0 and not _has_tokens(usage)
+                )
+                if not _has_tokens(usage) and not produced_nothing:
                     estimate = {
                         "prompt_tokens": _estimate_tokens(len(_request_text(request))),
                         "completion_tokens": _estimate_tokens(streamed_chars),
@@ -420,19 +425,21 @@ class UsageMeter:
                             usage["completion_tokens"],
                         )
                 if error is not None:
-                    # Bill what was seen, but keep the honest error trace
-                    # (carrying the billed usage) instead of a fake 'ok' one.
+                    # Bill what was seen (nothing, if the provider produced
+                    # nothing), but keep the honest error trace instead of a fake
+                    # 'ok' one — carrying the billed usage.
                     prompt, completion, cost = _parse_usage(model, usage)
-                    await self._bill(
-                        team_id,
-                        api_key_id,
-                        model,
-                        operation,
-                        prompt,
-                        completion,
-                        cost,
-                        datetime.now(UTC),
-                    )
+                    if _has_tokens(usage):
+                        await self._bill(
+                            team_id,
+                            api_key_id,
+                            model,
+                            operation,
+                            prompt,
+                            completion,
+                            cost,
+                            datetime.now(UTC),
+                        )
                     self.trace_error(
                         team_id,
                         api_key_id,
