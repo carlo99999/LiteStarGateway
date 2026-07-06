@@ -1,0 +1,19 @@
+# Migrazioni Alembic autogenerate — boilerplate, ~170 nodi di rumore
+# (migrations/env.py resta indicizzato: ha logica reale)
+migrations/versions/
+
+# Config Claude Code / skill vendorizzate — non è architettura del progetto
+.claude/
+.claude-plugin/
+skills/
+.github/
+
+# Log di lavoro gigante — genera nodi che diventano stale a ogni round
+ISSUES.md
+
+# uv.lock non è nella skip-list built-in di graphify (poetry.lock sì)
+uv.lock
+
+# File generati/config di tooling
+.secrets.baseline
+alembic.ini
