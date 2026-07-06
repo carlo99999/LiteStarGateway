@@ -8,8 +8,9 @@ Credential `values`: `vertex_project`, `vertex_location`, and (in production)
 `vertex_credentials` — the service-account JSON. Without it, Application Default
 Credentials are used.
 
-First-cut scope: text-in/text-out. Not yet translated: tools, multimodal,
-structured outputs.
+Scope: text-in/text-out, plus structured outputs (`response_format`) translated
+to `response_mime_type` + `response_schema`. Not yet translated: tools,
+multimodal, and structured outputs over streaming.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from google.oauth2 import service_account
 from litestar_gateway.domain.entities import Model
 from litestar_gateway.domain.exceptions import CredentialMisconfigured
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
+from litestar_gateway.infrastructure.llm.structured_output import parse_response_format
 
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 
@@ -73,6 +75,16 @@ def to_gemini_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
         config["max_output_tokens"] = max_tokens
     if (stop := effective.get("stop")) is not None:
         config["stop_sequences"] = [stop] if isinstance(stop, str) else list(stop)
+
+    # Structured output: Gemini emits JSON when response_mime_type is set, and
+    # constrains it to a schema via response_schema (a JSON-Schema subset). The
+    # JSON comes back as ordinary text in the candidate, so no response reshaping
+    # is needed — from_gemini_response already surfaces it as message.content.
+    structured = parse_response_format(effective)
+    if structured is not None:
+        config["response_mime_type"] = "application/json"
+        if structured.schema is not None:
+            config["response_schema"] = structured.schema
 
     return {"model": model.provider_model_id, "contents": contents, "config": config}
 

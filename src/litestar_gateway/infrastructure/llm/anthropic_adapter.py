@@ -4,12 +4,14 @@ Pure translators (`to_anthropic_request` / `from_anthropic_response`) do the
 schema work; the adapter is a thin client wrapper. Responses are provided by
 wrapping this adapter in `ChatToResponsesAdapter`.
 
-First-cut scope: text-in/text-out. Not yet translated: tool/function calling,
-multimodal content, structured outputs.
+Scope: text-in/text-out, plus structured outputs (`response_format`) translated
+to a forced tool. Not yet translated: general tool/function calling, multimodal
+content, and structured outputs over streaming.
 """
 
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import AsyncIterator
 from typing import Any
@@ -19,6 +21,7 @@ from anthropic import Anthropic, AsyncAnthropic
 from litestar_gateway.domain.entities import Model
 from litestar_gateway.infrastructure.llm.openai_adapter import require_api_key
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
+from litestar_gateway.infrastructure.llm.structured_output import parse_response_format
 
 # Anthropic requires max_tokens; use this when the request omits it.
 DEFAULT_MAX_TOKENS = 1024
@@ -43,6 +46,7 @@ def _text(content: Any) -> str:
 
 def to_anthropic_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
     effective = model.merge_params(request)
+    structured = parse_response_format(effective)
 
     system_parts: list[str] = []
     messages: list[dict[str, Any]] = []
@@ -54,6 +58,10 @@ def to_anthropic_request(request: dict[str, Any], model: Model) -> dict[str, Any
         elif role in ("user", "assistant"):
             messages.append({"role": role, "content": text})
         # tool/function messages are ignored in this first cut
+
+    # json_object (no schema): Anthropic has no JSON mode, so nudge via system.
+    if structured is not None and structured.schema is None:
+        system_parts.append("Respond with a single valid JSON object and nothing else.")
 
     kwargs: dict[str, Any] = {
         "model": model.provider_model_id,
@@ -69,15 +77,36 @@ def to_anthropic_request(request: dict[str, Any], model: Model) -> dict[str, Any
             kwargs[key] = effective[key]
     if (stop := effective.get("stop")) is not None:
         kwargs["stop_sequences"] = [stop] if isinstance(stop, str) else list(stop)
+    # json_schema: no native JSON mode — force a single tool whose input_schema is
+    # the requested schema, so the model must return a matching tool_use block.
+    # from_anthropic_response surfaces that input as the (JSON) message content.
+    if structured is not None and structured.schema is not None:
+        kwargs["tools"] = [
+            {
+                "name": structured.name,
+                "description": "Return the result as JSON matching the schema.",
+                "input_schema": structured.schema,
+            }
+        ]
+        kwargs["tool_choice"] = {"type": "tool", "name": structured.name}
     return kwargs
 
 
 def from_anthropic_response(message: dict[str, Any]) -> dict[str, Any]:
+    blocks = message.get("content", [])
     text = "".join(
         block.get("text", "")
-        for block in message.get("content", [])
+        for block in blocks
         if isinstance(block, dict) and block.get("type") == "text"
     )
+    # Forced structured-output tool: the JSON is the tool_use input, not a text
+    # block. Serialize it into content so the client sees the same JSON-in-content
+    # shape it gets natively from OpenAI's response_format.
+    if not text:
+        for block in blocks:
+            if isinstance(block, dict) and block.get("type") == "tool_use":
+                text = json.dumps(block.get("input") or {})
+                break
     usage = message.get("usage") or {}
     input_tokens = usage.get("input_tokens")
     output_tokens = usage.get("output_tokens")
