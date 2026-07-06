@@ -254,6 +254,13 @@ on their own branch (linked). Order within a phase is a recommendation.
 
 ### v2 (after v1)
 
+- **Structured outputs** — first-class, cross-provider support for
+  `response_format` / JSON-schema outputs. Today the param is allowlisted and
+  passed through verbatim (so it only works where the provider SDK accepts it
+  natively, e.g. OpenAI/Azure); it is not translated for Anthropic (tool-forcing)
+  or Gemini (`response_schema`), and the Responses-API emulation ignores it
+  entirely. v2 makes it work uniformly on every provider, streams included
+  _(no branch yet)_.
 - **AWS Bedrock provider** — Converse API + boto3 (no hand-rolled SigV4), responses emulated.
   [`adding-bedrock`](https://github.com/carlo99999/LiteStarGateway/blob/adding-bedrock/docs/bedrock.md)
 - **Weighted multi-model routing** — an alias splitting traffic across ≤5 models by percentage.
