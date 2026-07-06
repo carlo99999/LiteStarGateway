@@ -21,6 +21,10 @@ DEFAULT_ROTATION_TIME = "03:00"
 DEFAULT_MLFLOW_EXPERIMENT = "litestar-gateway"
 # SSO (OIDC). No discovery URL ⇒ SSO disabled.
 DEFAULT_OIDC_SCOPES = "openid email profile groups"
+# Platform role a brand-new SSO user is provisioned with at first login (JIT),
+# when not matched by OIDC_ADMIN_GROUPS. The platform role is binary.
+DEFAULT_PLATFORM_ROLE = "member"
+_PLATFORM_ROLES = frozenset({"admin", "member"})
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -76,6 +80,18 @@ def _env_float(name: str, default: float, *, minimum: float) -> float:
     return value
 
 
+def _env_choice(name: str, default: str, choices: frozenset[str]) -> str:
+    # Case-insensitive; a typo fails fast at startup (in every environment, not
+    # just non-local) rather than silently falling back to the default.
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if value not in choices:
+        raise InsecureConfigurationError(f"{name} must be one of {sorted(choices)}, got {raw!r}")
+    return value
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str
@@ -128,6 +144,16 @@ class Settings:
     # a reverse proxy/ingress, where the request's own host/scheme is the internal
     # one. When None, the callback URL is derived from the incoming request.
     oidc_redirect_uri: str | None = None
+    # Platform role a brand-new SSO user receives at first login (JIT) when not
+    # matched by OIDC_ADMIN_GROUPS: "member" (default) or "admin". The admin flag
+    # is upgrade-only — re-login never downgrades it (see UserService), so demotion
+    # is the explicit job of the platform-admin endpoint.
+    default_role: str = DEFAULT_PLATFORM_ROLE
+
+    @property
+    def default_admin(self) -> bool:
+        """Whether a first-login SSO user defaults to platform admin (DEFAULT_ROLE)."""
+        return self.default_role == "admin"
 
     @property
     def sso_enabled(self) -> bool:
@@ -234,4 +260,5 @@ class Settings:
                 g.strip() for g in os.environ.get("OIDC_ADMIN_GROUPS", "").split(",") if g.strip()
             ),
             oidc_redirect_uri=os.environ.get("OIDC_REDIRECT_URI"),
+            default_role=_env_choice("DEFAULT_ROLE", DEFAULT_PLATFORM_ROLE, _PLATFORM_ROLES),
         )

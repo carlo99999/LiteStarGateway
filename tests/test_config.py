@@ -199,3 +199,26 @@ def test_production_allows_no_master_key() -> None:
 def test_development_allows_weak_master_key() -> None:
     settings = dataclasses.replace(_BASE, environment="development", master_key="master")
     assert settings.is_production is False
+
+
+def test_default_role_absent_defaults_to_member(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DEFAULT_ROLE", raising=False)
+    settings = Settings.from_env()
+    assert settings.default_role == "member"
+    assert settings.default_admin is False
+
+
+def test_default_role_admin_sets_default_admin(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEFAULT_ROLE", "admin")
+    assert Settings.from_env().default_admin is True
+
+
+def test_default_role_is_case_insensitive(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEFAULT_ROLE", "ADMIN")
+    assert Settings.from_env().default_admin is True
+
+
+def test_default_role_rejects_unknown_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEFAULT_ROLE", "superuser")
+    with pytest.raises(InsecureConfigurationError):
+        Settings.from_env()

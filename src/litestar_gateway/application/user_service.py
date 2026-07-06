@@ -270,14 +270,22 @@ class UserService:
         """Invalidate all of the user's existing JWTs by bumping token_version."""
         await self._users.increment_token_version(user.id)
 
-    async def upsert_sso_user(self, identity: ExternalIdentity, is_admin: bool) -> User:
+    async def upsert_sso_user(
+        self, identity: ExternalIdentity, *, group_admin: bool, default_admin: bool
+    ) -> User:
         """Resolve (or JIT-provision) the local account for a verified SSO identity.
 
         Accounts are bound to the IdP subject (`sub`), which is stable across the
         user's email changes. An email is adopted only when the IdP asserts it
         verified, and never when it already belongs to a *different* subject (so a
-        recycled/spoofed email cannot take over another account). The admin flag is
-        re-synced from the IdP groups on every login — the IdP is the source of truth.
+        recycled/spoofed email cannot take over another account).
+
+        The platform-admin flag is **upgrade-only**. Membership in an admin group
+        (`group_admin`) grants admin, and a brand-new account additionally honours
+        the DEFAULT_ROLE fallback (`default_admin`) — but re-login never *revokes*
+        admin. Demotion is the explicit job of the platform-admin endpoint, so a
+        manual grant (or revoke) is never silently undone by the next SSO login, and
+        leaving the admin group does not strip a role granted another way.
         """
         if not identity.email or not identity.email_verified:
             raise SSOEmailNotVerified(identity.email or "<none>")
@@ -285,11 +293,19 @@ class UserService:
 
         existing = await self._users.get_by_sso_subject(identity.subject)
         if existing is None:
-            existing = await self._resolve_or_create_sso_user(identity, normalized, is_admin)
-            if existing.sso_subject == identity.subject:
-                # Freshly JIT-created with the right subject and role already set.
-                return existing
-        return await self._users.bind_sso(existing.id, identity.subject, is_admin)
+            # Not yet bound to this subject: JIT-create with the first-login role, or
+            # adopt a pre-existing password-only account (which keeps its own role;
+            # DEFAULT_ROLE seeds only genuinely new accounts).
+            created = await self._resolve_or_create_sso_user(
+                identity, normalized, group_admin or default_admin
+            )
+            if created.sso_subject == identity.subject:
+                return created  # freshly JIT-created; role already set
+            existing = created  # a password-only account to link
+        # Upgrade-only re-sync: group membership can promote, re-login never demotes.
+        return await self._users.bind_sso(
+            existing.id, identity.subject, existing.is_admin or group_admin
+        )
 
     async def _resolve_or_create_sso_user(
         self, identity: ExternalIdentity, normalized_email: str, is_admin: bool
@@ -343,6 +359,23 @@ class UserService:
         if not is_active and self._api_keys is not None:
             await self._api_keys.revoke_personal_keys_for_user(user_id, _now())
         await self._users.set_active(user_id, is_active)
+        updated = await self._users.get(user_id)
+        if updated is None:  # pragma: no cover - just set it
+            raise UserNotFound(str(user_id))
+        return updated
+
+    async def set_user_admin(self, actor: User, user_id: UUID, is_admin: bool) -> User:
+        """Platform-admin grants or revokes another user's platform-admin role. This
+        is the only path that *demotes* an admin — SSO group / DEFAULT_ROLE sync is
+        upgrade-only. An admin cannot change their own role (a self-lockout footgun,
+        matching the self-guard on enable/disable)."""
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        if actor.id == user_id:
+            raise PermissionDenied("Cannot change your own admin role")
+        if await self._users.get(user_id) is None:
+            raise UserNotFound(str(user_id))
+        await self._users.set_admin(user_id, is_admin)
         updated = await self._users.get(user_id)
         if updated is None:  # pragma: no cover - just set it
             raise UserNotFound(str(user_id))

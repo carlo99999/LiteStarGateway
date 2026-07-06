@@ -127,6 +127,49 @@ async def test_non_admin_cannot_disable_users(client: AsyncTestClient) -> None:
     assert resp.status_code == 403
 
 
+async def test_admin_can_promote_and_demote_platform_admin(client: AsyncTestClient) -> None:
+    await _signup(client, "bob@b.com", "S3cret!!")
+    token = (
+        await client.post("/login", json={"email": "bob@b.com", "password": "S3cret!!"})
+    ).json()["access_token"]
+    bob = {"Authorization": f"Bearer {token}"}
+    user_id = (await client.get("/me", headers=bob)).json()["id"]
+    admin = {"Authorization": f"Bearer {await _admin_token(client)}"}
+    assert (await client.get("/me", headers=bob)).json()["is_admin"] is False
+
+    promoted = await client.patch(f"/users/{user_id}/admin", json={"is_admin": True}, headers=admin)
+    assert promoted.status_code == HTTP_200_OK
+    assert promoted.json()["is_admin"] is True
+    # Effective immediately on bob's existing token — the role is read live from the
+    # DB per request, not carried in the JWT.
+    assert (await client.get("/me", headers=bob)).json()["is_admin"] is True
+
+    demoted = await client.patch(f"/users/{user_id}/admin", json={"is_admin": False}, headers=admin)
+    assert demoted.status_code == HTTP_200_OK
+    assert demoted.json()["is_admin"] is False
+    assert (await client.get("/me", headers=bob)).json()["is_admin"] is False
+
+
+async def test_non_admin_cannot_change_admin_role(client: AsyncTestClient) -> None:
+    await _signup(client, "bob@b.com", "S3cret!!")
+    token = (
+        await client.post("/login", json={"email": "bob@b.com", "password": "S3cret!!"})
+    ).json()["access_token"]
+    bob = {"Authorization": f"Bearer {token}"}
+    user_id = (await client.get("/me", headers=bob)).json()["id"]
+    # bob tries to promote himself → 403.
+    resp = await client.patch(f"/users/{user_id}/admin", json={"is_admin": True}, headers=bob)
+    assert resp.status_code == 403
+
+
+async def test_admin_cannot_change_own_admin_role(client: AsyncTestClient) -> None:
+    admin = {"Authorization": f"Bearer {await _admin_token(client)}"}
+    admin_id = (await client.get("/me", headers=admin)).json()["id"]
+    # Self-demotion is a lockout footgun — refused even for a real admin.
+    resp = await client.patch(f"/users/{admin_id}/admin", json={"is_admin": False}, headers=admin)
+    assert resp.status_code == 403
+
+
 async def test_logout_revokes_existing_tokens(client: AsyncTestClient) -> None:
     await _signup(client, "alice@b.com", "S3cret!!")
     token = (

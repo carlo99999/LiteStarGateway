@@ -154,7 +154,7 @@ async def test_sso_rejects_unverified_email(tmp_path: Path) -> None:
         assert (await _callback(client)).status_code == HTTP_401_UNAUTHORIZED
 
 
-async def test_sso_resyncs_admin_role_on_relogin(tmp_path: Path) -> None:
+async def test_sso_admin_sync_is_upgrade_only(tmp_path: Path) -> None:
     subject = "s-resync"
     # First login: not in the admin group ⇒ regular user.
     first = await _login_and_get_me(tmp_path, _identity(subject, "carol@corp.com"))
@@ -164,9 +164,11 @@ async def test_sso_resyncs_admin_role_on_relogin(tmp_path: Path) -> None:
         tmp_path, _identity(subject, "carol@corp.com", groups=(ADMIN_GROUP,))
     )
     assert second["is_admin"] is True
-    # And demoted again when dropped from the group (IdP is the source of truth).
+    # Dropped from the group on the next login: NOT demoted — the sync is
+    # upgrade-only, so a granted role is never revoked by re-login. Demotion is the
+    # explicit job of the platform-admin endpoint.
     third = await _login_and_get_me(tmp_path, _identity(subject, "carol@corp.com"))
-    assert third["is_admin"] is False
+    assert third["is_admin"] is True
 
 
 async def test_sso_binds_to_subject_across_email_change(tmp_path: Path) -> None:

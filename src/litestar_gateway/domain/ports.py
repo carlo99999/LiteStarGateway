@@ -218,9 +218,15 @@ class UserRepository(Protocol):
         the user's existing sessions."""
         ...
 
+    async def set_admin(self, user_id: UUID, is_admin: bool) -> None:
+        """Grant/revoke the account's platform-admin role. Read live per request
+        (not carried in the JWT), so it takes effect immediately — no token bump."""
+        ...
+
     async def bind_sso(self, user_id: UUID, sso_subject: str, is_admin: bool) -> User:
-        """Link an account to an IdP subject and set its admin flag (IdP is the
-        source of truth for SSO role), returning the updated user."""
+        """Link an account to an IdP subject and set its admin flag to the value the
+        caller computed. SSO role sync is upgrade-only (see UserService.upsert_sso_user),
+        so the caller passes an already-merged flag; returns the updated user."""
         ...
 
     async def increment_token_version(self, user_id: UUID) -> None: ...
