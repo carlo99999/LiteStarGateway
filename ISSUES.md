@@ -61,6 +61,28 @@ introduced by #103 over-bills in the one case it didn't consider.
 
 New counts: **0 CRITICAL · 1 HIGH · 7 MEDIUM · 8 LOW**.
 
+## Resolution status (Round 4, updated after remediation)
+
+**Fixed & merged to `main`:**
+
+| Finding | Fix PR |
+|---|---|
+| M32 — `UsageMeter` extracted from `CompletionService` (metering/billing collaborator) | #106 |
+| M30 + L23 — reservation scales with `n`; computed from the sanitized request | #108 |
+
+**Open (next in line):** M26 + L19 (stream error-path billing), M27 (un-iterated
+generator reservation leak) and M29 (unbounded settlement shield) — the latter two
+each need a small design decision first. H14, M28, M31 and the remaining LOWs are
+untouched.
+
+**Proposed follow-up (from the M30/L23 discussion):** an optional per-model
+`max_output_tokens` field, used as (a) the reservation fallback when the client
+omits a max-tokens field and (b) a per-model clamp replacing the global 32k
+default. Prior art: LiteLLM's `budget_reservation.py` reserves
+`min(requested, model max_output_tokens, 16384)` from its model registry and
+scales by `n`/`best_of`; its registry (MIT) could seed the field instead of
+manual admin entry. Product decision — needs a migration + config surface.
+
 ## HIGH (Round 4)
 
 ### H14 — Vertex/Gemini embeddings are always billed as zero tokens and zero cost
