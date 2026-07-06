@@ -42,7 +42,7 @@ def _text(content: Any) -> str:
 
 
 def to_anthropic_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
-    effective = {**model.params, **request}
+    effective = model.merge_params(request)
 
     system_parts: list[str] = []
     messages: list[dict[str, Any]] = []

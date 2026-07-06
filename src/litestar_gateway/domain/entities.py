@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -206,7 +206,7 @@ class Model:
     credential_id: UUID
     type: ModelType
     provider_model_id: str  # upstream model name, e.g. "gpt-4o"
-    params: dict[str, Any]  # default LLM params (temperature, max_tokens, ...)
+    params: dict[str, Any]  # client-overridable default LLM params (temperature, ...)
     # Note: no api_base here — the endpoint comes from the (admin-managed)
     # credential, so a team admin cannot redirect the credential's secret.
     api_version: str | None
@@ -214,6 +214,20 @@ class Model:
     output_cost_per_token: float | None
     enabled: bool
     created_at: datetime
+    # Admin policy the client cannot override (applied last in the merge), e.g. a
+    # forced response_format or a locked tool_choice. Distinct from `params`,
+    # which are defaults the client may override.
+    params_enforced: dict[str, Any] = field(default_factory=dict)
+    # Per-model output-token ceiling. When set, client output-token fields are
+    # clamped down to it (min semantics) and it is injected when the client omits
+    # one, so it is a real cap — not bypassable by omission. None = no cap.
+    max_output_tokens: int | None = None
+
+    def merge_params(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Effective request for a provider call: admin `params` (defaults the
+        client may override), then the sanitized client `request`, then
+        `params_enforced` (admin policy the client cannot override)."""
+        return {**self.params, **request, **self.params_enforced}
 
 
 @dataclass(frozen=True)

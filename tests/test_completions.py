@@ -312,6 +312,9 @@ async def _setup_team(
     provider_model_id: str = "gpt-4o",
     enabled: bool = True,
     model_type: str = "chat",
+    params: dict | None = None,
+    params_enforced: dict | None = None,
+    max_output_tokens: int | None = None,
 ) -> tuple[str, str, str]:
     """Configure a credential + team + model 'm' + key.
 
@@ -338,18 +341,21 @@ async def _setup_team(
             headers=_bearer(admin),
         )
     ).json()["id"]
-    await client.post(
-        f"/teams/{team}/models",
-        json={
-            "name": "m",
-            "provider": provider,
-            "credential_id": cred,
-            "type": model_type,
-            "provider_model_id": provider_model_id,
-            "enabled": enabled,
-        },
-        headers=_bearer(admin),
-    )
+    model_json: dict = {
+        "name": "m",
+        "provider": provider,
+        "credential_id": cred,
+        "type": model_type,
+        "provider_model_id": provider_model_id,
+        "enabled": enabled,
+    }
+    if params is not None:
+        model_json["params"] = params
+    if params_enforced is not None:
+        model_json["params_enforced"] = params_enforced
+    if max_output_tokens is not None:
+        model_json["max_output_tokens"] = max_output_tokens
+    await client.post(f"/teams/{team}/models", json=model_json, headers=_bearer(admin))
     key = (
         await client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(admin))
     ).json()["plaintext"]
@@ -363,6 +369,9 @@ async def _setup(
     provider_model_id: str = "gpt-4o",
     enabled: bool = True,
     model_type: str = "chat",
+    params: dict | None = None,
+    params_enforced: dict | None = None,
+    max_output_tokens: int | None = None,
 ) -> str:
     """Configure a credential + team + model 'm' + key. Returns the team API key."""
     key, _, _ = await _setup_team(
@@ -372,6 +381,9 @@ async def _setup(
         provider_model_id=provider_model_id,
         enabled=enabled,
         model_type=model_type,
+        params=params,
+        params_enforced=params_enforced,
+        max_output_tokens=max_output_tokens,
     )
     return key
 
@@ -416,6 +428,67 @@ async def test_request_params_are_sanitized_before_provider(
     assert "extra_headers" not in FakeClient.last_kwargs
     assert "extra_body" not in FakeClient.last_kwargs
     assert FakeClient.last_kwargs["n"] == MAX_N
+
+
+async def test_enforced_params_cannot_be_overridden_by_client(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # H15: params_enforced is admin policy applied last — the client cannot win.
+    _patch(monkeypatch)
+    api_key = await _setup(client, params_enforced={"response_format": {"type": "json_object"}})
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "hi"}],
+            "response_format": {"type": "text"},  # attempt to override admin policy
+        },
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeClient.last_kwargs["response_format"] == {"type": "json_object"}
+
+
+async def test_default_params_remain_overridable_by_client(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # H15: plain `params` are defaults — the client's value still wins.
+    _patch(monkeypatch)
+    api_key = await _setup(client, params={"temperature": 0.2})
+    await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}], "temperature": 0.9},
+        headers=_bearer(api_key),
+    )
+    assert FakeClient.last_kwargs["temperature"] == 0.9
+
+
+async def test_max_output_tokens_clamps_client_value(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # H15: the per-model ceiling lowers an over-large client request (min clamp).
+    _patch(monkeypatch)
+    api_key = await _setup(client, max_output_tokens=256)
+    await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 100_000},
+        headers=_bearer(api_key),
+    )
+    assert FakeClient.last_kwargs["max_tokens"] == 256
+
+
+async def test_max_output_tokens_injected_when_client_omits(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # H15: omitting max_tokens must not bypass the cap — inject it at the ceiling.
+    _patch(monkeypatch)
+    api_key = await _setup(client, max_output_tokens=256)
+    await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+        headers=_bearer(api_key),
+    )
+    assert FakeClient.last_kwargs["max_tokens"] == 256
 
 
 async def test_provider_client_gets_timeout_and_retries(

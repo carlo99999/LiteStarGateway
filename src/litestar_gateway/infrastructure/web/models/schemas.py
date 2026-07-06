@@ -17,7 +17,9 @@ class CreateModelRequest:
     credential_id: UUID  # must reference a credential of the same provider
     type: ModelType
     provider_model_id: str  # upstream model name, e.g. "gpt-4o"
-    params: dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)  # client-overridable defaults
+    params_enforced: dict[str, Any] = field(default_factory=dict)  # admin policy, not overridable
+    max_output_tokens: int | None = None  # per-model output-token ceiling (min clamp)
     api_version: str | None = None
     input_cost_per_token: float | None = None
     output_cost_per_token: float | None = None
@@ -31,6 +33,8 @@ class UpdateModelRequest:
 
     provider_model_id: str | None = None
     params: dict[str, Any] | None = None
+    params_enforced: dict[str, Any] | None = None
+    max_output_tokens: int | None = None
     api_version: str | None = None
     input_cost_per_token: float | None = None
     output_cost_per_token: float | None = None
@@ -47,6 +51,8 @@ class ModelResponse:
     type: ModelType
     provider_model_id: str
     params: dict[str, Any]
+    params_enforced: dict[str, Any]
+    max_output_tokens: int | None
     api_version: str | None
     input_cost_per_token: float | None
     output_cost_per_token: float | None
@@ -64,6 +70,8 @@ class ModelResponse:
             type=model.type,
             provider_model_id=model.provider_model_id,
             params=model.params,
+            params_enforced=model.params_enforced,
+            max_output_tokens=model.max_output_tokens,
             api_version=model.api_version,
             input_cost_per_token=model.input_cost_per_token,
             output_cost_per_token=model.output_cost_per_token,
