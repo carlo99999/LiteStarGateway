@@ -20,7 +20,7 @@ import anyio
 import pytest
 
 from litestar_gateway.application.completion_service import CompletionService
-from litestar_gateway.application.usage_meter import UsageMeter
+from litestar_gateway.application.usage_meter import UsageMeter, _chunk_output_text
 from litestar_gateway.domain.entities import Model, ModelType, Provider, TraceRecord, UsageEvent
 
 TEAM_ID = uuid4()
@@ -376,3 +376,15 @@ async def test_settlement_timeout_bounds_a_stalled_db() -> None:
             pass
 
     assert usage.events == []  # the stalled write was abandoned at the timeout
+
+
+def test_chunk_output_text_sums_all_choices() -> None:
+    # L19: an n>1 chat stream chunk carries a delta per choice; the estimate must
+    # count them all, not just choices[0], or a pre-usage disconnect under-bills.
+    chunk = {
+        "choices": [
+            {"index": 0, "delta": {"content": "aa"}},
+            {"index": 1, "delta": {"content": "bbb"}},
+        ]
+    }
+    assert _chunk_output_text(chunk) == "aabbb"
