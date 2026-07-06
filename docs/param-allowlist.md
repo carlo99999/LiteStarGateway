@@ -1,7 +1,12 @@
 # Design doc — Request parameter allowlist
 
-> **Status:** Draft / parked for future development. Lives on branch
-> `adding-param-allowlist`. No code yet.
+> **Status:** Implemented. `domain/request_policy.py` provides
+> `sanitize_request(operation, request)` (deny-by-default allowlist per
+> operation, clamps `n`→`MAX_N` = 8 and token fields →`MAX_TOKENS` = 32000) plus
+> `clamp_output_tokens(operation, request, ceiling)` (per-model output ceiling),
+> both wired into `CompletionService`. Cross-provider structured-output
+> translation is also in (`infrastructure/llm/structured_output.py`, see §3.1).
+> The rest of this doc is the original design rationale.
 
 ## 1. Goal
 
@@ -19,8 +24,9 @@ dedicated step it calls), so every op (`chat_completion`, `responses`,
 `embeddings`, `images`, and their streaming variants) is covered uniformly.
 
 ```text
-domain/request_policy.py     pure: sanitize(operation, request) -> dict   (+ allowlists/caps)
-application/completion_service.py   calls sanitize() before dispatching
+domain/request_policy.py     pure: sanitize_request(operation, request) -> dict   (+ allowlists/caps)
+                             pure: clamp_output_tokens(operation, request, ceiling) -> dict
+application/completion_service.py   calls sanitize_request() before dispatching
 ```
 
 Keep it a **pure function** in the domain (no I/O) → trivially unit-testable.
@@ -28,7 +34,7 @@ Keep it a **pure function** in the domain (no I/O) → trivially unit-testable.
 ## 3. Design
 
 - **Allowlist per operation** (deny by default). Indicative sets:
-  - chat: `messages, model, temperature, top_p, max_tokens, max_completion_tokens,
+  - chat.completions: `messages, model, temperature, top_p, max_tokens, max_completion_tokens,
     stop, n, presence_penalty, frequency_penalty, logit_bias, response_format,
     tools, tool_choice, seed, stream, stream_options, user`.
   - responses: `input, instructions, model, max_output_tokens, temperature, top_p,
@@ -57,6 +63,22 @@ Keep it a **pure function** in the domain (no I/O) → trivially unit-testable.
     *before* the budget reservation, so admission and the provider call agree.
     Keep token/`n` fields out of `params_enforced` — the ceiling owns them.
 - `model` is always forced to the resolved `provider_model_id` (already the case).
+
+### 3.1 Cross-provider structured output
+
+`response_format` (chat) / `text.format` (responses) is an allowlisted field, but
+its OpenAI shape is not portable. `infrastructure/llm/structured_output.py`
+parses it once — `parse_response_format(request)` → `StructuredOutput{name,
+schema}` (or `None`) — so every adapter shares one interpretation:
+
+- **OpenAI / Azure**: passed through natively.
+- **Gemini (Vertex)**: mapped to `response_schema`.
+- **Anthropic**: mapped to a forced tool (a tool whose input schema is the
+  requested schema, with `tool_choice` forcing it).
+- **Responses API**: the `text.format` shape carries the same spec.
+
+`{"type": "json_object"}` → schema-less JSON; `{"type": "json_schema", …}` →
+schema-constrained.
 
 ## 4. Open decisions
 

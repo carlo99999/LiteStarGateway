@@ -1,7 +1,10 @@
 # Design doc — Secrets management & key rotation
 
-> **Status:** Draft / parked (pre-v1). Branch `adding-secrets-rotation`.
-> No code yet.
+> **Status:** Implemented — envelope-encryption keyring
+> (`infrastructure/keyring.py`, `infrastructure/crypto.py`) with rotating data keys
+> stored in the DB (`SecretKey`; migration `add_secret_key_keyring_credential_key_id`),
+> and current+previous JWT verification keys for graceful rotation. Retained as the
+> original design rationale.
 
 ## 1. Goal
 
@@ -24,21 +27,28 @@ signing), `SALT_KEY` (credential encryption at rest).
 
 ### 3a. `SALT_KEY` (credential encryption)
 
-Rotating the key breaks decryption of existing ciphertext. Options:
+Rotating the key breaks decryption of existing ciphertext. Implemented approach:
 
-- **Keyed/versioned encryption (recommended)**: prefix each ciphertext with a key
-  id; support a small keyring `{kid: key}`. New writes use the current key; reads
-  pick the key by kid. Rotation = add a new current key, then a **re-encrypt
-  migration** that rewrites old rows to the new key, then retire the old key.
-- The cipher (`infrastructure/crypto.py`) grows a keyring + kid prefix; a
-  management command re-encrypts `credential.encrypted_values`.
+- **Envelope encryption with a DB keyring**: a fixed **master key derived from
+  `SALT_KEY`** (never auto-rotated) wraps rotating **data keys** stored in the DB
+  (`SecretKey` rows, `KeyPurpose.CREDENTIAL`). Credential values are encrypted with
+  a data key, and each credential row records **which key encrypted it** via a
+  `credential_key_id` column (not a kid prefix on the ciphertext), so existing rows
+  stay readable across rotations. New writes use the active data key; reads select
+  the key by the row's `credential_key_id`.
+- Rotation = add a fresh active data key (`Keyring.new_credential_key`), re-encrypt
+  old rows to it, then retire the superseded keys
+  (`Keyring.retire_old_credential_keys`); retired keys stay readable until nothing
+  references them. `crypto.py` holds `MasterCipher`/`DataCipher`; `keyring.py` holds
+  the keyring operations.
 
 ### 3b. `JWT_SECRET`
 
-- Support **multiple verification keys** (current + previous) so rotation doesn't
-  invalidate all live tokens at once: sign with current, accept current+previous
-  during a grace window. (Or accept the hard cutover — bumping the secret logs
-  everyone out, which `logout`/`token_version` semantics already tolerate.)
+- Implemented: **multiple verification keys** (current + previous) so rotation
+  doesn't invalidate all live tokens at once — sign with the active key, accept all
+  still-usable keys during a grace window (`Keyring.active_jwt_secret` /
+  `jwt_verification_secrets` / `rotate_jwt`, which keeps a retention grace beyond
+  the token TTL before deleting old keys).
 
 ### 3c. `MASTER_KEY`
 
@@ -46,12 +56,17 @@ Rotating the key breaks decryption of existing ciphertext. Options:
   admin **change-password** path so the account isn't pinned to the master key
   (ties to `adding-account-recovery`).
 
-## 4. Open decisions
+## 4. Decisions (as implemented)
 
-1. **Keyring format** for `SALT_KEY` (kid prefix scheme) and where kids live.
-2. **JWT** graceful (current+previous) vs hard cutover on rotation.
-3. **Re-encrypt tooling**: a CLI/management command vs an Alembic data migration
-   (depends on `adding-db-migrations`).
+1. **Keyring format**: a DB keyring (`SecretKey` rows) of master-wrapped data keys;
+   credentials reference the key via a `credential_key_id` column (no kid prefix on
+   the ciphertext).
+2. **JWT rotation**: graceful (current + previous verification keys), not a hard
+   cutover.
+
+Still open:
+
+3. **Re-encrypt tooling**: a CLI/management command vs an Alembic data migration.
 4. **Secret backend**: which manager to document as the reference.
 
 ## 5. Testing

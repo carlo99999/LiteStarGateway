@@ -1,7 +1,11 @@
 # Design doc — Account recovery & password change
 
-> **Status:** Draft / parked (pre-v1). Branch `adding-account-recovery`.
-> No code yet.
+> **Status:** Implemented — change-password, admin-driven reset
+> (`infrastructure/web/users/password_reset.py`, `PasswordReset` entity/table), and
+> per-account brute-force lockout with escalating, atomic (in-DB) durations
+> (`application/user_service.py`, `infrastructure/persistence/user_repository.py`).
+> Admin invite and password-reset issuance are audit-logged. Retained as the
+> original design rationale.
 
 ## 1. Goal
 
@@ -49,14 +53,17 @@ Reuse existing pieces: password complexity check, `token_version` revocation,
 the single-use-token pattern from invites, per-IP rate limiting, and the
 non-revealing response pattern from signup.
 
-## 4. Open decisions
+## 4. Decisions (as implemented)
 
-1. **Scope for v1**: change-password + admin-reset (no email) — recommended
-   minimum. Email-based reset deferred until an email adapter exists.
-2. **Admin reset shape**: temp password vs reset token.
+1. **Scope**: change-password + admin-reset (no email) shipped. Email-based reset
+   remains deferred until an email adapter exists.
+2. **Admin reset shape**: single-use reset token (`PasswordReset` entity/table),
+   like invites.
+
+Still open:
+
 3. **Email provider** (2c): SMTP vs a transactional provider; introduces the
    first `EmailSender` port.
-4. **Token expiry** for reset tokens.
 
 ## 5. Testing
 

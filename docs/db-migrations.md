@@ -1,7 +1,9 @@
 # Design doc — Database migrations (Alembic)
 
-> **Status:** Draft / parked for future development. Lives on branch
-> `adding-db-migrations`. No code yet.
+> **Status:** Implemented — Alembic env (`migrations/env.py`, `alembic.ini`) with a
+> baseline plus per-change revisions in `migrations/versions/`; `create_all` is off
+> in production (schema managed by migrations, run on start). Retained as the
+> original design rationale.
 
 ## 1. Goal
 
@@ -33,20 +35,23 @@ it rather than wiring raw Alembic:
 4. Document the workflow in the README: `alembic revision --autogenerate`,
    review, `alembic upgrade head`; run `upgrade head` on deploy.
 
-## 4. Open decisions
+## 4. Decisions (as implemented)
 
-1. **create_all coexistence**: gate by environment (prod = migrations only) vs
-   remove entirely. Lean: keep `create_all` for dev/test, disable in production.
-2. **Async vs sync Alembic env**: Alembic can run migrations sync; with async
-   drivers use the async template (`run_async`/`run_migrations_online` with the
-   async engine). Choose the async env to match `asyncpg`/`aiosqlite`.
-3. **Baseline strategy**: single baseline from current models vs stamping
-   existing DBs. For a young project, one baseline + `alembic stamp` for any
-   existing deploy.
-4. **CI check**: add a test/CI step asserting "no pending autogenerate diff"
-   (models and migrations are in sync), to catch forgotten migrations.
-5. **SQLite limits**: SQLite's limited `ALTER TABLE` may require Alembic
+1. **create_all coexistence**: gated by environment — `create_all` for dev/test,
+   disabled in production (production uses Alembic migrations only, run on start).
+2. **Async vs sync Alembic env**: async env, using the async template
+   (`run_async`/`run_migrations_online` with the async engine) to match
+   `asyncpg`/`aiosqlite`.
+3. **Baseline strategy**: a single baseline from the current models, with
+   `alembic stamp` for any existing deploy.
+4. **SQLite limits**: SQLite's limited `ALTER TABLE` may require Alembic
    batch-mode for some changes; Postgres is the production target anyway.
+
+Still open:
+
+4. **CI check**: add a test/CI step asserting "no pending autogenerate diff"
+   (models and migrations are in sync), to catch forgotten migrations — not yet
+   in the CI workflow.
 
 ## 5. Testing
 

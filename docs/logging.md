@@ -1,7 +1,12 @@
 # Design doc — Structured logging & error hygiene
 
-> **Status:** Draft / parked (pre-v1). Branch `adding-structured-logging`.
-> No code yet.
+> **Status:** Partially implemented. Structured logging + error hygiene shipped:
+> `build_logging_config` (`src/litestar_gateway/infrastructure/logging.py`,
+> wired in `app.py`) emits structured **JSON** (structlog) in production and
+> human-readable console logs in dev, with `log_exceptions="always"`; the app
+> never runs `debug=True`, so 5xx responses stay generic. The **request/
+> correlation-id** middleware + `X-Request-ID` echo (§2) is NOT yet implemented.
+> The rest of this doc is the original design rationale.
 
 ## 1. Goal
 

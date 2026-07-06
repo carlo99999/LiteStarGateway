@@ -1,7 +1,10 @@
 # Design doc — Enterprise: SSO, SCIM, RBAC, audit
 
-> **Status:** SSO in progress (branch `adding-enterprise-sso`); SCIM/RBAC/audit
-> still parked. The rest of this doc is the broader enterprise plan.
+> **Status:** OIDC SSO implemented (`infrastructure/sso/oidc.py`,
+> `infrastructure/web/session/sso.py`) and the audit log is implemented
+> (`infrastructure/persistence/audit_repository.py`, `infrastructure/web/audit/`,
+> wired into invites / password-reset / unlock / set-active). SCIM, extended RBAC,
+> and SAML remain parked. The rest of this doc is the broader enterprise plan.
 
 ## 0. OIDC SSO — implementation plan (refined after studying LiteLLM)
 
@@ -24,20 +27,32 @@ claim access (incl. `groups`), OIDC discovery, PKCE, and JWKS verification.
 
 **Flow / components (hexagonal):**
 
-- **Port** `IdentityProvider`: `authorization_url(state) -> str`,
-  `exchange(code, ...) -> ExternalIdentity(subject, email, groups, raw)`.
-- **Adapter** `OIDCIdentityProvider` (Authlib): discovery + PKCE + token exchange
-  - `id_token` verification; generic OIDC, with Google/Microsoft as config presets.
-- **Endpoints** (2): `GET /sso/login` (redirect to IdP, signed `state` + PKCE) and
-  `GET /sso/callback` (exchange → map → JIT upsert → **issue our own JWT** via the
-  existing keyring; rate-limited, non-revealing).
+- **Port** `IdentityProvider` (`infrastructure/sso/oidc.py`,
+  `OIDCIdentityProvider`):
+  `authorization_url(state, redirect_uri, *, nonce, code_verifier) -> str`,
+  `exchange(code, redirect_uri, *, nonce, code_verifier) -> ExternalIdentity(subject, email, email_verified, groups)`.
+- **Adapter** `OIDCIdentityProvider` (Authlib + joserfc): discovery + PKCE (S256) +
+  token exchange + `id_token` verification against the provider's JWKS. The
+  **`nonce`** claim is verified on exchange (replay defense — an id_token minted
+  for a different authorization request is rejected). The **`groups`** claim must
+  be a JSON array or the exchange fails closed (a non-list value is not iterated).
+  Discovery metadata is cached with a **TTL refresh** (~1h) and the JWKS is
+  refreshed lazily on an unknown-`kid` miss, so IdP endpoint/key rotation is picked
+  up without a restart. Generic OIDC, with Google/Microsoft as config presets.
+- **Endpoints** (2): `GET /sso/login` (redirect to IdP, signed `state` + PKCE +
+  `nonce`) and `GET /sso/callback` (exchange → map → JIT upsert → **issue our own
+  JWT** via the existing keyring; rate-limited, non-revealing). The web layer lives
+  in `infrastructure/web/session/sso.py`.
 - **Pure mapping**: `is_admin` from an admin-group set; `groups → (team, role)`
   memberships reconciled against the user's current ones.
 - **JIT upsert** in `UserService`: create/update the SSO user (no password),
   apply role + teams, bump `token_version` if disabled. `User` gains
   `sso_subject`/`external_id` and `is_active`.
 - **Config**: OIDC discovery URL, client id/secret, scopes, `SSO_ADMIN_GROUPS`,
-  `SSO_TEAM_MAPPING` (group → team,role).
+  `SSO_TEAM_MAPPING` (group → team,role). **`OIDC_REDIRECT_URI` is required when
+  SSO is enabled outside local dev** (`config.py` fails fast if unset) — otherwise
+  the redirect is derived from the request `Host` header, which a forged Host could
+  steer.
 - **Reuse**: the existing JWT session + keyring — SSO federates identity, then
   mints our token (no second session system).
 
@@ -61,14 +76,16 @@ The clean fit for the hexagon: authentication becomes a swappable adapter.
 
 ```text
 domain/ports.py        IdentityProvider (Protocol):
-                         authorize_url(state) -> str
-                         exchange(callback_params) -> ExternalIdentity
-domain/entities.py     ExternalIdentity (issuer, subject, email, groups, attrs)
-infrastructure/web/session/sso/
-    oidc_adapter.py     OIDC/OAuth2 (authlib): discovery, PKCE, JWKS validation
-    saml_adapter.py     SAML 2.0 (python3-saml): ACS, metadata, signature checks
-application/sso_service.py   maps ExternalIdentity -> local User (+ teams), then
-                             issues our existing login JWT
+                         authorization_url(state, redirect_uri, *, nonce, code_verifier) -> str
+                         exchange(code, redirect_uri, *, nonce, code_verifier) -> ExternalIdentity
+domain/entities.py     ExternalIdentity (subject, email, email_verified, groups)
+infrastructure/sso/
+    oidc.py             OIDCIdentityProvider (authlib + joserfc): discovery (TTL
+                        refresh), PKCE, nonce, JWKS validation [shipped]
+    saml_adapter.py     SAML 2.0 (python3-saml): ACS, metadata, signature checks [planned]
+infrastructure/web/session/sso.py   login/callback endpoints
+application/user_service.py   maps ExternalIdentity -> local User (+ teams), then
+                              issues our existing login JWT (JIT upsert)
 ```
 
 Flow: `/sso/{provider}/login` → IdP → `/sso/{provider}/callback` → validate →
