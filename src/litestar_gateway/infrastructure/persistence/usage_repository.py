@@ -128,10 +128,15 @@ class SQLAlchemyUsageRepository:
         # lives in exactly one of the two tables at any commit point (the
         # reconciler inserts + deletes in one transaction), so this never
         # double-counts.
+        # Quarantined rows (attempts >= MAX_RECONCILE_ATTEMPTS) are excluded:
+        # the reconciler will never drain them into the ledger, so they will
+        # never actually bill — counting them would permanently shrink the
+        # team's usable budget by a phantom amount for the whole window (M28).
         pending = await self._session.scalar(
             select(func.coalesce(func.sum(PendingUsageEventModel.cost), 0.0)).where(
                 PendingUsageEventModel.team_id == team_id,
                 PendingUsageEventModel.event_created_at >= since,
+                PendingUsageEventModel.attempts < MAX_RECONCILE_ATTEMPTS,
             )
         )
         return float(total or 0.0) + float(pending or 0.0)

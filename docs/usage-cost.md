@@ -18,6 +18,14 @@
 > when the limit is crossed still complete; requests without a max-tokens field
 > reserve only their prompt estimate; and the reservation is per replica, so the
 > bound scales with replica count.
+>
+> **Outbox spend & quarantine:** the gate also counts dead-lettered spend still
+> in the outbox (`pending_usage_event`) so a ledger-write degradation isn't a
+> budget-bypass window. Rows quarantined after `MAX_RECONCILE_ATTEMPTS` failed
+> reconciles are **excluded** from the gate: they will never drain into the
+> ledger (so they never actually bill), and counting them would permanently
+> shrink the team's usable budget by a phantom amount for the rest of the
+> window (M28).
 
 ## 1. Goal
 
