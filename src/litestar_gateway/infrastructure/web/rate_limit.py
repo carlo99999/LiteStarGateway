@@ -1,4 +1,4 @@
-"""Rate limiting: per-API-key for inference, per-IP for auth endpoints.
+"""Rate limiting: per-IP guardrails for inference and auth endpoints.
 
 These are conservative guardrails (not finely tuned) to bound provider cost and
 brute-force / account-spam attempts. They use Litestar's in-memory store by
@@ -16,29 +16,24 @@ from typing import Any, Literal
 from litestar.connection import Request
 from litestar.middleware.rate_limit import RateLimitConfig, get_remote_address
 
-from litestar_gateway.domain.key_generator import hash_key
-
 RateUnit = Literal["second", "minute", "hour", "day"]
 
-# Inference (`/v1/*`): per API key — bounds runaway provider spend per client.
+# Inference (`/v1/*`): per IP — bounds request rate before auth runs. Per-client
+# provider *spend* is bounded separately by the budget gate (admit/InFlightSpend).
 INFERENCE_RATE_LIMIT: tuple[RateUnit, int] = ("minute", 120)
 # Auth (`/login`, `/signup`): per IP — bounds brute force and account spam.
 AUTH_RATE_LIMIT: tuple[RateUnit, int] = ("minute", 20)
 
-_BEARER = "Bearer "
-
 
 def _inference_identifier(request: Request[Any, Any, Any]) -> str:
-    """Key inference calls by API key when present, else by client IP.
+    """Key inference calls by client IP.
 
-    Keying by the key's hash (never the plaintext) bounds per-key cost; the IP
-    fallback bounds anonymous / invalid-token floods that the auth layer rejects.
+    The limiter runs *before* authentication, so it must key on something an
+    unauthenticated caller cannot cheaply vary. Keying by the bearer token let an
+    attacker mint a fresh bucket per random token (M33), escaping the limit and
+    flooding the auth-layer DB lookup unthrottled. IP-keying bounds those floods;
+    per-client provider spend is bounded separately by the budget gate.
     """
-    authorization = request.headers.get("Authorization", "")
-    if authorization.startswith(_BEARER):
-        token = authorization[len(_BEARER) :].strip()
-        if token:
-            return f"key::{hash_key(token)}"
     return f"ip::{get_remote_address(request)}"
 
 
