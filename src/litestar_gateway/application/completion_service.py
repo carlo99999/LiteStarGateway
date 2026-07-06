@@ -49,12 +49,15 @@ class CompletionService:
         api_key_id: UUID,
         model: Model,
         operation: str,
+        request: dict[str, Any],
         call: Callable[[], Awaitable[dict[str, Any]]],
         reservation: float = 0.0,
     ) -> dict[str, Any]:
         """Run one gateway call, observing success (usage + trace) and failure
         (error trace) before the exception propagates to the HTTP layer. The
-        budget reservation taken at admission is released either way."""
+        budget reservation taken at admission is released either way. The request
+        is passed to settlement so usage can be estimated if the provider
+        reported none (H14)."""
         start = perf_counter()
         try:
             try:
@@ -65,7 +68,9 @@ class CompletionService:
                 )
                 raise
             latency_ms = (perf_counter() - start) * 1000
-            await self._meter.settle_ok(team_id, api_key_id, model, operation, response, latency_ms)
+            await self._meter.settle_ok(
+                team_id, api_key_id, model, operation, response, latency_ms, request
+            )
             return response
         finally:
             self._meter.release(team_id, reservation)
@@ -108,6 +113,7 @@ class CompletionService:
             api_key_id,
             model,
             "chat.completions",
+            clean,
             lambda: self._gateway.achat_completion(clean, model, values),
             reservation,
         )
@@ -124,6 +130,7 @@ class CompletionService:
             api_key_id,
             model,
             "responses",
+            clean,
             lambda: self._gateway.aresponses(clean, model, values),
             reservation,
         )
@@ -177,6 +184,7 @@ class CompletionService:
             api_key_id,
             model,
             "embeddings",
+            clean,
             lambda: self._gateway.aembeddings(clean, model, values),
             reservation,
         )
@@ -193,6 +201,7 @@ class CompletionService:
             api_key_id,
             model,
             "images",
+            clean,
             lambda: self._gateway.aimages(clean, model, values),
             reservation,
         )

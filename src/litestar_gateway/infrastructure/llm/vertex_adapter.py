@@ -132,11 +132,17 @@ def from_gemini_embeddings(response: dict[str, Any], model_id: str) -> dict[str,
         }
         for i, e in enumerate(embeddings)
     ]
+    # Bill from the provider's reported token count where available (H14). When
+    # google-genai omits usage_metadata, leave the fields None so the meter's
+    # non-streaming estimation fallback kicks in rather than billing zero.
+    usage = response.get("usage_metadata") or {}
+    prompt = usage.get("prompt_token_count") or usage.get("total_token_count")
+    total = usage.get("total_token_count") or prompt
     return {
         "object": "list",
         "data": data,
         "model": model_id,
-        "usage": {"prompt_tokens": None, "total_tokens": None},
+        "usage": {"prompt_tokens": prompt, "total_tokens": total},
     }
 
 

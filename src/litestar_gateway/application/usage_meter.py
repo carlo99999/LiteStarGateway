@@ -45,6 +45,9 @@ def _request_text(request: dict[str, Any]) -> str:
         parts.append(value)
     items = request.get("messages") or (value if isinstance(value, list) else [])
     for item in items:
+        if isinstance(item, str):  # embeddings input may be a list[str]
+            parts.append(item)
+            continue
         if not isinstance(item, dict):
             continue
         content = item.get("content")
@@ -210,9 +213,26 @@ class UsageMeter:
         operation: str,
         response: dict[str, Any],
         latency_ms: float,
+        request: dict[str, Any] | None = None,
     ) -> None:
-        """Record usage (billing) + emit an observability trace. Fail-safe."""
+        """Record usage (billing) + emit an observability trace. Fail-safe.
+
+        If the provider reported no usable token counts (e.g. an adapter that
+        omits usage), estimate the prompt from the request rather than billing
+        zero silently — the non-streaming mirror of the stream estimate (H14)."""
         usage = response.get("usage") or {}
+        if not _has_tokens(usage) and request is not None:
+            estimate = {"prompt_tokens": _estimate_tokens(len(_request_text(request)))}
+            if _has_tokens(estimate):
+                usage = estimate
+                logger.warning(
+                    "no authoritative usage from provider; billing estimate: "
+                    "team=%s model=%s op=%s prompt=%s",
+                    team_id,
+                    model.name,
+                    operation,
+                    usage["prompt_tokens"],
+                )
         prompt, completion, cost = _parse_usage(model, usage)
         now = datetime.now(UTC)
         await self._bill(team_id, api_key_id, model, operation, prompt, completion, cost, now)
