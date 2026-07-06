@@ -11,7 +11,9 @@ the admin flag is upgrade-only — re-login never revokes it.
 from __future__ import annotations
 
 import secrets
+from collections.abc import Iterable
 from typing import Annotated
+from uuid import UUID
 
 from litestar import Request, get
 from litestar.datastructures import Cookie
@@ -21,7 +23,10 @@ from litestar.params import FromQuery, QueryParameter
 from litestar.response import Redirect
 from litestar.router import Router
 
+from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.application.user_service import UserService
+from litestar_gateway.config import TeamGrant
+from litestar_gateway.domain.entities import TeamRole
 from litestar_gateway.domain.ports import IdentityProvider
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.web.rate_limit import build_auth_rate_limit
@@ -39,6 +44,21 @@ _EXPIRE_FLOW_COOKIES = [
     Cookie(key=key, value="", max_age=0, httponly=True, samesite="lax")
     for key in (_STATE_COOKIE, _NONCE_COOKIE, _VERIFIER_COOKIE)
 ]
+
+
+def _resolve_team_grants(
+    groups: Iterable[str], mapping: dict[str, tuple[TeamGrant, ...]]
+) -> tuple[dict[UUID, TeamRole], set[UUID]]:
+    """From the user's IdP groups and SSO_TEAM_MAPPING, compute the desired
+    (team -> role) grants and the set of SSO-governed teams (the mapping's
+    codomain). ADMIN wins when the user's groups grant one team at both roles."""
+    governed = {grant.team_id for grants in mapping.values() for grant in grants}
+    desired: dict[UUID, TeamRole] = {}
+    for group in groups:
+        for grant in mapping.get(group, ()):
+            if desired.get(grant.team_id) is None or grant.role is TeamRole.ADMIN:
+                desired[grant.team_id] = grant.role
+    return desired, governed
 
 
 def _redirect_uri(request: Request, configured: str | None) -> str:
@@ -99,9 +119,11 @@ async def sso_callback(
     request: Request,
     identity_provider: NamedDependency[IdentityProvider],
     user_service: NamedDependency[UserService],
+    team_service: NamedDependency[TeamService],
     keyring: NamedDependency[Keyring],
     sso_admin_groups: NamedDependency[tuple[str, ...]],
     sso_default_admin: NamedDependency[bool],
+    sso_team_mapping: NamedDependency[dict[str, tuple[TeamGrant, ...]]],
     sso_redirect_uri: NamedDependency[str | None],
     code: FromQuery[str | None] = None,
     # `state` is a reserved kwarg in Litestar (the app State), so alias the query.
@@ -130,6 +152,11 @@ async def sso_callback(
     user = await user_service.upsert_sso_user(
         identity, group_admin=group_admin, default_admin=sso_default_admin
     )
+    # Group → team/role mapping: reconcile the user's memberships in SSO-governed
+    # teams to their current IdP groups (add/update/remove); a no-op when unset.
+    desired, governed = _resolve_team_grants(identity.groups, sso_team_mapping)
+    if governed:
+        await team_service.reconcile_sso_memberships(user.id, desired, governed)
     secret = await keyring.active_jwt_secret()
     access_token, expires_in = issue_access_token(str(user.id), secret, user.token_version)
     return TokenResponse(access_token=access_token, token_type="bearer", expires_in=expires_in)
