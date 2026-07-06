@@ -185,8 +185,7 @@ on their own branch (linked). Order within a phase is a recommendation.
    [design](docs/ci.md)).
 2. ✅ **Container image & deployment** _(shipped)_ — multi-stage [`Dockerfile`](Dockerfile)
    (non-root, uvicorn + `--proxy-headers`, healthcheck) + [`docker-compose.yml`](docker-compose.yml),
-   see [Deployment](#deployment) and the [design](docs/deployment.md). _Postgres
-   service is stubbed pending the Postgres item._
+   see [Deployment](#deployment) and the [design](docs/deployment.md).
 3. ✅ **Database migrations (Alembic)** _(shipped)_ — production manages the schema
    via Alembic (in `migrations/`); `create_all` is used only in dev/test. The
    container runs `database upgrade` on start ([design](docs/db-migrations.md)).
