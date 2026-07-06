@@ -49,5 +49,5 @@ migrations, not `create_all`.
 ## 6. Rollout
 
 1. `feat/postgres-support` — asyncpg dep + pool config in `Settings`/`database.py`
-   + README.
+   - README.
 2. `feat/postgres-ci` — CI matrix/service running the suite on Postgres.

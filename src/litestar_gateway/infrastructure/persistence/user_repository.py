@@ -78,7 +78,7 @@ class SQLAlchemyUserRepository:
             .returning(UserModel.failed_login_attempts)
         )
         await self._session.commit()
-        return int(count or 0)
+        return count or 0
 
     async def set_login_lock(self, user_id: UUID, locked_until: datetime, cycles: int) -> None:
         await self._session.execute(

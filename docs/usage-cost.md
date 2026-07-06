@@ -37,6 +37,7 @@ multi-tenant gateway without accounting + limits.
 ## 2. Two parts
 
 ### 2a. Accounting (record every call's usage/cost)
+
 - After each call, read `usage` from the provider response (prompt/completion
   tokens), compute cost = tokens × the `Model` cost fields, and persist a
   **`UsageEvent`** (team_id, model_id, key_id, op, tokens, cost, ts, status).
@@ -48,15 +49,16 @@ multi-tenant gateway without accounting + limits.
   aggregation (by day/model/key).
 
 ### 2b. Budgets / quotas (enforce)
+
 - A **`Budget`** per team (and optionally per key): limit + window (monthly/daily)
-  + action (block vs alert).
+  - action (block vs alert).
 - Enforcement is **pre-call**: check accumulated spend for the window before
   dispatching; over-limit → `402 Payment Required` / `429`. Keep a fast running
   counter (cache/store) so enforcement isn't a heavy aggregate query per request.
 
 ## 3. Placement
 
-```
+```text
 domain/entities.py      UsageEvent, Budget
 domain/ports.py         UsageRepository, BudgetRepository
 application/completion_service.py

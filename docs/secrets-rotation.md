@@ -23,6 +23,7 @@ signing), `SALT_KEY` (credential encryption at rest).
 ## 3. Rotation — the hard part
 
 ### 3a. `SALT_KEY` (credential encryption)
+
 Rotating the key breaks decryption of existing ciphertext. Options:
 
 - **Keyed/versioned encryption (recommended)**: prefix each ciphertext with a key
@@ -33,12 +34,14 @@ Rotating the key breaks decryption of existing ciphertext. Options:
   management command re-encrypts `credential.encrypted_values`.
 
 ### 3b. `JWT_SECRET`
+
 - Support **multiple verification keys** (current + previous) so rotation doesn't
   invalidate all live tokens at once: sign with current, accept current+previous
   during a grace window. (Or accept the hard cutover — bumping the secret logs
   everyone out, which `logout`/`token_version` semantics already tolerate.)
 
 ### 3c. `MASTER_KEY`
+
 - Only used at bootstrap; "rotation" = the admin changing their password. Add an
   admin **change-password** path so the account isn't pinned to the master key
   (ties to `adding-account-recovery`).

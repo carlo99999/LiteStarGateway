@@ -2,15 +2,17 @@
 
 Load this when the user passed one or more `https://github.com/...` URLs, or named several local subfolders to merge into one graph.
 
-### Step 0 - Clone GitHub repo(s) (only if a GitHub URL was given)
+## Step 0 - Clone GitHub repo(s) (only if a GitHub URL was given)
 
 **Single repo:**
+
 ```bash
 LOCAL_PATH=$(graphify clone <github-url> [--branch <branch>])
 # Use LOCAL_PATH as the target for all subsequent steps
 ```
 
 **Multiple repos (cross-repo graph):**
+
 ```bash
 # Clone each repo, run the full pipeline on each, then merge
 graphify clone <url1>   # → ~/.graphify/repos/<owner1>/<repo1>

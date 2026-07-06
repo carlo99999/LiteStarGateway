@@ -23,10 +23,11 @@ framework-agnostic (httpx), installs on Python 3.14, and gives full `id_token`
 claim access (incl. `groups`), OIDC discovery, PKCE, and JWKS verification.
 
 **Flow / components (hexagonal):**
+
 - **Port** `IdentityProvider`: `authorization_url(state) -> str`,
   `exchange(code, ...) -> ExternalIdentity(subject, email, groups, raw)`.
 - **Adapter** `OIDCIdentityProvider` (Authlib): discovery + PKCE + token exchange
-  + `id_token` verification; generic OIDC, with Google/Microsoft as config presets.
+  - `id_token` verification; generic OIDC, with Google/Microsoft as config presets.
 - **Endpoints** (2): `GET /sso/login` (redirect to IdP, signed `state` + PKCE) and
   `GET /sso/callback` (exchange → map → JIT upsert → **issue our own JWT** via the
   existing keyring; rate-limited, non-revealing).
@@ -58,7 +59,7 @@ governs it, it does not replace it.
 
 The clean fit for the hexagon: authentication becomes a swappable adapter.
 
-```
+```text
 domain/ports.py        IdentityProvider (Protocol):
                          authorize_url(state) -> str
                          exchange(callback_params) -> ExternalIdentity

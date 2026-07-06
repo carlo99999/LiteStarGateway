@@ -139,7 +139,7 @@ class SQLAlchemyUsageRepository:
                 PendingUsageEventModel.attempts < MAX_RECONCILE_ATTEMPTS,
             )
         )
-        return float(total or 0.0) + float(pending or 0.0)
+        return (total or 0.0) + (pending or 0.0)
 
     async def enqueue_pending(self, event: UsageEvent) -> None:
         # The request session may be in a failed state after the ledger commit

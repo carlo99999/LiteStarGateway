@@ -18,7 +18,7 @@ bounded numeric ranges.
 dedicated step it calls), so every op (`chat_completion`, `responses`,
 `embeddings`, `images`, and their streaming variants) is covered uniformly.
 
-```
+```text
 domain/request_policy.py     pure: sanitize(operation, request) -> dict   (+ allowlists/caps)
 application/completion_service.py   calls sanitize() before dispatching
 ```

@@ -6,10 +6,11 @@ Two traversal modes - choose based on the question:
 
 | Mode | Flag | Best for |
 |------|------|----------|
-| BFS (default) | _(none)_ | "What is X connected to?" - broad context, nearest neighbors first |
+| BFS (default) | *(none)* | "What is X connected to?" - broad context, nearest neighbors first |
 | DFS | `--dfs` | "How does X reach Y?" - trace a specific chain or dependency path |
 
 First check the graph exists:
+
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 from pathlib import Path
@@ -18,15 +19,17 @@ if not Path('graphify-out/graph.json').exists():
     raise SystemExit(1)
 "
 ```
+
 If it fails, stop and tell the user to run `/graphify <path>` first.
 
-### Step 0 — Constrained query expansion (REQUIRED before traversal)
+## Step 0 — Constrained query expansion (REQUIRED before traversal)
 
 graphify's `query` CLI matches nodes via case-folded substring + IDF — there is **no stemming, no synonyms, no cross-language match** inside the binary, and the inline fallback below matches the same way. If the user's question uses different language or different domain vocabulary than the graph's labels (user says "обработчик" / graph says "handler"; user says "authentication" / graph says "Guardian"), the literal matcher returns 0 hits and the answer collapses to noise.
 
 Fix this **without inventing tokens** by expanding the query against the actual graph vocabulary first:
 
 1. Extract the token vocabulary from node labels:
+
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 import json, re
@@ -53,9 +56,11 @@ print(f'vocab: {len(vocab)} tokens')
    - Morphology: "handlers" maps to `handler` IFF present; "todos" maps to `todo` IFF present.
 
 3. Print the selection explicitly to the user before running the query, so the expansion is auditable:
-```
+
+```text
 Query expanded to (from graph vocab, N tokens): [token1, token2, ...]
 ```
+
 If the list is empty, say so plainly and stop — do not proceed to traversal.
 
 ### Step 1 — Traversal
@@ -63,6 +68,7 @@ If the list is empty, say so plainly and stop — do not proceed to traversal.
 Build the **expanded query string** by joining the selected tokens with spaces. Use this string as `QUESTION` below — NOT the original user question. (The original question is preserved only for `save-result` at the end.)
 
 Prefer the CLI when it is installed:
+
 ```bash
 graphify query "QUESTION"
 # or: graphify query "QUESTION" --dfs --budget 3000
