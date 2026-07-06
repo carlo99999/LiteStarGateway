@@ -1526,8 +1526,11 @@ async def test_anthropic_structured_output_forces_a_tool(
     assert tools[0]["input_schema"] == _JSON_SCHEMA_RF["json_schema"]["schema"]
     assert FakeAnthropic.last_kwargs["tool_choice"] == {"type": "tool", "name": "answer"}
     # The forced tool's input is surfaced as JSON in message.content.
-    content = resp.json()["choices"][0]["message"]["content"]
-    assert json.loads(content) == {"answer": 42}
+    choice = resp.json()["choices"][0]
+    assert json.loads(choice["message"]["content"]) == {"answer": 42}
+    # A structured completion looks like a normal one to the client, not a tool
+    # call — finish_reason must be "stop", not "tool_calls".
+    assert choice["finish_reason"] == "stop"
 
 
 async def test_anthropic_json_object_nudges_via_system(
@@ -1640,7 +1643,16 @@ async def test_anthropic_structured_output_streams_json(
     assert resp.status_code == HTTP_200_OK
     assert FakeAnthropic.last_kwargs["tool_choice"] == {"type": "tool", "name": "answer"}
     # The partial-JSON tool deltas reassemble into the structured result.
-    assert json.loads(_sse_content(resp.text)) == {"answer": 42}
+    body = resp.text
+    assert json.loads(_sse_content(body)) == {"answer": 42}
+    # Streamed finish_reason is "stop" too (not "tool_calls").
+    finishes = [
+        choice.get("finish_reason")
+        for ev in _sse_events(body)
+        for choice in ev.get("choices", [])
+        if choice.get("finish_reason")
+    ]
+    assert finishes == ["stop"]
 
 
 async def test_openai_structured_output_streaming_passes_through(
