@@ -65,8 +65,10 @@ inputs/outputs/attributes. No global state, concurrency-safe.
 
 ## 5. Off the hot path (hard constraint)
 
-- The endpoint responds to the client **before** logging: use a Litestar
-  **`BackgroundTask`** attached to the response.
+- The endpoint responds to the client **before** logging: the service enqueues
+  the `TraceRecord` on the bounded-queue **`TraceDispatcher`** (worker thread;
+  dropped-with-a-warning when full), superseding the per-response
+  `BackgroundTask` originally sketched here (see status header).
 - MLflow calls (blocking HTTP) run inside `anyio.to_thread.run_sync`, never on
   the event loop.
 - The sink is **fail-safe**: any exception is logged and swallowed — it must
@@ -124,7 +126,8 @@ Experiment creation at team creation is **best-effort** (if MLflow is down,
 - `provide_trace_sink()` → `MLflowTraceSink(...)` if a tracking URI is present,
   else `NullTraceSink`.
 - `CompletionService` receives the sink; each operation times itself, builds the
-  `TraceRecord`, and enqueues the log as a background task.
+  `TraceRecord`, and enqueues it on the bounded-queue `TraceDispatcher` (worker
+  thread), not a per-response background task.
 
 ## 11. Testing
 

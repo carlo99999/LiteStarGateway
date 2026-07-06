@@ -1,6 +1,8 @@
 # Design doc — Container image & deployment
 
-> **Status:** Draft / parked (pre-v1). Branch `adding-docker-deploy`. No code yet.
+> **Status:** Implemented — see `Dockerfile`, `docker-compose.yml`,
+> `docker-entrypoint.sh`, `.dockerignore`. Retained as the original design
+> rationale.
 
 ## 1. Goal
 
@@ -21,8 +23,9 @@ server), which is not a production setup.
 - **Config**: all via env (already the case). Document required vars
   (`DATABASE_URL` → Postgres, `MASTER_KEY`, `JWT_SECRET`, `SALT_KEY`,
   `ENVIRONMENT=production`).
-- **Health/readiness**: keep `/health`; add a readiness check that verifies DB
-  connectivity for orchestrator probes.
+- **Health/readiness**: `/health` is a liveness-only probe (it does not touch the
+  database); the container `HEALTHCHECK` calls it. No DB-connectivity readiness
+  probe was added.
 - **Docs**: a "Deploy" section in the README + an example `docker-compose.yml`
   (app + Postgres) for local prod-like runs.
 
@@ -32,13 +35,18 @@ Rate-limit and any future cache use an in-memory store per process. With multipl
 workers, back them with a **shared store (Redis)** or limits are per-worker. Tie
 this to the rate-limit/observability docs.
 
-## 4. Open decisions
+## 4. Decisions (as implemented)
 
-1. **uvicorn vs gunicorn+uvicorn workers** (process management).
-2. **Base image**: `python:3.x-slim` vs distroless.
-3. **Migrations on deploy**: run `alembic upgrade head` as an init step (depends
-   on `adding-db-migrations`).
-4. **Redis** as a dependency now vs later (needed for multi-worker rate limiting).
+1. **ASGI server**: **uvicorn** with `--proxy-headers --forwarded-allow-ips`
+   (`docker-entrypoint.sh`).
+2. **Base image**: builder `ghcr.io/astral-sh/uv:python3.14-bookworm-slim`,
+   runtime `python:3.14-slim-bookworm` (`Dockerfile`).
+3. **Migrations on deploy**: run on start via
+   `litestar … database upgrade --no-prompt` in `docker-entrypoint.sh` (gated by
+   `MIGRATE_ON_START`, default on).
+4. **Redis**: shipped as a `docker-compose.yml` service and enabled via
+   `REDIS_URL` (needed for multi-worker rate limiting; falls back to in-memory
+   when unset).
 
 ## 5. Rollout
 

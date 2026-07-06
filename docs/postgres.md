@@ -1,6 +1,8 @@
 # Design doc — Production Postgres
 
-> **Status:** Draft / parked (pre-v1). Branch `adding-postgres`. No code yet.
+> **Status:** Implemented — `asyncpg` is a dependency (`pyproject.toml`), pool
+> knobs live in `Settings` (`config.py`), and `docker-compose.yml` runs the app
+> against `postgres:17`. Retained as the original design rationale.
 
 ## 1. Goal
 
@@ -11,11 +13,10 @@ validation + config, not a rewrite.
 
 ## 2. Plan
 
-- **Driver**: `asyncpg` (add to deps). Connection string via `DATABASE_URL`
-  (already supported).
-- **Connection pool**: configure pool size / max overflow / pool_timeout /
-  `pool_pre_ping` on the `SQLAlchemyAsyncConfig` for production. Today we pass none
-  (SQLite defaults). Expose the knobs via `Settings`.
+- **Driver**: `asyncpg` (shipped in deps — `pyproject.toml`). Connection string
+  via `DATABASE_URL` (already supported).
+- **Connection pool**: pool knobs are exposed via `Settings` — `db_pool_size` and
+  `db_max_overflow` (`config.py`), read from `DB_POOL_SIZE` / `DB_MAX_OVERFLOW`.
 - **Validate concurrency behavior**: the unit-of-work flows (`create_team`,
   `register`) and the atomic invite `UPDATE` must be exercised on Postgres. In
   particular re-confirm the unit-of-work commit path here (SQLite masked an

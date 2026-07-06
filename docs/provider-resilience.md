@@ -1,7 +1,15 @@
 # Design doc — Provider resilience (timeouts, retries, circuit breaker)
 
-> **Status:** Draft / parked (pre-v1). Branch `adding-provider-resilience`.
-> No code yet.
+> **Status:** Partially implemented. Timeouts + bounded retries shipped — a
+> per-call `request_timeout` (default 60s) and `max_retries` (default 2) are
+> delegated to the OpenAI/Anthropic SDKs (native exponential backoff, Retry-After,
+> correct streaming handling) via `ResilienceConfig`
+> (`src/litestar_gateway/infrastructure/llm/resilience.py`), configured from
+> `Settings` (`REQUEST_TIMEOUT`/`MAX_RETRIES`, `src/litestar_gateway/config.py`);
+> the Vertex/genai client takes the timeout in ms through `HttpOptions`. This is
+> SDK-native config, **not** a hand-rolled retry loop or `ResilientGateway`
+> wrapper. The **circuit breaker** below is NOT yet built. The rest of this doc is
+> the original design rationale.
 
 ## 1. Goal
 

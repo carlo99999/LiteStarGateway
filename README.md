@@ -250,6 +250,8 @@ on their own branch (linked). Order within a phase is a recommendation.
   code copied. _Follow-ups: group→team mapping, SCIM, SAML, audit,
   per-org SSO, fine-grained RBAC._
   [design](docs/enterprise-sso.md)
+- ✅ **Test coverage gate** _(shipped)_ — CI enforces 80% via `pytest --cov-fail-under=80` ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+- ✅ **Dependency CVE scanning** _(shipped)_ — CI runs `pip-audit` on every PR ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 ### v2 (after v1)
 
@@ -270,8 +272,7 @@ on their own branch (linked). Order within a phase is a recommendation.
 - ✅ **LICENSE & repo hygiene** _(shipped)_ — Apache 2.0 [`LICENSE`](LICENSE),
   [`CONTRIBUTING.md`](CONTRIBUTING.md) (DCO sign-off), and a
   [`SECURITY.md`](SECURITY.md) policy (private vulnerability reporting).
-- **Test coverage gate** — enforce 80% (`--cov-fail-under`) in CI _(no branch yet)_.
-- **Minor hardening** — `GET /v1/models`, request body-size limits, security headers, DB backups, dependency scanning (pip-audit / Dependabot), admin audit log, API-key expiry _(no branch yet)_.
+- **Minor hardening** — `GET /v1/models`, request body-size limits, security headers, DB backups, Dependabot, admin audit log, API-key expiry _(no branch yet)_.
 
 ## Security — known issues & follow-ups
 

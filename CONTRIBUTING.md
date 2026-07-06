@@ -34,10 +34,10 @@ uv run litestar --app litestar_gateway.app:app run   # run the app
 Every PR must pass the same checks CI runs:
 
 ```bash
-uv run ruff check src tests   # lint
-uv run ruff format --check .  # formatting
-uv run pyrefly check          # type check
-uv run pytest                 # full test suite
+uv run pre-commit run --all-files   # ruff (lint + format), markdown (rumdl), detect-secrets, hygiene
+uv run pyrefly check                 # type check
+uv run --with pip-audit pip-audit    # dependency CVE scan
+uv run pytest --cov=src/litestar_gateway --cov-fail-under=80   # full test suite + coverage gate
 ```
 
 Guidelines:
