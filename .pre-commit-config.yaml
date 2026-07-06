@@ -29,8 +29,11 @@ repos:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
         # migrations are generated schema code (column names like *_hash trip the
-        # keyword detector); they hold no secrets.
-        exclude: (?x)^(uv\.lock|\.secrets\.baseline|migrations/.*|graphify-out/(graph\.json|GRAPH_REPORT\.md))$
+        # keyword detector); they hold no secrets. ISSUES.md / README.md are prose
+        # that names env vars (JWT_SECRET/MASTER_KEY) — the keyword detector
+        # false-positives on them and every doc edit shifts line numbers, churning
+        # the baseline, so they're excluded too.
+        exclude: (?x)^(uv\.lock|\.secrets\.baseline|migrations/.*|graphify-out/(graph\.json|GRAPH_REPORT\.md)|ISSUES\.md|README\.md)$
 
   # Lint + format, reusing the project's pinned ruff (single source of truth,
   # same as CI) rather than a separately versioned mirror.
@@ -48,10 +51,10 @@ repos:
         language: system
         types_or: [python, pyi]
         require_serial: true
-   
-       
+
+
   - repo: https://github.com/rvben/rumdl-pre-commit
     rev: v0.2.28  # Use latest version
     hooks:
       - id: rumdl      # Lint only; add args [--fix] to auto-fix
-      - id: rumdl-fmt  # Pure format, always exits 0      
+      - id: rumdl-fmt  # Pure format, always exits 0
