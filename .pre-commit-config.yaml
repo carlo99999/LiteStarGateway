@@ -2,6 +2,12 @@
 # Run on everything: uv run pre-commit run --all-files
 # CI runs the same hooks on every PR (see .github/workflows/ci.yml).
 
+# Tracked graphify outputs are large generated artifacts (regenerate with
+# `graphify update .`): skip the hygiene/large-file hooks for them. detect-secrets
+# has its own exclude below (hook-level overrides this global one), so the same
+# paths are repeated there.
+exclude: (?x)^graphify-out/(graph\.json|GRAPH_REPORT\.md)$
+
 repos:
   # General hygiene + secret/key safety.
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -24,7 +30,7 @@ repos:
         args: ["--baseline", ".secrets.baseline"]
         # migrations are generated schema code (column names like *_hash trip the
         # keyword detector); they hold no secrets.
-        exclude: (?x)^(uv\.lock|\.secrets\.baseline|migrations/.*)$
+        exclude: (?x)^(uv\.lock|\.secrets\.baseline|migrations/.*|graphify-out/(graph\.json|GRAPH_REPORT\.md))$
 
   # Lint + format, reusing the project's pinned ruff (single source of truth,
   # same as CI) rather than a separately versioned mirror.
