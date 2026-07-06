@@ -1578,18 +1578,34 @@ async def test_gemini_structured_output_sets_response_schema(
 # --- Structured output over streaming (PR2) -----------------------------------
 
 
-def _sse_content(body: str) -> str:
-    """Reassemble the streamed assistant text from an SSE response body."""
-    out = ""
+def _sse_events(body: str) -> list[dict]:
+    """Parse the JSON payloads out of an SSE response body."""
+    events = []
     for line in body.splitlines():
         if not line.startswith("data: "):
             continue
         payload = line[len("data: ") :].strip()
-        if payload == "[DONE]":
-            continue
-        for choice in json.loads(payload).get("choices", []):
+        if payload != "[DONE]":
+            events.append(json.loads(payload))
+    return events
+
+
+def _sse_content(body: str) -> str:
+    """Reassemble the streamed assistant text from a chat SSE response body."""
+    out = ""
+    for event in _sse_events(body):
+        for choice in event.get("choices", []):
             out += (choice.get("delta") or {}).get("content") or ""
     return out
+
+
+def _sse_responses_text(body: str) -> str:
+    """Reassemble streamed text from a Responses SSE body (output_text deltas)."""
+    return "".join(
+        ev.get("delta") or ""
+        for ev in _sse_events(body)
+        if ev.get("type") == "response.output_text.delta"
+    )
 
 
 def test_anthropic_input_json_delta_maps_to_content() -> None:
@@ -1663,3 +1679,76 @@ async def test_gemini_structured_output_streaming_sets_schema(
     config = FakeGenaiClient.last_kwargs["config"]
     assert config["response_mime_type"] == "application/json"
     assert config["response_schema"] == _JSON_SCHEMA_RF["json_schema"]["schema"]
+
+
+# --- Structured output on the Responses API (PR3) -----------------------------
+
+_TEXT_FORMAT = {
+    "type": "json_schema",
+    "name": "answer",
+    "schema": {"type": "object", "properties": {"answer": {"type": "integer"}}},
+}
+
+
+def test_responses_text_format_maps_to_response_format() -> None:
+    from litestar_gateway.infrastructure.llm.responses_emulation import to_chat_completions
+
+    chat = to_chat_completions({"input": "hi", "text": {"format": _TEXT_FORMAT}})
+    assert chat["response_format"] == {
+        "type": "json_schema",
+        "json_schema": {"name": "answer", "schema": _TEXT_FORMAT["schema"]},
+    }
+
+
+async def test_responses_native_passes_text_format(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # OpenAI has a native Responses API — text.format must reach the SDK verbatim.
+    _patch(monkeypatch)
+    api_key = await _setup(client)
+    resp = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "hi", "text": {"format": _TEXT_FORMAT}},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeClient.last_kwargs["text"] == {"format": _TEXT_FORMAT}
+
+
+async def test_responses_emulated_structured_output(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Emulated Responses (Anthropic): text.format -> chat response_format ->
+    # forced tool -> the JSON is surfaced as the Responses output_text.
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client, provider="anthropic", values=ANTHROPIC_VALUES, provider_model_id="claude-3-5-sonnet"
+    )
+    resp = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "hi", "text": {"format": _TEXT_FORMAT}},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeAnthropic.last_kwargs["tool_choice"] == {"type": "tool", "name": "answer"}
+    assert json.loads(resp.json()["output_text"]) == {"answer": 42}
+
+
+async def test_responses_emulated_structured_output_streaming(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The streaming emulation shares to_chat_completions, so text.format still
+    # forces the tool on the streamed path.
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client, provider="anthropic", values=ANTHROPIC_VALUES, provider_model_id="claude-3-5-sonnet"
+    )
+    resp = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "hi", "stream": True, "text": {"format": _TEXT_FORMAT}},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeAnthropic.last_kwargs["tool_choice"] == {"type": "tool", "name": "answer"}
+    # The tool's partial-JSON deltas stream through as output_text and reassemble.
+    assert json.loads(_sse_responses_text(resp.text)) == {"answer": 42}

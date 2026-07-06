@@ -5,10 +5,10 @@ Responses request into a chat.completions call and reshape the chat response
 into a Responses object. Pure translators + a thin wrapper adapter.
 
 The client keeps using the stock OpenAI SDK (`client.responses.create`), so it
-"just works" — but emulation only covers the common text-in/text-out path.
+"just works" — text-in/text-out plus structured outputs (`text.format` is
+translated to the chat `response_format`, which each adapter maps per provider).
 NOT supported (the corresponding request fields are ignored):
   * tools / function calling
-  * structured outputs (`response_format` / json schema)
   * multimodal input (images, files, audio)
   * stateful conversations (`previous_response_id`, `store`)
   * reasoning items / built-in tools (web search, file search, ...)
@@ -68,7 +68,29 @@ def to_chat_completions(request: dict[str, Any]) -> dict[str, Any]:
             chat[key] = request[key]
     if "max_output_tokens" in request:
         chat["max_tokens"] = request["max_output_tokens"]
+    if response_format := _text_format_to_response_format(request.get("text")):
+        chat["response_format"] = response_format
     return chat
+
+
+def _text_format_to_response_format(text: Any) -> dict[str, Any] | None:
+    """Map a Responses `text.format` block to a chat `response_format`, so the
+    inner chat adapter applies the same cross-provider structured-output logic.
+
+    Responses puts the schema fields flat under `format`; chat nests them under
+    `json_schema`."""
+    fmt = text.get("format") if isinstance(text, dict) else None
+    if not isinstance(fmt, dict):
+        return None
+    ftype = fmt.get("type")
+    if ftype == "json_object":
+        return {"type": "json_object"}
+    if ftype == "json_schema":
+        return {
+            "type": "json_schema",
+            "json_schema": {k: fmt[k] for k in ("name", "schema", "strict") if k in fmt},
+        }
+    return None
 
 
 def to_responses(chat_response: dict[str, Any]) -> dict[str, Any]:
