@@ -48,6 +48,15 @@ multi-tenant gateway without accounting + limits.
 - Expose `GET /usage` (team-scoped; platform-admin can see all) with filters +
   aggregation (by day/model/key).
 
+> **Known gap — image generation is unbilled (L22).** The cost model is
+> per-token (`input_cost_per_token`/`output_cost_per_token`), but image responses
+> (DALL·E, Imagen) carry no token usage, so an image call records a `UsageEvent`
+> with 0 cost and reserves ~0 against the budget. Image spend is therefore
+> invisible to budgets and aggregates. This is a missing pricing dimension, not a
+> logic bug; when image traffic matters, add a per-image price to `Model` (e.g.
+> `image_cost_per_call`, optionally by size/quality) and bill it in settlement.
+> Until then, treat image usage as out of budget scope.
+
 ### 2b. Budgets / quotas (enforce)
 
 - A **`Budget`** per team (and optionally per key): limit + window (monthly/daily)
