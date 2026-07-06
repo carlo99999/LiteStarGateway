@@ -273,3 +273,58 @@ async def test_reservation_is_released_when_opening_the_stream_fails() -> None:
 
     await service.chat_completion(TEAM_ID, KEY_ID, dict(MAX_TOKENS_REQUEST))
     assert gateway.calls == 1
+
+
+async def test_multi_choice_stream_reserves_output_per_choice() -> None:
+    # n=8 regenerates the output ceiling per choice: the reservation must be
+    # ~8x the single-choice one, or a near-exhausted budget admits a burst
+    # whose real committed cost is 8x what the gate accounted for.
+    gateway = CountingGateway()
+    service = _service(gateway, FakeUsage(spent=0.0), FakeBudgets(_budget(1.0)))
+
+    # max_tokens=20 at 0.01 → 0.2 per choice; x8 choices reserves 1.6 ≥ 1.0.
+    stream = await service.open_chat_stream(
+        TEAM_ID, KEY_ID, {**REQUEST, "max_tokens": 20, "n": 8, "stream": True}
+    )
+    with pytest.raises(BudgetExceeded):
+        await service.chat_completion(TEAM_ID, KEY_ID, {**REQUEST, "max_tokens": 20})
+    assert gateway.calls == 1
+
+    async for _ in stream:  # settle: the n-scaled reservation is fully released
+        pass
+    await service.chat_completion(TEAM_ID, KEY_ID, {**REQUEST, "max_tokens": 20})
+    assert gateway.calls == 2
+
+
+async def test_single_choice_stream_does_not_over_reserve() -> None:
+    # Same shape with n=1: 0.2 reserved, the concurrent call must still pass.
+    gateway = CountingGateway()
+    service = _service(gateway, FakeUsage(spent=0.0), FakeBudgets(_budget(1.0)))
+
+    stream = await service.open_chat_stream(
+        TEAM_ID, KEY_ID, {**REQUEST, "max_tokens": 20, "n": 1, "stream": True}
+    )
+    await service.chat_completion(TEAM_ID, KEY_ID, {**REQUEST, "max_tokens": 20})
+    assert gateway.calls == 2
+
+    async for _ in stream:
+        pass
+
+
+async def test_reservation_uses_the_clamped_max_tokens() -> None:
+    # An absurd client max_tokens must not poison the gate: the dispatched
+    # request is clamped to MAX_TOKENS (32k → 320.0 reserved at 0.01), so a
+    # normal concurrent call under a 1000.0 budget is still admitted. Before
+    # the fix the reservation was taken from the raw value (~10M USD) and
+    # locked the whole team out until the stream settled.
+    gateway = CountingGateway()
+    service = _service(gateway, FakeUsage(spent=0.0), FakeBudgets(_budget(1000.0)))
+
+    stream = await service.open_chat_stream(
+        TEAM_ID, KEY_ID, {**REQUEST, "max_tokens": 999_999_999, "stream": True}
+    )
+    await service.chat_completion(TEAM_ID, KEY_ID, {**REQUEST, "max_tokens": 100})
+    assert gateway.calls == 2
+
+    async for _ in stream:
+        pass
