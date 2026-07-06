@@ -63,15 +63,21 @@ def _request_text(request: dict[str, Any]) -> str:
 
 
 def _chunk_output_text(chunk: dict[str, Any]) -> str:
-    """Output text carried by one stream chunk (chat delta or Responses event)."""
+    """Output text carried by one stream chunk (chat delta or Responses event).
+
+    Sums the delta across *all* choices, not just `choices[0]`: an `n>1` chat
+    stream that disconnects or errors before the authoritative usage chunk would
+    otherwise have its estimate under-count the other n-1 choices (L19)."""
     if chunk.get("type") == "response.output_text.delta":
         delta = chunk.get("delta")
         return delta if isinstance(delta, str) else ""
-    choices = chunk.get("choices") or []
-    if choices and isinstance(choices[0], dict):
-        content = (choices[0].get("delta") or {}).get("content")
-        return content if isinstance(content, str) else ""
-    return ""
+    text = ""
+    for choice in chunk.get("choices") or []:
+        if isinstance(choice, dict):
+            content = (choice.get("delta") or {}).get("content")
+            if isinstance(content, str):
+                text += content
+    return text
 
 
 def _has_tokens(usage: dict[str, Any]) -> bool:
