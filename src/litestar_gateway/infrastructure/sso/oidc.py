@@ -17,6 +17,8 @@ failure rather than a 500 that leaks the provider's internals.
 
 from __future__ import annotations
 
+import time
+
 import httpx
 from authlib.common.errors import AuthlibBaseError
 from authlib.integrations.httpx_client import AsyncOAuth2Client
@@ -34,6 +36,10 @@ _ID_TOKEN_ALGS = ["RS256", "RS384", "RS512", "ES256", "ES384", "ES512"]
 # fails clearly instead of raising a bare KeyError deep in the flow.
 _REQUIRED_METADATA = ("authorization_endpoint", "token_endpoint", "jwks_uri", "issuer")
 
+# Refresh the discovery document at most this often, so an IdP that rotates its
+# endpoints/issuer is picked up without a process restart (L27).
+_METADATA_TTL_SECONDS = 3600
+
 
 def _claim_is_true(value: object) -> bool:
     """OIDC booleans arrive as a JSON bool or, from some IdPs, the string "true"."""
@@ -49,25 +55,42 @@ class OIDCIdentityProvider:
         self._client_secret = client_secret
         self._scopes = scopes
         self._metadata: dict | None = None
+        self._metadata_fetched_at: float = 0.0
         # Cached JWKS key set; refreshed lazily on an unknown-`kid` miss (keys rotate).
         self._jwks: KeySet | None = None
 
+    async def _fetch_metadata(self) -> dict:
+        try:
+            async with httpx.AsyncClient() as http:
+                resp = await http.get(self._discovery_url)
+                resp.raise_for_status()
+                metadata = resp.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise SSOExchangeError("could not load OIDC discovery document") from exc
+        missing = [k for k in _REQUIRED_METADATA if not metadata.get(k)]
+        if missing:
+            raise SSOExchangeError(
+                f"OIDC discovery document missing fields: {', '.join(missing)}"
+            )
+        return metadata
+
     async def _load_metadata(self) -> dict:
-        if self._metadata is None:
-            try:
-                async with httpx.AsyncClient() as http:
-                    resp = await http.get(self._discovery_url)
-                    resp.raise_for_status()
-                    metadata = resp.json()
-            except (httpx.HTTPError, ValueError) as exc:
-                raise SSOExchangeError("could not load OIDC discovery document") from exc
-            missing = [k for k in _REQUIRED_METADATA if not metadata.get(k)]
-            if missing:
-                raise SSOExchangeError(
-                    f"OIDC discovery document missing fields: {', '.join(missing)}"
-                )
-            self._metadata = metadata
-        return self._metadata
+        # Cache the discovery document but refresh it after a TTL, so an IdP that
+        # rotates its endpoints/issuer is picked up without a restart (L27). If a
+        # refresh fails, keep serving the cached copy — a transient IdP blip must
+        # not break logins.
+        now = time.monotonic()
+        if self._metadata is not None and now - self._metadata_fetched_at < _METADATA_TTL_SECONDS:
+            return self._metadata
+        try:
+            metadata = await self._fetch_metadata()
+        except SSOExchangeError:
+            if self._metadata is not None:
+                return self._metadata
+            raise
+        self._metadata = metadata
+        self._metadata_fetched_at = now
+        return metadata
 
     def _client(self, redirect_uri: str) -> AsyncOAuth2Client:
         return AsyncOAuth2Client(
@@ -123,13 +146,24 @@ class OIDCIdentityProvider:
         # authorization request (replay/injection).
         if claims.get("nonce") != nonce:
             raise SSOExchangeError("id_token nonce mismatch")
-        groups = claims.get("groups") or []
         return ExternalIdentity(
             subject=str(claims["sub"]),
             email=str(claims.get("email") or ""),
             email_verified=_claim_is_true(claims.get("email_verified")),
-            groups=tuple(str(g) for g in groups),
+            groups=self._parse_groups(claims.get("groups")),
         )
+
+    @staticmethod
+    def _parse_groups(raw: object) -> tuple[str, ...]:
+        """The `groups` claim must be a JSON array. Some IdPs omit it (no groups),
+        which is fine; but a present-but-non-list value (e.g. a space-delimited
+        string) would be iterated character-by-character and silently corrupt role
+        mapping — so fail closed on it rather than trust garbage (M36)."""
+        if raw is None:
+            return ()
+        if isinstance(raw, (list, tuple)):
+            return tuple(str(g) for g in raw)
+        raise SSOExchangeError("id_token 'groups' claim is not a list")
 
     async def _fetch_key_set(self, metadata: dict) -> KeySet:
         async with httpx.AsyncClient() as http:
