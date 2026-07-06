@@ -9,7 +9,7 @@ instance; multiple replicas need Redis to actually serialize.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
@@ -26,7 +26,7 @@ class NoOpDistributedLock:
     REDIS_URL to actually serialize across replicas."""
 
     @asynccontextmanager
-    async def hold(self, name: str, *, ttl: timedelta) -> AsyncIterator[bool]:
+    async def hold(self, name: str, *, ttl: timedelta) -> AsyncGenerator[bool]:
         yield True
 
 
@@ -35,7 +35,7 @@ class RedisDistributedLock:
         self._url = url
 
     @asynccontextmanager
-    async def hold(self, name: str, *, ttl: timedelta) -> AsyncIterator[bool]:
+    async def hold(self, name: str, *, ttl: timedelta) -> AsyncGenerator[bool]:
         # A short-lived client per use — guarded sections are rare (e.g. daily
         # rotation), so a long-lived connection isn't worth it.
         client: Redis = Redis.from_url(self._url)
