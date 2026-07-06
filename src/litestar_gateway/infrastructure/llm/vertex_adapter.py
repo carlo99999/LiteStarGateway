@@ -9,8 +9,8 @@ Credential `values`: `vertex_project`, `vertex_location`, and (in production)
 Credentials are used.
 
 Scope: text-in/text-out, plus structured outputs (`response_format`) translated
-to `response_mime_type` + `response_schema`. Not yet translated: tools,
-multimodal, and structured outputs over streaming.
+to `response_mime_type` + `response_schema`, streaming included (the same request
+builder feeds both paths). Not yet translated: tools, multimodal.
 """
 
 from __future__ import annotations
