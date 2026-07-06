@@ -9,5 +9,10 @@ __pycache__/
 .coverage.*
 htmlcov/
 
-# graphify knowledge-graph output (generated; regenerate with /graphify)
-graphify-out/
+# graphify knowledge-graph output. Track only the curated products (graph.json,
+# GRAPH_REPORT.md); ignore the regenerable cache, dated backups, machine-local
+# state (.graphify_python holds an absolute path) and junk. Regenerate the
+# tracked files with `graphify update .`.
+graphify-out/*
+!graphify-out/graph.json
+!graphify-out/GRAPH_REPORT.md
