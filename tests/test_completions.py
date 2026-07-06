@@ -168,6 +168,39 @@ class FakeAnthropic:
 
     async def create(self, **kwargs):
         FakeAnthropic.last_kwargs = kwargs
+        if kwargs.get("stream") and kwargs.get("tool_choice"):
+            # Structured output streamed as a forced tool: the JSON arrives via
+            # input_json_delta events (partial_json), not text_delta.
+            return _FakeStream(
+                [
+                    {
+                        "type": "message_start",
+                        "message": {
+                            "id": "msg-x",
+                            "usage": {"input_tokens": 3, "output_tokens": 1},
+                        },
+                    },
+                    {
+                        "type": "content_block_start",
+                        "index": 0,
+                        "content_block": {"type": "tool_use", "name": "answer", "input": {}},
+                    },
+                    {
+                        "type": "content_block_delta",
+                        "delta": {"type": "input_json_delta", "partial_json": '{"answer":'},
+                    },
+                    {
+                        "type": "content_block_delta",
+                        "delta": {"type": "input_json_delta", "partial_json": " 42}"},
+                    },
+                    {
+                        "type": "message_delta",
+                        "delta": {"stop_reason": "tool_use"},
+                        "usage": {"output_tokens": 5},
+                    },
+                    {"type": "message_stop"},
+                ]
+            )
         if kwargs.get("tool_choice"):
             # Forced structured-output tool: return the JSON as a tool_use input.
             return _Result(
@@ -1532,6 +1565,96 @@ async def test_gemini_structured_output_sets_response_schema(
         json={
             "model": "m",
             "messages": [{"role": "user", "content": "hi"}],
+            "response_format": _JSON_SCHEMA_RF,
+        },
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    config = FakeGenaiClient.last_kwargs["config"]
+    assert config["response_mime_type"] == "application/json"
+    assert config["response_schema"] == _JSON_SCHEMA_RF["json_schema"]["schema"]
+
+
+# --- Structured output over streaming (PR2) -----------------------------------
+
+
+def _sse_content(body: str) -> str:
+    """Reassemble the streamed assistant text from an SSE response body."""
+    out = ""
+    for line in body.splitlines():
+        if not line.startswith("data: "):
+            continue
+        payload = line[len("data: ") :].strip()
+        if payload == "[DONE]":
+            continue
+        for choice in json.loads(payload).get("choices", []):
+            out += (choice.get("delta") or {}).get("content") or ""
+    return out
+
+
+def test_anthropic_input_json_delta_maps_to_content() -> None:
+    # The forced tool streams its JSON via input_json_delta, not text_delta.
+    delta, finish = anthropic_adapter.anthropic_event_to_delta(
+        {
+            "type": "content_block_delta",
+            "delta": {"type": "input_json_delta", "partial_json": '{"a":1}'},
+        }
+    )
+    assert delta == {"content": '{"a":1}'}
+    assert finish is None
+
+
+async def test_anthropic_structured_output_streams_json(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client, provider="anthropic", values=ANTHROPIC_VALUES, provider_model_id="claude-3-5-sonnet"
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "hi"}],
+            "stream": True,
+            "response_format": _JSON_SCHEMA_RF,
+        },
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeAnthropic.last_kwargs["tool_choice"] == {"type": "tool", "name": "answer"}
+    # The partial-JSON tool deltas reassemble into the structured result.
+    assert json.loads(_sse_content(resp.text)) == {"answer": 42}
+
+
+async def test_openai_structured_output_streaming_passes_through(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(client)
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "messages": [], "stream": True, "response_format": _JSON_SCHEMA_RF},
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeClient.last_kwargs["stream"] is True
+    assert FakeClient.last_kwargs["response_format"] == _JSON_SCHEMA_RF
+
+
+async def test_gemini_structured_output_streaming_sets_schema(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client, provider="vertex_ai", values=VERTEX_VALUES, provider_model_id="gemini-1.5-pro"
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "hi"}],
+            "stream": True,
             "response_format": _JSON_SCHEMA_RF,
         },
         headers=_bearer(api_key),

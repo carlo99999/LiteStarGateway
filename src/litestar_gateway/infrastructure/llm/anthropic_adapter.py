@@ -5,8 +5,9 @@ schema work; the adapter is a thin client wrapper. Responses are provided by
 wrapping this adapter in `ChatToResponsesAdapter`.
 
 Scope: text-in/text-out, plus structured outputs (`response_format`) translated
-to a forced tool. Not yet translated: general tool/function calling, multimodal
-content, and structured outputs over streaming.
+to a forced tool — streaming included (the tool's `input_json_delta` events are
+relayed as content). Not yet translated: general tool/function calling and
+multimodal content.
 """
 
 from __future__ import annotations
@@ -140,8 +141,14 @@ def anthropic_event_to_delta(event: dict[str, Any]) -> tuple[dict[str, Any] | No
         return {"role": "assistant"}, None
     if etype == "content_block_delta":
         delta = event.get("delta") or {}
-        if delta.get("type") == "text_delta":
+        dtype = delta.get("type")
+        if dtype == "text_delta":
             return {"content": delta.get("text", "")}, None
+        if dtype == "input_json_delta":
+            # Structured output streams as a forced tool: relay its partial JSON
+            # as content deltas so the client reconstructs the same JSON it gets
+            # non-streamed (matching how OpenAI/Gemini stream JSON content).
+            return {"content": delta.get("partial_json", "")}, None
         return None, None
     if etype == "message_delta":
         reason = (event.get("delta") or {}).get("stop_reason")
