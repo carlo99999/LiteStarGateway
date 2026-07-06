@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from litestar_gateway.application.completion_service import CompletionService
+from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.budget import window_start
 from litestar_gateway.domain.entities import (
     Budget,
@@ -125,9 +126,11 @@ def _service(
         models=FakeModels(_model()),  # type: ignore[arg-type]
         credentials=FakeCredentials(),  # type: ignore[arg-type]
         gateway=gateway,  # type: ignore[arg-type]
-        usage=usage,  # type: ignore[arg-type]
-        emit_trace=traces.append,
-        budgets=budgets,  # type: ignore[arg-type]
+        meter=UsageMeter(
+            usage=usage,  # type: ignore[arg-type]
+            emit_trace=traces.append,
+            budgets=budgets,  # type: ignore[arg-type]
+        ),
     )
 
 

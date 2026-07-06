@@ -5,7 +5,8 @@ from __future__ import annotations
 from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_gateway.application.completion_service import CompletionService, InFlightSpend
+from litestar_gateway.application.completion_service import CompletionService
+from litestar_gateway.application.usage_meter import InFlightSpend, UsageMeter
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.ports import BudgetRepository, LLMGateway, UsageRepository
 from litestar_gateway.infrastructure.keyring import Keyring
@@ -43,8 +44,8 @@ def provide_budget_repository(db_session: NamedDependency[AsyncSession]) -> Budg
     return SQLAlchemyBudgetRepository(db_session)
 
 
-# Process-wide: request-scoped CompletionServices must share the in-flight
-# reservations or the budget gate's burst bound would reset per request.
+# Process-wide: request-scoped meters must share the in-flight reservations
+# or the budget gate's burst bound would reset per request.
 _in_flight_spend = InFlightSpend()
 
 
@@ -58,8 +59,10 @@ def provide_completion_service(
         models=SQLAlchemyModelRepository(db_session),
         credentials=SQLAlchemyCredentialRepository(db_session, keyring),
         gateway=llm_gateway,
-        usage=SQLAlchemyUsageRepository(db_session),
-        emit_trace=trace_dispatcher.enqueue,
-        budgets=SQLAlchemyBudgetRepository(db_session),
-        in_flight=_in_flight_spend,
+        meter=UsageMeter(
+            usage=SQLAlchemyUsageRepository(db_session),
+            emit_trace=trace_dispatcher.enqueue,
+            budgets=SQLAlchemyBudgetRepository(db_session),
+            in_flight=_in_flight_spend,
+        ),
     )

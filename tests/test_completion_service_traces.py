@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from litestar_gateway.application.completion_service import CompletionService
+from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.entities import Model, ModelType, Provider, TraceRecord, UsageEvent
 
 TEAM_ID = uuid4()
@@ -85,8 +86,7 @@ def _service(gateway: Any, usage: FakeUsage, traces: list[TraceRecord]) -> Compl
         models=FakeModels(_model()),  # type: ignore[arg-type]
         credentials=FakeCredentials(),  # type: ignore[arg-type]
         gateway=gateway,
-        usage=usage,  # type: ignore[arg-type]
-        emit_trace=traces.append,
+        meter=UsageMeter(usage=usage, emit_trace=traces.append),  # type: ignore[arg-type]
     )
 
 
