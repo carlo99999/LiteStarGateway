@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
-DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///api_keys.db"
+DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///gateway.db"
 DEFAULT_ADMIN_EMAIL = "admin@example.com"
 DEFAULT_ENVIRONMENT = "development"
 DEFAULT_DB_POOL_SIZE = 5
