@@ -174,21 +174,30 @@ New counts: **0 CRITICAL · 1 HIGH · 7 MEDIUM · 8 LOW**.
 
 | Finding | Fix PR |
 |---|---|
-| M32 — `UsageMeter` extracted from `CompletionService` (metering/billing collaborator) | #106 |
+| M32 — `UsageMeter` extracted from `CompletionService` | #106 |
 | M30 + L23 — reservation scales with `n`; computed from the sanitized request | #108 |
+| H14 — Vertex embeddings billed from reported/estimated usage (non-stream estimation fallback) | #113 |
+| M26 — streams the provider rejects before any output bill nothing | #114 |
+| M27 — stream reservation released even if the generator is never iterated | #115 |
+| M28 — quarantined outbox rows excluded from the budget gate | #116 |
+| M29 — shielded stream settlement bounded by a timeout | #117 |
+| M31 — `OIDC_REDIRECT_URI` required when SSO enabled outside local dev | #121 |
+| L19 — stream usage estimate sums all choices, not just `choices[0]` | #122 |
+| L20 — `lockout_cycles` incremented in-database (atomic) | #123 |
+| L21 — unauthenticated MLflow port no longer published to the host | #124 |
+| L22 — image-generation billing gap documented in `docs/usage-cost.md` | #125 |
+| L24 — dead `revoke_personal_keys_for_user` wrapper removed; annotation restored | #126 |
+| L26 — stale README Postgres note dropped; default DB renamed `gateway.db` | #127 |
 
-**Open (next in line):** M26 + L19 (stream error-path billing), M27 (un-iterated
-generator reservation leak) and M29 (unbounded settlement shield) — the latter two
-each need a small design decision first. H14, M28, M31 and the remaining LOWs are
-untouched.
+The proposed per-model `max_output_tokens` follow-up shipped as part of **H15**
+(Round 5, #109): clamp with `min` semantics + inject on omission.
 
-**Proposed follow-up (from the M30/L23 discussion):** an optional per-model
-`max_output_tokens` field, used as (a) the reservation fallback when the client
-omits a max-tokens field and (b) a per-model clamp replacing the global 32k
-default. Prior art: LiteLLM's `budget_reservation.py` reserves
-`min(requested, model max_output_tokens, 16384)` from its model registry and
-scales by `n`/`best_of`; its registry (MIT) could seed the field instead of
-manual admin entry. Product decision — needs a migration + config surface.
+**Deferred (deliberate — not a defect):**
+
+- **L25** — `TeamController` mixes members/keys/budgets/usage in ~340 lines. Each
+  handler is individually fine; per the finding this is an early-warning to
+  **split when it next grows** (into `BudgetController`/`UsageController`), not a
+  bug to refactor now. Left as-is to avoid churning working routing/DI wiring.
 
 ### HIGH (Round 4)
 
