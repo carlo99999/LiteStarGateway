@@ -342,3 +342,37 @@ async def test_provider_reject_before_output_bills_nothing() -> None:
     assert [t.status for t in traces] == ["error"]
     assert traces[0].prompt_tokens == 0
     assert traces[0].completion_tokens == 0
+
+
+class HangingUsage(FakeUsage):
+    """A usage repository whose ledger write never returns — a stalled DB."""
+
+    async def record(self, event: UsageEvent) -> None:
+        await anyio.sleep_forever()
+
+
+async def test_settlement_timeout_bounds_a_stalled_db() -> None:
+    # M29: the settlement is shielded from client-disconnect cancellation, but a
+    # stalled DB write must not leave the coroutine (and its pool connection)
+    # orphaned forever. A short settlement timeout abandons the write instead.
+    traces: list[TraceRecord] = []
+    usage = HangingUsage()
+    meter = UsageMeter(
+        usage=usage,  # type: ignore[arg-type]
+        emit_trace=traces.append,
+        settlement_timeout=0.05,
+    )
+    service = CompletionService(
+        models=FakeModels(_model()),  # type: ignore[arg-type]
+        credentials=FakeCredentials(),  # type: ignore[arg-type]
+        gateway=StreamGateway(_chat_chunks()),  # type: ignore[arg-type]
+        meter=meter,
+    )
+
+    stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(CHAT_REQUEST))
+    # Completes (bounded) rather than hanging on the stalled write.
+    with anyio.fail_after(5):
+        async for _ in stream:
+            pass
+
+    assert usage.events == []  # the stalled write was abandoned at the timeout

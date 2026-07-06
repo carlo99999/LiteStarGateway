@@ -163,6 +163,7 @@ class UsageMeter:
         emit_trace: Callable[[TraceRecord], None],
         budgets: BudgetRepository | None = None,
         in_flight: InFlightSpend | None = None,
+        settlement_timeout: float = 30.0,
     ) -> None:
         self._usage = usage
         self._emit_trace = emit_trace
@@ -170,6 +171,9 @@ class UsageMeter:
         # Library use may omit it; the web wiring passes one shared instance so
         # request-scoped meters see each other's reservations.
         self._in_flight = in_flight if in_flight is not None else InFlightSpend()
+        # Upper bound on the shielded stream settlement, so a stalled DB can't
+        # leave an unbounded pile of orphan cleanup coroutines (M29).
+        self._settlement_timeout = settlement_timeout
 
     async def admit(self, team_id: UUID, model: Model, request: dict[str, Any]) -> float:
         """Pre-call spend gate: reject once committed spend plus the estimated
@@ -427,34 +431,51 @@ class UsageMeter:
                             usage["prompt_tokens"],
                             usage["completion_tokens"],
                         )
-                if error is not None:
-                    # Bill what was seen (nothing, if the provider produced
-                    # nothing), but keep the honest error trace instead of a fake
-                    # 'ok' one — carrying the billed usage.
-                    prompt, completion, cost = _parse_usage(model, usage)
-                    if _has_tokens(usage):
-                        await self._bill(
+                # Bound the DB settlement: the shield above (correctly) makes it
+                # uncancellable by a client disconnect, but without a deadline a
+                # stalled DB would leave this coroutine — and its pool connection
+                # — orphaned forever, piling up under degradation and hanging
+                # graceful shutdown (M29). On timeout the spend for this one
+                # settlement is dropped with an ERROR (a Postgres statement
+                # timeout would instead surface as a failure the outbox catches).
+                with anyio.move_on_after(self._settlement_timeout) as settle_scope:
+                    if error is not None:
+                        # Bill what was seen (nothing, if the provider produced
+                        # nothing), but keep the honest error trace instead of a
+                        # fake 'ok' one — carrying the billed usage.
+                        prompt, completion, cost = _parse_usage(model, usage)
+                        if _has_tokens(usage):
+                            await self._bill(
+                                team_id,
+                                api_key_id,
+                                model,
+                                operation,
+                                prompt,
+                                completion,
+                                cost,
+                                datetime.now(UTC),
+                            )
+                        self.trace_error(
                             team_id,
                             api_key_id,
                             model,
                             operation,
-                            prompt,
-                            completion,
-                            cost,
-                            datetime.now(UTC),
+                            latency_ms,
+                            error,
+                            prompt_tokens=prompt,
+                            completion_tokens=completion,
+                            cost=cost,
                         )
-                    self.trace_error(
+                    else:
+                        await self.settle_ok(
+                            team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
+                        )
+                if settle_scope.cancelled_caught:
+                    logger.error(
+                        "stream settlement timed out after %ss; spend may be unrecorded: "
+                        "team=%s model=%s op=%s",
+                        self._settlement_timeout,
                         team_id,
-                        api_key_id,
-                        model,
+                        model.name,
                         operation,
-                        latency_ms,
-                        error,
-                        prompt_tokens=prompt,
-                        completion_tokens=completion,
-                        cost=cost,
-                    )
-                else:
-                    await self.settle_ok(
-                        team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
                     )
