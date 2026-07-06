@@ -69,9 +69,7 @@ class OIDCIdentityProvider:
             raise SSOExchangeError("could not load OIDC discovery document") from exc
         missing = [k for k in _REQUIRED_METADATA if not metadata.get(k)]
         if missing:
-            raise SSOExchangeError(
-                f"OIDC discovery document missing fields: {', '.join(missing)}"
-            )
+            raise SSOExchangeError(f"OIDC discovery document missing fields: {', '.join(missing)}")
         return metadata
 
     async def _load_metadata(self) -> dict:

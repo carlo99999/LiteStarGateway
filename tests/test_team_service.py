@@ -233,21 +233,25 @@ async def test_last_admin_protected_when_admin_is_beyond_first_page(service, rep
     _, teams, memberships, users = repos
     actor = _user("platform@b.com", is_admin=True)
     users.add_user(actor)
-    team = await teams.add(
-        Team(id=uuid4(), organization_id=uuid4(), name="Big", created_at=_now())
-    )
+    team = await teams.add(Team(id=uuid4(), organization_id=uuid4(), name="Big", created_at=_now()))
     for _ in range(100):  # 100 members occupy the whole first page
         await memberships.add(
             TeamMembership(
-                id=uuid4(), team_id=team.id, user_id=uuid4(),
-                role=TeamRole.MEMBER, created_at=_now(),
+                id=uuid4(),
+                team_id=team.id,
+                user_id=uuid4(),
+                role=TeamRole.MEMBER,
+                created_at=_now(),
             )
         )
     admin_user = _user("teamadmin@b.com")  # sole admin, added last -> page 2
     await memberships.add(
         TeamMembership(
-            id=uuid4(), team_id=team.id, user_id=admin_user.id,
-            role=TeamRole.ADMIN, created_at=_now(),
+            id=uuid4(),
+            team_id=team.id,
+            user_id=admin_user.id,
+            role=TeamRole.ADMIN,
+            created_at=_now(),
         )
     )
 
