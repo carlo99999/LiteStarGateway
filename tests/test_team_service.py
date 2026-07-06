@@ -58,8 +58,11 @@ class FakeTeamRepo:
     async def get(self, team_id: UUID) -> Team | None:
         return self.items.get(team_id)
 
-    async def list_by_organization(self, organization_id: UUID) -> list[Team]:
-        return [t for t in self.items.values() if t.organization_id == organization_id]
+    async def list_by_organization(
+        self, organization_id: UUID, *, limit: int = 100, offset: int = 0
+    ) -> list[Team]:
+        rows = [t for t in self.items.values() if t.organization_id == organization_id]
+        return rows[offset : offset + limit]
 
 
 class FakeMembershipRepo:
