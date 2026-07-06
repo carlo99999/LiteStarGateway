@@ -80,11 +80,21 @@ class SQLAlchemyUserRepository:
         await self._session.commit()
         return count or 0
 
-    async def set_login_lock(self, user_id: UUID, locked_until: datetime, cycles: int) -> None:
+    async def set_login_lock(
+        self, user_id: UUID, locked_until: datetime, *, reset_cycles: bool
+    ) -> None:
+        # Increment lockout_cycles in-database (not from a stale read), so two
+        # concurrent threshold-crossing failures can't both write the same
+        # cycles+1 and lose an escalation step (L20). A decayed lock restarts the
+        # curve at 1.
         await self._session.execute(
             update(UserModel)
             .where(UserModel.id == user_id)
-            .values(locked_until=locked_until, failed_login_attempts=0, lockout_cycles=cycles)
+            .values(
+                locked_until=locked_until,
+                failed_login_attempts=0,
+                lockout_cycles=1 if reset_cycles else UserModel.lockout_cycles + 1,
+            )
         )
         await self._session.commit()
 

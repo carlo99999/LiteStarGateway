@@ -237,10 +237,13 @@ class UserService:
             return
         now = _now()
         cycles = user.lockout_cycles
-        if user.locked_until is not None and now - user.locked_until > LOCKOUT_DECAY:
+        decayed = user.locked_until is not None and now - user.locked_until > LOCKOUT_DECAY
+        if decayed:
             cycles = 0
         duration = lockout_duration(cycles)
-        await self._users.set_login_lock(user.id, now + duration, cycles + 1)
+        # lockout_cycles is incremented in-database (reset to 1 on decay); the
+        # duration still uses the snapshot cycle for the exponential.
+        await self._users.set_login_lock(user.id, now + duration, reset_cycles=decayed)
         # Escalating cycles on one account are the signature of a sustained
         # lockout attack — make each one visible to operators.
         logger.warning(
