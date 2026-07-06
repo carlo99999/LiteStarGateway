@@ -70,6 +70,8 @@ search-path = ["src"]
 python-version = "3.14"
 
 [tool.rumdl]
-# Line length (MD013) is off: prose and audit notes wrap naturally and long
-# links/tables shouldn't be forced to break.
-disable = ["MD013"]
+# MD013 (line length) off: prose/audit notes wrap naturally and long links/tables
+# shouldn't be force-broken. MD036 (emphasis-as-heading) off: the skill/example
+# docs use bold labels (**Step B0 …**, **❌ …**) as intentional inline emphasis,
+# not section headings.
+disable = ["MD013", "MD036"]
