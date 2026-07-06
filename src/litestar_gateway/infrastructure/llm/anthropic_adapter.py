@@ -31,7 +31,12 @@ _FINISH_REASON = {
     "end_turn": "stop",
     "max_tokens": "length",
     "stop_sequence": "stop",
-    "tool_use": "tool_calls",
+    # We force a tool only for structured output (general tool-calling isn't
+    # translated yet), and surface its JSON as message.content — so from the
+    # client's view this is a normal completion, not a tool call: report "stop",
+    # not "tool_calls" (which would make a strict OpenAI client look for an
+    # absent message.tool_calls). Revisit when real tool-calling is added.
+    "tool_use": "stop",
 }
 
 
