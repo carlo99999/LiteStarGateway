@@ -253,13 +253,12 @@ on their own branch (linked). Order within a phase is a recommendation.
 
 ### v2 (after v1)
 
-- **Structured outputs** — first-class, cross-provider support for
-  `response_format` / JSON-schema outputs. Today the param is allowlisted and
-  passed through verbatim (so it only works where the provider SDK accepts it
-  natively, e.g. OpenAI/Azure); it is not translated for Anthropic (tool-forcing)
-  or Gemini (`response_schema`), and the Responses-API emulation ignores it
-  entirely. v2 makes it work uniformly on every provider, streams included
-  _(no branch yet)_.
+- ✅ **Structured outputs** _(shipped)_ — first-class, cross-provider
+  `response_format` (and the Responses API's `text.format`): native for
+  OpenAI/Azure, translated to a forced tool for Anthropic and to
+  `response_mime_type` + `response_schema` for Gemini, with the JSON normalized
+  into `message.content` on every provider. Works on chat and the Responses API
+  (native and emulated), streaming included (#129, #130, #131).
 - **AWS Bedrock provider** — Converse API + boto3 (no hand-rolled SigV4), responses emulated.
   [`adding-bedrock`](https://github.com/carlo99999/LiteStarGateway/blob/adding-bedrock/docs/bedrock.md)
 - **Weighted multi-model routing** — an alias splitting traffic across ≤5 models by percentage.
