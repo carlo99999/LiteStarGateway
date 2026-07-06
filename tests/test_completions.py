@@ -1220,6 +1220,29 @@ async def test_embeddings_vertex(client: AsyncTestClient, monkeypatch: pytest.Mo
     assert body["data"][0]["embedding"] == [0.4, 0.5, 0.6]
 
 
+async def test_embeddings_vertex_bills_nonzero_usage(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # H14: Vertex embeddings used to record a UsageEvent with 0 tokens / 0 cost
+    # (usage hardcoded to None). The meter now estimates from the input when the
+    # provider reports no usage, so the spend is no longer invisible.
+    _patch(monkeypatch)
+    key, team, admin = await _setup_team(
+        client,
+        provider="vertex_ai",
+        values=VERTEX_VALUES,
+        provider_model_id="text-embedding-004",
+        model_type="embeddings",
+    )
+    resp = await client.post(
+        "/v1/embeddings", json={"model": "m", "input": "hello"}, headers=_bearer(key)
+    )
+    assert resp.status_code == HTTP_200_OK
+    rows = await _team_usage(client, team, admin)
+    assert len(rows) == 1
+    assert rows[0]["prompt_tokens"] == 2  # ceil(len("hello")/4), not billed as zero
+
+
 async def test_embeddings_wrong_model_type_400(
     client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
