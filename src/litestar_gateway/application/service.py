@@ -97,11 +97,8 @@ class APIKeyService:
             return await self._repo.update(dataclasses.replace(key, last_used_at=now))
         return key
 
-    async def revoke_for_service_principal(self, sp_id: UUID, revoked_at) -> None:  # noqa: ANN001
+    async def revoke_for_service_principal(self, sp_id: UUID, revoked_at: datetime) -> None:
         await self._repo.revoke_for_service_principal(sp_id, revoked_at)
-
-    async def revoke_personal_keys_for_user(self, user_id: UUID, revoked_at) -> None:  # noqa: ANN001
-        await self._repo.revoke_personal_keys_for_user(user_id, revoked_at)
 
     async def revoke_for_team(self, team_id: UUID, key_id: UUID) -> None:
         key = await self._repo.get(key_id)
