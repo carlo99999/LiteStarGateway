@@ -262,9 +262,9 @@ on their own branch (linked). Order within a phase is a recommendation.
   [`adding-smart-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-smart-routing/docs/smart-routing.md)
 - **Web UI** — SPA over the JSON API for login + admin + usage dashboards.
   [`adding-web-ui`](https://github.com/carlo99999/LiteStarGateway/blob/adding-web-ui/docs/web-ui.md)
-- 🟡 **LICENSE & repo hygiene** _(license + contributing shipped)_ — Apache 2.0
-  [`LICENSE`](LICENSE) and [`CONTRIBUTING.md`](CONTRIBUTING.md) (DCO sign-off) are
-  in place; a `SECURITY.md` policy is still to do.
+- ✅ **LICENSE & repo hygiene** _(shipped)_ — Apache 2.0 [`LICENSE`](LICENSE),
+  [`CONTRIBUTING.md`](CONTRIBUTING.md) (DCO sign-off), and a
+  [`SECURITY.md`](SECURITY.md) policy (private vulnerability reporting).
 - **Test coverage gate** — enforce 80% (`--cov-fail-under`) in CI _(no branch yet)_.
 - **Minor hardening** — `GET /v1/models`, request body-size limits, security headers, DB backups, dependency scanning (pip-audit / Dependabot), admin audit log, API-key expiry _(no branch yet)_.
 
