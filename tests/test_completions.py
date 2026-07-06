@@ -5,6 +5,7 @@ The provider SDKs are monkeypatched, so no real provider call is made.
 
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator
 from pathlib import Path
 from types import SimpleNamespace
@@ -167,6 +168,25 @@ class FakeAnthropic:
 
     async def create(self, **kwargs):
         FakeAnthropic.last_kwargs = kwargs
+        if kwargs.get("tool_choice"):
+            # Forced structured-output tool: return the JSON as a tool_use input.
+            return _Result(
+                {
+                    "id": "msg-x",
+                    "type": "message",
+                    "role": "assistant",
+                    "model": kwargs.get("model"),
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": kwargs["tool_choice"]["name"],
+                            "input": {"answer": 42},
+                        }
+                    ],
+                    "stop_reason": "tool_use",
+                    "usage": {"input_tokens": 3, "output_tokens": 5},
+                }
+            )
         if kwargs.get("stream"):
             # Real Anthropic streams report input tokens on message_start and
             # cumulative output tokens on message_delta (top-level `usage`).
@@ -1417,3 +1437,106 @@ async def test_unsupported_provider_501(
         headers=_bearer(api_key),
     )
     assert resp.status_code == HTTP_501_NOT_IMPLEMENTED
+
+
+# --- Structured output (response_format) cross-provider ------------------------
+
+_JSON_SCHEMA_RF = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "answer",
+        "schema": {"type": "object", "properties": {"answer": {"type": "integer"}}},
+    },
+}
+
+
+async def test_openai_response_format_passes_through(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # OpenAI/Azure accept response_format natively — it must reach the SDK verbatim.
+    _patch(monkeypatch)
+    api_key = await _setup(client)
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "hi"}],
+            **{"response_format": _JSON_SCHEMA_RF},
+        },
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeClient.last_kwargs["response_format"] == _JSON_SCHEMA_RF
+
+
+async def test_anthropic_structured_output_forces_a_tool(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Anthropic has no native JSON mode: a json_schema request must be translated
+    # into a forced tool, and the tool's input surfaced as JSON message content.
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client, provider="anthropic", values=ANTHROPIC_VALUES, provider_model_id="claude-3-5-sonnet"
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "hi"}],
+            "response_format": _JSON_SCHEMA_RF,
+        },
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    tools = FakeAnthropic.last_kwargs["tools"]
+    assert tools[0]["name"] == "answer"
+    assert tools[0]["input_schema"] == _JSON_SCHEMA_RF["json_schema"]["schema"]
+    assert FakeAnthropic.last_kwargs["tool_choice"] == {"type": "tool", "name": "answer"}
+    # The forced tool's input is surfaced as JSON in message.content.
+    content = resp.json()["choices"][0]["message"]["content"]
+    assert json.loads(content) == {"answer": 42}
+
+
+async def test_anthropic_json_object_nudges_via_system(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A bare json_object request (no schema) can't force a tool; nudge via system.
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client, provider="anthropic", values=ANTHROPIC_VALUES, provider_model_id="claude-3-5-sonnet"
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "hi"}],
+            "response_format": {"type": "json_object"},
+        },
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert "tools" not in FakeAnthropic.last_kwargs  # no schema -> no forced tool
+    assert "JSON" in (FakeAnthropic.last_kwargs.get("system") or "")
+
+
+async def test_gemini_structured_output_sets_response_schema(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Gemini structured output = response_mime_type + response_schema in config.
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client, provider="vertex_ai", values=VERTEX_VALUES, provider_model_id="gemini-1.5-pro"
+    )
+    resp = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "hi"}],
+            "response_format": _JSON_SCHEMA_RF,
+        },
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    config = FakeGenaiClient.last_kwargs["config"]
+    assert config["response_mime_type"] == "application/json"
+    assert config["response_schema"] == _JSON_SCHEMA_RF["json_schema"]["schema"]
