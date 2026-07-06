@@ -79,7 +79,7 @@ flowchart TD
     Keys --> Apps["Customer applications<br/>stock OpenAI client"]
 ```
 
-Teams never see provider secrets: models *reference* a credential, the
+Teams never see provider secrets: models _reference_ a credential, the
 gateway decrypts it per call, and usage is attributed back to the team and
 key for billing.
 
@@ -333,7 +333,7 @@ Tracked items not yet implemented (see also the code review notes):
 - **Email enumeration on signup** — a duplicate email now returns the same
   generic `400` as other client errors (the email is never echoed), so the
   response no longer reveals whether an address is registered. Because signup is
-  invite-gated and the invite is consumed *before* the email check, probing an
+  invite-gated and the invite is consumed _before_ the email check, probing an
   address costs one single-use, admin-issued invite per attempt — so enumeration
   is bounded by invite scarcity, not just by the (now generic) response.
 - **Rate limiting** — `/v1/*` is throttled **per API key** (hashed, never the

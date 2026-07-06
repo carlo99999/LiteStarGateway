@@ -44,7 +44,7 @@ Databricks), behind a swappable abstraction.
   `request + response + model + timing → TraceRecord`) and hands it to the sink.
   No MLflow SDK in the core.
 
-```
+```text
 domain/ports.py                                TraceSink (Protocol)
 domain/entities.py                             TraceRecord (frozen dataclass)
 infrastructure/observability/mlflow_sink.py    MLflowTraceSink

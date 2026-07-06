@@ -13,6 +13,7 @@ add at least: **self-service password change** (authenticated) and an
 ## 2. Design
 
 ### 2a. Change password (authenticated) — minimum
+
 - `POST /me/password` (JWT-protected): verify current password, validate the new
   one (reuse the existing complexity check), store the new hash, and **bump
   `token_version`** so all other sessions are invalidated (logout-everywhere).
@@ -20,11 +21,13 @@ add at least: **self-service password change** (authenticated) and an
   `adding-secrets-rotation`).
 
 ### 2b. Admin reset — no email needed
+
 - Platform-admin endpoint to reset a user's password: either set a temporary
   password returned once, or issue a single-use **reset token** (like invites)
   the user redeems to set a new password. Bump `token_version` on reset.
 
 ### 2c. Email-based self-service reset (optional, needs email)
+
 - `POST /password-reset/request` (per-IP rate-limited, **non-revealing** like
   signup — always 202 regardless of whether the email exists) → emails a
   single-use, expiring token.
@@ -35,7 +38,7 @@ add at least: **self-service password change** (authenticated) and an
 
 ## 3. Placement
 
-```
+```text
 application/user_service.py   change_password, admin_reset, (reset_request/confirm)
 domain/entities.py            PasswordReset (single-use, expiring) if token-based
 domain/ports.py               EmailSender (only for 2c)

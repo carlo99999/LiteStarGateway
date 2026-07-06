@@ -30,6 +30,7 @@ def export_users(format='json'):
 ```
 
 **Problems:**
+
 - Assumed it should export ALL users (what about pagination? privacy?)
 - Assumed file location without asking
 - Assumed which fields to include
@@ -37,7 +38,7 @@ def export_users(format='json'):
 
 **✅ What Should Happen (Surface Assumptions)**
 
-```
+```text
 Before implementing, I need to clarify:
 
 1. **Scope**: Export all users or filtered subset? (privacy implications)
@@ -70,7 +71,7 @@ async def search(query: str) -> List[Result]:
 
 **✅ What Should Happen**
 
-```
+```text
 "Make the search faster" could mean:
 
 1. **Faster response time** (< 100ms instead of 500ms)
@@ -261,6 +262,7 @@ def save_preferences(db, user_id: int, preferences: dict):
 ```
 
 **Problems:**
+
 - "Improved" email validation beyond the bug fix
 - Added username validation nobody asked for
 - Changed comments
@@ -330,6 +332,7 @@ def save_preferences(db, user_id: int, preferences: dict):
 ```
 
 **Problems:**
+
 - Changed quote style ('' to "")
 - Added type hints nobody asked for
 - Added docstring
@@ -375,7 +378,7 @@ def save_preferences(db, user_id: int, preferences: dict):
 
 **❌ What LLMs Do (Vague Approach)**
 
-```
+```text
 I'll fix the authentication system by:
 1. Reviewing the code
 2. Identifying issues
@@ -387,7 +390,7 @@ I'll fix the authentication system by:
 
 **✅ What Should Happen (Verifiable Goals)**
 
-```
+```text
 To "fix authentication," I need to define success criteria.
 What specific issue are we solving?
 
@@ -424,7 +427,7 @@ What's the specific auth issue you're seeing?
 
 **✅ What Should Happen (Incremental with Verification)**
 
-```
+```text
 Plan for rate limiting:
 
 1. Add basic in-memory rate limiting (single endpoint)
@@ -514,6 +517,7 @@ The "overcomplicated" examples aren't obviously wrong—they follow design patte
 - Harder to test
 
 The "simple" versions are:
+
 - Easier to understand
 - Faster to implement
 - Easier to test
