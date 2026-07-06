@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from litestar import Litestar
@@ -55,7 +55,7 @@ def make_usage_reconciler(database: Database, settings: Settings):
                 logger.exception("usage reconciliation failed")
 
     @asynccontextmanager
-    async def lifespan(app: Litestar) -> AsyncIterator[None]:
+    async def lifespan(app: Litestar) -> AsyncGenerator[None]:
         task = asyncio.create_task(_loop(app))
         try:
             yield

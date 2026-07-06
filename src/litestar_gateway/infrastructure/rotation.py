@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
@@ -110,7 +110,7 @@ def make_rotation_scheduler(database: Database, settings: Settings):
                 logger.exception("key rotation failed")
 
     @asynccontextmanager
-    async def lifespan(app: Litestar) -> AsyncIterator[None]:
+    async def lifespan(app: Litestar) -> AsyncGenerator[None]:
         if not settings.rotation_enabled:
             yield
             return

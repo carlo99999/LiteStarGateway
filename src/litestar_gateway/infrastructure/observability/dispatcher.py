@@ -11,10 +11,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 
-import anyio
+import anyio.to_thread as to_thread
 from litestar import Litestar
 
 from litestar_gateway.domain.entities import TraceRecord
@@ -48,14 +48,14 @@ class TraceDispatcher:
         while True:
             record = await self._queue.get()
             try:
-                await anyio.to_thread.run_sync(self._sink.write, record)
+                await to_thread.run_sync(self._sink.write, record)
             except Exception:  # a sink error must never take down the worker
                 logger.warning("failed to write trace", exc_info=True)
             finally:
                 self._queue.task_done()
 
     @asynccontextmanager
-    async def run(self, _: Litestar) -> AsyncIterator[None]:
+    async def run(self, _: Litestar) -> AsyncGenerator[None]:
         task = asyncio.create_task(self._worker())
         try:
             yield
