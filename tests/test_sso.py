@@ -105,6 +105,21 @@ async def test_sso_callback_jit_creates_admin_and_issues_jwt(
     assert me.json()["is_admin"] is True
 
 
+async def test_sso_callback_clears_flow_cookies(
+    admin_identity_client: AsyncTestClient,
+) -> None:
+    # L28: the one-time flow cookies must not linger after the callback consumes them.
+    client = admin_identity_client
+    state = await _login_state(client)
+    assert client.cookies.get("sso_state")  # set by /sso/login
+    resp = await client.get(f"/sso/callback?code=abc&state={state}")
+    assert resp.status_code == HTTP_200_OK
+    # Cleared (Set-Cookie max-age=0) -> httpx drops them from the jar.
+    assert client.cookies.get("sso_state") is None
+    assert client.cookies.get("sso_nonce") is None
+    assert client.cookies.get("sso_verifier") is None
+
+
 async def test_sso_callback_rejects_state_mismatch(
     admin_identity_client: AsyncTestClient,
 ) -> None:

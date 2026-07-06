@@ -65,16 +65,25 @@ def _request(authorization: str | None) -> Any:
     return _FakeRequest()
 
 
-def test_inference_identifier_keys_by_api_key() -> None:
+def test_inference_identifier_keys_by_ip_not_token() -> None:
     identifier = _inference_identifier(_request("Bearer lsk_secret-token"))
-    assert identifier.startswith("key::")
-    # The plaintext token must never appear in the cache key.
+    assert identifier.startswith("ip::")
+    # The token must never appear in the cache key (no per-token bucket at all).
     assert "lsk_secret-token" not in identifier
 
 
-def test_inference_identifier_falls_back_to_ip() -> None:
+def test_inference_identifier_is_ip_based_regardless_of_token() -> None:
     assert _inference_identifier(_request(None)).startswith("ip::")
     assert _inference_identifier(_request("Bearer ")).startswith("ip::")
+
+
+def test_inference_identifier_same_ip_different_tokens_share_bucket() -> None:
+    # M33: an attacker varying the bearer token per request must not mint a fresh
+    # rate-limit bucket each time. Same client IP -> same identifier.
+    a = _inference_identifier(_request("Bearer garbage-one"))
+    b = _inference_identifier(_request("Bearer garbage-two"))
+    c = _inference_identifier(_request(None))
+    assert a == b == c
 
 
 def test_rate_limit_uses_memory_store_by_default(tmp_path: Path) -> None:

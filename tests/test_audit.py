@@ -73,6 +73,26 @@ async def test_privileged_actions_are_audited(client: AsyncTestClient) -> None:
     assert FAKE_OPENAI_VALUE not in (create["detail"] or "")
 
 
+async def test_invite_and_password_reset_issuance_are_audited(client: AsyncTestClient) -> None:
+    # M35: minting an invite or a password-reset token — the two primitives that
+    # can create or take over an account — must leave an attributable audit trail.
+    admin = await _admin_token(client)
+    invite = await client.post("/invites", headers=_bearer(admin))
+    assert invite.status_code < 300
+    reset = await client.post(
+        "/password-resets", json={"email": ADMIN_EMAIL}, headers=_bearer(admin)
+    )
+    assert reset.status_code < 300
+
+    events = (await client.get("/audit", headers=_bearer(admin))).json()
+    by_action = {e["action"]: e for e in events}
+    assert "invite.create" in by_action
+    assert "password_reset.create" in by_action
+    assert by_action["invite.create"]["actor_email"] == ADMIN_EMAIL
+    assert by_action["invite.create"]["target_type"] == "invite"
+    assert by_action["password_reset.create"]["target_type"] == "user"
+
+
 async def test_audit_read_requires_platform_admin(client: AsyncTestClient) -> None:
     admin = await _admin_token(client)
     invite = (await client.post("/invites", headers=_bearer(admin))).json()["token"]

@@ -75,8 +75,20 @@ New counts: **0 CRITICAL · 1 HIGH · 4 MEDIUM · 3 LOW**.
 |---|---|
 | H15 — `model.params` precedence conflated three governance semantics | `Model.params` (client-overridable defaults) + new `Model.params_enforced` (admin policy, applied last) via `Model.merge_params`, used at all five adapter sites; new per-model `Model.max_output_tokens` ceiling clamped with `min` and injected on omission inside `clamp_output_tokens`, applied in `_prepare` before the reservation so admission and the provider call agree. Migration `b3c4d5e6f7a8` adds both columns (nullable → existing models unchanged). This also delivers the Round 4 proposed `max_output_tokens` follow-up. Regression tests: `tests/test_model_params.py`, `clamp_output_tokens` cases in `tests/test_request_policy.py`, and four end-to-end cases in `tests/test_completions.py`. Full suite green (341). |
 
-**Open:** M33, M34, M35, M36, L27, L28, L29. M34 is a correctness regression
-introduced by the M5/#57 pagination change and worth fixing next.
+**Fixed (remediation pass — all remaining Round 5 findings):**
+
+| Finding | Fix |
+|---|---|
+| M33 — inference rate-limiter bypassable by varying the bearer token | `_inference_identifier` now keys by client IP (the one thing an unauthenticated caller can't cheaply vary); per-client spend stays bounded by the budget gate. |
+| M34 — last-admin check truncated to the first page of memberships | New `TeamMembershipRepository.count_admins`; `_is_last_admin` checks the target is an admin + the admin count is 1 (unpaginated). |
+| M35 — admin invite / password-reset issuance not audited | `create_invite` and `create_password_reset` now emit `invite.create` / `password_reset.create` via `record_audit`. |
+| M36 — OIDC `groups` claim assumed to be a list | `_parse_groups` accepts only a list/tuple (absent = no groups); fails closed on any other shape. |
+| L27 — OIDC discovery/JWKS cached with no TTL | Discovery refreshed after a 1h TTL, serving the cached copy if a refresh fails. |
+| L28 — SSO flow cookies not cleared on callback | `sso_callback` expires `sso_state`/`sso_nonce`/`sso_verifier` (max-age=0). |
+| L29 — `TeamRepository.list_by_organization` unbounded | Added `limit`/`offset` matching the sibling repos (preventive; still no caller). |
+
+Each fix has a regression test; the full suite stays green. **Round 5 is fully
+remediated.**
 
 ## HIGH (Round 5)
 

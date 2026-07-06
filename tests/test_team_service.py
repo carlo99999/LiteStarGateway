@@ -58,8 +58,11 @@ class FakeTeamRepo:
     async def get(self, team_id: UUID) -> Team | None:
         return self.items.get(team_id)
 
-    async def list_by_organization(self, organization_id: UUID) -> list[Team]:
-        return [t for t in self.items.values() if t.organization_id == organization_id]
+    async def list_by_organization(
+        self, organization_id: UUID, *, limit: int = 100, offset: int = 0
+    ) -> list[Team]:
+        rows = [t for t in self.items.values() if t.organization_id == organization_id]
+        return rows[offset : offset + limit]
 
 
 class FakeMembershipRepo:
@@ -79,7 +82,13 @@ class FakeMembershipRepo:
     async def list_by_team(
         self, team_id: UUID, *, limit: int = 100, offset: int = 0
     ) -> list[TeamMembership]:
-        return [m for m in self.items if m.team_id == team_id]
+        # Honor limit/offset like the real repo, so tests can exercise the
+        # >1-page truncation that M34 was about.
+        rows = [m for m in self.items if m.team_id == team_id]
+        return rows[offset : offset + limit]
+
+    async def count_admins(self, team_id: UUID) -> int:
+        return sum(1 for m in self.items if m.team_id == team_id and m.is_admin)
 
     async def update(self, m: TeamMembership) -> TeamMembership:
         self.items = [x for x in self.items if x.id != m.id] + [m]
@@ -215,6 +224,41 @@ async def test_ensure_can_manage_unknown_team(service, repos) -> None:  # noqa: 
     users.add_user(admin)
     with pytest.raises(TeamNotFound):
         await service.ensure_can_manage_team(admin, uuid4())
+
+
+async def test_last_admin_protected_when_admin_is_beyond_first_page(service, repos) -> None:  # noqa: ANN001, E501
+    # M34: the sole admin sits past the first page of memberships (e.g. added
+    # after 100 members). _is_last_admin must count admins, not scan one page —
+    # otherwise the admin is invisible and demote/remove wrongly succeeds.
+    _, teams, memberships, users = repos
+    actor = _user("platform@b.com", is_admin=True)
+    users.add_user(actor)
+    team = await teams.add(Team(id=uuid4(), organization_id=uuid4(), name="Big", created_at=_now()))
+    for _ in range(100):  # 100 members occupy the whole first page
+        await memberships.add(
+            TeamMembership(
+                id=uuid4(),
+                team_id=team.id,
+                user_id=uuid4(),
+                role=TeamRole.MEMBER,
+                created_at=_now(),
+            )
+        )
+    admin_user = _user("teamadmin@b.com")  # sole admin, added last -> page 2
+    await memberships.add(
+        TeamMembership(
+            id=uuid4(),
+            team_id=team.id,
+            user_id=admin_user.id,
+            role=TeamRole.ADMIN,
+            created_at=_now(),
+        )
+    )
+
+    with pytest.raises(LastTeamAdmin):
+        await service.remove_member(actor, team.id, admin_user.id)
+    with pytest.raises(LastTeamAdmin):
+        await service.set_role(actor, team.id, admin_user.id, TeamRole.MEMBER)
 
 
 async def _team_with_two_admins(service, repos):  # noqa: ANN001, ANN202

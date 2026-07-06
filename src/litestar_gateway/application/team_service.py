@@ -86,9 +86,13 @@ class TeamService:
 
     async def _is_last_admin(self, team_id: UUID, user_id: UUID) -> bool:
         """True if `user_id` is the team's only remaining admin, so demoting or
-        removing them would leave the team with no admin."""
-        admins = [m for m in await self._memberships.list_by_team(team_id) if m.is_admin]
-        return len(admins) == 1 and admins[0].user_id == user_id
+        removing them would leave the team with no admin. Uses an admin *count*
+        rather than a page of `list_by_team`, so the invariant stays correct on
+        teams with more members than one page (the M5 pagination default)."""
+        membership = await self._memberships.get(team_id, user_id)
+        if membership is None or not membership.is_admin:
+            return False
+        return await self._memberships.count_admins(team_id) == 1
 
     async def ensure_can_manage_team(self, actor: User, team_id: UUID) -> Team:
         """Return the team if `actor` may manage it, else raise."""

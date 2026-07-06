@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_gateway.domain.entities import TeamMembership
+from litestar_gateway.domain.entities import TeamMembership, TeamRole
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.infrastructure.persistence.orm import TeamMembershipModel
 
@@ -49,6 +49,17 @@ class SQLAlchemyTeamMembershipRepository:
             .offset(offset)
         )
         return [m.to_entity() for m in models]
+
+    async def count_admins(self, team_id: UUID) -> int:
+        count = await self._session.scalar(
+            select(func.count())
+            .select_from(TeamMembershipModel)
+            .where(
+                TeamMembershipModel.team_id == team_id,
+                TeamMembershipModel.role == TeamRole.ADMIN.value,
+            )
+        )
+        return count or 0
 
     async def update(self, membership: TeamMembership) -> TeamMembership:
         model = await self._session.get(TeamMembershipModel, membership.id)

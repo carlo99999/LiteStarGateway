@@ -32,6 +32,13 @@ _NONCE_COOKIE = "sso_nonce"
 _VERIFIER_COOKIE = "sso_verifier"
 _STATE_TTL_SECONDS = 600  # the user must complete the round-trip within 10 minutes
 
+# Once the callback runs the one-time flow cookies are spent; expire them so a
+# leftover copy on a shared/kiosk browser can't be replayed within the TTL (L28).
+_EXPIRE_FLOW_COOKIES = [
+    Cookie(key=key, value="", max_age=0, httponly=True, samesite="lax")
+    for key in (_STATE_COOKIE, _NONCE_COOKIE, _VERIFIER_COOKIE)
+]
+
 
 def _redirect_uri(request: Request, configured: str | None) -> str:
     # A configured public callback URL wins (correct behind a reverse proxy, where
@@ -82,7 +89,11 @@ async def sso_login(
     )
 
 
-@get("/sso/callback", middleware=[build_auth_rate_limit().middleware])
+@get(
+    "/sso/callback",
+    middleware=[build_auth_rate_limit().middleware],
+    response_cookies=_EXPIRE_FLOW_COOKIES,
+)
 async def sso_callback(
     request: Request,
     identity_provider: NamedDependency[IdentityProvider],

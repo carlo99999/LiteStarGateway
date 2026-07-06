@@ -6,6 +6,7 @@ signed with a generated RSA key so verification exercises the real joserfc path.
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import httpx
@@ -15,7 +16,11 @@ from joserfc import jwt
 from joserfc.jwk import KeySet, RSAKey
 
 from litestar_gateway.domain.exceptions import SSOExchangeError
-from litestar_gateway.infrastructure.sso.oidc import OIDCIdentityProvider, _claim_is_true
+from litestar_gateway.infrastructure.sso.oidc import (
+    _METADATA_TTL_SECONDS,
+    OIDCIdentityProvider,
+    _claim_is_true,
+)
 
 _ISSUER = "https://idp.example"
 _CLIENT_ID = "client-abc"
@@ -39,6 +44,7 @@ def _seeded_provider(signing_key: RSAKey) -> OIDCIdentityProvider:
     """Provider with discovery + JWKS pre-seeded, so only token exchange hits IO."""
     provider = OIDCIdentityProvider(_DISCOVERY_URL, _CLIENT_ID, "secret", "openid email")
     provider._metadata = dict(_METADATA)
+    provider._metadata_fetched_at = time.monotonic()  # seeded == freshly fetched
     provider._jwks = KeySet.import_key_set({"keys": [signing_key.as_dict(private=False)]})
     return provider
 
@@ -110,6 +116,64 @@ async def test_exchange_parses_identity(
     assert identity.email == "a@corp.com"
     assert identity.email_verified is True
     assert identity.groups == ("g1", "admins")
+
+
+async def test_exchange_rejects_non_list_groups_claim(
+    signing_key: RSAKey, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # M36: a string groups claim would be iterated character-by-character and
+    # corrupt role mapping; fail closed instead of trusting it.
+    provider = _seeded_provider(signing_key)
+    _patch_fetch_token(monkeypatch, {"id_token": _id_token(signing_key, groups="admins")})
+    with pytest.raises(SSOExchangeError):
+        await provider.exchange(
+            "code", "https://app/sso/callback", nonce=NONCE, code_verifier=VERIFIER
+        )
+
+
+async def test_exchange_allows_absent_groups_claim(
+    signing_key: RSAKey, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Omitting groups is legitimate (the user is in no groups), not an error.
+    provider = _seeded_provider(signing_key)
+    _patch_fetch_token(monkeypatch, {"id_token": _id_token(signing_key, groups=None)})
+    identity = await provider.exchange(
+        "code", "https://app/sso/callback", nonce=NONCE, code_verifier=VERIFIER
+    )
+    assert identity.groups == ()
+
+
+async def test_metadata_refreshes_after_ttl(monkeypatch: pytest.MonkeyPatch) -> None:
+    # L27: discovery is cached but refreshed after the TTL, so an IdP rotating its
+    # endpoints/issuer is picked up without a process restart.
+    provider = OIDCIdentityProvider(_DISCOVERY_URL, _CLIENT_ID, "secret", "openid email")
+    calls = {"n": 0}
+
+    async def fake_fetch(self: Any) -> dict[str, Any]:
+        calls["n"] += 1
+        return dict(_METADATA)
+
+    monkeypatch.setattr(OIDCIdentityProvider, "_fetch_metadata", fake_fetch)
+    await provider._load_metadata()
+    await provider._load_metadata()  # within TTL -> served from cache
+    assert calls["n"] == 1
+    provider._metadata_fetched_at -= _METADATA_TTL_SECONDS + 1  # force staleness
+    await provider._load_metadata()  # stale -> refetch
+    assert calls["n"] == 2
+
+
+async def test_metadata_serves_stale_when_refresh_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A transient IdP blip on refresh must not break logins: keep the cached copy.
+    provider = OIDCIdentityProvider(_DISCOVERY_URL, _CLIENT_ID, "secret", "openid email")
+    provider._metadata = dict(_METADATA)
+    provider._metadata_fetched_at = time.monotonic() - _METADATA_TTL_SECONDS - 1  # stale
+
+    async def failing_fetch(self: Any) -> dict[str, Any]:
+        raise SSOExchangeError("idp down")
+
+    monkeypatch.setattr(OIDCIdentityProvider, "_fetch_metadata", failing_fetch)
+    metadata = await provider._load_metadata()
+    assert metadata["issuer"] == _ISSUER  # stale copy served, no raise
 
 
 async def test_exchange_missing_id_token_raises(

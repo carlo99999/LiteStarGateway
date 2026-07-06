@@ -7,7 +7,7 @@ it. Redeeming revokes the user's existing sessions.
 
 from __future__ import annotations
 
-from litestar import post
+from litestar import Request, post
 from litestar.di import NamedDependency, Provide
 from litestar.exceptions import ClientException
 from litestar.status_codes import HTTP_204_NO_CONTENT
@@ -15,6 +15,8 @@ from litestar.status_codes import HTTP_204_NO_CONTENT
 from litestar_gateway.application.user_service import UserService
 from litestar_gateway.domain.entities import User
 from litestar_gateway.domain.exceptions import InvalidPasswordReset, WeakPassword
+from litestar_gateway.domain.ports import AuditLog
+from litestar_gateway.infrastructure.web.audit.recorder import record_audit
 from litestar_gateway.infrastructure.web.rate_limit import build_auth_rate_limit
 from litestar_gateway.infrastructure.web.session.dependencies import provide_current_admin
 from litestar_gateway.infrastructure.web.users.schemas import (
@@ -31,11 +33,22 @@ from litestar_gateway.infrastructure.web.users.schemas import (
     middleware=[build_auth_rate_limit().middleware],
 )
 async def create_password_reset(
+    request: Request,
     data: PasswordResetCreateRequest,
     admin_user: NamedDependency[User],
     user_service: NamedDependency[UserService],
+    audit_log: NamedDependency[AuditLog],
 ) -> PasswordResetResponse:
     issued = await user_service.create_password_reset(admin_user, data.email)
+    # A reset token can take over the target account — audit who issued it (M35).
+    await record_audit(
+        audit_log,
+        request,
+        admin_user,
+        "password_reset.create",
+        target_type="user",
+        target_id=issued.reset.user_id,
+    )
     return PasswordResetResponse.from_issued(issued)
 
 

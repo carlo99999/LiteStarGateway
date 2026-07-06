@@ -174,7 +174,9 @@ class TeamRepository(Protocol):
 
     async def get(self, team_id: UUID) -> Team | None: ...
 
-    async def list_by_organization(self, organization_id: UUID) -> list[Team]: ...
+    async def list_by_organization(
+        self, organization_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[Team]: ...
 
 
 class TeamMembershipRepository(Protocol):
@@ -187,6 +189,11 @@ class TeamMembershipRepository(Protocol):
     async def list_by_team(
         self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
     ) -> list[TeamMembership]: ...
+
+    async def count_admins(self, team_id: UUID) -> int:
+        """Number of admin memberships on the team. Unpaginated on purpose: the
+        last-admin invariant must see every admin, not just the first page."""
+        ...
 
     async def update(self, membership: TeamMembership) -> TeamMembership: ...
 
