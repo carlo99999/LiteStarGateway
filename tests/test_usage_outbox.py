@@ -141,6 +141,27 @@ async def test_poisoned_row_cannot_starve_newer_events(session: AsyncSession) ->
     assert "permanently failing row" in (remaining[0].last_error or "")
 
 
+async def test_spend_since_excludes_quarantined_rows(session: AsyncSession) -> None:
+    # M28: a poison row that will never settle (quarantined after
+    # MAX_RECONCILE_ATTEMPTS) must stop counting against the budget gate — it
+    # will never bill, so counting it permanently shrinks the team's usable
+    # budget by a phantom amount for the rest of the window.
+    repo = SQLAlchemyUsageRepository(session)
+    poison = _event()
+    await repo.enqueue_pending(poison)
+    window = poison.created_at - timedelta(minutes=1)
+
+    # Still retriable: its cost gates (it may yet settle into the ledger).
+    assert await repo.spend_since(poison.team_id, window) == 0.12
+
+    _poison_get(session, poison.id)
+    for _ in range(MAX_RECONCILE_ATTEMPTS):
+        assert await repo.reconcile_pending(limit=1) == 0
+
+    # Quarantined: never billable, so no longer gating.
+    assert await repo.spend_since(poison.team_id, window) == 0.0
+
+
 async def test_transient_failure_is_retried_and_settles(session: AsyncSession) -> None:
     # A row that fails once (transient DB blip) is not lost: its attempt is
     # counted, and the next cycle settles it normally.
