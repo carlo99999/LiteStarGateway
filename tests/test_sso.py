@@ -81,18 +81,16 @@ _MASTER_KEY = "master-secret"  # pragma: allowlist secret
 
 async def _admin_token(client: AsyncTestClient) -> str:
     """Log in as the bootstrap platform admin (password == master key on first boot)."""
-    resp = await client.post(
-        "/login", json={"email": "admin@example.com", "password": _MASTER_KEY}
-    )
+    resp = await client.post("/login", json={"email": "admin@example.com", "password": _MASTER_KEY})
     return resp.json()["access_token"]
 
 
 async def _create_team(client: AsyncTestClient) -> str:
     """As the bootstrap admin, create an org + team; return the team's id."""
     headers = {"Authorization": f"Bearer {await _admin_token(client)}"}
-    org_id = (
-        await client.post("/organizations", json={"name": "Acme"}, headers=headers)
-    ).json()["id"]
+    org_id = (await client.post("/organizations", json={"name": "Acme"}, headers=headers)).json()[
+        "id"
+    ]
     team = await client.post(
         f"/organizations/{org_id}/teams",
         json={"name": "Core", "admin_email": "admin@example.com"},
