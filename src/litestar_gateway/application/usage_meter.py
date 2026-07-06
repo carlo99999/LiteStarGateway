@@ -109,11 +109,15 @@ def _parse_usage(model: Model, usage: dict[str, Any]) -> tuple[int, int, float]:
 
 def _reservation_cost(model: Model, request: dict[str, Any]) -> float:
     """Pessimistic pre-dispatch cost of a request: the estimated prompt plus
-    the requested output ceiling. A request without a max-tokens field (or on
-    an unpriced model) reserves only what can be known — those bursts stay
-    bounded by the prompt estimate alone."""
+    the requested output ceiling per choice — `n` choices each regenerate the
+    full output ceiling (providers bill the prompt once). A request without a
+    max-tokens field (or on an unpriced model) reserves only what can be
+    known — those bursts stay bounded by the prompt estimate alone. Callers
+    pass the sanitized request, so `n`/max-tokens are already clamped."""
     prompt = _estimate_tokens(len(_request_text(request))) * (model.input_cost_per_token or 0.0)
-    output = _max_output_tokens(request) * (model.output_cost_per_token or 0.0)
+    n = request.get("n")
+    choices = n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else 1
+    output = _max_output_tokens(request) * choices * (model.output_cost_per_token or 0.0)
     return prompt + output
 
 

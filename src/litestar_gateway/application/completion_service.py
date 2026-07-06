@@ -96,8 +96,8 @@ class CompletionService:
     async def chat_completion(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
-        model, values, reservation = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("chat.completions", request)
+        model, values, reservation = await self._prepare(team_id, clean, ModelType.CHAT)
         return await self._dispatch(
             team_id,
             api_key_id,
@@ -110,8 +110,8 @@ class CompletionService:
     async def responses(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
-        model, values, reservation = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("responses", request)
+        model, values, reservation = await self._prepare(team_id, clean, ModelType.CHAT)
         return await self._dispatch(
             team_id,
             api_key_id,
@@ -127,8 +127,8 @@ class CompletionService:
         """Resolve the model + credentials (may raise → HTTP error) and return an
         async iterator of OpenAI chunk dicts, metered for usage. Awaited before
         streaming starts so resolution errors surface as HTTP status codes."""
-        model, values, reservation = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("chat.completions", request)
+        model, values, reservation = await self._prepare(team_id, clean, ModelType.CHAT)
         try:
             stream = await self._gateway.astream_chat_completion(clean, model, values)
         except BaseException:
@@ -143,8 +143,8 @@ class CompletionService:
     ) -> AsyncIterator[dict[str, Any]]:
         """Resolve (may raise → HTTP error) and return an async iterator of
         Responses-API stream events, metered for usage."""
-        model, values, reservation = await self._prepare(team_id, request, ModelType.CHAT)
         clean = sanitize_request("responses", request)
+        model, values, reservation = await self._prepare(team_id, clean, ModelType.CHAT)
         try:
             stream = await self._gateway.astream_responses(clean, model, values)
         except BaseException:
@@ -157,8 +157,8 @@ class CompletionService:
     async def embeddings(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
-        model, values, reservation = await self._prepare(team_id, request, ModelType.EMBEDDINGS)
         clean = sanitize_request("embeddings", request)
+        model, values, reservation = await self._prepare(team_id, clean, ModelType.EMBEDDINGS)
         return await self._dispatch(
             team_id,
             api_key_id,
@@ -171,8 +171,8 @@ class CompletionService:
     async def images(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
-        model, values, reservation = await self._prepare(team_id, request, ModelType.IMAGE)
         clean = sanitize_request("images", request)
+        model, values, reservation = await self._prepare(team_id, clean, ModelType.IMAGE)
         return await self._dispatch(
             team_id,
             api_key_id,
