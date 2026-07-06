@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from litestar_gateway.application.user_service import UserService
-from litestar_gateway.domain.entities import Invite, PasswordReset, User
+from litestar_gateway.domain.entities import ExternalIdentity, Invite, PasswordReset, User
 from litestar_gateway.domain.exceptions import (
     EmailAlreadyRegistered,
     InvalidCredentials,
@@ -82,6 +82,11 @@ class FakeUserRepository:
                 self._by_email[email] = dataclasses.replace(
                     user, is_active=is_active, token_version=tv
                 )
+
+    async def set_admin(self, user_id: UUID, is_admin: bool) -> None:
+        for email, user in self._by_email.items():
+            if user.id == user_id:
+                self._by_email[email] = dataclasses.replace(user, is_admin=is_admin)
 
     async def get(self, user_id: UUID) -> User | None:
         return next((u for u in self._by_email.values() if u.id == user_id), None)
@@ -213,6 +218,78 @@ async def test_disabled_user_cannot_authenticate(service: UserService) -> None:
     await service.set_user_active(admin, target.id, is_active=False)
     with pytest.raises(InvalidCredentials):
         await service.authenticate("bob@b.com", "Passw0rd!")
+
+
+async def test_set_user_admin_promotes_and_demotes(service: UserService) -> None:
+    admin = _account("admin@b.com", is_admin=True)
+    target = _account("bob@b.com")
+    await service._users.add(admin)
+    await service._users.add(target)
+
+    promoted = await service.set_user_admin(admin, target.id, is_admin=True)
+    assert promoted.is_admin is True
+    demoted = await service.set_user_admin(admin, target.id, is_admin=False)
+    assert demoted.is_admin is False
+
+
+async def test_set_user_admin_requires_platform_admin(service: UserService) -> None:
+    non_admin = _account("nope@b.com")
+    other = _account("other@b.com")
+    await service._users.add(non_admin)
+    await service._users.add(other)
+    with pytest.raises(PermissionDenied):
+        await service.set_user_admin(non_admin, other.id, is_admin=True)
+
+
+async def test_set_user_admin_forbids_changing_own_role(service: UserService) -> None:
+    # An admin demoting themselves is a self-lockout footgun (mirrors set_active).
+    admin = _account("admin@b.com", is_admin=True)
+    await service._users.add(admin)
+    with pytest.raises(PermissionDenied):
+        await service.set_user_admin(admin, admin.id, is_admin=False)
+
+
+async def test_set_user_admin_unknown_user(service: UserService) -> None:
+    admin = _account("admin@b.com", is_admin=True)
+    await service._users.add(admin)
+    with pytest.raises(UserNotFound):
+        await service.set_user_admin(admin, uuid4(), is_admin=True)
+
+
+def _identity(subject: str, *, groups: tuple[str, ...] = ()) -> ExternalIdentity:
+    return ExternalIdentity(
+        subject=subject, email=f"{subject}@b.com", email_verified=True, groups=groups
+    )
+
+
+async def test_sso_new_user_gets_admin_from_group(service: UserService) -> None:
+    user = await service.upsert_sso_user(_identity("s1"), group_admin=True, default_admin=False)
+    assert user.is_admin is True
+
+
+async def test_sso_new_user_gets_admin_from_default_role(service: UserService) -> None:
+    # DEFAULT_ROLE=admin seeds a brand-new account even without an admin group.
+    user = await service.upsert_sso_user(_identity("s2"), group_admin=False, default_admin=True)
+    assert user.is_admin is True
+
+
+async def test_sso_new_user_defaults_to_member(service: UserService) -> None:
+    user = await service.upsert_sso_user(_identity("s3"), group_admin=False, default_admin=False)
+    assert user.is_admin is False
+
+
+async def test_sso_relogin_never_downgrades_admin(service: UserService) -> None:
+    # A manual (or prior) admin grant survives a re-login without the admin group —
+    # sync is upgrade-only; only the platform-admin endpoint demotes.
+    await service.upsert_sso_user(_identity("s4"), group_admin=True, default_admin=False)
+    again = await service.upsert_sso_user(_identity("s4"), group_admin=False, default_admin=False)
+    assert again.is_admin is True
+
+
+async def test_sso_relogin_upgrades_member_in_admin_group(service: UserService) -> None:
+    await service.upsert_sso_user(_identity("s5"), group_admin=False, default_admin=False)
+    again = await service.upsert_sso_user(_identity("s5"), group_admin=True, default_admin=False)
+    assert again.is_admin is True
 
 
 async def test_ensure_admin_raises_when_empty_and_no_master_key(

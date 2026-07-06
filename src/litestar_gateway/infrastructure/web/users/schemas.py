@@ -33,6 +33,11 @@ class SetUserActiveRequest:
 
 
 @dataclass(frozen=True)
+class SetUserAdminRequest:
+    is_admin: bool
+
+
+@dataclass(frozen=True)
 class UserResponse:
     id: UUID
     email: str

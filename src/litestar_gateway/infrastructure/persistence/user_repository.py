@@ -50,6 +50,15 @@ class SQLAlchemyUserRepository:
         )
         await self._session.commit()
 
+    async def set_admin(self, user_id: UUID, is_admin: bool) -> None:
+        # The platform role is read live from the DB on every request (see
+        # provide_current_admin) and is not carried in the JWT, so the change takes
+        # effect on the target's next call — no token_version bump needed.
+        await self._session.execute(
+            update(UserModel).where(UserModel.id == user_id).values(is_admin=is_admin)
+        )
+        await self._session.commit()
+
     async def increment_token_version(self, user_id: UUID) -> None:
         await self._session.execute(
             update(UserModel)
