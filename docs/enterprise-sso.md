@@ -107,12 +107,24 @@ domains.
 - Maps onto existing `User`/`TeamMembership` tables; adds an `external_id` and an
   `is_active` flag to `User`.
 
-## 4. Group → team / role mapping
+## 4. Group → team / role mapping — **implemented**
 
-- A per-org **mapping**: IdP group/claim → `(team, role)`. On each SSO login (and
-  on SCIM sync), reconcile the user's memberships to match their current IdP
-  groups (add/remove/keep), so access follows the IdP as source of truth.
-- Keep a manual-override escape hatch for platform admins.
+Configured via `SSO_TEAM_MAPPING` (env, JSON): IdP group → list of
+`{team: <team-uuid>, role: admin|member}` grants (`role` defaults to `member`).
+Malformed JSON fails fast at startup. Teams are referenced by UUID (names are not
+globally unique); name-based resolution could be a follow-up.
+
+On each SSO login the callback derives the desired `(team → role)` grants and the
+set of **SSO-governed** teams (the mapping's codomain), then
+`TeamService.reconcile_sso_memberships` makes the user's memberships in those
+teams match their current groups: grants are added, stale roles updated, and
+dropped grants removed — so access follows the IdP as source of truth. Teams
+**not** in the mapping are never touched, so manually-added memberships survive
+(that is the platform-admin override hatch). A team's last admin is never
+stripped or demoted by reconciliation, to avoid orphaning the team.
+
+Not yet done: a per-org (rather than global) mapping, and reconciliation driven
+by SCIM sync (§3) in addition to interactive login.
 
 ## 5. Extended RBAC
 
