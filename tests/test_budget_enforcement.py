@@ -7,6 +7,7 @@ Budget limit and raises BudgetExceeded (402) without calling the provider.
 
 from __future__ import annotations
 
+import gc
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -166,6 +167,22 @@ async def test_spend_exactly_at_limit_blocks() -> None:
         await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
 
     assert gateway.calls == 0
+
+
+async def test_unstarted_stream_releases_reservation() -> None:
+    # M27: a stream admitted (reservation taken at the gate) but never iterated
+    # — e.g. the SSE layer returns before the first byte, or the client drops —
+    # must not leak its reservation into InFlightSpend. The metered generator's
+    # finally only runs once started, so a finalizer covers the never-started case.
+    gateway = CountingGateway()
+    service = _service(gateway, FakeUsage(spent=0.0), FakeBudgets(_budget(100.0)))
+
+    stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(REQUEST))
+    assert service._meter._in_flight.total(TEAM_ID) > 0  # reserved at admission
+
+    del stream  # never iterated
+    gc.collect()  # collect the abandoned generator -> finalizer releases
+    assert service._meter._in_flight.total(TEAM_ID) == 0  # released, not leaked
 
 
 async def test_no_budget_configured_allows_the_call() -> None:
