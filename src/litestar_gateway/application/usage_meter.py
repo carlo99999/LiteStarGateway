@@ -357,7 +357,7 @@ class UsageMeter:
         operation: str,
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
-        reservation: float = 0.0,
+        release: Callable[[], None] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Relay chunks unchanged while capturing usage as it flows, then record a
         UsageEvent + emit a trace once the stream finishes (or the client
@@ -393,7 +393,10 @@ class UsageMeter:
             # Synchronous and first, so the budget reservation is released even
             # when a client disconnect cancelled this scope (a cancelled frame
             # runs sync code fine; it's the next checkpoint that re-raises).
-            self._in_flight.remove(team_id, reservation)
+            # release() is idempotent — the caller also finalizes it for the
+            # never-iterated case (M27), so a double call here is safe.
+            if release is not None:
+                release()
             # Shielded: on a client disconnect this frame is already cancelled,
             # and the settlement's first checkpoint (the DB commit) would
             # re-raise CancelledError — no ledger row, no outbox, no trace.

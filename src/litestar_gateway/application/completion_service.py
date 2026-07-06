@@ -9,6 +9,7 @@ budget admission, usage metering, billing, traces — is delegated to `UsageMete
 
 from __future__ import annotations
 
+import weakref
 from collections.abc import AsyncIterator, Awaitable, Callable
 from time import perf_counter
 from typing import Any
@@ -150,7 +151,7 @@ class CompletionService:
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        return self._meter.metered_stream(
+        return self._metered(
             team_id, api_key_id, model, "chat.completions", stream, clean, reservation
         )
 
@@ -168,9 +169,37 @@ class CompletionService:
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        return self._meter.metered_stream(
-            team_id, api_key_id, model, "responses", stream, clean, reservation
+        return self._metered(team_id, api_key_id, model, "responses", stream, clean, reservation)
+
+    def _metered(
+        self,
+        team_id: UUID,
+        api_key_id: UUID,
+        model: Model,
+        operation: str,
+        stream: AsyncIterator[dict[str, Any]],
+        request: dict[str, Any],
+        reservation: float,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Wrap the provider stream with usage metering, releasing the budget
+        reservation exactly once. The metered generator releases it in its
+        finally when iterated; a `weakref.finalize` covers the case where the
+        SSE layer returns without ever starting it (client drops before the
+        first byte) — otherwise the reservation would leak into InFlightSpend
+        forever and eventually 402 the whole team (M27)."""
+        released = False
+
+        def release() -> None:
+            nonlocal released
+            if not released:
+                released = True
+                self._meter.release(team_id, reservation)
+
+        gen = self._meter.metered_stream(
+            team_id, api_key_id, model, operation, stream, request, release
         )
+        weakref.finalize(gen, release)
+        return gen
 
     async def embeddings(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
