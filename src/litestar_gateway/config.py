@@ -189,6 +189,16 @@ class Settings:
                 raise InsecureConfigurationError(
                     f"MASTER_KEY must be at least {MIN_SECRET_LENGTH} characters when set"
                 )
+        # With SSO enabled outside local dev, require an explicit callback URL.
+        # Otherwise sso.py derives redirect_uri from the request's Host header,
+        # so a forged Host steers the OIDC redirect declared in the authorization
+        # request — exploitable against IdPs with non-exact redirect matching (M31).
+        if self.sso_enabled and not self.oidc_redirect_uri:
+            raise InsecureConfigurationError(
+                "OIDC_REDIRECT_URI must be set when SSO is enabled outside local "
+                "environments (otherwise the callback URL is derived from the "
+                "untrusted Host header)"
+            )
 
     @classmethod
     def from_env(cls) -> Settings:

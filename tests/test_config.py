@@ -103,6 +103,36 @@ def test_production_allows_no_salt_key() -> None:
     assert settings.is_production is True
 
 
+_SSO = {
+    "oidc_discovery_url": "https://idp.example/.well-known/openid-configuration",
+    "oidc_client_id": "client-abc",
+    "oidc_client_secret": "s3cr3t-value",  # pragma: allowlist secret
+}
+
+
+def test_sso_outside_local_requires_redirect_uri() -> None:
+    # M31: without OIDC_REDIRECT_URI the callback URL is derived from the
+    # untrusted Host header — reject it outside local dev.
+    with pytest.raises(InsecureConfigurationError, match="OIDC_REDIRECT_URI"):
+        dataclasses.replace(_BASE, environment="staging", oidc_redirect_uri=None, **_SSO)
+
+
+def test_sso_outside_local_accepts_explicit_redirect_uri() -> None:
+    settings = dataclasses.replace(
+        _BASE,
+        environment="staging",
+        oidc_redirect_uri="https://gateway.example.com/sso/callback",
+        **_SSO,
+    )
+    assert settings.sso_enabled is True
+
+
+def test_sso_in_local_allows_derived_redirect_uri() -> None:
+    # Local dev may derive the callback from the request; the check is skipped.
+    settings = dataclasses.replace(_BASE, environment="development", oidc_redirect_uri=None, **_SSO)
+    assert settings.sso_enabled is True
+
+
 def test_from_env_rejects_non_numeric_pool_size(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DB_POOL_SIZE", "ten")
     with pytest.raises(InsecureConfigurationError):
