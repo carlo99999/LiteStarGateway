@@ -3,9 +3,10 @@
 > **Status:** OIDC SSO implemented (`infrastructure/sso/oidc.py`,
 > `infrastructure/web/session/sso.py`), the audit log is implemented
 > (`infrastructure/persistence/audit_repository.py`, `infrastructure/web/audit/`,
-> wired into invites / password-reset / unlock / set-active), and SCIM 2.0 Users
+> wired into invites / password-reset / unlock / set-active), SCIM 2.0 Users
 > provisioning is implemented (`application/scim_service.py`,
-> `infrastructure/web/scim/`). Extended RBAC and SAML remain parked. The rest of
+> `infrastructure/web/scim/`), and SSO group→team mapping is implemented
+> (`SSO_TEAM_MAPPING`, §5). Extended RBAC and SAML remain parked. The rest of
 > this doc is the broader enterprise plan.
 
 ## 0. OIDC SSO — implementation plan (refined after studying LiteLLM)
@@ -46,13 +47,14 @@ claim access (incl. `groups`), OIDC discovery, PKCE, and JWKS verification.
   JWT** via the existing keyring; rate-limited, non-revealing). The web layer lives
   in `infrastructure/web/session/sso.py`.
 - **Pure mapping**: the platform-admin flag is derived from an admin-group set
-  (`OIDC_ADMIN_GROUPS`), upgrade-only. SSO does **not** manage teams — team
-  membership is managed inside the gateway (see §4).
+  (`OIDC_ADMIN_GROUPS`), upgrade-only. Team membership is managed inside the
+  gateway (see §4) unless a team is put under IdP governance via
+  `SSO_TEAM_MAPPING` (§5).
 - **JIT upsert** in `UserService`: create/update the SSO user (no password),
   apply the platform role, bump `token_version` if disabled. `User` gains
   `sso_subject`/`external_id` and `is_active`.
 - **Config**: OIDC discovery URL, client id/secret, scopes, `OIDC_ADMIN_GROUPS`,
-  `DEFAULT_ROLE` (§4). **`OIDC_REDIRECT_URI` is required when SSO is enabled
+  `DEFAULT_ROLE` (§4), `SSO_TEAM_MAPPING` (§5). **`OIDC_REDIRECT_URI` is required when SSO is enabled
   outside local dev** (`config.py` fails fast if unset) — otherwise the redirect is
   derived from the request `Host` header, which a forged Host could steer.
 - **Reuse**: the existing JWT session + keyring — SSO federates identity, then
@@ -123,16 +125,18 @@ domains.
 - **Guard rails**: SCIM cannot deactivate a platform admin (the gateway, not
   the IdP, governs admins — the same philosophy as the upgrade-only admin
   flag); demote first via `PATCH /users/{id}/admin`. `/Groups` is deliberately
-  not implemented — team membership is managed in the gateway (§4) — and is
-  declared unsupported to the IdP.
+  not implemented — team membership is governed in the gateway (§4), or via the
+  SSO-login group→team mapping when configured (§5) — and is declared
+  unsupported to the IdP.
 
 ## 4. Platform role & admin — how SSO maps to authorization — **implemented**
 
 **Design principle: SSO authenticates, the gateway authorizes.** SSO answers *who
 you are* (JIT-provisions your account, binds it to the IdP `sub`). *What you can
-do* — teams, memberships, the platform-admin flag — lives in the gateway. There is
-no IdP→team mapping to maintain: you create teams in the gateway and manage
-membership there, exactly as for a password user.
+do* — teams, memberships, the platform-admin flag — lives in the gateway. By
+default there is no IdP→team mapping to maintain: you create teams in the gateway
+and manage membership there, exactly as for a password user. (Optionally,
+`SSO_TEAM_MAPPING` puts specific teams under IdP governance — see §5.)
 
 The one authorization signal SSO carries is the **platform-admin flag**
 (`User.is_admin`), which is binary: you are either a platform admin or a regular
@@ -212,8 +216,26 @@ on-prem AD). Okta/Keycloak/Google typically emit the name directly.
 
 Not yet done: per-org (rather than global) admin groups. SCIM-driven
 provisioning/deprovisioning is implemented (§3).
+## 5. Group → team / role mapping — **implemented**
 
-## 5. Extended RBAC
+Configured via `SSO_TEAM_MAPPING` (env, JSON): IdP group → list of
+`{team: <team-uuid>, role: admin|member}` grants (`role` defaults to `member`).
+Malformed JSON fails fast at startup. Teams are referenced by UUID (names are not
+globally unique); name-based resolution could be a follow-up.
+
+On each SSO login the callback derives the desired `(team → role)` grants and the
+set of **SSO-governed** teams (the mapping's codomain), then
+`TeamService.reconcile_sso_memberships` makes the user's memberships in those
+teams match their current groups: grants are added, stale roles updated, and
+dropped grants removed — so access follows the IdP as source of truth. Teams
+**not** in the mapping are never touched, so manually-added memberships survive
+(that is the platform-admin override hatch). A team's last admin is never
+stripped or demoted by reconciliation, to avoid orphaning the team.
+
+Not yet done: a per-org (rather than global) mapping, and reconciliation driven
+by SCIM sync (§3) in addition to interactive login.
+
+## 6. Extended RBAC
 
 Today: platform-admin / team-admin / member. Enterprise needs finer control:
 
@@ -222,21 +244,21 @@ Today: platform-admin / team-admin / member. Enterprise needs finer control:
   identity). Keep it declarative and centrally checked, not scattered.
 - Examples: "billing viewer", "model manager", "key issuer", read-only auditor.
 
-## 6. Audit log
+## 7. Audit log
 
 - Append-only record of privileged actions (login, SSO/SCIM events, key/credential
   create/revoke, team/member/role changes, budget changes): who, what, when, from
   where, result. Written off the hot path (like the trace sink / usage events).
 - Exposed to platform/org admins; retained per policy.
 
-## 7. Compliance (process, not just code)
+## 8. Compliance (process, not just code)
 
 Enterprise procurement asks for **SOC 2 / ISO 27001**, data residency, and a
 retention/PII policy — especially relevant if payload logging (observability) is
 on. These are mostly process + hosting, but the code must support: data export /
 deletion, configurable retention, and region-pinned storage.
 
-## 8. Open decisions
+## 9. Open decisions
 
 1. **OIDC-first vs SAML-first**: most SaaS IdPs do OIDC; large enterprises often
    require SAML. Lean: OIDC first (authlib), SAML second.
@@ -248,7 +270,7 @@ deletion, configurable retention, and region-pinned storage.
    require SCIM. Support JIT, layer SCIM for deprovisioning.
 5. **RBAC granularity**: how fine to go without over-engineering.
 
-## 9. Testing
+## 10. Testing
 
 - OIDC/SAML adapters with faked IdP responses (JWKS/signature validation, PKCE,
   state); no real IdP in tests.
@@ -256,7 +278,7 @@ deletion, configurable retention, and region-pinned storage.
 - Group mapping reconciliation (add/remove/keep) is a pure function → unit tests.
 - Audit: privileged actions produce records; failures don't break the request.
 
-## 10. Rollout (Enterprise phase)
+## 11. Rollout (Enterprise phase)
 
 1. `feat/oidc-sso` — `IdentityProvider` port + OIDC adapter + `sso_service` +
    JIT user upsert, reusing the JWT session.
