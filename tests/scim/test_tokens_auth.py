@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from conftest import _admin_headers, _scim_headers
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -10,6 +9,8 @@ from litestar.status_codes import (
     HTTP_401_UNAUTHORIZED,
 )
 from litestar.testing import AsyncTestClient
+
+from .conftest import _admin_headers, _scim_headers
 
 
 async def test_mint_scim_token_requires_admin_jwt(client: AsyncTestClient) -> None:

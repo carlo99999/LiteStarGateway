@@ -5,12 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from conftest import ADMIN_EMAIL, OPENAI_VALUES, FakeClient, _admin, _bearer, _patch, _setup
 from litestar.status_codes import HTTP_200_OK
 from litestar.testing import AsyncTestClient
 
 from litestar_gateway.config import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
 from litestar_gateway.domain.request_policy import MAX_N
+
+from .conftest import ADMIN_EMAIL, OPENAI_VALUES, FakeClient, _admin, _bearer, _patch, _setup
 
 
 async def test_openai_chat_completions(

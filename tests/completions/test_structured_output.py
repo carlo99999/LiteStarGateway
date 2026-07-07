@@ -6,7 +6,12 @@ from __future__ import annotations
 import json
 
 import pytest
-from conftest import (
+from litestar.status_codes import HTTP_200_OK
+from litestar.testing import AsyncTestClient
+
+from litestar_gateway.infrastructure.llm import anthropic_adapter
+
+from .conftest import (
     ANTHROPIC_VALUES,
     VERTEX_VALUES,
     FakeAnthropic,
@@ -16,10 +21,6 @@ from conftest import (
     _patch,
     _setup,
 )
-from litestar.status_codes import HTTP_200_OK
-from litestar.testing import AsyncTestClient
-
-from litestar_gateway.infrastructure.llm import anthropic_adapter
 
 _JSON_SCHEMA_RF = {
     "type": "json_schema",

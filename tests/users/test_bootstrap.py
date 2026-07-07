@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import pytest
-from conftest import (
+
+from litestar_gateway.application.user_service import UserService
+from litestar_gateway.domain.entities import User
+from litestar_gateway.domain.exceptions import EmailAlreadyRegistered, MasterKeyMissing
+
+from .conftest import (
     FakeInviteRepository,
     FakePasswordResetRepository,
     FakeTransaction,
     FakeUserRepository,
 )
-
-from litestar_gateway.application.user_service import UserService
-from litestar_gateway.domain.entities import User
-from litestar_gateway.domain.exceptions import EmailAlreadyRegistered, MasterKeyMissing
 
 
 async def test_ensure_admin_raises_when_empty_and_no_master_key(

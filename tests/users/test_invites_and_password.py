@@ -6,12 +6,6 @@ import dataclasses
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import (
-    FakeInviteRepository,
-    FakePasswordResetRepository,
-    FakeTransaction,
-    FakeUserRepository,
-)
 
 from litestar_gateway.application.user_service import UserService
 from litestar_gateway.domain.entities import User
@@ -23,6 +17,13 @@ from litestar_gateway.domain.exceptions import (
     PermissionDenied,
     UserNotFound,
     WeakPassword,
+)
+
+from .conftest import (
+    FakeInviteRepository,
+    FakePasswordResetRepository,
+    FakeTransaction,
+    FakeUserRepository,
 )
 
 

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from conftest import _admin_headers, _create_user
 from litestar.testing import AsyncTestClient
+
+from .conftest import _admin_headers, _create_user
 
 
 async def test_scim_actions_are_audited(client: AsyncTestClient) -> None:

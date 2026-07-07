@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from conftest import (
+from litestar.status_codes import HTTP_200_OK
+from litestar.testing import AsyncTestClient
+
+from .conftest import (
     ANTHROPIC_VALUES,
     AZURE_VALUES,
     DATABRICKS_VALUES,
@@ -15,8 +18,6 @@ from conftest import (
     _patch,
     _setup,
 )
-from litestar.status_codes import HTTP_200_OK
-from litestar.testing import AsyncTestClient
 
 
 async def test_openai_responses(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:

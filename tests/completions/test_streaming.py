@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from conftest import (
+from litestar.status_codes import HTTP_200_OK, HTTP_404_NOT_FOUND
+from litestar.testing import AsyncTestClient
+
+from .conftest import (
     ADMIN_EMAIL,
     ANTHROPIC_VALUES,
     DATABRICKS_VALUES,
@@ -19,8 +22,6 @@ from conftest import (
     _setup_team,
     _team_usage,
 )
-from litestar.status_codes import HTTP_200_OK, HTTP_404_NOT_FOUND
-from litestar.testing import AsyncTestClient
 
 
 async def test_streaming_openai_sse(

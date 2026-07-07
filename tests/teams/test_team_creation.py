@@ -5,10 +5,11 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from conftest import _now, _user
 
 from litestar_gateway.domain.entities import Organization, TeamRole
 from litestar_gateway.domain.exceptions import OrganizationNotFound, PermissionDenied, UserNotFound
+
+from .conftest import _now, _user
 
 
 async def test_create_team_requires_platform_admin(service, repos) -> None:  # noqa: ANN001

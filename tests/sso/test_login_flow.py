@@ -5,7 +5,14 @@ from __future__ import annotations
 import dataclasses
 from pathlib import Path
 
-from conftest import (
+from litestar.status_codes import HTTP_200_OK, HTTP_401_UNAUTHORIZED
+from litestar.testing import AsyncTestClient
+
+from litestar_gateway.app import create_app
+from litestar_gateway.config import Settings
+from litestar_gateway.domain.entities import ExternalIdentity
+
+from .conftest import (
     ADMIN_GROUP,
     FakeIdP,
     _callback,
@@ -15,12 +22,6 @@ from conftest import (
     _login_state,
     _settings,
 )
-from litestar.status_codes import HTTP_200_OK, HTTP_401_UNAUTHORIZED
-from litestar.testing import AsyncTestClient
-
-from litestar_gateway.app import create_app
-from litestar_gateway.config import Settings
-from litestar_gateway.domain.entities import ExternalIdentity
 
 
 async def test_sso_callback_jit_creates_admin_and_issues_jwt(

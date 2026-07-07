@@ -2,14 +2,6 @@
 
 from __future__ import annotations
 
-from conftest import (
-    ADMIN_EMAIL,
-    ERROR_URN,
-    USER_URN,
-    _create_user,
-    _scim_headers,
-    _signup_password_user,
-)
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_204_NO_CONTENT,
@@ -18,6 +10,15 @@ from litestar.status_codes import (
     HTTP_409_CONFLICT,
 )
 from litestar.testing import AsyncTestClient
+
+from .conftest import (
+    ADMIN_EMAIL,
+    ERROR_URN,
+    USER_URN,
+    _create_user,
+    _scim_headers,
+    _signup_password_user,
+)
 
 
 async def test_put_replaces_username_external_id_and_active(client: AsyncTestClient) -> None:

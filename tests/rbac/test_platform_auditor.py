@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from conftest import _admin, _bearer, _credential, _login, _model_payload, _signup, _team
 from litestar.status_codes import HTTP_200_OK, HTTP_403_FORBIDDEN
 from litestar.testing import AsyncTestClient
+
+from .conftest import _admin, _bearer, _credential, _login, _model_payload, _signup, _team
 
 
 async def test_admin_grants_and_revokes_auditor_with_audit_trail(

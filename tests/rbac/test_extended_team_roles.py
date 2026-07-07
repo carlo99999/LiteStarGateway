@@ -3,7 +3,6 @@ plus member/admin unchanged and the last-admin guard against demotion."""
 
 from __future__ import annotations
 
-from conftest import ADMIN_EMAIL, _admin, _bearer, _credential, _member_token, _model_payload, _team
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -12,6 +11,16 @@ from litestar.status_codes import (
     HTTP_409_CONFLICT,
 )
 from litestar.testing import AsyncTestClient
+
+from .conftest import (
+    ADMIN_EMAIL,
+    _admin,
+    _bearer,
+    _credential,
+    _member_token,
+    _model_payload,
+    _team,
+)
 
 
 async def test_model_manager_manages_models_and_nothing_else(client: AsyncTestClient) -> None:

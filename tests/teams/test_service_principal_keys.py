@@ -3,9 +3,10 @@ team isolation, and the no-self-replication rule (SP admin is JWT-only)."""
 
 from __future__ import annotations
 
-from conftest import _admin, _bearer, _model, _sp, _sp_key, _team_and_credential
 from litestar.status_codes import HTTP_201_CREATED, HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 from litestar.testing import AsyncTestClient
+
+from .conftest import _admin, _bearer, _model, _sp, _sp_key, _team_and_credential
 
 
 async def test_sp_key_can_manage_its_team(client: AsyncTestClient) -> None:

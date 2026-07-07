@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from conftest import _bearer, _patch, _setup
 from litestar.status_codes import (
     HTTP_400_BAD_REQUEST,
     HTTP_404_NOT_FOUND,
@@ -11,6 +10,8 @@ from litestar.status_codes import (
     HTTP_501_NOT_IMPLEMENTED,
 )
 from litestar.testing import AsyncTestClient
+
+from .conftest import _bearer, _patch, _setup
 
 
 async def test_vertex_invalid_service_account_json_400(

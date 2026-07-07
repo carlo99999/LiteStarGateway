@@ -5,11 +5,12 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from conftest import _now, _user
 
 from litestar_gateway.domain.authorization import Permission
 from litestar_gateway.domain.entities import Organization, Team, TeamMembership, TeamRole
 from litestar_gateway.domain.exceptions import LastTeamAdmin, TeamNotFound
+
+from .conftest import _now, _user
 
 
 async def test_ensure_can_manage_unknown_team(service, repos) -> None:  # noqa: ANN001

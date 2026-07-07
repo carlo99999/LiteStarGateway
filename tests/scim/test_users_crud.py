@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 
-from conftest import ERROR_URN, LIST_URN, USER_URN, _create_user, _scim_headers
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -13,6 +12,8 @@ from litestar.status_codes import (
     HTTP_409_CONFLICT,
 )
 from litestar.testing import AsyncTestClient
+
+from .conftest import ERROR_URN, LIST_URN, USER_URN, _create_user, _scim_headers
 
 
 async def test_create_user_returns_scim_resource(client: AsyncTestClient) -> None:

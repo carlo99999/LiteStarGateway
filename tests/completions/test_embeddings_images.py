@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from conftest import (
+from litestar.status_codes import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_501_NOT_IMPLEMENTED
+from litestar.testing import AsyncTestClient
+
+from .conftest import (
     ANTHROPIC_VALUES,
     DATABRICKS_VALUES,
     VERTEX_VALUES,
@@ -15,8 +18,6 @@ from conftest import (
     _setup_team,
     _team_usage,
 )
-from litestar.status_codes import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_501_NOT_IMPLEMENTED
-from litestar.testing import AsyncTestClient
 
 
 async def test_embeddings_openai(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:

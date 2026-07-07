@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from conftest import DEV_PASSWORD, _admin, _bearer, _model, _team_and_credential
 from litestar.status_codes import (
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
@@ -10,6 +9,8 @@ from litestar.status_codes import (
     HTTP_403_FORBIDDEN,
 )
 from litestar.testing import AsyncTestClient
+
+from .conftest import DEV_PASSWORD, _admin, _bearer, _model, _team_and_credential
 
 
 async def test_personal_key_is_inference_only(client: AsyncTestClient) -> None:

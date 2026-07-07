@@ -5,10 +5,11 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from conftest import _account
 
 from litestar_gateway.application.user_service import UserService
 from litestar_gateway.domain.exceptions import InvalidCredentials, PermissionDenied, UserNotFound
+
+from .conftest import _account
 
 
 async def test_set_user_active_disables_and_revokes(service: UserService) -> None:

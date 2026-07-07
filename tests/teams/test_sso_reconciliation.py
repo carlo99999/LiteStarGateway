@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from conftest import _now, _user
-
 from litestar_gateway.domain.entities import Team, TeamMembership, TeamRole
+
+from .conftest import _now, _user
 
 
 async def _governed_team(repos):  # noqa: ANN001, ANN202

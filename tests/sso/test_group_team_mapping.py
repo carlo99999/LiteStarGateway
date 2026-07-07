@@ -6,13 +6,14 @@ import dataclasses
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from conftest import FakeIdP, _callback, _create_team, _identity, _settings, _team_membership
 from litestar.testing import AsyncTestClient
 
 from litestar_gateway.app import create_app
 from litestar_gateway.config import TeamGrant
 from litestar_gateway.domain.entities import TeamRole
 from litestar_gateway.infrastructure.web.session.sso import _resolve_team_grants
+
+from .conftest import FakeIdP, _callback, _create_team, _identity, _settings, _team_membership
 
 
 def test_resolve_team_grants_admin_wins_and_governed_is_codomain() -> None:
