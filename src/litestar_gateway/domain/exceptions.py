@@ -136,6 +136,24 @@ class ModelTypeMismatch(DomainError):
     """The model's type does not match the requested operation (e.g. chat vs embeddings)."""
 
 
+class RouterNotFound(DomainError):
+    """No router (virtual model) exists for the given id/name in the team."""
+
+
+class RouterNameExists(DomainError):
+    """A router or model with this name already exists in the team."""
+
+
+class InvalidRouterConfig(DomainError):
+    """The router definition is invalid (unknown strategy, bad candidates,
+    default_model not among candidates, ...)."""
+
+
+class NoRoutableCandidate(DomainError):
+    """The hard capability filters left zero candidates — a router
+    configuration problem, surfaced clearly instead of guessing a model."""
+
+
 class ServicePrincipalNotFound(DomainError):
     """No such service principal in this team."""
 

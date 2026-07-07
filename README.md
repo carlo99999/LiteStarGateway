@@ -270,6 +270,15 @@ on their own branch (linked). Order within a phase is a recommendation.
 
 ### v2 (after v1)
 
+- 🟡 **Smart routing** _(phase 1 shipped)_ — admin-defined **virtual models**
+  (`POST /teams/{id}/routers`): N candidate models with declared profiles
+  (quality tier, vision/tools/json_schema, context window, costs); each request
+  is dispatched by a pluggable strategy after hard capability filters. Phase 1
+  ships the rule-based complexity strategy (7 weighted signals, EN+IT keywords,
+  ported from LiteLLM's complexity router, MIT), decision logging
+  (`routing_decision`), and a strict never-fail policy: any strategy error
+  falls back to the router's `default_model`.
+  [design](docs/next-steps/smart-routing.md)
 - ✅ **Structured outputs** _(shipped)_ — first-class, cross-provider
   `response_format` (and the Responses API's `text.format`): native for
   OpenAI/Azure, translated to a forced tool for Anthropic and to

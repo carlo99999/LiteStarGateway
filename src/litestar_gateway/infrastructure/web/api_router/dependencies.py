@@ -6,6 +6,7 @@ from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.application.completion_service import CompletionService
+from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import InFlightSpend, UsageMeter
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.ports import BudgetRepository, LLMGateway, UsageRepository
@@ -21,6 +22,10 @@ from litestar_gateway.infrastructure.persistence.credential_repository import (
 )
 from litestar_gateway.infrastructure.persistence.model_repository import (
     SQLAlchemyModelRepository,
+)
+from litestar_gateway.infrastructure.persistence.router_repository import (
+    SQLAlchemyRouterRepository,
+    SQLAlchemyRoutingDecisionLog,
 )
 from litestar_gateway.infrastructure.persistence.usage_repository import (
     SQLAlchemyUsageRepository,
@@ -59,6 +64,11 @@ def provide_completion_service(
         models=SQLAlchemyModelRepository(db_session),
         credentials=SQLAlchemyCredentialRepository(db_session, keyring),
         gateway=llm_gateway,
+        router_service=RouterService(
+            routers=SQLAlchemyRouterRepository(db_session),
+            models=SQLAlchemyModelRepository(db_session),
+            decisions=SQLAlchemyRoutingDecisionLog(db_session),
+        ),
         meter=UsageMeter(
             usage=SQLAlchemyUsageRepository(db_session),
             emit_trace=trace_dispatcher.enqueue,

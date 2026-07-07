@@ -52,6 +52,8 @@ from litestar_gateway.infrastructure.web.organizations.dependencies import (
     provide_organization_service,
     provide_team_service,
 )
+from litestar_gateway.infrastructure.web.routing import RouterController
+from litestar_gateway.infrastructure.web.routing.dependencies import provide_router_service
 from litestar_gateway.infrastructure.web.scim import (
     create_scim_router,
     create_scim_tokens_router,
@@ -111,6 +113,7 @@ def create_app(
         OrganizationController,  # platform-admin: orgs + team creation
         TeamController,  # team-admin: members + team-scoped API keys
         ModelController,  # team-admin: team-scoped model deployments
+        RouterController,  # team-admin: smart routers (virtual models)
         ServicePrincipalController,  # team-admin: service principals + their keys
         CredentialController,  # platform-admin: encrypted provider credentials
         AuditController,  # platform-admin: read the audit trail
@@ -129,6 +132,7 @@ def create_app(
             provide_service_principal_service, sync_to_thread=False
         ),
         "scim_service": Provide(provide_scim_service, sync_to_thread=False),
+        "router_service": Provide(provide_router_service, sync_to_thread=False),
         "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
         "budget_repository": Provide(provide_budget_repository, sync_to_thread=False),
         "audit_log": Provide(provide_audit_log, sync_to_thread=False),

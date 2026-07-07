@@ -1,5 +1,16 @@
 # Implementation prompt: Smart Routing
 
+> **Status — phase 1 implemented**: core contract (`domain/routing.py`:
+> `RoutingStrategy` port, `RoutingContext`/`CandidateModel`/`RoutingDecision`),
+> hard capability filters, S1 rule-based complexity strategy
+> (`application/routing/complexity.py`, EN+IT keywords, ported from LiteLLM,
+> MIT), decision persistence (`routing_decision` table), router CRUD
+> (`/teams/{id}/routers`, `models:manage`), §4 fallback policy, and the offline
+> eval harness (`tests/test_routing_eval.py`). Integration point is
+> `CompletionService._prepare` as prescribed. Phases 2-6 (webhook, shadow mode,
+> observability endpoints + savings, embeddings, LLM judge, hybrid, export)
+> are not yet implemented.
+
 You are implementing **smart routing** for this LLM gateway (Litestar, hexagonal architecture, `src/litestar_gateway/`). Smart routing lets an admin define a **virtual model** (a "router") backed by N candidate models; every incoming request to the virtual model is dispatched to the best candidate according to a configurable strategy.
 
 Read `CLAUDE.md`, `CONTRIBUTING.md`, and `domain/ports.py` first and follow the existing conventions: Protocol-based ports in `domain/`, services in `application/`, adapters in `infrastructure/`, dependency injection everywhere, full typing, tests mirroring the source tree.

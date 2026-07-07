@@ -33,6 +33,12 @@ from litestar_gateway.domain.entities import (
     UsageEvent,
     User,
 )
+from litestar_gateway.domain.routing import (
+    CandidateModel,
+    QualityTier,
+    RouterConfig,
+    RoutingDecisionRecord,
+)
 
 
 class UserModel(base.UUIDAuditBase):
@@ -150,6 +156,81 @@ class ScimTokenModel(base.UUIDAuditBase):
             token_hash=self.token_hash,
             created_at=self.created_at,
             revoked_at=self.revoked_at,
+        )
+
+
+class RouterModel(base.UUIDAuditBase):
+    __tablename__ = "router"
+    __table_args__ = (UniqueConstraint("team_id", "name"),)
+
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    name: Mapped[str] = mapped_column(index=True)
+    # Candidate profiles as declared by the admin (see domain/routing.py).
+    candidates: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    default_model: Mapped[str] = mapped_column()
+    strategy: Mapped[str] = mapped_column()
+    strategy_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    shadow_strategy: Mapped[str | None] = mapped_column(default=None)
+    enabled: Mapped[bool] = mapped_column(default=True)
+
+    def to_entity(self) -> RouterConfig:
+        return RouterConfig(
+            id=self.id,
+            team_id=self.team_id,
+            name=self.name,
+            candidates=tuple(
+                CandidateModel(
+                    model_name=c["model_name"],
+                    description=c.get("description", ""),
+                    quality_tier=QualityTier(c["quality_tier"]),
+                    supports_vision=c.get("supports_vision", False),
+                    supports_tools=c.get("supports_tools", False),
+                    supports_json_schema=c.get("supports_json_schema", False),
+                    context_window_tokens=c.get("context_window_tokens"),
+                    input_cost_per_token=c.get("input_cost_per_token"),
+                    output_cost_per_token=c.get("output_cost_per_token"),
+                )
+                for c in self.candidates
+            ),
+            default_model=self.default_model,
+            strategy=self.strategy,
+            strategy_config=self.strategy_config,
+            enabled=self.enabled,
+            created_at=self.created_at,
+            shadow_strategy=self.shadow_strategy,
+        )
+
+
+class RoutingDecisionModel(base.UUIDAuditBase):
+    __tablename__ = "routing_decision"
+
+    team_id: Mapped[UUID] = mapped_column(index=True)
+    router_name: Mapped[str] = mapped_column(index=True)
+    strategy: Mapped[str] = mapped_column()
+    chosen_model: Mapped[str] = mapped_column()
+    tier: Mapped[str | None] = mapped_column(default=None)
+    score: Mapped[float | None] = mapped_column(default=None)
+    signals: Mapped[list[str]] = mapped_column(JSON, default=list)
+    decision_ms: Mapped[float] = mapped_column(default=0.0)
+    is_shadow: Mapped[bool] = mapped_column(default=False)
+    fallback_used: Mapped[bool] = mapped_column(default=False)
+    api_key_id: Mapped[UUID | None] = mapped_column(default=None)
+
+    def to_entity(self) -> RoutingDecisionRecord:
+        return RoutingDecisionRecord(
+            id=self.id,
+            team_id=self.team_id,
+            router_name=self.router_name,
+            strategy=self.strategy,
+            chosen_model=self.chosen_model,
+            tier=self.tier,
+            score=self.score,
+            signals=tuple(self.signals),
+            decision_ms=self.decision_ms,
+            is_shadow=self.is_shadow,
+            fallback_used=self.fallback_used,
+            api_key_id=self.api_key_id,
+            created_at=self.created_at,
         )
 
 
