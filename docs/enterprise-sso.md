@@ -1,10 +1,12 @@
 # Design doc — Enterprise: SSO, SCIM, RBAC, audit
 
 > **Status:** OIDC SSO implemented (`infrastructure/sso/oidc.py`,
-> `infrastructure/web/session/sso.py`) and the audit log is implemented
+> `infrastructure/web/session/sso.py`), the audit log is implemented
 > (`infrastructure/persistence/audit_repository.py`, `infrastructure/web/audit/`,
-> wired into invites / password-reset / unlock / set-active). SCIM, extended RBAC,
-> and SAML remain parked. The rest of this doc is the broader enterprise plan.
+> wired into invites / password-reset / unlock / set-active), and SCIM 2.0 Users
+> provisioning is implemented (`application/scim_service.py`,
+> `infrastructure/web/scim/`). Extended RBAC and SAML remain parked. The rest of
+> this doc is the broader enterprise plan.
 
 ## 0. OIDC SSO — implementation plan (refined after studying LiteLLM)
 
@@ -97,15 +99,32 @@ Config: providers registered per deployment (or per organization for true
 multi-tenant SSO) — client id/secret, discovery URL / SAML metadata, allowed
 domains.
 
-## 3. SCIM — provisioning / deprovisioning
+## 3. SCIM — provisioning / deprovisioning — **implemented (Users)**
 
-- Implement the **SCIM 2.0** `/scim/v2/Users` (and `/Groups`) endpoints so the
-  IdP can create/update/**deactivate** users automatically. Deactivation must
-  disable login and bump `token_version` (revoke sessions).
-- Auth for SCIM: a dedicated provisioning token (admin-issued), separate from user
-  JWTs and `lsk_` keys.
-- Maps onto existing `User`/`TeamMembership` tables; adds an `external_id` and an
-  `is_active` flag to `User`.
+- **SCIM 2.0 `/scim/v2/Users`**: create, read, list with `userName eq` /
+  `externalId eq` filters (the matching queries Entra/Okta run),
+  `startIndex`/`count` pagination, PUT/PATCH (incl. Entra's no-path
+  `{"op": "Replace", "value": {...}}` form and `"True"/"False"` string
+  booleans), and DELETE → **deactivate** (never a hard delete: audit/usage
+  history keeps its actor). Deactivation disables login, bumps `token_version`
+  (revokes sessions) and revokes the user's personal API keys — the same
+  semantics as the admin's `PATCH /users/{id}`.
+  `GET /scim/v2/ServiceProviderConfig` declares the capabilities.
+- **Auth**: a dedicated provisioning token, minted by a platform admin
+  (`POST /scim-tokens`, plaintext shown once, hash at rest like invites; list
+  via `GET`, revoke via `DELETE /scim-tokens/{id}`) — separate from user JWTs
+  and `lsk_` keys. Mint/revoke and every SCIM mutation are audited (actor
+  `scim:<token-name>`).
+- **Model**: `User` gains `external_id` (unique — the IdP's SCIM id);
+  `is_active` already existed. SCIM-created accounts get an unknowable random
+  password — they authenticate via SSO; an existing password/SSO account is
+  adopted by the IdP through the filter-then-PATCH flow (Entra/Okta's standard
+  matching).
+- **Guard rails**: SCIM cannot deactivate a platform admin (the gateway, not
+  the IdP, governs admins — the same philosophy as the upgrade-only admin
+  flag); demote first via `PATCH /users/{id}/admin`. `/Groups` is deliberately
+  not implemented — team membership is managed in the gateway (§4) — and is
+  declared unsupported to the IdP.
 
 ## 4. Platform role & admin — how SSO maps to authorization — **implemented**
 
@@ -191,8 +210,8 @@ on-prem AD). Okta/Keycloak/Google typically emit the name directly.
   caller-computed flag; `set_admin` flips it for the manual endpoint.
 - Audit: promote/demote emit `user.grant_admin` / `user.revoke_admin`.
 
-Not yet done: per-org (rather than global) admin groups, and SCIM-driven
-provisioning/deprovisioning (§3).
+Not yet done: per-org (rather than global) admin groups. SCIM-driven
+provisioning/deprovisioning is implemented (§3).
 
 ## 5. Extended RBAC
 

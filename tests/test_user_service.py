@@ -120,6 +120,24 @@ class FakeUserRepository:
                     user, failed_login_attempts=0, locked_until=None, lockout_cycles=0
                 )
 
+    async def get_by_external_id(self, external_id: str) -> User | None:
+        return next((u for u in self._by_email.values() if u.external_id == external_id), None)
+
+    async def list(self, *, offset: int, limit: int) -> list[User]:
+        users = sorted(self._by_email.values(), key=lambda u: (u.created_at, str(u.id)))
+        return users[offset : offset + limit]
+
+    async def update_scim_identity(
+        self, user_id: UUID, email: str, external_id: str | None
+    ) -> User:
+        for old_email, user in self._by_email.items():
+            if user.id == user_id:
+                updated = dataclasses.replace(user, email=email, external_id=external_id)
+                del self._by_email[old_email]
+                self._by_email[email] = updated
+                return updated
+        raise AssertionError(f"no user {user_id}")
+
 
 class FakeInviteRepository:
     def __init__(self) -> None:

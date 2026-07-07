@@ -20,6 +20,19 @@ class UserRepository(Protocol):
 
     async def get_by_sso_subject(self, subject: str) -> User | None: ...
 
+    async def get_by_external_id(self, external_id: str) -> User | None: ...
+
+    async def list(self, *, offset: int, limit: int) -> list[User]:
+        """Users in a stable order (creation time) for paged listing."""
+        ...
+
+    async def update_scim_identity(
+        self, user_id: UUID, email: str, external_id: str | None
+    ) -> User:
+        """Set the SCIM-managed identity attributes (email/externalId), returning
+        the updated user. Raises EmailAlreadyRegistered on a uniqueness clash."""
+        ...
+
     async def count(self) -> int: ...
 
     async def set_active(self, user_id: UUID, is_active: bool) -> None:

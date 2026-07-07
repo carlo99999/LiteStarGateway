@@ -24,6 +24,7 @@ from litestar_gateway.domain.entities import (
     Organization,
     PasswordReset,
     Provider,
+    ScimToken,
     SecretKey,
     ServicePrincipal,
     Team,
@@ -45,6 +46,9 @@ class UserModel(base.UUIDAuditBase):
     # accounts). Unique so two identities can't bind to the same local account.
     sso_subject: Mapped[str | None] = mapped_column(default=None, unique=True, index=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # The IdP's SCIM externalId, once SCIM-provisioned/adopted. Unique so two IdP
+    # records can't bind to the same local account.
+    external_id: Mapped[str | None] = mapped_column(default=None, unique=True, index=True)
     failed_login_attempts: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[datetime | None] = mapped_column(default=None)
     lockout_cycles: Mapped[int] = mapped_column(default=0)
@@ -59,6 +63,7 @@ class UserModel(base.UUIDAuditBase):
             token_version=self.token_version,
             sso_subject=self.sso_subject,
             is_active=self.is_active,
+            external_id=self.external_id,
             failed_login_attempts=self.failed_login_attempts,
             locked_until=self.locked_until,
             lockout_cycles=self.lockout_cycles,
@@ -125,6 +130,23 @@ class PasswordResetModel(base.UUIDAuditBase):
             created_at=self.created_at,
             expires_at=self.expires_at,
             used_at=self.used_at,
+        )
+
+
+class ScimTokenModel(base.UUIDAuditBase):
+    __tablename__ = "scim_token"
+
+    name: Mapped[str] = mapped_column()
+    token_hash: Mapped[str] = mapped_column(unique=True, index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(default=None)
+
+    def to_entity(self) -> ScimToken:
+        return ScimToken(
+            id=self.id,
+            name=self.name,
+            token_hash=self.token_hash,
+            created_at=self.created_at,
+            revoked_at=self.revoked_at,
         )
 
 

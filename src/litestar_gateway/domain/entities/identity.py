@@ -36,6 +36,9 @@ class User:
     # A disabled account cannot authenticate (login JWTs are rejected). Toggled by
     # a platform admin; disabling also revokes existing sessions (token_version bump).
     is_active: bool = True
+    # The IdP's SCIM `externalId` for this account, once provisioned/adopted via
+    # SCIM. None for accounts the IdP does not manage.
+    external_id: str | None = None
     # Per-account brute-force defense: consecutive failed password logins, and a
     # temporary lock once the threshold is hit. Reset on successful login.
     failed_login_attempts: int = 0
@@ -137,4 +140,29 @@ class IssuedPasswordReset:
     """Result of creating a reset: the entity plus the one-time token."""
 
     reset: PasswordReset
+    token: str
+
+
+@dataclass(frozen=True)
+class ScimToken:
+    """An admin-issued SCIM provisioning token — the IdP's credential for the
+    /scim/v2 surface. Only the token hash is persisted. It does not expire (the
+    IdP holds it long-term); rotation is an explicit admin revoke + re-mint."""
+
+    id: UUID
+    name: str
+    token_hash: str
+    created_at: datetime
+    revoked_at: datetime | None
+
+    @property
+    def is_usable(self) -> bool:
+        return self.revoked_at is None
+
+
+@dataclass(frozen=True)
+class IssuedScimToken:
+    """Result of minting a SCIM token: the entity plus the one-time plaintext."""
+
+    scim_token: ScimToken
     token: str

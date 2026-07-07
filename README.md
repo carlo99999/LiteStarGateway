@@ -247,8 +247,16 @@ on their own branch (linked). Order within a phase is a recommendation.
   the IdP `sub`, verified email required) and mints our JWT; an IdP admin group
   maps to platform admin and is re-synced on every login. Registered only when
   `OIDC_DISCOVERY_URL` is set. Design ported from LiteLLM's OIDC SSO (MIT), no
-  code copied. _Follow-ups: group→team mapping, SCIM, SAML, audit,
-  per-org SSO, fine-grained RBAC._
+  code copied. _Follow-ups: group→team mapping, SAML, per-org SSO,
+  fine-grained RBAC._
+  [design](docs/enterprise-sso.md)
+- ✅ **SCIM 2.0 provisioning** _(shipped)_ — `/scim/v2/Users` (create, read,
+  list+filter, PUT/PATCH, deactivate-on-DELETE) so the IdP provisions and —
+  critically — **deprovisions** accounts without waiting for a login: deactivation
+  revokes sessions and personal API keys. Authenticated by admin-minted
+  provisioning tokens (`POST /scim-tokens`, hashed at rest, revocable, audited).
+  Platform admins can't be deactivated via SCIM (gateway governs admins). Groups
+  are declared unsupported — team membership stays gateway-managed.
   [design](docs/enterprise-sso.md)
 - ✅ **Test coverage gate** _(shipped)_ — CI enforces 80% via `pytest --cov-fail-under=80` ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 - ✅ **Dependency CVE scanning** _(shipped)_ — CI runs `pip-audit` on every PR ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
