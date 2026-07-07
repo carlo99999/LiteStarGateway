@@ -15,6 +15,7 @@ from litestar.params import FromPath, FromQuery
 
 from litestar_gateway.application.model_service import ModelService
 from litestar_gateway.application.team_service import TeamService
+from litestar_gateway.domain.authorization import Permission
 from litestar_gateway.domain.entities import Principal
 from litestar_gateway.domain.pagination import resolve_page
 from litestar_gateway.domain.ports import AuditLog
@@ -52,7 +53,9 @@ class ModelController(Controller):
         model_service: NamedDependency[ModelService],
         audit_log: NamedDependency[AuditLog],
     ) -> ModelResponse:
-        await team_service.ensure_principal_can_manage_team(principal, team_id)
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.MODELS_MANAGE
+        )
         model = await model_service.create(
             team_id=team_id,
             name=data.name,
@@ -89,7 +92,9 @@ class ModelController(Controller):
         limit: FromQuery[int | None] = None,
         offset: FromQuery[int | None] = None,
     ) -> list[ModelResponse]:
-        await team_service.ensure_principal_can_manage_team(principal, team_id)
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.MODELS_READ
+        )
         page_limit, page_offset = resolve_page(limit, offset)
         models = await model_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
         return [ModelResponse.from_entity(m) for m in models]
@@ -110,7 +115,9 @@ class ModelController(Controller):
         model_service: NamedDependency[ModelService],
         audit_log: NamedDependency[AuditLog],
     ) -> ModelResponse:
-        await team_service.ensure_principal_can_manage_team(principal, team_id)
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.MODELS_MANAGE
+        )
         model = await model_service.update(
             team_id,
             model_id,
@@ -145,7 +152,9 @@ class ModelController(Controller):
         model_service: NamedDependency[ModelService],
         audit_log: NamedDependency[AuditLog],
     ) -> None:
-        await team_service.ensure_principal_can_manage_team(principal, team_id)
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.MODELS_MANAGE
+        )
         await model_service.delete(team_id, model_id)
         await record_audit(
             audit_log,

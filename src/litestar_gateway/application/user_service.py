@@ -364,6 +364,20 @@ class UserService:
             raise UserNotFound(str(user_id))
         return updated
 
+    async def set_user_auditor(self, actor: User, user_id: UUID, is_auditor: bool) -> User:
+        """Platform-admin grants or revokes the read-only platform-auditor role.
+        No self-guard: unlike the admin flag, dropping auditor from yourself
+        cannot lock anyone out of anything."""
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        if await self._users.get(user_id) is None:
+            raise UserNotFound(str(user_id))
+        await self._users.set_auditor(user_id, is_auditor)
+        updated = await self._users.get(user_id)
+        if updated is None:  # pragma: no cover - just set it
+            raise UserNotFound(str(user_id))
+        return updated
+
     async def set_user_admin(self, actor: User, user_id: UUID, is_admin: bool) -> User:
         """Platform-admin grants or revokes another user's platform-admin role. This
         is the only path that *demotes* an admin — SSO group / DEFAULT_ROLE sync is

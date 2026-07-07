@@ -1,6 +1,6 @@
 """Team membership management + team-scoped API keys.
 
-Authorization is enforced by `TeamService.ensure_can_manage_team` (platform
+Authorization is enforced by `TeamService.ensure_team_permission` (platform
 admin or team admin). Domain errors are mapped to HTTP by the central handler.
 """
 
@@ -15,6 +15,7 @@ from litestar.params import FromPath, FromQuery
 
 from litestar_gateway.application.service import APIKeyService
 from litestar_gateway.application.team_service import TeamService
+from litestar_gateway.domain.authorization import Permission
 from litestar_gateway.domain.budget import window_start
 from litestar_gateway.domain.entities import Budget, BudgetWindow, KeyScope, Principal, User
 from litestar_gateway.domain.exceptions import BudgetNotFound, InvalidBudget, InvalidKeyScope
@@ -155,7 +156,7 @@ class TeamController(Controller):
         api_key_service: NamedDependency[APIKeyService],
         audit_log: NamedDependency[AuditLog],
     ) -> CreatedKeyResponse:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_team_permission(current_user, team_id, Permission.KEYS_ISSUE)
         try:
             scope = KeyScope(data.scope)
         except ValueError:
@@ -185,7 +186,7 @@ class TeamController(Controller):
         limit: FromQuery[int | None] = None,
         offset: FromQuery[int | None] = None,
     ) -> list[KeyResponse]:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_team_permission(current_user, team_id, Permission.KEYS_READ)
         page_limit, page_offset = resolve_page(limit, offset)
         keys = await api_key_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
         return [KeyResponse.from_entity(k) for k in keys]
@@ -208,7 +209,9 @@ class TeamController(Controller):
         """Every API key of the team — active and revoked — with its accumulated
         token/cost totals, so past keys and their spend stay visible.
         Accepts a JWT or a management-scoped API key (own team only)."""
-        await team_service.ensure_principal_can_manage_team(principal, team_id)
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.USAGE_READ
+        )
         page_limit, page_offset = resolve_page(limit, offset)
         keys = await api_key_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
         spend = {s.api_key_id: s for s in await usage_repository.spend_by_api_key(team_id)}
@@ -225,7 +228,7 @@ class TeamController(Controller):
         api_key_service: NamedDependency[APIKeyService],
         audit_log: NamedDependency[AuditLog],
     ) -> None:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_team_permission(current_user, team_id, Permission.KEYS_ISSUE)
         await api_key_service.revoke_for_team(team_id, key_id)
         await record_audit(
             audit_log,
@@ -248,7 +251,9 @@ class TeamController(Controller):
     ) -> BudgetResponse:
         """The team's spend cap plus its current-window spend and remainder.
         Accepts a JWT or a management-scoped API key (own team only)."""
-        await team_service.ensure_principal_can_manage_team(principal, team_id)
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.BUDGET_READ
+        )
         budget = await budget_repository.get(team_id)
         if budget is None:
             raise BudgetNotFound(f"Team {team_id} has no budget configured")
@@ -274,7 +279,9 @@ class TeamController(Controller):
     ) -> BudgetResponse:
         """Create or replace the team's spend cap. Platform-admin only — a team
         admin must not be able to raise their own limit."""
-        await team_service.ensure_can_manage_team(current_admin, team_id)  # team must exist
+        await team_service.ensure_team_permission(
+            current_admin, team_id, Permission.BUDGET_READ
+        )  # team must exist
         budget = await budget_repository.set(_parse_budget(data, team_id))
         await record_audit(
             audit_log,
@@ -304,7 +311,7 @@ class TeamController(Controller):
         audit_log: NamedDependency[AuditLog],
     ) -> None:
         """Remove the team's spend cap. Platform-admin only."""
-        await team_service.ensure_can_manage_team(current_admin, team_id)
+        await team_service.ensure_team_permission(current_admin, team_id, Permission.BUDGET_READ)
         await budget_repository.remove(team_id)
         await record_audit(
             audit_log,
@@ -330,7 +337,9 @@ class TeamController(Controller):
         """Per-model token/cost totals for the team. Optional `?model=` and
         `?api_key_id=` query filters; unfiltered returns every model, paged.
         Accepts a JWT or a management-scoped API key (own team only)."""
-        await team_service.ensure_principal_can_manage_team(principal, team_id)
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.USAGE_READ
+        )
         page_limit, page_offset = resolve_page(limit, offset)
         aggregates = await usage_repository.aggregate(
             team_id,

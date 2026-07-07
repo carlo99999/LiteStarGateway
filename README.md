@@ -248,7 +248,7 @@ on their own branch (linked). Order within a phase is a recommendation.
   maps to platform admin (upgrade-only), and `SSO_TEAM_MAPPING` optionally maps
   IdP groups to team memberships, reconciled on every login. Registered only when
   `OIDC_DISCOVERY_URL` is set. Design ported from LiteLLM's OIDC SSO (MIT), no
-  code copied. _Follow-ups: SAML, per-org SSO, fine-grained RBAC._
+  code copied. _Follow-ups: SAML, per-org SSO._
   [design](docs/enterprise-sso.md)
 - ✅ **SCIM 2.0 provisioning** _(shipped)_ — `/scim/v2/Users` (create, read,
   list+filter, PUT/PATCH, deactivate-on-DELETE) so the IdP provisions and —
@@ -257,6 +257,13 @@ on their own branch (linked). Order within a phase is a recommendation.
   provisioning tokens (`POST /scim-tokens`, hashed at rest, revocable, audited).
   Platform admins can't be deactivated via SCIM (gateway governs admins). Groups
   are declared unsupported — team membership stays gateway-managed.
+  [design](docs/enterprise-sso.md)
+- ✅ **Extended RBAC** _(shipped)_ — declarative roles → permissions
+  (`domain/authorization.py`), centrally enforced. Team roles beyond
+  admin/member: `model-manager`, `key-issuer`, `billing-viewer` (one capability
+  domain each, assignable via the team API or `SSO_TEAM_MAPPING`), plus a
+  read-only **platform auditor** (`PATCH /users/{id}/auditor`) who sees the
+  audit log and every team's usage/spend without any write access.
   [design](docs/enterprise-sso.md)
 - ✅ **Test coverage gate** _(shipped)_ — CI enforces 80% via `pytest --cov-fail-under=80` ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 - ✅ **Dependency CVE scanning** _(shipped)_ — CI runs `pip-audit` on every PR ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).

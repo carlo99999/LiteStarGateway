@@ -4,8 +4,15 @@ from enum import StrEnum
 
 
 class TeamRole(StrEnum):
+    """A user's role in one team. `admin` and `member` are the classic pair;
+    the extended roles grant a member one capability domain (see
+    `domain/authorization.py` for the role → permission mapping)."""
+
     ADMIN = "admin"
     MEMBER = "member"
+    MODEL_MANAGER = "model-manager"
+    KEY_ISSUER = "key-issuer"
+    BILLING_VIEWER = "billing-viewer"
 
 
 class KeyPurpose(StrEnum):

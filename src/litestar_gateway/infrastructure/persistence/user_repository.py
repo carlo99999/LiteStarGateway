@@ -28,6 +28,7 @@ class SQLAlchemyUserRepository:
             sso_subject=user.sso_subject,
             is_active=user.is_active,
             external_id=user.external_id,
+            is_auditor=user.is_auditor,
         )
         self._session.add(model)
         try:
@@ -48,6 +49,13 @@ class SQLAlchemyUserRepository:
             values["token_version"] = UserModel.token_version + 1
         await self._session.execute(
             update(UserModel).where(UserModel.id == user_id).values(**values)
+        )
+        await self._session.commit()
+
+    async def set_auditor(self, user_id: UUID, is_auditor: bool) -> None:
+        # Like set_admin: read live per request, effective on the next call.
+        await self._session.execute(
+            update(UserModel).where(UserModel.id == user_id).values(is_auditor=is_auditor)
         )
         await self._session.commit()
 

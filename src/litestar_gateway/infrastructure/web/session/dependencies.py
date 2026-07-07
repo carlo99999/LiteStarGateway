@@ -56,3 +56,16 @@ async def provide_current_admin(
     if not user.is_admin:
         raise PermissionDeniedException("Admin privileges required")
     return user
+
+
+async def provide_audit_reader(
+    request: Request,
+    keyring: NamedDependency[Keyring],
+    user_service: NamedDependency[UserService],
+) -> User:
+    """Like `provide_current_user`, but requires the platform-admin or the
+    read-only platform-auditor role (403 otherwise)."""
+    user = await provide_current_user(request, keyring, user_service)
+    if not (user.is_admin or user.is_auditor):
+        raise PermissionDeniedException("Admin or auditor privileges required")
+    return user

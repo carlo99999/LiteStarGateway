@@ -11,6 +11,7 @@ from litestar_gateway.infrastructure.web.users.password_reset import (
 )
 from litestar_gateway.infrastructure.web.users.set_active import set_user_active
 from litestar_gateway.infrastructure.web.users.set_admin import set_user_admin
+from litestar_gateway.infrastructure.web.users.set_auditor import set_user_auditor
 from litestar_gateway.infrastructure.web.users.signup import signup
 from litestar_gateway.infrastructure.web.users.unlock import unlock_user
 
@@ -27,6 +28,7 @@ def create_users_router() -> Router:
             reset_password,
             set_user_active,
             set_user_admin,
+            set_user_auditor,
             unlock_user,
         ],
         tags=["users"],

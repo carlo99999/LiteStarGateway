@@ -1,7 +1,7 @@
 """Application service for team-scoped model deployments.
 
 Authorization (platform admin or team admin) is enforced by the caller via
-`TeamService.ensure_can_manage_team`; this service owns the model invariants:
+`TeamService.ensure_principal_team_permission`; this service owns the model invariants:
 unique name per team and provider == referenced credential's provider.
 """
 

@@ -88,6 +88,11 @@ class FakeUserRepository:
             if user.id == user_id:
                 self._by_email[email] = dataclasses.replace(user, is_admin=is_admin)
 
+    async def set_auditor(self, user_id: UUID, is_auditor: bool) -> None:
+        for email, user in self._by_email.items():
+            if user.id == user_id:
+                self._by_email[email] = dataclasses.replace(user, is_auditor=is_auditor)
+
     async def get(self, user_id: UUID) -> User | None:
         return next((u for u in self._by_email.values() if u.id == user_id), None)
 
