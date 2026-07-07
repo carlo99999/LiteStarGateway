@@ -216,6 +216,7 @@ on-prem AD). Okta/Keycloak/Google typically emit the name directly.
 
 Not yet done: per-org (rather than global) admin groups. SCIM-driven
 provisioning/deprovisioning is implemented (§3).
+
 ## 5. Group → team / role mapping — **implemented**
 
 Configured via `SSO_TEAM_MAPPING` (env, JSON): IdP group → list of

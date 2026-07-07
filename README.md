@@ -245,10 +245,10 @@ on their own branch (linked). Order within a phase is a recommendation.
   (Authlib; works with Google/Microsoft/Okta/Keycloak via their discovery URL).
   `GET /sso/login` → IdP → `GET /sso/callback` JIT-provisions the user (bound to
   the IdP `sub`, verified email required) and mints our JWT; an IdP admin group
-  maps to platform admin and is re-synced on every login. Registered only when
+  maps to platform admin (upgrade-only), and `SSO_TEAM_MAPPING` optionally maps
+  IdP groups to team memberships, reconciled on every login. Registered only when
   `OIDC_DISCOVERY_URL` is set. Design ported from LiteLLM's OIDC SSO (MIT), no
-  code copied. _Follow-ups: group→team mapping, SAML, per-org SSO,
-  fine-grained RBAC._
+  code copied. _Follow-ups: SAML, per-org SSO, fine-grained RBAC._
   [design](docs/enterprise-sso.md)
 - ✅ **SCIM 2.0 provisioning** _(shipped)_ — `/scim/v2/Users` (create, read,
   list+filter, PUT/PATCH, deactivate-on-DELETE) so the IdP provisions and —
