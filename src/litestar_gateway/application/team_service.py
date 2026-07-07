@@ -213,3 +213,53 @@ class TeamService:
             raise LastTeamAdmin("Cannot remove the last admin of the team")
         async with self._unit_of_work():
             await self._memberships.remove(team_id, user_id)
+
+    async def reconcile_sso_memberships(
+        self,
+        user_id: UUID,
+        desired: dict[UUID, TeamRole],
+        governed_team_ids: set[UUID],
+    ) -> None:
+        """Sync an SSO user's memberships to their IdP groups (no human actor).
+
+        This is a system operation invoked from the SSO login path, so it skips
+        the actor authorization checks the other mutators enforce — the caller
+        derives `desired`/`governed_team_ids` from the verified id_token groups
+        and the trusted SSO_TEAM_MAPPING.
+
+        `governed_team_ids` is the mapping's codomain — every team SSO can assign.
+        For those teams membership is dictated by the user's groups: add the ones
+        `desired` grants, update a stale role, remove the ones no longer granted.
+        Teams outside this set are never touched, so memberships added manually
+        (to teams the mapping doesn't govern) survive. The last admin of a team is
+        never stripped or demoted — that would leave the team unmanageable; such a
+        membership is left as-is and can be changed through the normal team API.
+        """
+        async with self._unit_of_work():
+            for team_id in governed_team_ids:
+                if await self._teams.get(team_id) is None:
+                    continue  # mapping references a since-deleted team
+                existing = await self._memberships.get(team_id, user_id)
+                role = desired.get(team_id)
+                if role is None:
+                    if existing is not None and not (
+                        existing.is_admin and await self._is_last_admin(team_id, user_id)
+                    ):
+                        await self._memberships.remove(team_id, user_id)
+                    continue
+                if existing is None:
+                    await self._memberships.add(
+                        TeamMembership(
+                            id=uuid4(),
+                            team_id=team_id,
+                            user_id=user_id,
+                            role=role,
+                            created_at=_now(),
+                        )
+                    )
+                elif existing.role is not role and not (
+                    existing.is_admin
+                    and role is not TeamRole.ADMIN
+                    and await self._is_last_admin(team_id, user_id)
+                ):
+                    await self._memberships.update(dataclasses.replace(existing, role=role))
