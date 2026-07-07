@@ -1,8 +1,8 @@
 """Creation-time validation of credential ``values`` per provider.
 
 Mirrors the field contract documented on ``POST /credentials`` (and the keys
-each LLM adapter actually reads). Providers without an entry (e.g. ``bedrock``,
-which has no adapter yet) are accepted without validation.
+each LLM adapter actually reads). Providers without an entry are accepted
+without validation.
 """
 
 from __future__ import annotations
@@ -25,6 +25,10 @@ _FIELDS: dict[Provider, tuple[frozenset[str], frozenset[str]]] = {
         frozenset({"vertex_credentials"}),
     ),
     Provider.DATABRICKS: (frozenset({"api_key", "api_base"}), frozenset()),
+    Provider.BEDROCK: (
+        frozenset({"region", "aws_access_key_id", "aws_secret_access_key"}),
+        frozenset({"aws_session_token"}),
+    ),
 }
 
 

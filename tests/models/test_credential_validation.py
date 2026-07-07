@@ -66,6 +66,19 @@ VALID = [
         {"vertex_project": "p", "vertex_location": "us-central1", "vertex_credentials": "{}"},
     ),
     ("databricks", {"api_key": "dapi-x", "api_base": "https://w.databricks.com"}),
+    (
+        "bedrock",
+        {"region": "eu-west-1", "aws_access_key_id": "AKIA", "aws_secret_access_key": "s"},
+    ),
+    (
+        "bedrock",
+        {
+            "region": "eu-west-1",
+            "aws_access_key_id": "AKIA",
+            "aws_secret_access_key": "s",
+            "aws_session_token": "tok",
+        },
+    ),
 ]
 
 
@@ -86,6 +99,13 @@ INVALID = [
     ("vertex_ai", {"vertex_project": "p"}),  # missing vertex_location
     ("vertex_ai", {"api_key": "sk-x"}),  # openai-shaped values on vertex
     ("databricks", {"api_key": "dapi-x"}),  # missing api_base
+    # missing region
+    ("bedrock", {"aws_access_key_id": "AKIA", "aws_secret_access_key": "s"}),
+    # litellm-style key the adapter does not read
+    (
+        "bedrock",
+        {"aws_region_name": "us-east-1", "aws_access_key_id": "AKIA", "aws_secret_access_key": "s"},
+    ),
 ]
 
 
@@ -107,9 +127,3 @@ async def test_error_names_the_offending_keys(client: AsyncTestClient) -> None:
     detail = resp.json()["detail"]
     assert "api_base" in detail
     assert "api_version" in detail
-
-
-async def test_provider_without_rules_is_accepted(client: AsyncTestClient) -> None:
-    # bedrock has no field rules yet: accept as before.
-    status = await _create(client, "bedrock-any", "bedrock", {"anything": "goes"})
-    assert status == HTTP_201_CREATED
