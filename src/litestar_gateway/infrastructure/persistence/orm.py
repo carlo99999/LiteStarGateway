@@ -221,6 +221,8 @@ class RoutingDecisionModel(base.UUIDAuditBase):
     alt_output_cost: Mapped[float | None] = mapped_column(default=None)
     prompt_tokens: Mapped[int | None] = mapped_column(default=None)
     completion_tokens: Mapped[int | None] = mapped_column(default=None)
+    user_text: Mapped[str | None] = mapped_column(default=None)
+    system_prompt: Mapped[str | None] = mapped_column(default=None)
 
     def to_entity(self) -> RoutingDecisionRecord:
         return RoutingDecisionRecord(
@@ -243,6 +245,8 @@ class RoutingDecisionModel(base.UUIDAuditBase):
             alt_output_cost=self.alt_output_cost,
             prompt_tokens=self.prompt_tokens,
             completion_tokens=self.completion_tokens,
+            user_text=self.user_text,
+            system_prompt=self.system_prompt,
         )
 
 

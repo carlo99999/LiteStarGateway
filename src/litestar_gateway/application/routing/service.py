@@ -18,6 +18,8 @@ from uuid import UUID, uuid4
 
 from litestar_gateway.application.routing.complexity import ComplexityStrategy
 from litestar_gateway.application.routing.embeddings import EmbeddingsStrategy
+from litestar_gateway.application.routing.hybrid import HybridStrategy
+from litestar_gateway.application.routing.judge import JudgeStrategy
 from litestar_gateway.application.routing.webhook import WebhookStrategy
 from litestar_gateway.domain.entities import ModelType
 from litestar_gateway.domain.exceptions import (
@@ -49,6 +51,8 @@ STRATEGIES: dict[str, type] = {
     "complexity": ComplexityStrategy,
     "webhook": WebhookStrategy,
     "embeddings": EmbeddingsStrategy,
+    "judge": JudgeStrategy,
+    "hybrid": HybridStrategy,
 }
 
 # Hard time budget for a strategy call. The rule-based strategy is local and
@@ -128,10 +132,30 @@ class RouterService:
                 raise InvalidRouterConfig(
                     f"Candidate '{name}' is not an enabled chat model of this team"
                 )
-        if router.strategy == "embeddings":
-            await self._validate_embeddings_config(router, router.strategy_config)
-        if router.shadow_strategy == "embeddings":
-            await self._validate_embeddings_config(router, router.strategy_config.get("shadow", {}))
+        await self._validate_strategy_deps(router, router.strategy, router.strategy_config)
+        if router.shadow_strategy is not None:
+            await self._validate_strategy_deps(
+                router, router.shadow_strategy, router.strategy_config.get("shadow", {})
+            )
+
+    async def _validate_strategy_deps(self, router: RouterConfig, name: str, config: dict) -> None:
+        """Config checks needing repository lookups (pure shape checks already
+        ran via strategy instantiation in _validate)."""
+        if name == "embeddings":
+            await self._validate_embeddings_config(router, config)
+        if name == "judge":
+            await self._validate_judge_config(router, config)
+        if name == "hybrid":
+            shell = HybridStrategy(config)
+            await self._validate_strategy_deps(
+                router, shell.escalation_name, shell.escalation_config
+            )
+
+    async def _validate_judge_config(self, router: RouterConfig, config: dict) -> None:
+        judge_name = config.get("judge_model")
+        model = await self._models.get_by_name(router.team_id, judge_name) if judge_name else None
+        if model is None or not model.enabled or model.type is not ModelType.CHAT:
+            raise InvalidRouterConfig(f"'{judge_name}' is not an enabled chat model of this team")
 
     async def _validate_embeddings_config(self, router: RouterConfig, config: dict) -> None:
         model_name = config.get("embedding_model")
@@ -207,7 +231,7 @@ class RouterService:
         else:
             decision, fallback_used = await self._run_strategy(router, ctx, capable)
 
-        await self._persist(router, decision, fallback_used, api_key_id, capable)
+        await self._persist(router, decision, fallback_used, api_key_id, capable, ctx)
         if router.shadow_strategy is not None and self._shadow_decisions is not None:
             # §6: fire-and-forget — the shadow's would-be decision is persisted
             # alongside the real one, never blocking or failing the request.
@@ -233,6 +257,20 @@ class RouterService:
         )
         return [item["embedding"] for item in response["data"]]
 
+    async def _judge_complete(
+        self, team_id: UUID, model_name: str, request: dict[str, Any]
+    ) -> dict[str, Any]:
+        """One non-streamed chat call to the judge, via the gateway's own port."""
+        if self._gateway is None or self._credentials is None:
+            raise ValueError("judge strategy is not wired (no gateway/credentials)")
+        model = await self._models.get_by_name(team_id, model_name)
+        if model is None or not model.enabled or model.type is not ModelType.CHAT:
+            raise ValueError(f"'{model_name}' is not an enabled chat model of this team")
+        values = await self._credentials.get_values(model.credential_id)
+        if values is None:
+            raise ValueError(f"credential missing for judge model '{model_name}'")
+        return await self._gateway.achat_completion(request, model, values)
+
     def _build_strategy(self, router: RouterConfig, name: str, config: dict[str, Any]):
         if name == "embeddings":
 
@@ -240,6 +278,18 @@ class RouterService:
                 return await self._embed_texts(router.team_id, model_name, texts)
 
             return EmbeddingsStrategy(config, embed=embed)
+        if name == "judge":
+
+            async def complete(model_name: str, request: dict[str, Any]) -> dict[str, Any]:
+                return await self._judge_complete(router.team_id, model_name, request)
+
+            return JudgeStrategy(config, complete=complete)
+        if name == "hybrid":
+            shell = HybridStrategy(config)  # validates margin/escalation name
+            escalation = self._build_strategy(
+                router, shell.escalation_name, shell.escalation_config
+            )
+            return HybridStrategy(config, escalation=escalation)
         return STRATEGIES[name](config)
 
     async def _run_strategy(self, router, ctx, capable) -> tuple[RoutingDecision, bool]:
@@ -288,6 +338,7 @@ class RouterService:
                 decision = await strategy.select(ctx, capable)
             if self._shadow_decisions is None:  # pragma: no cover - guarded by caller
                 return
+            user_text, system_prompt = self._distillation_text(decision, ctx)
             async with self._shadow_decisions() as log:
                 await log.record(
                     RoutingDecisionRecord(
@@ -304,6 +355,8 @@ class RouterService:
                         fallback_used=False,
                         api_key_id=api_key_id,
                         created_at=_now(),
+                        user_text=user_text,
+                        system_prompt=system_prompt,
                     )
                 )
         except Exception:
@@ -381,9 +434,22 @@ class RouterService:
             "decisions_without_usage": without_usage,
         }
 
-    async def _persist(self, router, decision, fallback_used, api_key_id, capable) -> None:
+    @staticmethod
+    def _distillation_text(decision: RoutingDecision, ctx) -> tuple[str | None, str | None]:
+        """§S6: keep the text only for judge decisions and hybrid escalations —
+        the data a distilled classifier trains on. Everything else stays
+        payload-free (privacy default)."""
+        judged = decision.strategy == "judge" or any(
+            "escalated" in signal for signal in decision.signals
+        )
+        if not judged:
+            return None, None
+        return ctx.user_text, ctx.system_prompt
+
+    async def _persist(self, router, decision, fallback_used, api_key_id, capable, ctx) -> None:
         """Decision observability must never fail the request."""
         chosen_in, chosen_out, alt_in, alt_out = self._unit_costs(decision.model_name, capable)
+        user_text, system_prompt = self._distillation_text(decision, ctx)
         record_id = uuid4()
         try:
             await self._decisions.record(
@@ -405,6 +471,8 @@ class RouterService:
                     chosen_output_cost=chosen_out,
                     alt_input_cost=alt_in,
                     alt_output_cost=alt_out,
+                    user_text=user_text,
+                    system_prompt=system_prompt,
                 )
             )
             self.last_decision_record_id = record_id

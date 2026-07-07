@@ -23,8 +23,16 @@
 > (`application/routing/embeddings.py`): routes declared in the strategy
 > config, user text embedded through the gateway's own `LLMGateway` port with
 > the team's embedding model, cosine vs lazily-cached utterance embeddings,
-> below-threshold → `default_model`. Phases 5-6 (LLM judge, hybrid, export)
-> are not yet implemented.
+> below-threshold → `default_model`.
+> **Phase 5 implemented**: S4 LLM judge (`application/routing/judge.py`,
+> constrained json_schema enum over candidate names, versioned prompt, char
+> budget), S5 hybrid gray-zone (`application/routing/hybrid.py`, S1 + judge or
+> webhook escalation within a configurable boundary margin, escalation recorded
+> in signals), and the S6 distillation export
+> (`GET .../decisions/export`, JSONL of judge/escalation decisions with the
+> stored text — the intended path is judge → dataset → small local classifier).
+> Remaining: §8 semantic cache (optional; assess reuse of the S3 embedding
+> path) — training/serving a distilled classifier stays out of scope.
 
 You are implementing **smart routing** for this LLM gateway (Litestar, hexagonal architecture, `src/litestar_gateway/`). Smart routing lets an admin define a **virtual model** (a "router") backed by N candidate models; every incoming request to the virtual model is dispatched to the best candidate according to a configurable strategy.
 
