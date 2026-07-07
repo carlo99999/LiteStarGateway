@@ -125,6 +125,10 @@ class RoutingDecisionRecord:
     # Actual usage, filled in after settlement (None for streams in phase 3).
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    # Distillation data (§S6): stored ONLY for judge decisions and hybrid
+    # escalations, so the judge's calls can train a cheap classifier offline.
+    user_text: str | None = None
+    system_prompt: str | None = None
 
 
 class RoutingStrategy(Protocol):

@@ -116,6 +116,8 @@ class SQLAlchemyRoutingDecisionLog:
                 alt_output_cost=decision.alt_output_cost,
                 prompt_tokens=decision.prompt_tokens,
                 completion_tokens=decision.completion_tokens,
+                user_text=decision.user_text,
+                system_prompt=decision.system_prompt,
             )
         )
         await self._session.commit()

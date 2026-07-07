@@ -7,12 +7,13 @@ a router is a virtual model. Authorization goes through the central
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from litestar import Controller, Request, delete, get, post, put
+from litestar import Controller, Request, Response, delete, get, post, put
 from litestar.di import NamedDependency, Provide
 from litestar.params import FromPath, FromQuery
 
@@ -297,3 +298,48 @@ class RouterController(Controller):
     ) -> dict[str, Any]:
         await team_service.ensure_team_permission(current_user, team_id, Permission.USAGE_READ)
         return await router_service.savings(team_id, router_id)
+
+    @get(
+        "/{team_id:uuid}/routers/{router_id:uuid}/decisions/export",
+        summary="JSONL export of judge/escalation decisions (distillation dataset, §S6)",
+    )
+    async def export_decisions(
+        self,
+        team_id: FromPath[UUID],
+        router_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        router_service: NamedDependency[RouterService],
+        strategy: FromQuery[str | None] = None,
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
+    ) -> Response:
+        """One JSON object per line: {text, system_prompt, chosen_model,
+        strategy, score, signals, timestamp}. Only decisions that stored their
+        text (judge decisions and hybrid escalations) are exported — the
+        intended path is judge → dataset → small local classifier."""
+        await team_service.ensure_team_permission(current_user, team_id, Permission.USAGE_READ)
+        from litestar_gateway.domain.pagination import resolve_page
+
+        page_limit, page_offset = resolve_page(limit, offset)
+        records = await router_service.list_decisions(
+            team_id, router_id, strategy=strategy, limit=page_limit, offset=page_offset
+        )
+        lines = [
+            json.dumps(
+                {
+                    "text": r.user_text,
+                    "system_prompt": r.system_prompt,
+                    "chosen_model": r.chosen_model,
+                    "strategy": r.strategy,
+                    "score": r.score,
+                    "signals": list(r.signals),
+                    "timestamp": r.created_at.isoformat(),
+                },
+                ensure_ascii=False,
+            )
+            for r in records
+            if r.user_text is not None
+        ]
+        body = "\n".join(lines) + ("\n" if lines else "")
+        return Response(body, media_type="application/x-ndjson")
