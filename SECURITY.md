@@ -53,6 +53,6 @@ Out of scope:
 
 Deliberate design decisions and tracked follow-ups are documented in
 [README → Security](README.md#security--known-issues--follow-ups) and in the
-code-review log ([`ISSUES.md`](ISSUES.md)) — please read those before
+code-review log ([`issues/INDEX.md`](issues/INDEX.md)) — please read those before
 reporting, as some behaviors (e.g. platform-global provider credentials) are
 intentional.

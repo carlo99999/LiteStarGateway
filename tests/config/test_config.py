@@ -160,7 +160,7 @@ def test_from_env_zero_metrics_interval_disables_the_publisher(
 
 
 def test_from_env_rejects_negative_metrics_interval(monkeypatch: pytest.MonkeyPatch) -> None:
-    # The only numeric env var that had no validation coverage (ISSUES.md L18).
+    # The only numeric env var that had no validation coverage (issues/round-3.md L18).
     monkeypatch.setenv("MLFLOW_METRICS_INTERVAL", "-5")
     with pytest.raises(InsecureConfigurationError):
         Settings.from_env()
