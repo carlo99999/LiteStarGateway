@@ -280,6 +280,9 @@ on their own branch (linked). Order within a phase is a recommendation.
   falls back to the router's `default_model`. Phase 2 adds the **external
   webhook strategy** (bring your own picker — [contract](docs/routing-webhook.md))
   and **shadow mode** (validate a strategy on live traffic without activating it).
+  Phase 3 adds **decision observability**: per-router decision log, model/tier
+  distribution stats, and **estimated savings** vs the most expensive capable
+  candidate, computed from each request's actual token usage.
   [design](docs/next-steps/smart-routing.md)
 - ✅ **Structured outputs** _(shipped)_ — first-class, cross-provider
   `response_format` (and the Responses API's `text.format`): native for

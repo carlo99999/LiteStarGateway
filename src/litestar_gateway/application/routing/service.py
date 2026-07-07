@@ -31,6 +31,7 @@ from litestar_gateway.domain.ports import (
     RoutingDecisionLogFactory,
 )
 from litestar_gateway.domain.routing import (
+    CandidateModel,
     RouterConfig,
     RoutingDecision,
     RoutingDecisionRecord,
@@ -69,6 +70,9 @@ class RouterService:
         self._models = models
         self._decisions = decisions
         self._shadow_decisions = shadow_decisions
+        # The persisted record id of this request's routing decision (the
+        # service is request-scoped), so settlement can attach actual usage.
+        self.last_decision_record_id: UUID | None = None
 
     # ── CRUD (validated) ─────────────────────────────────────────────────────
 
@@ -172,7 +176,7 @@ class RouterService:
         else:
             decision, fallback_used = await self._run_strategy(router, ctx, capable)
 
-        await self._persist(router, decision, fallback_used, api_key_id)
+        await self._persist(router, decision, fallback_used, api_key_id, capable)
         if router.shadow_strategy is not None and self._shadow_decisions is not None:
             # §6: fire-and-forget — the shadow's would-be decision is persisted
             # alongside the real one, never blocking or failing the request.
@@ -253,12 +257,81 @@ class RouterService:
                 exc_info=True,
             )
 
-    async def _persist(self, router, decision, fallback_used, api_key_id) -> None:
+    @staticmethod
+    def _unit_costs(
+        chosen_name: str, candidates: tuple[CandidateModel, ...]
+    ) -> tuple[float | None, float | None, float | None, float | None]:
+        """(chosen_in, chosen_out, alt_in, alt_out) unit costs for savings (§7):
+        `alt` is the most expensive capable candidate — what the request would
+        have cost without routing. None when profiles carry no costs."""
+        chosen = next((c for c in candidates if c.model_name == chosen_name), None)
+        priced = [c for c in candidates if c.input_cost_per_token is not None]
+        alt = max(
+            priced,
+            key=lambda c: (c.input_cost_per_token or 0) + (c.output_cost_per_token or 0),
+            default=None,
+        )
+        return (
+            chosen.input_cost_per_token if chosen else None,
+            chosen.output_cost_per_token if chosen else None,
+            alt.input_cost_per_token if alt else None,
+            alt.output_cost_per_token if alt else None,
+        )
+
+    async def record_usage(self, prompt_tokens: int, completion_tokens: int) -> None:
+        """Attach actual usage to this request's decision. Never fails the request."""
+        if self.last_decision_record_id is None:
+            return
+        try:
+            await self._decisions.update_usage(
+                self.last_decision_record_id, prompt_tokens, completion_tokens
+            )
+        except Exception:
+            logger.warning("failed to attach usage to routing decision", exc_info=True)
+
+    async def list_decisions(self, team_id: UUID, router_id: UUID, **filters):
+        router = await self.get(team_id, router_id)
+        return await self._decisions.list_decisions(team_id, router.name, **filters)
+
+    async def stats(self, team_id: UUID, router_id: UUID) -> dict[str, Any]:
+        router = await self.get(team_id, router_id)
+        rows = await self._decisions.distribution(team_id, router.name)
+        by_model: dict[str, int] = {}
+        by_tier: dict[str, int] = {}
+        shadow_by_model: dict[str, int] = {}
+        for model_name, tier, is_shadow, count in rows:
+            if is_shadow:
+                shadow_by_model[model_name] = shadow_by_model.get(model_name, 0) + count
+                continue
+            by_model[model_name] = by_model.get(model_name, 0) + count
+            if tier:
+                by_tier[tier] = by_tier.get(tier, 0) + count
+        return {
+            "router": router.name,
+            "total": sum(by_model.values()),
+            "by_model": by_model,
+            "by_tier": by_tier,
+            "shadow_by_model": shadow_by_model,
+        }
+
+    async def savings(self, team_id: UUID, router_id: UUID) -> dict[str, Any]:
+        router = await self.get(team_id, router_id)
+        total, counted, without_usage = await self._decisions.savings(team_id, router.name)
+        return {
+            "router": router.name,
+            "estimated_savings": total,
+            "decisions_counted": counted,
+            "decisions_without_usage": without_usage,
+        }
+
+    async def _persist(self, router, decision, fallback_used, api_key_id, capable) -> None:
         """Decision observability must never fail the request."""
+        chosen_in, chosen_out, alt_in, alt_out = self._unit_costs(decision.model_name, capable)
+        record_id = uuid4()
         try:
             await self._decisions.record(
                 RoutingDecisionRecord(
-                    id=uuid4(),
+                    id=record_id,
                     team_id=router.team_id,
                     router_name=router.name,
                     strategy=decision.strategy,
@@ -271,8 +344,13 @@ class RouterService:
                     fallback_used=fallback_used,
                     api_key_id=api_key_id,
                     created_at=_now(),
+                    chosen_input_cost=chosen_in,
+                    chosen_output_cost=chosen_out,
+                    alt_input_cost=alt_in,
+                    alt_output_cost=alt_out,
                 )
             )
+            self.last_decision_record_id = record_id
         except Exception:
             logger.warning(
                 "router %s: failed to persist routing decision", router.name, exc_info=True

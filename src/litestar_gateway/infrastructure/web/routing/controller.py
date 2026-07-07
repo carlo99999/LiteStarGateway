@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 
 from litestar import Controller, Request, delete, get, post, put
 from litestar.di import NamedDependency, Provide
-from litestar.params import FromPath
+from litestar.params import FromPath, FromQuery
 
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.team_service import TeamService
@@ -114,6 +114,39 @@ class RouterResponse:
         )
 
 
+@dataclass(frozen=True)
+class DecisionResponse:
+    id: UUID
+    strategy: str
+    chosen_model: str
+    tier: str | None
+    score: float | None
+    signals: list[str]
+    decision_ms: float
+    is_shadow: bool
+    fallback_used: bool
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    created_at: datetime
+
+    @classmethod
+    def from_record(cls, r) -> DecisionResponse:
+        return cls(
+            id=r.id,
+            strategy=r.strategy,
+            chosen_model=r.chosen_model,
+            tier=r.tier,
+            score=r.score,
+            signals=list(r.signals),
+            decision_ms=r.decision_ms,
+            is_shadow=r.is_shadow,
+            fallback_used=r.fallback_used,
+            prompt_tokens=r.prompt_tokens,
+            completion_tokens=r.completion_tokens,
+            created_at=r.created_at,
+        )
+
+
 class RouterController(Controller):
     path = "/teams"
     tags = ["routers"]
@@ -202,3 +235,65 @@ class RouterController(Controller):
             target_type="router",
             target_id=router_id,
         )
+
+    @get(
+        "/{team_id:uuid}/routers/{router_id:uuid}/decisions",
+        summary="Routing decisions (most recent first)",
+    )
+    async def list_decisions(
+        self,
+        team_id: FromPath[UUID],
+        router_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        router_service: NamedDependency[RouterService],
+        strategy: FromQuery[str | None] = None,
+        model: FromQuery[str | None] = None,
+        shadow: FromQuery[bool | None] = None,
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
+    ) -> list[DecisionResponse]:
+        await team_service.ensure_team_permission(current_user, team_id, Permission.USAGE_READ)
+        from litestar_gateway.domain.pagination import resolve_page
+
+        page_limit, page_offset = resolve_page(limit, offset)
+        records = await router_service.list_decisions(
+            team_id,
+            router_id,
+            strategy=strategy,
+            chosen_model=model,
+            is_shadow=shadow,
+            limit=page_limit,
+            offset=page_offset,
+        )
+        return [DecisionResponse.from_record(r) for r in records]
+
+    @get(
+        "/{team_id:uuid}/routers/{router_id:uuid}/stats",
+        summary="Request distribution per chosen model / tier",
+    )
+    async def router_stats(
+        self,
+        team_id: FromPath[UUID],
+        router_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        router_service: NamedDependency[RouterService],
+    ) -> dict[str, Any]:
+        await team_service.ensure_team_permission(current_user, team_id, Permission.USAGE_READ)
+        return await router_service.stats(team_id, router_id)
+
+    @get(
+        "/{team_id:uuid}/routers/{router_id:uuid}/savings",
+        summary="Estimated savings vs the most expensive capable candidate",
+    )
+    async def router_savings(
+        self,
+        team_id: FromPath[UUID],
+        router_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        router_service: NamedDependency[RouterService],
+    ) -> dict[str, Any]:
+        await team_service.ensure_team_permission(current_user, team_id, Permission.USAGE_READ)
+        return await router_service.savings(team_id, router_id)

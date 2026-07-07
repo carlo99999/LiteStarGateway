@@ -113,6 +113,15 @@ class RoutingDecisionRecord:
     fallback_used: bool
     api_key_id: UUID | None
     created_at: datetime
+    # Unit costs captured at decision time: the chosen candidate's and the most
+    # expensive capable candidate's ("what this request would have cost").
+    chosen_input_cost: float | None = None
+    chosen_output_cost: float | None = None
+    alt_input_cost: float | None = None
+    alt_output_cost: float | None = None
+    # Actual usage, filled in after settlement (None for streams in phase 3).
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
 
 
 class RoutingStrategy(Protocol):
