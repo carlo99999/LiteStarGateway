@@ -12,6 +12,8 @@ per the existing `_prepare` integration.
 from __future__ import annotations
 
 import random
+from bisect import bisect
+from itertools import accumulate
 from time import perf_counter
 from typing import Any
 
@@ -29,28 +31,27 @@ class WeightedStrategy:
         self, ctx: RoutingContext, candidates: tuple[CandidateModel, ...]
     ) -> RoutingDecision:
         start = perf_counter()
+        weights: list[float] = []
         for candidate in candidates:
-            if not isinstance(candidate.weight, (int, float)) or candidate.weight <= 0:
+            weight = candidate.weight
+            if not isinstance(weight, (int, float)) or weight <= 0:
                 raise ValueError(
                     f"weighted strategy requires a positive 'weight' on every "
-                    f"candidate; '{candidate.model_name}' has {candidate.weight!r}"
+                    f"candidate; '{candidate.model_name}' has {weight!r}"
                 )
-        total = sum(candidate.weight for candidate in candidates)  # type: ignore[misc]
+            weights.append(weight)
 
+        cumulative_weights = list(accumulate(weights))
+        total = cumulative_weights[-1]
         draw = self._random_fn() * total
-        cumulative = 0.0
-        chosen = candidates[-1]
-        for candidate in candidates:
-            cumulative += candidate.weight  # type: ignore[operator]
-            if draw < cumulative:
-                chosen = candidate
-                break
+        index = min(bisect(cumulative_weights, draw), len(candidates) - 1)
+        chosen, chosen_weight = candidates[index], weights[index]
 
         return RoutingDecision(
             model_name=chosen.model_name,
             strategy=STRATEGY_ID,
             tier=None,
-            score=chosen.weight / total,  # type: ignore[operator]
-            signals=(f"weighted pick {chosen.model_name} ({chosen.weight}/{total})",),
+            score=chosen_weight / total,
+            signals=(f"weighted pick {chosen.model_name} ({chosen_weight}/{total})",),
             decision_ms=(perf_counter() - start) * 1000,
         )
