@@ -72,15 +72,17 @@ async def test_disabled_model_409(client: AsyncTestClient, monkeypatch: pytest.M
     assert resp.status_code == HTTP_409_CONFLICT
 
 
-async def test_unsupported_provider_501(
+async def test_unsupported_operation_501(
     client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch(monkeypatch)
-    # 'bedrock' has no adapter in the gateway yet → 501.
-    api_key = await _setup(client, provider="bedrock")
+    # Anthropic has no embeddings API → the capability matrix answers 501.
+    api_key = await _setup(
+        client, provider="anthropic", values={"api_key": "k"}, model_type="embeddings"
+    )
     resp = await client.post(
-        "/v1/chat/completions",
-        json={"model": "m", "messages": []},
+        "/v1/embeddings",
+        json={"model": "m", "input": "hi"},
         headers=_bearer(api_key),
     )
     assert resp.status_code == HTTP_501_NOT_IMPLEMENTED

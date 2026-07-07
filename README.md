@@ -34,7 +34,7 @@ client.chat.completions.create(model="<team-model-alias>", messages=[...])
 
 The alias resolves to a team `Model`, which selects the provider and a
 platform-managed, encrypted `Credential`. Providers: OpenAI, Azure OpenAI,
-Databricks, Anthropic, Vertex/Gemini.
+Databricks, Anthropic, Vertex/Gemini, AWS Bedrock.
 
 ## How it works
 
@@ -54,7 +54,7 @@ flowchart LR
         Policy --> Adapter["Provider adapter<br/>official SDK"]
     end
 
-    Adapter <--> Providers["OpenAI · Azure OpenAI<br/>Anthropic · Vertex · Databricks"]
+    Adapter <--> Providers["OpenAI · Azure OpenAI<br/>Anthropic · Vertex · Databricks · Bedrock"]
 
     Adapter --> Meter["Usage metering<br/>tokens + cost, streams included"]
     Meter --> Ledger[("usage_event ledger<br/>+ durable outbox")]
@@ -85,12 +85,12 @@ key for billing.
 
 ## Endpoints
 
-| Endpoint | OpenAI | Azure | Databricks | Anthropic | Vertex |
-|---|:--:|:--:|:--:|:--:|:--:|
-| `POST /v1/chat/completions` (+ `stream`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `POST /v1/responses` (+ `stream`) | native | native | emulated | emulated | emulated |
-| `POST /v1/embeddings` | ✅ | ✅ | ✅ | 501 | ✅ |
-| `POST /v1/images/generations` | ✅ | ✅ | 501 | 501 | ✅ |
+| Endpoint | OpenAI | Azure | Databricks | Anthropic | Vertex | Bedrock |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|
+| `POST /v1/chat/completions` (+ `stream`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `POST /v1/responses` (+ `stream`) | native | native | emulated | emulated | emulated | emulated |
+| `POST /v1/embeddings` | ✅ | ✅ | ✅ | 501 | ✅ | ✅ |
+| `POST /v1/images/generations` | ✅ | ✅ | 501 | 501 | ✅ | ✅ |
 
 Plus: users/invites, JWT login (with per-account login lockout), organizations →
 teams → memberships, team-scoped API keys, service principals with
@@ -294,8 +294,9 @@ on their own branch (linked). Order within a phase is a recommendation.
   `response_mime_type` + `response_schema` for Gemini, with the JSON normalized
   into `message.content` on every provider. Works on chat and the Responses API
   (native and emulated), streaming included (#129, #130, #131).
-- **AWS Bedrock provider** — Converse API + boto3 (no hand-rolled SigV4), responses emulated.
-  [`adding-bedrock`](https://github.com/carlo99999/LiteStarGateway/blob/adding-bedrock/docs/bedrock.md)
+- ✅ **AWS Bedrock provider** _(shipped)_ — Converse API + boto3 (no hand-rolled
+  SigV4): chat + streaming, emulated Responses, Titan/Cohere embeddings, Titan
+  images, structured outputs via forced tool. [design](docs/bedrock.md)
 - **Web UI** — SPA over the JSON API for login + admin + usage dashboards.
   [`adding-web-ui`](https://github.com/carlo99999/LiteStarGateway/blob/adding-web-ui/docs/web-ui.md)
 - ✅ **LICENSE & repo hygiene** _(shipped)_ — Apache 2.0 [`LICENSE`](LICENSE),

@@ -15,6 +15,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 import anthropic
+import botocore.exceptions
 import httpx
 import openai
 
@@ -29,8 +30,34 @@ from litestar_gateway.domain.exceptions import (
 )
 
 # Timeouts subclass the connection errors in both SDKs, so they must be checked first.
-_TIMEOUT_TYPES = (httpx.TimeoutException, openai.APITimeoutError, anthropic.APITimeoutError)
-_CONNECTION_TYPES = (httpx.TransportError, openai.APIConnectionError, anthropic.APIConnectionError)
+_TIMEOUT_TYPES = (
+    httpx.TimeoutException,
+    openai.APITimeoutError,
+    anthropic.APITimeoutError,
+    botocore.exceptions.ReadTimeoutError,
+    botocore.exceptions.ConnectTimeoutError,
+)
+_CONNECTION_TYPES = (
+    httpx.TransportError,
+    openai.APIConnectionError,
+    anthropic.APIConnectionError,
+    botocore.exceptions.ConnectionError,
+)
+
+# AWS can report throttling as HTTP 400 with one of these error codes, so the
+# code must be checked before the status.
+_AWS_THROTTLE_CODES = frozenset(
+    {"ThrottlingException", "TooManyRequestsException", "ProvisionedThroughputExceededException"}
+)
+
+
+def _aws_error_code(exc: Exception) -> str | None:
+    # botocore's ClientError carries the parsed error response as a dict.
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        code = (response.get("Error") or {}).get("Code")
+        return code if isinstance(code, str) else None
+    return None
 
 
 def _status_code(exc: Exception) -> int | None:
@@ -38,6 +65,12 @@ def _status_code(exc: Exception) -> int | None:
     # exposes `code`. Both are plain ints.
     for attr in ("status_code", "code"):
         value = getattr(exc, attr, None)
+        if isinstance(value, int):
+            return value
+    # botocore's ClientError: the status lives in the parsed response dict.
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        value = (response.get("ResponseMetadata") or {}).get("HTTPStatusCode")
         if isinstance(value, int):
             return value
     return None
@@ -58,6 +91,8 @@ def translate_upstream_error(exc: Exception) -> UpstreamError | None:
     if isinstance(exc, _TIMEOUT_TYPES):
         return UpstreamTimeout("upstream provider timed out")
     status = _status_code(exc)
+    if _aws_error_code(exc) in _AWS_THROTTLE_CODES:
+        status = 429
     if status == 429:
         return UpstreamRateLimited(
             "upstream provider rate limited the request", retry_after=_retry_after(exc)
