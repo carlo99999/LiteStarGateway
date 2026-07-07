@@ -501,7 +501,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_model_service_modelservice",
-      "community": 28,
+      "community": 100,
       "norm_label": "modelservice"
     },
     {
@@ -511,7 +511,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_model_service_modelservice_init",
-      "community": 138,
+      "community": 100,
       "norm_label": ".__init__()"
     },
     {
@@ -521,7 +521,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_model_service_py_credentialrepository",
-      "community": 138,
+      "community": 100,
       "norm_label": "credentialrepository"
     },
     {
@@ -531,7 +531,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_model_service_modelservice_validate_credential",
-      "community": 83,
+      "community": 100,
       "norm_label": "._validate_credential()"
     },
     {
@@ -551,7 +551,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_model_service_modelservice_create",
-      "community": 83,
+      "community": 100,
       "norm_label": ".create()"
     },
     {
@@ -631,7 +631,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_organization_service",
-      "community": 54,
+      "community": 81,
       "norm_label": "organization_service.py"
     },
     {
@@ -641,7 +641,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_organization_service_now",
-      "community": 54,
+      "community": 81,
       "norm_label": "_now()"
     },
     {
@@ -651,7 +651,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_organization_service_py_datetime",
-      "community": 54,
+      "community": 81,
       "norm_label": "datetime"
     },
     {
@@ -661,7 +661,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_organization_service_require_platform_admin",
-      "community": 54,
+      "community": 81,
       "norm_label": "_require_platform_admin()"
     },
     {
@@ -671,7 +671,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_organization_service_organizationservice",
-      "community": 61,
+      "community": 81,
       "norm_label": "organizationservice"
     },
     {
@@ -681,7 +681,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_organization_service_organizationservice_init",
-      "community": 40,
+      "community": 81,
       "norm_label": ".__init__()"
     },
     {
@@ -691,7 +691,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_organization_service_organizationservice_create",
-      "community": 54,
+      "community": 81,
       "norm_label": ".create()"
     },
     {
@@ -701,7 +701,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_organization_service_organizationservice_list",
-      "community": 54,
+      "community": 81,
       "norm_label": ".list()"
     },
     {
@@ -711,7 +711,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_organization_service_rationale_1",
-      "community": 54,
+      "community": 81,
       "norm_label": "application service for organizations (platform-admin only)."
     },
     {
@@ -741,7 +741,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_complexity",
-      "community": 156,
+      "community": 160,
       "norm_label": "complexity.py"
     },
     {
@@ -751,7 +751,7 @@
       "source_location": "L275",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_complexity_dimension",
-      "community": 156,
+      "community": 160,
       "norm_label": "_dimension"
     },
     {
@@ -761,7 +761,7 @@
       "source_location": "L281",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_complexity_keyword_matches",
-      "community": 156,
+      "community": 160,
       "norm_label": "_keyword_matches()"
     },
     {
@@ -771,7 +771,7 @@
       "source_location": "L290",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_complexity_score_keywords",
-      "community": 156,
+      "community": 160,
       "norm_label": "_score_keywords()"
     },
     {
@@ -811,7 +811,7 @@
       "source_location": "L323",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_complexity_complexitystrategy_classify",
-      "community": 156,
+      "community": 160,
       "norm_label": ".classify()"
     },
     {
@@ -831,7 +831,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_complexity_rationale_1",
-      "community": 156,
+      "community": 160,
       "norm_label": "s1 \u2014 rule-based complexity strategy.  algorithm ported from litellm's complexity"
     },
     {
@@ -841,7 +841,7 @@
       "source_location": "L282",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_complexity_rationale_282",
-      "community": 156,
+      "community": 160,
       "norm_label": "word-boundary matching for single words (so \"error\" never matches     \"terrorism"
     },
     {
@@ -1021,7 +1021,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_hybrid_hybridstrategy_is_uncertain",
-      "community": 66,
+      "community": 78,
       "norm_label": "._is_uncertain()"
     },
     {
@@ -1061,7 +1061,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_judge",
-      "community": 66,
+      "community": 78,
       "norm_label": "judge.py"
     },
     {
@@ -1071,7 +1071,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_judge_judgestrategy",
-      "community": 66,
+      "community": 78,
       "norm_label": "judgestrategy"
     },
     {
@@ -1131,7 +1131,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_judge_rationale_1",
-      "community": 66,
+      "community": 78,
       "norm_label": "s4 \u2014 llm as a judge.  a small, fast team model (the *judge*, picked by the admin"
     },
     {
@@ -1171,7 +1171,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_routerservice",
-      "community": 128,
+      "community": 152,
       "norm_label": "routerservice"
     },
     {
@@ -1181,7 +1181,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_routerservice_init",
-      "community": 159,
+      "community": 138,
       "norm_label": ".__init__()"
     },
     {
@@ -1191,7 +1191,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_py_credentialrepository",
-      "community": 159,
+      "community": 138,
       "norm_label": "credentialrepository"
     },
     {
@@ -1201,7 +1201,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_routerservice_validate",
-      "community": 128,
+      "community": 106,
       "norm_label": "._validate()"
     },
     {
@@ -1211,7 +1211,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_routerservice_validate_strategy_deps",
-      "community": 128,
+      "community": 165,
       "norm_label": "._validate_strategy_deps()"
     },
     {
@@ -1221,7 +1221,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_routerservice_validate_weighted_candidates",
-      "community": 128,
+      "community": 165,
       "norm_label": "._validate_weighted_candidates()"
     },
     {
@@ -1231,7 +1231,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_routerservice_validate_judge_config",
-      "community": 128,
+      "community": 165,
       "norm_label": "._validate_judge_config()"
     },
     {
@@ -1241,7 +1241,7 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_routerservice_validate_embeddings_config",
-      "community": 128,
+      "community": 165,
       "norm_label": "._validate_embeddings_config()"
     },
     {
@@ -1251,7 +1251,7 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_routerservice_create",
-      "community": 128,
+      "community": 106,
       "norm_label": ".create()"
     },
     {
@@ -1261,7 +1261,7 @@
       "source_location": "L190",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_routerservice_update",
-      "community": 128,
+      "community": 106,
       "norm_label": ".update()"
     },
     {
@@ -1301,7 +1301,7 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_routerservice_delete",
-      "community": 106,
+      "community": 128,
       "norm_label": ".delete()"
     },
     {
@@ -1401,7 +1401,7 @@
       "source_location": "L403",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_routerservice_record_usage",
-      "community": 128,
+      "community": 152,
       "norm_label": ".record_usage()"
     },
     {
@@ -1471,7 +1471,7 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_rationale_144",
-      "community": 128,
+      "community": 165,
       "norm_label": "config checks needing repository lookups (pure shape checks already         ran"
     },
     {
@@ -1531,7 +1531,7 @@
       "source_location": "L404",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_service_rationale_404",
-      "community": 128,
+      "community": 152,
       "norm_label": "attach actual usage to this request's decision. never fails the request."
     },
     {
@@ -1678,7 +1678,7 @@
       "label": "WeightedStrategy",
       "file_type": "code",
       "source_file": "src/litestar_gateway/application/routing/weighted.py",
-      "source_location": "L23",
+      "source_location": "L25",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_weighted_weightedstrategy",
       "community": 47,
@@ -1688,7 +1688,7 @@
       "label": ".__init__()",
       "file_type": "code",
       "source_file": "src/litestar_gateway/application/routing/weighted.py",
-      "source_location": "L24",
+      "source_location": "L26",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_weighted_weightedstrategy_init",
       "community": 47,
@@ -1708,7 +1708,7 @@
       "label": ".select()",
       "file_type": "code",
       "source_file": "src/litestar_gateway/application/routing/weighted.py",
-      "source_location": "L28",
+      "source_location": "L30",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_routing_weighted_weightedstrategy_select",
       "community": 78,
@@ -2031,7 +2031,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_service_apikeyservice_init",
-      "community": 129,
+      "community": 44,
       "norm_label": ".__init__()"
     },
     {
@@ -2041,7 +2041,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_service_apikeyservice_issue",
-      "community": 83,
+      "community": 105,
       "norm_label": ".issue()"
     },
     {
@@ -2151,7 +2151,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_service_principal_service_serviceprincipalservice_init",
-      "community": 81,
+      "community": 44,
       "norm_label": ".__init__()"
     },
     {
@@ -2311,7 +2311,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_team_service_teamservice_init",
-      "community": 62,
+      "community": 71,
       "norm_label": ".__init__()"
     },
     {
@@ -2971,7 +2971,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_user_service_userservice_init",
-      "community": 8,
+      "community": 103,
       "norm_label": ".__init__()"
     },
     {
@@ -2981,7 +2981,7 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_user_service_userservice_unit_of_work",
-      "community": 101,
+      "community": 155,
       "norm_label": "._unit_of_work()"
     },
     {
@@ -3001,7 +3001,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_user_service_userservice_create_invite",
-      "community": 135,
+      "community": 8,
       "norm_label": ".create_invite()"
     },
     {
@@ -3011,7 +3011,7 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_user_service_userservice_check_password_complexity",
-      "community": 101,
+      "community": 155,
       "norm_label": "._check_password_complexity()"
     },
     {
@@ -3021,7 +3021,7 @@
       "source_location": "L167",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_user_service_userservice_register",
-      "community": 101,
+      "community": 27,
       "norm_label": ".register()"
     },
     {
@@ -3081,7 +3081,7 @@
       "source_location": "L269",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_user_service_userservice_logout",
-      "community": 54,
+      "community": 14,
       "norm_label": ".logout()"
     },
     {
@@ -3151,7 +3151,7 @@
       "source_location": "L424",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_user_service_userservice_reset_password",
-      "community": 101,
+      "community": 155,
       "norm_label": ".reset_password()"
     },
     {
@@ -3181,7 +3181,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_user_service_rationale_111",
-      "community": 101,
+      "community": 155,
       "norm_label": "commit staged writes once on success; roll back on any failure."
     },
     {
@@ -3231,7 +3231,7 @@
       "source_location": "L270",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_user_service_rationale_270",
-      "community": 54,
+      "community": 14,
       "norm_label": "invalidate all of the user's existing jwts by bumping token_version."
     },
     {
@@ -3301,7 +3301,7 @@
       "source_location": "L425",
       "_origin": "ast",
       "id": "src_litestar_gateway_application_user_service_rationale_425",
-      "community": 101,
+      "community": 155,
       "norm_label": "redeem a reset token: validate, set the new password, revoke old jwts."
     },
     {
@@ -3351,7 +3351,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_litestar_gateway_config_teamgrant",
-      "community": 22,
+      "community": 67,
       "norm_label": "teamgrant"
     },
     {
@@ -3501,7 +3501,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "src_litestar_gateway_config_rationale_63",
-      "community": 22,
+      "community": 67,
       "norm_label": "one (team, role) an idp group confers via sso_team_mapping."
     },
     {
@@ -3671,7 +3671,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_access",
-      "community": 83,
+      "community": 46,
       "norm_label": "access.py"
     },
     {
@@ -3701,7 +3701,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_access_serviceprincipal",
-      "community": 81,
+      "community": 44,
       "norm_label": "serviceprincipal"
     },
     {
@@ -3741,7 +3741,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_access_issuedkey",
-      "community": 83,
+      "community": 105,
       "norm_label": "issuedkey"
     },
     {
@@ -3751,7 +3751,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_access_rationale_1",
-      "community": 83,
+      "community": 46,
       "norm_label": "api key, secret key, and service principal entities."
     },
     {
@@ -3771,7 +3771,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_access_rationale_31",
-      "community": 81,
+      "community": 44,
       "norm_label": "a team-owned, named machine identity (databricks-style). its keys carry     mana"
     },
     {
@@ -3791,7 +3791,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_access_rationale_74",
-      "community": 83,
+      "community": 105,
       "norm_label": "result of issuing a key: the entity plus the one-time plaintext."
     },
     {
@@ -3831,7 +3831,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_billing",
-      "community": 83,
+      "community": 43,
       "norm_label": "billing.py"
     },
     {
@@ -3861,7 +3861,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_billing_usageaggregate",
-      "community": 83,
+      "community": 43,
       "norm_label": "usageaggregate"
     },
     {
@@ -3871,7 +3871,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_billing_apikeyspend",
-      "community": 83,
+      "community": 43,
       "norm_label": "apikeyspend"
     },
     {
@@ -3881,7 +3881,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_billing_tracerecord",
-      "community": 144,
+      "community": 151,
       "norm_label": "tracerecord"
     },
     {
@@ -3891,7 +3891,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_billing_rationale_1",
-      "community": 83,
+      "community": 43,
       "norm_label": "billing and usage tracking entities."
     },
     {
@@ -3921,7 +3921,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_billing_rationale_46",
-      "community": 83,
+      "community": 43,
       "norm_label": "usage summed for one model (over an optional api-key/model filter)."
     },
     {
@@ -3931,7 +3931,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_billing_rationale_58",
-      "community": 83,
+      "community": 43,
       "norm_label": "accumulated usage/cost for one api key across all of its calls."
     },
     {
@@ -3941,7 +3941,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_billing_rationale_69",
-      "community": 144,
+      "community": 151,
       "norm_label": "one observability trace for a model call (metadata; no payload in v1)."
     },
     {
@@ -3971,7 +3971,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_enums_keypurpose",
-      "community": 53,
+      "community": 46,
       "norm_label": "keypurpose"
     },
     {
@@ -4011,7 +4011,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_enums_budgetwindow",
-      "community": 83,
+      "community": 43,
       "norm_label": "budgetwindow"
     },
     {
@@ -4051,7 +4051,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_enums_rationale_19",
-      "community": 53,
+      "community": 46,
       "norm_label": "what a keyring key is used for."
     },
     {
@@ -4071,7 +4071,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_enums_rationale_43",
-      "community": 83,
+      "community": 43,
       "norm_label": "spend window a budget applies to. calendar-based, utc."
     },
     {
@@ -4091,7 +4091,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_identity_externalidentity",
-      "community": 22,
+      "community": 162,
       "norm_label": "externalidentity"
     },
     {
@@ -4101,7 +4101,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_identity_user",
-      "community": 54,
+      "community": 14,
       "norm_label": "user"
     },
     {
@@ -4201,7 +4201,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_identity_issuedinvite",
-      "community": 135,
+      "community": 8,
       "norm_label": "issuedinvite"
     },
     {
@@ -4211,7 +4211,7 @@
       "source_location": "L124",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_identity_passwordreset",
-      "community": 8,
+      "community": 137,
       "norm_label": "passwordreset"
     },
     {
@@ -4231,7 +4231,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_identity_issuedpasswordreset",
-      "community": 65,
+      "community": 8,
       "norm_label": "issuedpasswordreset"
     },
     {
@@ -4281,7 +4281,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_identity_rationale_14",
-      "community": 22,
+      "community": 162,
       "norm_label": "an identity resolved from an sso provider's id_token claims."
     },
     {
@@ -4291,7 +4291,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_identity_rationale_24",
-      "community": 54,
+      "community": 14,
       "norm_label": "a user account. only the password hash is ever persisted."
     },
     {
@@ -4331,7 +4331,7 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_identity_rationale_117",
-      "community": 135,
+      "community": 8,
       "norm_label": "result of creating an invite: the entity plus the one-time token."
     },
     {
@@ -4341,7 +4341,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_identity_rationale_125",
-      "community": 8,
+      "community": 137,
       "norm_label": "a single-use, expiring admin-issued password reset for a specific user.      onl"
     },
     {
@@ -4351,7 +4351,7 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_identity_rationale_144",
-      "community": 65,
+      "community": 8,
       "norm_label": "result of creating a reset: the entity plus the one-time token."
     },
     {
@@ -4501,7 +4501,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_organization_teammembership",
-      "community": 24,
+      "community": 45,
       "norm_label": "teammembership"
     },
     {
@@ -4511,7 +4511,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_organization_teammembership_is_admin",
-      "community": 24,
+      "community": 45,
       "norm_label": ".is_admin()"
     },
     {
@@ -4551,7 +4551,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_entities_organization_rationale_33",
-      "community": 24,
+      "community": 45,
       "norm_label": "a user's membership in a team, with a role."
     },
     {
@@ -4781,7 +4781,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_lastteamadmin",
-      "community": 45,
+      "community": 166,
       "norm_label": "lastteamadmin"
     },
     {
@@ -4831,7 +4831,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_modelnotfound",
-      "community": 27,
+      "community": 170,
       "norm_label": "modelnotfound"
     },
     {
@@ -4871,7 +4871,7 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_unsupportedoperation",
-      "community": 27,
+      "community": 34,
       "norm_label": "unsupportedoperation"
     },
     {
@@ -4891,7 +4891,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_routernotfound",
-      "community": 106,
+      "community": 128,
       "norm_label": "routernotfound"
     },
     {
@@ -4911,7 +4911,7 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_invalidrouterconfig",
-      "community": 128,
+      "community": 165,
       "norm_label": "invalidrouterconfig"
     },
     {
@@ -4921,7 +4921,7 @@
       "source_location": "L152",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_noroutablecandidate",
-      "community": 128,
+      "community": 27,
       "norm_label": "noroutablecandidate"
     },
     {
@@ -4931,7 +4931,7 @@
       "source_location": "L157",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_serviceprincipalnotfound",
-      "community": 27,
+      "community": 44,
       "norm_label": "serviceprincipalnotfound"
     },
     {
@@ -4961,7 +4961,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_invalidkeyscope",
-      "community": 27,
+      "community": 3,
       "norm_label": "invalidkeyscope"
     },
     {
@@ -5001,7 +5001,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_upstreamerror",
-      "community": 146,
+      "community": 27,
       "norm_label": "upstreamerror"
     },
     {
@@ -5011,7 +5011,7 @@
       "source_location": "L189",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_upstreamratelimited",
-      "community": 146,
+      "community": 190,
       "norm_label": "upstreamratelimited"
     },
     {
@@ -5021,7 +5021,7 @@
       "source_location": "L193",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_upstreamratelimited_init",
-      "community": 146,
+      "community": 190,
       "norm_label": ".__init__()"
     },
     {
@@ -5031,7 +5031,7 @@
       "source_location": "L198",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_upstreamauthfailed",
-      "community": 146,
+      "community": 157,
       "norm_label": "upstreamauthfailed"
     },
     {
@@ -5051,7 +5051,7 @@
       "source_location": "L208",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_upstreamunavailable",
-      "community": 146,
+      "community": 157,
       "norm_label": "upstreamunavailable"
     },
     {
@@ -5281,7 +5281,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_95",
-      "community": 45,
+      "community": 166,
       "norm_label": "the operation would leave the team with no admin (removing/demoting the     last"
     },
     {
@@ -5331,7 +5331,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_116",
-      "community": 27,
+      "community": 170,
       "norm_label": "no model exists for the given id (within the team)."
     },
     {
@@ -5371,7 +5371,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_132",
-      "community": 27,
+      "community": 34,
       "norm_label": "this provider does not support the requested operation (e.g. /responses)."
     },
     {
@@ -5391,7 +5391,7 @@
       "source_location": "L140",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_140",
-      "community": 106,
+      "community": 128,
       "norm_label": "no router (virtual model) exists for the given id/name in the team."
     },
     {
@@ -5411,7 +5411,7 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_148",
-      "community": 128,
+      "community": 165,
       "norm_label": "the router definition is invalid (unknown strategy, bad candidates,     default_"
     },
     {
@@ -5421,7 +5421,7 @@
       "source_location": "L153",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_153",
-      "community": 128,
+      "community": 27,
       "norm_label": "the hard capability filters left zero candidates \u2014 a router     configuration pr"
     },
     {
@@ -5431,7 +5431,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_158",
-      "community": 27,
+      "community": 44,
       "norm_label": "no such service principal in this team."
     },
     {
@@ -5461,7 +5461,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_170",
-      "community": 27,
+      "community": 3,
       "norm_label": "the requested api-key scope is not one of inference/management/all."
     },
     {
@@ -5501,7 +5501,7 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_186",
-      "community": 146,
+      "community": 27,
       "norm_label": "base for provider-side failures surfaced by the gateway (not gateway bugs)."
     },
     {
@@ -5511,7 +5511,7 @@
       "source_location": "L190",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_190",
-      "community": 146,
+      "community": 190,
       "norm_label": "the provider rate-limited the request (429). `retry_after` carries the     provi"
     },
     {
@@ -5521,7 +5521,7 @@
       "source_location": "L199",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_199",
-      "community": 146,
+      "community": 157,
       "norm_label": "the provider rejected the gateway's credential (401/403): expired or     rotated"
     },
     {
@@ -5541,7 +5541,7 @@
       "source_location": "L209",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_exceptions_rationale_209",
-      "community": 146,
+      "community": 157,
       "norm_label": "the provider returned a 5xx or could not be reached."
     },
     {
@@ -5561,7 +5561,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_key_generator",
-      "community": 135,
+      "community": 155,
       "norm_label": "key_generator.py"
     },
     {
@@ -5571,7 +5571,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_key_generator_newkeymaterial",
-      "community": 135,
+      "community": 155,
       "norm_label": "newkeymaterial"
     },
     {
@@ -5581,7 +5581,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_key_generator_hash_key",
-      "community": 135,
+      "community": 155,
       "norm_label": "hash_key()"
     },
     {
@@ -5591,7 +5591,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_key_generator_keys_match",
-      "community": 135,
+      "community": 155,
       "norm_label": "keys_match()"
     },
     {
@@ -5601,7 +5601,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_key_generator_generate_key",
-      "community": 135,
+      "community": 155,
       "norm_label": "generate_key()"
     },
     {
@@ -5611,7 +5611,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_key_generator_rationale_1",
-      "community": 135,
+      "community": 155,
       "norm_label": "pure domain logic for generating and hashing keys.  keys are high-entropy random"
     },
     {
@@ -5701,7 +5701,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "protocol",
-      "community": 127,
+      "community": 71,
       "norm_label": "protocol"
     },
     {
@@ -5901,7 +5901,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_budget",
-      "community": 127,
+      "community": 71,
       "norm_label": "budget.py"
     },
     {
@@ -5911,7 +5911,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_budget_budgetrepository",
-      "community": 127,
+      "community": 71,
       "norm_label": "budgetrepository"
     },
     {
@@ -5921,7 +5921,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_budget_budgetrepository_get",
-      "community": 127,
+      "community": 71,
       "norm_label": ".get()"
     },
     {
@@ -5931,7 +5931,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_budget_py_uuid",
-      "community": 127,
+      "community": 71,
       "norm_label": "uuid"
     },
     {
@@ -5951,7 +5951,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_budget_budgetrepository_remove",
-      "community": 127,
+      "community": 71,
       "norm_label": ".remove()"
     },
     {
@@ -5961,7 +5961,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_budget_rationale_1",
-      "community": 127,
+      "community": 71,
       "norm_label": "port \u2014 per-team budget persistence."
     },
     {
@@ -5971,7 +5971,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_budget_rationale_13",
-      "community": 127,
+      "community": 71,
       "norm_label": "persistence port for per-team spend caps (at most one budget per team)."
     },
     {
@@ -5991,7 +5991,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_identity",
-      "community": 22,
+      "community": 162,
       "norm_label": "identity.py"
     },
     {
@@ -6001,7 +6001,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_identity_identityprovider",
-      "community": 22,
+      "community": 162,
       "norm_label": "identityprovider"
     },
     {
@@ -6011,7 +6011,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_identity_identityprovider_authorization_url",
-      "community": 22,
+      "community": 162,
       "norm_label": ".authorization_url()"
     },
     {
@@ -6021,7 +6021,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_identity_identityprovider_exchange",
-      "community": 22,
+      "community": 162,
       "norm_label": ".exchange()"
     },
     {
@@ -6031,7 +6031,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_identity_rationale_1",
-      "community": 22,
+      "community": 162,
       "norm_label": "port \u2014 sso identity provider."
     },
     {
@@ -6041,7 +6041,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_identity_rationale_12",
-      "community": 22,
+      "community": 162,
       "norm_label": "sso provider: build the login redirect and resolve the callback code.      `nonc"
     },
     {
@@ -6051,7 +6051,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite",
-      "community": 8,
+      "community": 103,
       "norm_label": "invite.py"
     },
     {
@@ -6061,7 +6061,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_inviterepository",
-      "community": 8,
+      "community": 103,
       "norm_label": "inviterepository"
     },
     {
@@ -6071,7 +6071,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_inviterepository_add",
-      "community": 8,
+      "community": 103,
       "norm_label": ".add()"
     },
     {
@@ -6081,7 +6081,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_inviterepository_get_by_token_hash",
-      "community": 8,
+      "community": 103,
       "norm_label": ".get_by_token_hash()"
     },
     {
@@ -6091,7 +6091,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_inviterepository_mark_used",
-      "community": 8,
+      "community": 103,
       "norm_label": ".mark_used()"
     },
     {
@@ -6101,7 +6101,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_py_uuid",
-      "community": 8,
+      "community": 103,
       "norm_label": "uuid"
     },
     {
@@ -6111,7 +6111,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_py_datetime",
-      "community": 8,
+      "community": 103,
       "norm_label": "datetime"
     },
     {
@@ -6121,7 +6121,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_passwordresetrepository",
-      "community": 8,
+      "community": 103,
       "norm_label": "passwordresetrepository"
     },
     {
@@ -6131,7 +6131,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_passwordresetrepository_add",
-      "community": 8,
+      "community": 103,
       "norm_label": ".add()"
     },
     {
@@ -6141,7 +6141,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_passwordresetrepository_get_by_token_hash",
-      "community": 8,
+      "community": 103,
       "norm_label": ".get_by_token_hash()"
     },
     {
@@ -6151,7 +6151,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_passwordresetrepository_mark_used",
-      "community": 8,
+      "community": 103,
       "norm_label": ".mark_used()"
     },
     {
@@ -6161,7 +6161,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_rationale_1",
-      "community": 8,
+      "community": 103,
       "norm_label": "port \u2014 invites and password resets."
     },
     {
@@ -6171,7 +6171,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_rationale_13",
-      "community": 8,
+      "community": 103,
       "norm_label": "persistence port for invites."
     },
     {
@@ -6181,7 +6181,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_invite_rationale_23",
-      "community": 8,
+      "community": 103,
       "norm_label": "persistence port for admin-issued password resets."
     },
     {
@@ -6361,7 +6361,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_lock",
-      "community": 163,
+      "community": 4,
       "norm_label": "lock.py"
     },
     {
@@ -6371,7 +6371,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_lock_distributedlock",
-      "community": 163,
+      "community": 4,
       "norm_label": "distributedlock"
     },
     {
@@ -6381,7 +6381,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_lock_distributedlock_hold",
-      "community": 163,
+      "community": 4,
       "norm_label": ".hold()"
     },
     {
@@ -6391,7 +6391,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_lock_py_timedelta",
-      "community": 163,
+      "community": 4,
       "norm_label": "timedelta"
     },
     {
@@ -6401,7 +6401,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_lock_py_abstractasynccontextmanager",
-      "community": 163,
+      "community": 4,
       "norm_label": "abstractasynccontextmanager"
     },
     {
@@ -6411,7 +6411,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_lock_rationale_1",
-      "community": 163,
+      "community": 4,
       "norm_label": "port \u2014 distributed lock."
     },
     {
@@ -6421,7 +6421,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_lock_rationale_11",
-      "community": 163,
+      "community": 4,
       "norm_label": "cross-process mutual exclusion, e.g. so only one replica runs key rotation."
     },
     {
@@ -6431,7 +6431,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_lock_rationale_14",
-      "community": 163,
+      "community": 4,
       "norm_label": "async context manager that yields true if the lock was acquired (held         fo"
     },
     {
@@ -6781,7 +6781,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_routing_routingdecisionlogfactory",
-      "community": 159,
+      "community": 171,
       "norm_label": "routingdecisionlogfactory"
     },
     {
@@ -6791,7 +6791,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_routing_routingdecisionlogfactory_call",
-      "community": 159,
+      "community": 171,
       "norm_label": ".__call__()"
     },
     {
@@ -6801,7 +6801,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_routing_py_abstractasynccontextmanager",
-      "community": 159,
+      "community": 171,
       "norm_label": "abstractasynccontextmanager"
     },
     {
@@ -6871,7 +6871,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_routing_rationale_65",
-      "community": 159,
+      "community": 171,
       "norm_label": "opens a decision log with its own unit of work \u2014 for shadow-mode tasks     that"
     },
     {
@@ -6881,7 +6881,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_service_principal",
-      "community": 81,
+      "community": 44,
       "norm_label": "service_principal.py"
     },
     {
@@ -6891,7 +6891,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_service_principal_serviceprincipalrepository",
-      "community": 81,
+      "community": 44,
       "norm_label": "serviceprincipalrepository"
     },
     {
@@ -6901,7 +6901,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_service_principal_serviceprincipalrepository_add",
-      "community": 81,
+      "community": 44,
       "norm_label": ".add()"
     },
     {
@@ -6911,7 +6911,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_service_principal_serviceprincipalrepository_get",
-      "community": 81,
+      "community": 44,
       "norm_label": ".get()"
     },
     {
@@ -6921,7 +6921,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_service_principal_py_uuid",
-      "community": 81,
+      "community": 44,
       "norm_label": "uuid"
     },
     {
@@ -6931,7 +6931,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_service_principal_serviceprincipalrepository_list_by_team",
-      "community": 81,
+      "community": 44,
       "norm_label": ".list_by_team()"
     },
     {
@@ -6941,7 +6941,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_service_principal_serviceprincipalrepository_set_enabled",
-      "community": 81,
+      "community": 44,
       "norm_label": ".set_enabled()"
     },
     {
@@ -6951,7 +6951,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_service_principal_serviceprincipalrepository_remove",
-      "community": 81,
+      "community": 44,
       "norm_label": ".remove()"
     },
     {
@@ -6961,7 +6961,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_service_principal_rationale_1",
-      "community": 81,
+      "community": 44,
       "norm_label": "port \u2014 service principal persistence."
     },
     {
@@ -6971,7 +6971,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_service_principal_rationale_13",
-      "community": 81,
+      "community": 44,
       "norm_label": "persistence port for team service principals."
     },
     {
@@ -6991,7 +6991,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_team_teamrepository",
-      "community": 62,
+      "community": 73,
       "norm_label": "teamrepository"
     },
     {
@@ -7001,7 +7001,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_team_teamrepository_add",
-      "community": 62,
+      "community": 73,
       "norm_label": ".add()"
     },
     {
@@ -7011,7 +7011,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_team_teamrepository_get",
-      "community": 62,
+      "community": 73,
       "norm_label": ".get()"
     },
     {
@@ -7031,7 +7031,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_team_teamrepository_list_by_organization",
-      "community": 62,
+      "community": 73,
       "norm_label": ".list_by_organization()"
     },
     {
@@ -7121,7 +7121,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_team_rationale_13",
-      "community": 62,
+      "community": 73,
       "norm_label": "persistence port for teams."
     },
     {
@@ -7201,7 +7201,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_transaction",
-      "community": 62,
+      "community": 71,
       "norm_label": "transaction.py"
     },
     {
@@ -7211,7 +7211,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_transaction_transaction",
-      "community": 62,
+      "community": 71,
       "norm_label": "transaction"
     },
     {
@@ -7221,7 +7221,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_transaction_transaction_commit",
-      "community": 62,
+      "community": 71,
       "norm_label": ".commit()"
     },
     {
@@ -7231,7 +7231,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_transaction_transaction_rollback",
-      "community": 62,
+      "community": 71,
       "norm_label": ".rollback()"
     },
     {
@@ -7241,7 +7241,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_transaction_rationale_1",
-      "community": 62,
+      "community": 71,
       "norm_label": "port \u2014 unit-of-work transaction boundary."
     },
     {
@@ -7251,7 +7251,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_ports_transaction_rationale_9",
-      "community": 62,
+      "community": 71,
       "norm_label": "unit-of-work boundary for a single use-case.      repositories participating in"
     },
     {
@@ -7851,7 +7851,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_routing_qualitytier",
-      "community": 139,
+      "community": 160,
       "norm_label": "qualitytier"
     },
     {
@@ -7871,7 +7871,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_routing_routerconfig",
-      "community": 128,
+      "community": 106,
       "norm_label": "routerconfig"
     },
     {
@@ -7911,7 +7911,7 @@
       "source_location": "L137",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_routing_routingstrategy",
-      "community": 156,
+      "community": 78,
       "norm_label": "routingstrategy"
     },
     {
@@ -8021,7 +8021,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_routing_rationale_25",
-      "community": 139,
+      "community": 160,
       "norm_label": "which complexity tier a candidate model serves."
     },
     {
@@ -8041,7 +8041,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_routing_rationale_60",
-      "community": 128,
+      "community": 106,
       "norm_label": "a virtual model owned by a team. `default_model` is the \u00a74 safety net:     any s"
     },
     {
@@ -8081,7 +8081,7 @@
       "source_location": "L138",
       "_origin": "ast",
       "id": "src_litestar_gateway_domain_routing_rationale_138",
-      "community": 156,
+      "community": 78,
       "norm_label": "port: pick one candidate for the request. implementations must never     mutate"
     },
     {
@@ -8361,7 +8361,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_keyring",
-      "community": 53,
+      "community": 167,
       "norm_label": "keyring.py"
     },
     {
@@ -8371,7 +8371,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_keyring_now",
-      "community": 53,
+      "community": 167,
       "norm_label": "_now()"
     },
     {
@@ -8381,7 +8381,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_keyring_py_datetime",
-      "community": 53,
+      "community": 167,
       "norm_label": "datetime"
     },
     {
@@ -8501,7 +8501,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_keyring_keyring_rotate_jwt",
-      "community": 53,
+      "community": 167,
       "norm_label": ".rotate_jwt()"
     },
     {
@@ -8511,7 +8511,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_keyring_py_timedelta",
-      "community": 53,
+      "community": 167,
       "norm_label": "timedelta"
     },
     {
@@ -8531,7 +8531,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_keyring_keyring_retire_old_credential_keys",
-      "community": 53,
+      "community": 167,
       "norm_label": ".retire_old_credential_keys()"
     },
     {
@@ -8541,7 +8541,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_keyring_rationale_1",
-      "community": 53,
+      "community": 167,
       "norm_label": "keyring: envelope-encryption operations over the db-stored rotating keys.  keys"
     },
     {
@@ -8561,7 +8561,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_keyring_rationale_91",
-      "community": 53,
+      "community": 167,
       "norm_label": "add a fresh jwt signing key and drop keys too old to have signed any         sti"
     },
     {
@@ -8581,7 +8581,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_keyring_rationale_104",
-      "community": 53,
+      "community": 167,
       "norm_label": "retire every credential key except the newest (the active one). retired"
     },
     {
@@ -8741,7 +8741,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_azure_adapter",
-      "community": 26,
+      "community": 163,
       "norm_label": "azure_adapter.py"
     },
     {
@@ -8751,7 +8751,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_azure_adapter_client_kwargs",
-      "community": 26,
+      "community": 163,
       "norm_label": "_client_kwargs()"
     },
     {
@@ -8761,7 +8761,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_azure_adapter_py_any",
-      "community": 26,
+      "community": 163,
       "norm_label": "any"
     },
     {
@@ -8771,7 +8771,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_azure_adapter_azureopenaiadapter",
-      "community": 26,
+      "community": 163,
       "norm_label": "azureopenaiadapter"
     },
     {
@@ -8781,7 +8781,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_azure_adapter_azureopenaiadapter_sync_client",
-      "community": 26,
+      "community": 163,
       "norm_label": "._sync_client()"
     },
     {
@@ -8791,7 +8791,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "azureopenai",
-      "community": 26,
+      "community": 163,
       "norm_label": "azureopenai"
     },
     {
@@ -8801,7 +8801,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_azure_adapter_azureopenaiadapter_async_client",
-      "community": 26,
+      "community": 163,
       "norm_label": "._async_client()"
     },
     {
@@ -8811,7 +8811,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "asyncazureopenai",
-      "community": 26,
+      "community": 163,
       "norm_label": "asyncazureopenai"
     },
     {
@@ -8821,7 +8821,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_azure_adapter_rationale_1",
-      "community": 26,
+      "community": 163,
       "norm_label": "azure openai adapter \u2014 same openai surface, different client construction.  cred"
     },
     {
@@ -8921,7 +8921,7 @@
       "source_location": "L107",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_errors_translate_stream",
-      "community": 146,
+      "community": 192,
       "norm_label": "translate_stream()"
     },
     {
@@ -8931,7 +8931,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_errors_py_any",
-      "community": 146,
+      "community": 192,
       "norm_label": "any"
     },
     {
@@ -8961,7 +8961,7 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_errors_rationale_110",
-      "community": 146,
+      "community": 192,
       "norm_label": "relay chunks unchanged, translating errors raised mid-stream too (the     provid"
     },
     {
@@ -9131,7 +9131,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_openai_adapter",
-      "community": 26,
+      "community": 33,
       "norm_label": "openai_adapter.py"
     },
     {
@@ -9171,7 +9171,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_openai_adapter_base_url",
-      "community": 26,
+      "community": 33,
       "norm_label": "_base_url()"
     },
     {
@@ -9351,7 +9351,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_openai_adapter_openaiadapter_sync_client",
-      "community": 26,
+      "community": 33,
       "norm_label": "._sync_client()"
     },
     {
@@ -9361,7 +9361,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "openai",
-      "community": 26,
+      "community": 33,
       "norm_label": "openai"
     },
     {
@@ -9391,7 +9391,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_llm_openai_adapter_rationale_1",
-      "community": 26,
+      "community": 33,
       "norm_label": "openai-compatible adapters (openai, databricks; azure subclasses the base).  the"
     },
     {
@@ -10061,7 +10061,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_locks",
-      "community": 163,
+      "community": 4,
       "norm_label": "locks.py"
     },
     {
@@ -10071,7 +10071,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_locks_noopdistributedlock",
-      "community": 163,
+      "community": 4,
       "norm_label": "noopdistributedlock"
     },
     {
@@ -10081,7 +10081,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_locks_noopdistributedlock_hold",
-      "community": 163,
+      "community": 4,
       "norm_label": ".hold()"
     },
     {
@@ -10091,7 +10091,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_locks_py_timedelta",
-      "community": 163,
+      "community": 4,
       "norm_label": "timedelta"
     },
     {
@@ -10101,7 +10101,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_locks_redisdistributedlock",
-      "community": 163,
+      "community": 4,
       "norm_label": "redisdistributedlock"
     },
     {
@@ -10111,7 +10111,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_locks_redisdistributedlock_init",
-      "community": 163,
+      "community": 4,
       "norm_label": ".__init__()"
     },
     {
@@ -10121,7 +10121,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_locks_redisdistributedlock_hold",
-      "community": 163,
+      "community": 4,
       "norm_label": ".hold()"
     },
     {
@@ -10131,7 +10131,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_locks_build_distributed_lock",
-      "community": 163,
+      "community": 4,
       "norm_label": "build_distributed_lock()"
     },
     {
@@ -10141,7 +10141,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_locks_rationale_1",
-      "community": 163,
+      "community": 4,
       "norm_label": "distributed-lock adapters for cross-replica coordination.  with `redis_url` conf"
     },
     {
@@ -10151,7 +10151,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_locks_rationale_25",
-      "community": 163,
+      "community": 4,
       "norm_label": "no coordination \u2014 always acquires. fine for a single instance; configure     red"
     },
     {
@@ -10161,7 +10161,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_logging",
-      "community": 157,
+      "community": 75,
       "norm_label": "logging.py"
     },
     {
@@ -10171,7 +10171,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_logging_build_logging_config",
-      "community": 157,
+      "community": 21,
       "norm_label": "build_logging_config()"
     },
     {
@@ -10181,7 +10181,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "baseloggingconfig",
-      "community": 157,
+      "community": 21,
       "norm_label": "baseloggingconfig"
     },
     {
@@ -10191,7 +10191,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_logging_rationale_1",
-      "community": 157,
+      "community": 75,
       "norm_label": "logging factory: pick the logger type by environment.  development gets human-re"
     },
     {
@@ -10211,7 +10211,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_aggregator",
-      "community": 5,
+      "community": 140,
       "norm_label": "aggregator.py"
     },
     {
@@ -10221,7 +10221,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_aggregator_metricsaggregator",
-      "community": 5,
+      "community": 140,
       "norm_label": "metricsaggregator"
     },
     {
@@ -10231,7 +10231,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_aggregator_metricsaggregator_init",
-      "community": 5,
+      "community": 140,
       "norm_label": ".__init__()"
     },
     {
@@ -10241,7 +10241,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_aggregator_metricsaggregator_write",
-      "community": 144,
+      "community": 151,
       "norm_label": ".write()"
     },
     {
@@ -10251,7 +10251,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_aggregator_metricsaggregator_record_dropped_trace",
-      "community": 5,
+      "community": 140,
       "norm_label": ".record_dropped_trace()"
     },
     {
@@ -10261,7 +10261,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_aggregator_metricsaggregator_snapshot",
-      "community": 5,
+      "community": 140,
       "norm_label": ".snapshot()"
     },
     {
@@ -10271,7 +10271,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_aggregator_rationale_1",
-      "community": 5,
+      "community": 140,
       "norm_label": "in-process metrics aggregation from tracerecords (a `tracesink`).  counts what a"
     },
     {
@@ -10281,7 +10281,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_aggregator_rationale_50",
-      "community": 5,
+      "community": 140,
       "norm_label": "cumulative totals plus interval latency stats (reset on read)."
     },
     {
@@ -10301,7 +10301,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_composite_compositetracesink",
-      "community": 147,
+      "community": 5,
       "norm_label": "compositetracesink"
     },
     {
@@ -10321,7 +10321,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_composite_compositetracesink_write",
-      "community": 147,
+      "community": 5,
       "norm_label": ".write()"
     },
     {
@@ -10341,7 +10341,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_composite_rationale_14",
-      "community": 147,
+      "community": 5,
       "norm_label": "one sink failing (e.g. mlflow down) must not starve the others."
     },
     {
@@ -10481,7 +10481,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_mlflow_metrics_mlflowmetricspublisher_init",
-      "community": 5,
+      "community": 140,
       "norm_label": ".__init__()"
     },
     {
@@ -10491,7 +10491,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_mlflow_metrics_py_any",
-      "community": 5,
+      "community": 140,
       "norm_label": "any"
     },
     {
@@ -10661,7 +10661,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_observability_null_sink_nulltracesink_write",
-      "community": 144,
+      "community": 151,
       "norm_label": ".write()"
     },
     {
@@ -11361,7 +11361,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_orm",
-      "community": 106,
+      "community": 8,
       "norm_label": "orm.py"
     },
     {
@@ -11381,7 +11381,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_orm_usermodel_to_entity",
-      "community": 54,
+      "community": 14,
       "norm_label": ".to_entity()"
     },
     {
@@ -11431,7 +11431,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_orm_passwordresetmodel",
-      "community": 8,
+      "community": 137,
       "norm_label": "passwordresetmodel"
     },
     {
@@ -11441,7 +11441,7 @@
       "source_location": "L134",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_orm_passwordresetmodel_to_entity",
-      "community": 8,
+      "community": 137,
       "norm_label": ".to_entity()"
     },
     {
@@ -11481,7 +11481,7 @@
       "source_location": "L176",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_orm_routermodel_to_entity",
-      "community": 139,
+      "community": 160,
       "norm_label": ".to_entity()"
     },
     {
@@ -11641,7 +11641,7 @@
       "source_location": "L389",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_orm_credentialmodel",
-      "community": 4,
+      "community": 8,
       "norm_label": "credentialmodel"
     },
     {
@@ -11701,7 +11701,7 @@
       "source_location": "L466",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_orm_apikeymodel",
-      "community": 67,
+      "community": 65,
       "norm_label": "apikeymodel"
     },
     {
@@ -11721,7 +11721,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_orm_rationale_1",
-      "community": 106,
+      "community": 8,
       "norm_label": "sqlalchemy orm mappings (persistence detail)."
     },
     {
@@ -11761,7 +11761,7 @@
       "source_location": "L467",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_orm_rationale_467",
-      "community": 67,
+      "community": 65,
       "norm_label": "`uuidauditbase` provides `id`, `created_at`, `updated_at`."
     },
     {
@@ -11771,7 +11771,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_password_reset_repository",
-      "community": 8,
+      "community": 137,
       "norm_label": "password_reset_repository.py"
     },
     {
@@ -11781,7 +11781,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_password_reset_repository_sqlalchemypasswordresetrepository",
-      "community": 8,
+      "community": 137,
       "norm_label": "sqlalchemypasswordresetrepository"
     },
     {
@@ -11791,7 +11791,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_password_reset_repository_sqlalchemypasswordresetrepository_init",
-      "community": 8,
+      "community": 137,
       "norm_label": ".__init__()"
     },
     {
@@ -11801,7 +11801,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_password_reset_repository_py_asyncsession",
-      "community": 8,
+      "community": 137,
       "norm_label": "asyncsession"
     },
     {
@@ -11811,7 +11811,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_password_reset_repository_sqlalchemypasswordresetrepository_add",
-      "community": 8,
+      "community": 137,
       "norm_label": ".add()"
     },
     {
@@ -11821,7 +11821,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_password_reset_repository_sqlalchemypasswordresetrepository_get_by_token_hash",
-      "community": 8,
+      "community": 137,
       "norm_label": ".get_by_token_hash()"
     },
     {
@@ -11831,7 +11831,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_password_reset_repository_sqlalchemypasswordresetrepository_mark_used",
-      "community": 8,
+      "community": 137,
       "norm_label": ".mark_used()"
     },
     {
@@ -11841,7 +11841,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_password_reset_repository_py_uuid",
-      "community": 8,
+      "community": 137,
       "norm_label": "uuid"
     },
     {
@@ -11851,7 +11851,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_password_reset_repository_py_datetime",
-      "community": 8,
+      "community": 137,
       "norm_label": "datetime"
     },
     {
@@ -11861,7 +11861,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_password_reset_repository_rationale_1",
-      "community": 8,
+      "community": 137,
       "norm_label": "sqlalchemy adapter implementing the `passwordresetrepository` port."
     },
     {
@@ -11871,7 +11871,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_password_reset_repository_rationale_40",
-      "community": 8,
+      "community": 137,
       "norm_label": "atomically consume the reset. returns false if it was already used         (cond"
     },
     {
@@ -11881,7 +11881,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository",
-      "community": 67,
+      "community": 65,
       "norm_label": "repository.py"
     },
     {
@@ -11891,7 +11891,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_sqlalchemyapikeyrepository",
-      "community": 67,
+      "community": 65,
       "norm_label": "sqlalchemyapikeyrepository"
     },
     {
@@ -11901,7 +11901,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_sqlalchemyapikeyrepository_init",
-      "community": 67,
+      "community": 65,
       "norm_label": ".__init__()"
     },
     {
@@ -11911,7 +11911,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_py_asyncsession",
-      "community": 67,
+      "community": 65,
       "norm_label": "asyncsession"
     },
     {
@@ -11921,7 +11921,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_sqlalchemyapikeyrepository_add",
-      "community": 67,
+      "community": 65,
       "norm_label": ".add()"
     },
     {
@@ -11931,7 +11931,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_sqlalchemyapikeyrepository_get",
-      "community": 67,
+      "community": 65,
       "norm_label": ".get()"
     },
     {
@@ -11941,7 +11941,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_py_uuid",
-      "community": 67,
+      "community": 65,
       "norm_label": "uuid"
     },
     {
@@ -11951,7 +11951,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_sqlalchemyapikeyrepository_get_by_hash",
-      "community": 67,
+      "community": 65,
       "norm_label": ".get_by_hash()"
     },
     {
@@ -11961,7 +11961,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_sqlalchemyapikeyrepository_list_by_team",
-      "community": 67,
+      "community": 65,
       "norm_label": ".list_by_team()"
     },
     {
@@ -11971,7 +11971,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_sqlalchemyapikeyrepository_update",
-      "community": 67,
+      "community": 65,
       "norm_label": ".update()"
     },
     {
@@ -11981,7 +11981,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_sqlalchemyapikeyrepository_revoke_personal_keys_for_user",
-      "community": 67,
+      "community": 65,
       "norm_label": ".revoke_personal_keys_for_user()"
     },
     {
@@ -11991,7 +11991,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_py_datetime",
-      "community": 67,
+      "community": 65,
       "norm_label": "datetime"
     },
     {
@@ -12001,7 +12001,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_sqlalchemyapikeyrepository_revoke_for_service_principal",
-      "community": 67,
+      "community": 65,
       "norm_label": ".revoke_for_service_principal()"
     },
     {
@@ -12011,7 +12011,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_rationale_1",
-      "community": 67,
+      "community": 65,
       "norm_label": "sqlalchemy adapter implementing the `apikeyrepository` port."
     },
     {
@@ -12021,7 +12021,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_persistence_repository_rationale_17",
-      "community": 67,
+      "community": 65,
       "norm_label": "maps between `apikey` domain entities and `apikeymodel` rows."
     },
     {
@@ -13081,7 +13081,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_rotation",
-      "community": 4,
+      "community": 131,
       "norm_label": "rotation.py"
     },
     {
@@ -13101,7 +13101,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_rotation_rotationservice",
-      "community": 4,
+      "community": 131,
       "norm_label": "rotationservice"
     },
     {
@@ -13111,7 +13111,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_rotation_rotationservice_init",
-      "community": 4,
+      "community": 131,
       "norm_label": ".__init__()"
     },
     {
@@ -13121,7 +13121,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "sqlalchemycredentialrepository",
-      "community": 161,
+      "community": 131,
       "norm_label": "sqlalchemycredentialrepository"
     },
     {
@@ -13131,7 +13131,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_rotation_py_timedelta",
-      "community": 4,
+      "community": 131,
       "norm_label": "timedelta"
     },
     {
@@ -13141,7 +13141,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_rotation_rotationservice_rotate_all",
-      "community": 4,
+      "community": 131,
       "norm_label": ".rotate_all()"
     },
     {
@@ -13151,7 +13151,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_rotation_seconds_until",
-      "community": 4,
+      "community": 131,
       "norm_label": "seconds_until()"
     },
     {
@@ -13161,7 +13161,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_rotation_py_datetime",
-      "community": 4,
+      "community": 131,
       "norm_label": "datetime"
     },
     {
@@ -13171,7 +13171,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_rotation_make_rotation_scheduler",
-      "community": 21,
+      "community": 131,
       "norm_label": "make_rotation_scheduler()"
     },
     {
@@ -13181,7 +13181,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_rotation_rationale_1",
-      "community": 4,
+      "community": 131,
       "norm_label": "daily key rotation, driven from the app lifespan.  when enabled, a background ta"
     },
     {
@@ -13201,7 +13201,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_rotation_rationale_77",
-      "community": 4,
+      "community": 131,
       "norm_label": "seconds from `now` until the next utc occurrence of \"hh:mm\"."
     },
     {
@@ -13211,7 +13211,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_rotation_rationale_86",
-      "community": 21,
+      "community": 131,
       "norm_label": "return a litestar lifespan that runs daily rotation when enabled."
     },
     {
@@ -13461,7 +13461,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions",
-      "community": 49,
+      "community": 16,
       "norm_label": "completions.py"
     },
     {
@@ -13471,7 +13471,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_sse_response_events",
-      "community": 49,
+      "community": 16,
       "norm_label": "_sse_response_events()"
     },
     {
@@ -13481,7 +13481,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_py_any",
-      "community": 49,
+      "community": 16,
       "norm_label": "any"
     },
     {
@@ -13491,7 +13491,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "serversenteventmessage",
-      "community": 49,
+      "community": 16,
       "norm_label": "serversenteventmessage"
     },
     {
@@ -13501,7 +13501,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_sse_events",
-      "community": 49,
+      "community": 16,
       "norm_label": "_sse_events()"
     },
     {
@@ -13511,7 +13511,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_chat_completions",
-      "community": 49,
+      "community": 16,
       "norm_label": "chat_completions()"
     },
     {
@@ -13521,7 +13521,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_py_request",
-      "community": 49,
+      "community": 16,
       "norm_label": "request"
     },
     {
@@ -13531,7 +13531,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_py_nameddependency",
-      "community": 49,
+      "community": 16,
       "norm_label": "nameddependency"
     },
     {
@@ -13541,7 +13541,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_py_response",
-      "community": 49,
+      "community": 16,
       "norm_label": "response"
     },
     {
@@ -13551,7 +13551,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_responses",
-      "community": 49,
+      "community": 16,
       "norm_label": "responses()"
     },
     {
@@ -13561,7 +13561,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_embeddings",
-      "community": 49,
+      "community": 16,
       "norm_label": "embeddings()"
     },
     {
@@ -13571,7 +13571,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_images",
-      "community": 49,
+      "community": 16,
       "norm_label": "images()"
     },
     {
@@ -13581,7 +13581,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_rationale_1",
-      "community": 49,
+      "community": 16,
       "norm_label": "openai-compatible inference endpoints.  authenticated by a team api key (`author"
     },
     {
@@ -13591,7 +13591,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_rationale_32",
-      "community": 49,
+      "community": 16,
       "norm_label": "responses-api wire format: typed sse events (`event:` + `data:`), no [done]."
     },
     {
@@ -13601,7 +13601,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_completions_rationale_38",
-      "community": 49,
+      "community": 16,
       "norm_label": "openai streaming wire format: each chunk as a `data:` event, then `[done]`."
     },
     {
@@ -13611,7 +13611,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_dependencies",
-      "community": 103,
+      "community": 68,
       "norm_label": "dependencies.py"
     },
     {
@@ -13631,7 +13631,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_dependencies_provide_usage_repository",
-      "community": 103,
+      "community": 68,
       "norm_label": "provide_usage_repository()"
     },
     {
@@ -13641,7 +13641,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_dependencies_py_nameddependency",
-      "community": 103,
+      "community": 68,
       "norm_label": "nameddependency"
     },
     {
@@ -13651,7 +13651,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_dependencies_py_asyncsession",
-      "community": 103,
+      "community": 68,
       "norm_label": "asyncsession"
     },
     {
@@ -13661,7 +13661,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_dependencies_provide_budget_repository",
-      "community": 103,
+      "community": 68,
       "norm_label": "provide_budget_repository()"
     },
     {
@@ -13671,7 +13671,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_dependencies_provide_completion_service",
-      "community": 103,
+      "community": 68,
       "norm_label": "provide_completion_service()"
     },
     {
@@ -13681,7 +13681,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_dependencies_rationale_1",
-      "community": 103,
+      "community": 68,
       "norm_label": "dependencies for the openai-compatible inference endpoints."
     },
     {
@@ -13701,7 +13701,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_router",
-      "community": 49,
+      "community": 16,
       "norm_label": "router.py"
     },
     {
@@ -13711,7 +13711,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_router_create_api_router",
-      "community": 49,
+      "community": 16,
       "norm_label": "create_api_router()"
     },
     {
@@ -13721,7 +13721,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_router_py_sqlalchemyasyncconfig",
-      "community": 49,
+      "community": 16,
       "norm_label": "sqlalchemyasyncconfig"
     },
     {
@@ -13731,7 +13731,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_router_py_router",
-      "community": 49,
+      "community": 16,
       "norm_label": "router"
     },
     {
@@ -13741,7 +13741,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_router_rationale_1",
-      "community": 49,
+      "community": 16,
       "norm_label": "the protected \"api-endpoint\" group.  every handler registered on this router req"
     },
     {
@@ -13751,7 +13751,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_wo_am_i",
-      "community": 49,
+      "community": 16,
       "norm_label": "wo_am_i.py"
     },
     {
@@ -13761,7 +13761,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_wo_am_i_whoami",
-      "community": 49,
+      "community": 16,
       "norm_label": "whoami()"
     },
     {
@@ -13771,7 +13771,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_wo_am_i_py_request",
-      "community": 49,
+      "community": 16,
       "norm_label": "request"
     },
     {
@@ -13781,7 +13781,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_api_router_wo_am_i_rationale_7",
-      "community": 49,
+      "community": 16,
       "norm_label": "example protected endpoint. `request.user` is the key's team id."
     },
     {
@@ -13841,7 +13841,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "controller",
-      "community": 134,
+      "community": 61,
       "norm_label": "controller"
     },
     {
@@ -13991,7 +13991,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_auth",
-      "community": 71,
+      "community": 98,
       "norm_label": "auth.py"
     },
     {
@@ -14001,7 +14001,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_auth_extract_key",
-      "community": 71,
+      "community": 98,
       "norm_label": "_extract_key()"
     },
     {
@@ -14011,7 +14011,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "asgiconnection",
-      "community": 71,
+      "community": 98,
       "norm_label": "asgiconnection"
     },
     {
@@ -14021,7 +14021,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_auth_apikeyauthmiddleware",
-      "community": 71,
+      "community": 98,
       "norm_label": "apikeyauthmiddleware"
     },
     {
@@ -14031,7 +14031,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "abstractauthenticationmiddleware",
-      "community": 71,
+      "community": 98,
       "norm_label": "abstractauthenticationmiddleware"
     },
     {
@@ -14041,7 +14041,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_auth_apikeyauthmiddleware_init",
-      "community": 71,
+      "community": 98,
       "norm_label": ".__init__()"
     },
     {
@@ -14051,7 +14051,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "asgiapp",
-      "community": 71,
+      "community": 98,
       "norm_label": "asgiapp"
     },
     {
@@ -14061,7 +14061,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_auth_py_sqlalchemyasyncconfig",
-      "community": 71,
+      "community": 98,
       "norm_label": "sqlalchemyasyncconfig"
     },
     {
@@ -14071,7 +14071,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_auth_apikeyauthmiddleware_authenticate_request",
-      "community": 71,
+      "community": 98,
       "norm_label": ".authenticate_request()"
     },
     {
@@ -14081,7 +14081,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "authenticationresult",
-      "community": 71,
+      "community": 98,
       "norm_label": "authenticationresult"
     },
     {
@@ -14091,7 +14091,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_auth_rationale_1",
-      "community": 71,
+      "community": 98,
       "norm_label": "authentication adapter: validates an api key per request.  the middleware runs o"
     },
     {
@@ -14571,7 +14571,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_organizations_dependencies",
-      "community": 40,
+      "community": 81,
       "norm_label": "dependencies.py"
     },
     {
@@ -14581,7 +14581,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_organizations_dependencies_provide_organization_service",
-      "community": 40,
+      "community": 81,
       "norm_label": "provide_organization_service()"
     },
     {
@@ -14591,7 +14591,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_organizations_dependencies_py_nameddependency",
-      "community": 40,
+      "community": 81,
       "norm_label": "nameddependency"
     },
     {
@@ -14601,7 +14601,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_organizations_dependencies_py_asyncsession",
-      "community": 40,
+      "community": 81,
       "norm_label": "asyncsession"
     },
     {
@@ -14611,7 +14611,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_organizations_dependencies_provide_team_service",
-      "community": 40,
+      "community": 81,
       "norm_label": "provide_team_service()"
     },
     {
@@ -14621,7 +14621,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_organizations_dependencies_rationale_1",
-      "community": 40,
+      "community": 81,
       "norm_label": "dependency wiring for organization and team services."
     },
     {
@@ -14681,7 +14681,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_principal",
-      "community": 89,
+      "community": 191,
       "norm_label": "principal.py"
     },
     {
@@ -14691,7 +14691,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_principal_provide_principal",
-      "community": 89,
+      "community": 191,
       "norm_label": "provide_principal()"
     },
     {
@@ -14701,7 +14701,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_principal_py_request",
-      "community": 89,
+      "community": 191,
       "norm_label": "request"
     },
     {
@@ -14711,7 +14711,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_principal_py_nameddependency",
-      "community": 89,
+      "community": 191,
       "norm_label": "nameddependency"
     },
     {
@@ -14721,7 +14721,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_principal_rationale_1",
-      "community": 89,
+      "community": 191,
       "norm_label": "resolve the acting principal: a human jwt or a team service-principal key.  used"
     },
     {
@@ -14861,7 +14861,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_routing_controller_candidaterequest",
-      "community": 128,
+      "community": 165,
       "norm_label": "candidaterequest"
     },
     {
@@ -14871,7 +14871,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_routing_controller_candidaterequest_to_entity",
-      "community": 128,
+      "community": 165,
       "norm_label": ".to_entity()"
     },
     {
@@ -15931,7 +15931,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_service_principals_dependencies",
-      "community": 131,
+      "community": 98,
       "norm_label": "dependencies.py"
     },
     {
@@ -15941,7 +15941,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_service_principals_dependencies_provide_service_principal_service",
-      "community": 131,
+      "community": 98,
       "norm_label": "provide_service_principal_service()"
     },
     {
@@ -15951,7 +15951,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_service_principals_dependencies_py_nameddependency",
-      "community": 131,
+      "community": 98,
       "norm_label": "nameddependency"
     },
     {
@@ -15961,7 +15961,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_service_principals_dependencies_py_asyncsession",
-      "community": 131,
+      "community": 98,
       "norm_label": "asyncsession"
     },
     {
@@ -15971,7 +15971,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_service_principals_dependencies_rationale_1",
-      "community": 131,
+      "community": 98,
       "norm_label": "dependency wiring for service principals."
     },
     {
@@ -16091,7 +16091,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_jwt",
-      "community": 22,
+      "community": 142,
       "norm_label": "jwt.py"
     },
     {
@@ -16101,7 +16101,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_jwt_issue_access_token",
-      "community": 22,
+      "community": 142,
       "norm_label": "issue_access_token()"
     },
     {
@@ -16111,7 +16111,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_jwt_decode_token",
-      "community": 22,
+      "community": 142,
       "norm_label": "decode_token()"
     },
     {
@@ -16121,7 +16121,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_jwt_rationale_1",
-      "community": 22,
+      "community": 142,
       "norm_label": "jwt issuing/decoding for login sessions (hs256, 7-day expiry).  wraps litestar's"
     },
     {
@@ -16131,7 +16131,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_jwt_rationale_22",
-      "community": 22,
+      "community": 142,
       "norm_label": "return (encoded_jwt, expires_in_seconds) for the given subject (user id).      e"
     },
     {
@@ -16141,7 +16141,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_jwt_rationale_33",
-      "community": 22,
+      "community": 142,
       "norm_label": "return (subject, token_version) from a token that verifies against any of     th"
     },
     {
@@ -16151,7 +16151,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_login",
-      "community": 22,
+      "community": 142,
       "norm_label": "login.py"
     },
     {
@@ -16161,7 +16161,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_login_login",
-      "community": 22,
+      "community": 142,
       "norm_label": "login()"
     },
     {
@@ -16171,7 +16171,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_login_py_nameddependency",
-      "community": 22,
+      "community": 142,
       "norm_label": "nameddependency"
     },
     {
@@ -16181,7 +16181,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_login_rationale_1",
-      "community": 22,
+      "community": 142,
       "norm_label": "public login endpoint: email + password -> jwt (valid 7 days)."
     },
     {
@@ -16311,7 +16311,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_schemas",
-      "community": 22,
+      "community": 142,
       "norm_label": "schemas.py"
     },
     {
@@ -16321,7 +16321,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_schemas_loginrequest",
-      "community": 22,
+      "community": 142,
       "norm_label": "loginrequest"
     },
     {
@@ -16331,7 +16331,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_schemas_tokenresponse",
-      "community": 22,
+      "community": 142,
       "norm_label": "tokenresponse"
     },
     {
@@ -16341,7 +16341,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso",
-      "community": 22,
+      "community": 67,
       "norm_label": "sso.py"
     },
     {
@@ -16351,7 +16351,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_resolve_team_grants",
-      "community": 22,
+      "community": 67,
       "norm_label": "_resolve_team_grants()"
     },
     {
@@ -16361,7 +16361,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_py_uuid",
-      "community": 22,
+      "community": 67,
       "norm_label": "uuid"
     },
     {
@@ -16371,7 +16371,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_redirect_uri",
-      "community": 22,
+      "community": 67,
       "norm_label": "_redirect_uri()"
     },
     {
@@ -16381,7 +16381,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_py_request",
-      "community": 22,
+      "community": 67,
       "norm_label": "request"
     },
     {
@@ -16391,7 +16391,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_sso_login",
-      "community": 22,
+      "community": 67,
       "norm_label": "sso_login()"
     },
     {
@@ -16401,7 +16401,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_py_nameddependency",
-      "community": 22,
+      "community": 67,
       "norm_label": "nameddependency"
     },
     {
@@ -16411,7 +16411,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "redirect",
-      "community": 22,
+      "community": 67,
       "norm_label": "redirect"
     },
     {
@@ -16421,7 +16421,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_sso_callback",
-      "community": 22,
+      "community": 67,
       "norm_label": "sso_callback()"
     },
     {
@@ -16431,7 +16431,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_py_fromquery",
-      "community": 22,
+      "community": 67,
       "norm_label": "fromquery"
     },
     {
@@ -16441,7 +16441,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_py_queryparameter",
-      "community": 22,
+      "community": 67,
       "norm_label": "queryparameter"
     },
     {
@@ -16451,7 +16451,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_py_name",
-      "community": 22,
+      "community": 67,
       "norm_label": "name"
     },
     {
@@ -16461,7 +16461,7 @@
       "source_location": "L165",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_create_sso_router",
-      "community": 22,
+      "community": 67,
       "norm_label": "create_sso_router()"
     },
     {
@@ -16471,7 +16471,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_py_router",
-      "community": 22,
+      "community": 67,
       "norm_label": "router"
     },
     {
@@ -16481,7 +16481,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_rationale_1",
-      "community": 22,
+      "community": 67,
       "norm_label": "sso login via oidc: redirect to the idp, then exchange the callback and mint our"
     },
     {
@@ -16491,7 +16491,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_session_sso_rationale_52",
-      "community": 22,
+      "community": 67,
       "norm_label": "from the user's idp groups and sso_team_mapping, compute the desired     (team -"
     },
     {
@@ -16631,7 +16631,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_teams_controller_teamcontroller_create_key",
-      "community": 19,
+      "community": 3,
       "norm_label": ".create_key()"
     },
     {
@@ -16901,7 +16901,7 @@
       "source_location": "L124",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_teams_schemas_createkeyrequest",
-      "community": 19,
+      "community": 3,
       "norm_label": "createkeyrequest"
     },
     {
@@ -16961,7 +16961,7 @@
       "source_location": "L201",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_teams_schemas_keyspendingresponse_from_key_and_spend",
-      "community": 19,
+      "community": 43,
       "norm_label": ".from_key_and_spend()"
     },
     {
@@ -17311,7 +17311,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_users_schemas_passwordresetresponse",
-      "community": 65,
+      "community": 18,
       "norm_label": "passwordresetresponse"
     },
     {
@@ -17321,7 +17321,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_users_schemas_passwordresetresponse_from_issued",
-      "community": 65,
+      "community": 18,
       "norm_label": ".from_issued()"
     },
     {
@@ -17351,7 +17351,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "src_litestar_gateway_infrastructure_web_users_schemas_rationale_85",
-      "community": 65,
+      "community": 18,
       "norm_label": "returned once to the admin. `token` is never retrievable again."
     },
     {
@@ -19168,7 +19168,7 @@
       "label": "test_unknown_model_alias_404()",
       "file_type": "code",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L51",
+      "source_location": "L56",
       "_origin": "ast",
       "id": "tests_completions_test_error_paths_test_unknown_model_alias_404",
       "community": 0,
@@ -19178,7 +19178,7 @@
       "label": "test_disabled_model_409()",
       "file_type": "code",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L64",
+      "source_location": "L69",
       "_origin": "ast",
       "id": "tests_completions_test_error_paths_test_disabled_model_409",
       "community": 0,
@@ -19188,7 +19188,7 @@
       "label": "test_unsupported_provider_501()",
       "file_type": "code",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L75",
+      "source_location": "L80",
       "_origin": "ast",
       "id": "tests_completions_test_error_paths_test_unsupported_provider_501",
       "community": 0,
@@ -19951,7 +19951,7 @@
       "source_location": "L350",
       "_origin": "ast",
       "id": "tests_completions_test_stream_usage_fallback_hangingusage_record",
-      "community": 17,
+      "community": 84,
       "norm_label": ".record()"
     },
     {
@@ -20681,7 +20681,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors",
-      "community": 146,
+      "community": 158,
       "norm_label": "test_upstream_errors.py"
     },
     {
@@ -20691,7 +20691,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_http_response",
-      "community": 146,
+      "community": 157,
       "norm_label": "_http_response()"
     },
     {
@@ -20701,7 +20701,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_py_response",
-      "community": 146,
+      "community": 157,
       "norm_label": "response"
     },
     {
@@ -20711,7 +20711,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_test_openai_rate_limit_maps_to_429_with_retry_after",
-      "community": 146,
+      "community": 190,
       "norm_label": "test_openai_rate_limit_maps_to_429_with_retry_after()"
     },
     {
@@ -20721,7 +20721,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_test_openai_5xx_maps_to_unavailable",
-      "community": 146,
+      "community": 157,
       "norm_label": "test_openai_5xx_maps_to_unavailable()"
     },
     {
@@ -20731,7 +20731,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_test_anthropic_overloaded_maps_to_unavailable",
-      "community": 146,
+      "community": 157,
       "norm_label": "test_anthropic_overloaded_maps_to_unavailable()"
     },
     {
@@ -20741,7 +20741,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_test_genai_429_maps_to_rate_limited",
-      "community": 146,
+      "community": 190,
       "norm_label": "test_genai_429_maps_to_rate_limited()"
     },
     {
@@ -20761,7 +20761,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_test_connection_error_maps_to_unavailable",
-      "community": 146,
+      "community": 157,
       "norm_label": "test_connection_error_maps_to_unavailable()"
     },
     {
@@ -20771,7 +20771,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_test_upstream_401_maps_to_auth_failed",
-      "community": 146,
+      "community": 157,
       "norm_label": "test_upstream_401_maps_to_auth_failed()"
     },
     {
@@ -20781,7 +20781,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_test_upstream_403_maps_to_auth_failed",
-      "community": 146,
+      "community": 157,
       "norm_label": "test_upstream_403_maps_to_auth_failed()"
     },
     {
@@ -20811,7 +20811,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_test_unrelated_errors_pass_through",
-      "community": 146,
+      "community": 170,
       "norm_label": "test_unrelated_errors_pass_through()"
     },
     {
@@ -20821,7 +20821,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_test_translate_stream_maps_midstream_errors",
-      "community": 146,
+      "community": 192,
       "norm_label": "test_translate_stream_maps_midstream_errors()"
     },
     {
@@ -20831,7 +20831,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_raisingclient",
-      "community": 146,
+      "community": 170,
       "norm_label": "_raisingclient"
     },
     {
@@ -20841,7 +20841,7 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_raisingclient_init",
-      "community": 146,
+      "community": 170,
       "norm_label": ".__init__()"
     },
     {
@@ -20851,7 +20851,7 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_raisingclient_close",
-      "community": 146,
+      "community": 170,
       "norm_label": ".close()"
     },
     {
@@ -20861,7 +20861,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_raisingclient_create",
-      "community": 146,
+      "community": 170,
       "norm_label": ".create()"
     },
     {
@@ -20871,7 +20871,7 @@
       "source_location": "L141",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_client",
-      "community": 146,
+      "community": 158,
       "norm_label": "client()"
     },
     {
@@ -20881,7 +20881,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_py_path",
-      "community": 146,
+      "community": 158,
       "norm_label": "path"
     },
     {
@@ -20891,7 +20891,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_py_asynctestclient",
-      "community": 146,
+      "community": 158,
       "norm_label": "asynctestclient"
     },
     {
@@ -20901,7 +20901,7 @@
       "source_location": "L153",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_bearer",
-      "community": 146,
+      "community": 158,
       "norm_label": "_bearer()"
     },
     {
@@ -20911,7 +20911,7 @@
       "source_location": "L157",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_setup",
-      "community": 146,
+      "community": 158,
       "norm_label": "_setup()"
     },
     {
@@ -20921,7 +20921,7 @@
       "source_location": "L227",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_test_provider_error_surfaces_as_client_status",
-      "community": 146,
+      "community": 158,
       "norm_label": "test_provider_error_surfaces_as_client_status()"
     },
     {
@@ -20931,7 +20931,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_py_monkeypatch",
-      "community": 146,
+      "community": 158,
       "norm_label": "monkeypatch"
     },
     {
@@ -20941,7 +20941,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_py_exception",
-      "community": 146,
+      "community": 158,
       "norm_label": "exception"
     },
     {
@@ -20951,7 +20951,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_rationale_1",
-      "community": 146,
+      "community": 158,
       "norm_label": "provider errors (429/5xx/timeout) must map to client status codes, not 500.  uni"
     },
     {
@@ -20961,7 +20961,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_rationale_126",
-      "community": 146,
+      "community": 170,
       "norm_label": "async openai-sdk stand-in whose chat.completions.create raises."
     },
     {
@@ -20971,7 +20971,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "tests_completions_test_upstream_errors_rationale_158",
-      "community": 146,
+      "community": 158,
       "norm_label": "configure a credential + team + chat model 'm' + key. returns the api key."
     },
     {
@@ -21691,7 +21691,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_misc_test_health",
-      "community": 55,
+      "community": 168,
       "norm_label": "test_health.py"
     },
     {
@@ -21701,7 +21701,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "tests_misc_test_health_client",
-      "community": 55,
+      "community": 168,
       "norm_label": "client()"
     },
     {
@@ -21711,7 +21711,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_misc_test_health_py_path",
-      "community": 55,
+      "community": 168,
       "norm_label": "path"
     },
     {
@@ -21721,7 +21721,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_misc_test_health_py_asynctestclient",
-      "community": 55,
+      "community": 168,
       "norm_label": "asynctestclient"
     },
     {
@@ -21731,7 +21731,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "tests_misc_test_health_test_liveness_is_ok",
-      "community": 55,
+      "community": 168,
       "norm_label": "test_liveness_is_ok()"
     },
     {
@@ -21741,7 +21741,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "tests_misc_test_health_test_readiness_ok_when_db_reachable",
-      "community": 55,
+      "community": 168,
       "norm_label": "test_readiness_ok_when_db_reachable()"
     },
     {
@@ -21751,7 +21751,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "tests_misc_test_health_test_readiness_503_when_db_unavailable",
-      "community": 55,
+      "community": 168,
       "norm_label": "test_readiness_503_when_db_unavailable()"
     },
     {
@@ -21761,7 +21761,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_misc_test_health_py_monkeypatch",
-      "community": 55,
+      "community": 168,
       "norm_label": "monkeypatch"
     },
     {
@@ -21771,7 +21771,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_misc_test_health_rationale_1",
-      "community": 55,
+      "community": 168,
       "norm_label": "liveness and readiness probes."
     },
     {
@@ -22001,7 +22001,7 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "tests_misc_test_rotation_test_seconds_until_same_day",
-      "community": 4,
+      "community": 131,
       "norm_label": "test_seconds_until_same_day()"
     },
     {
@@ -22011,7 +22011,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "tests_misc_test_rotation_test_seconds_until_next_day_when_passed",
-      "community": 4,
+      "community": 131,
       "norm_label": "test_seconds_until_next_day_when_passed()"
     },
     {
@@ -22081,7 +22081,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "tests_misc_test_rotation_lock_settings",
-      "community": 163,
+      "community": 4,
       "norm_label": "_lock_settings()"
     },
     {
@@ -22091,7 +22091,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "tests_misc_test_rotation_test_build_distributed_lock_selects_backend",
-      "community": 163,
+      "community": 4,
       "norm_label": "test_build_distributed_lock_selects_backend()"
     },
     {
@@ -22535,6 +22535,126 @@
       "norm_label": "__init__.py"
     },
     {
+      "label": "test_credential_validation.py",
+      "file_type": "code",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation",
+      "community": 143,
+      "norm_label": "test_credential_validation.py"
+    },
+    {
+      "label": "client()",
+      "file_type": "code",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L22",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation_client",
+      "community": 143,
+      "norm_label": "client()"
+    },
+    {
+      "label": "Path",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation_py_path",
+      "community": 143,
+      "norm_label": "path"
+    },
+    {
+      "label": "AsyncTestClient",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation_py_asynctestclient",
+      "community": 143,
+      "norm_label": "asynctestclient"
+    },
+    {
+      "label": "_bearer()",
+      "file_type": "code",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L34",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation_bearer",
+      "community": 143,
+      "norm_label": "_bearer()"
+    },
+    {
+      "label": "_admin_token()",
+      "file_type": "code",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L38",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation_admin_token",
+      "community": 143,
+      "norm_label": "_admin_token()"
+    },
+    {
+      "label": "_create()",
+      "file_type": "code",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L44",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation_create",
+      "community": 143,
+      "norm_label": "_create()"
+    },
+    {
+      "label": "test_valid_values_accepted()",
+      "file_type": "code",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L73",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation_test_valid_values_accepted",
+      "community": 143,
+      "norm_label": "test_valid_values_accepted()"
+    },
+    {
+      "label": "test_invalid_values_rejected_with_400()",
+      "file_type": "code",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L93",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation_test_invalid_values_rejected_with_400",
+      "community": 143,
+      "norm_label": "test_invalid_values_rejected_with_400()"
+    },
+    {
+      "label": "test_error_names_the_offending_keys()",
+      "file_type": "code",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L99",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation_test_error_names_the_offending_keys",
+      "community": 143,
+      "norm_label": "test_error_names_the_offending_keys()"
+    },
+    {
+      "label": "test_provider_without_rules_is_accepted()",
+      "file_type": "code",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L112",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation_test_provider_without_rules_is_accepted",
+      "community": 143,
+      "norm_label": "test_provider_without_rules_is_accepted()"
+    },
+    {
+      "label": "Creation-time validation of credential `values` per provider.",
+      "file_type": "rationale",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "tests_models_test_credential_validation_rationale_1",
+      "community": 143,
+      "norm_label": "creation-time validation of credential `values` per provider."
+    },
+    {
       "label": "test_models.py",
       "file_type": "code",
       "source_file": "tests/models/test_models.py",
@@ -22701,7 +22821,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_observability_test_logging",
-      "community": 157,
+      "community": 21,
       "norm_label": "test_logging.py"
     },
     {
@@ -22711,7 +22831,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "tests_observability_test_logging_settings",
-      "community": 157,
+      "community": 21,
       "norm_label": "_settings()"
     },
     {
@@ -22721,7 +22841,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "tests_observability_test_logging_test_development_uses_stdlib_console_logging",
-      "community": 157,
+      "community": 21,
       "norm_label": "test_development_uses_stdlib_console_logging()"
     },
     {
@@ -22731,7 +22851,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "tests_observability_test_logging_test_production_uses_structured_json_logging",
-      "community": 157,
+      "community": 21,
       "norm_label": "test_production_uses_structured_json_logging()"
     },
     {
@@ -22741,7 +22861,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_observability_test_logging_rationale_1",
-      "community": 157,
+      "community": 21,
       "norm_label": "unit tests for the environment-aware logging factory."
     },
     {
@@ -22751,7 +22871,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_observability_test_mlflow_metrics",
-      "community": 140,
+      "community": 5,
       "norm_label": "test_mlflow_metrics.py"
     },
     {
@@ -22901,7 +23021,7 @@
       "source_location": "L134",
       "_origin": "ast",
       "id": "tests_observability_test_mlflow_metrics_test_app_startup_and_shutdown_never_wait_on_mlflow",
-      "community": 140,
+      "community": 5,
       "norm_label": "test_app_startup_and_shutdown_never_wait_on_mlflow()"
     },
     {
@@ -22951,7 +23071,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_observability_test_mlflow_metrics_rationale_1",
-      "community": 140,
+      "community": 5,
       "norm_label": "ops metrics on mlflow: aggregate tracerecords, publish to a metrics run.  mlflow"
     },
     {
@@ -22981,7 +23101,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "tests_observability_test_observability_record",
-      "community": 144,
+      "community": 15,
       "norm_label": "_record()"
     },
     {
@@ -22991,7 +23111,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "tests_observability_test_observability_fakesink",
-      "community": 144,
+      "community": 15,
       "norm_label": "_fakesink"
     },
     {
@@ -23001,7 +23121,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tests_observability_test_observability_fakesink_init",
-      "community": 144,
+      "community": 15,
       "norm_label": ".__init__()"
     },
     {
@@ -23011,7 +23131,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "tests_observability_test_observability_fakesink_write",
-      "community": 144,
+      "community": 15,
       "norm_label": ".write()"
     },
     {
@@ -23021,7 +23141,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "tests_observability_test_observability_test_dispatcher_delivers_to_sink",
-      "community": 144,
+      "community": 15,
       "norm_label": "test_dispatcher_delivers_to_sink()"
     },
     {
@@ -23031,7 +23151,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "tests_observability_test_observability_test_dispatcher_drops_when_full_without_raising",
-      "community": 144,
+      "community": 15,
       "norm_label": "test_dispatcher_drops_when_full_without_raising()"
     },
     {
@@ -24101,7 +24221,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_routing_test_eval",
-      "community": 139,
+      "community": 193,
       "norm_label": "test_eval.py"
     },
     {
@@ -24111,7 +24231,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "tests_routing_test_eval_test_s1_tier_accuracy_meets_threshold",
-      "community": 139,
+      "community": 193,
       "norm_label": "test_s1_tier_accuracy_meets_threshold()"
     },
     {
@@ -24121,7 +24241,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_routing_test_eval_rationale_1",
-      "community": 139,
+      "community": 193,
       "norm_label": "offline eval harness for the s1 complexity strategy.  ~30 labeled prompts (mixed"
     },
     {
@@ -24411,7 +24531,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "tests_routing_test_judge_hybrid_export_test_judge_requires_model_config",
-      "community": 66,
+      "community": 78,
       "norm_label": "test_judge_requires_model_config()"
     },
     {
@@ -24481,7 +24601,7 @@
       "source_location": "L138",
       "_origin": "ast",
       "id": "tests_routing_test_judge_hybrid_export_fakeopenai",
-      "community": 66,
+      "community": 186,
       "norm_label": "fakeopenai"
     },
     {
@@ -24491,7 +24611,7 @@
       "source_location": "L141",
       "_origin": "ast",
       "id": "tests_routing_test_judge_hybrid_export_fakeopenai_init",
-      "community": 66,
+      "community": 186,
       "norm_label": ".__init__()"
     },
     {
@@ -24501,7 +24621,7 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "tests_routing_test_judge_hybrid_export_fakeopenai_close",
-      "community": 66,
+      "community": 186,
       "norm_label": ".close()"
     },
     {
@@ -24511,7 +24631,7 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "tests_routing_test_judge_hybrid_export_fakeopenai_create",
-      "community": 66,
+      "community": 186,
       "norm_label": ".create()"
     },
     {
@@ -24521,7 +24641,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "tests_routing_test_judge_hybrid_export_client",
-      "community": 66,
+      "community": 186,
       "norm_label": "client()"
     },
     {
@@ -24531,7 +24651,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_routing_test_judge_hybrid_export_py_path",
-      "community": 66,
+      "community": 186,
       "norm_label": "path"
     },
     {
@@ -24541,7 +24661,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_routing_test_judge_hybrid_export_py_monkeypatch",
-      "community": 66,
+      "community": 186,
       "norm_label": "monkeypatch"
     },
     {
@@ -24611,7 +24731,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "tests_routing_test_judge_hybrid_export_rationale_139",
-      "community": 66,
+      "community": 186,
       "norm_label": "judge calls (response_format present) pick cheap-model; chat echoes."
     },
     {
@@ -25631,7 +25751,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "tests_sso_conftest_identity",
-      "community": 22,
+      "community": 49,
       "norm_label": "_identity()"
     },
     {
@@ -25651,7 +25771,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "tests_sso_conftest_fakeidp_init",
-      "community": 22,
+      "community": 162,
       "norm_label": ".__init__()"
     },
     {
@@ -25671,7 +25791,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "tests_sso_conftest_fakeidp_exchange",
-      "community": 22,
+      "community": 162,
       "norm_label": ".exchange()"
     },
     {
@@ -25721,7 +25841,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "tests_sso_conftest_login_state",
-      "community": 22,
+      "community": 49,
       "norm_label": "_login_state()"
     },
     {
@@ -25731,7 +25851,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "tests_sso_conftest_callback",
-      "community": 22,
+      "community": 49,
       "norm_label": "_callback()"
     },
     {
@@ -25741,7 +25861,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_sso_conftest_py_response",
-      "community": 22,
+      "community": 49,
       "norm_label": "response"
     },
     {
@@ -25781,7 +25901,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "tests_sso_conftest_login_and_get_me",
-      "community": 22,
+      "community": 49,
       "norm_label": "_login_and_get_me()"
     },
     {
@@ -25851,7 +25971,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "tests_sso_conftest_rationale_105",
-      "community": 22,
+      "community": 49,
       "norm_label": "run a full login for `identity` against the (shared) tmp_path db, return /me."
     },
     {
@@ -25871,7 +25991,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "tests_sso_test_group_team_mapping_test_resolve_team_grants_admin_wins_and_governed_is_codomain",
-      "community": 22,
+      "community": 67,
       "norm_label": "test_resolve_team_grants_admin_wins_and_governed_is_codomain()"
     },
     {
@@ -25881,7 +26001,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "tests_sso_test_group_team_mapping_test_resolve_team_grants_governed_covers_unmatched_groups",
-      "community": 22,
+      "community": 67,
       "norm_label": "test_resolve_team_grants_governed_covers_unmatched_groups()"
     },
     {
@@ -25951,7 +26071,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_login_flow.py"
     },
     {
@@ -25961,7 +26081,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_callback_jit_creates_admin_and_issues_jwt",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_callback_jit_creates_admin_and_issues_jwt()"
     },
     {
@@ -25971,7 +26091,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_py_asynctestclient",
-      "community": 22,
+      "community": 49,
       "norm_label": "asynctestclient"
     },
     {
@@ -25981,7 +26101,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_callback_clears_flow_cookies",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_callback_clears_flow_cookies()"
     },
     {
@@ -25991,7 +26111,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_callback_rejects_state_mismatch",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_callback_rejects_state_mismatch()"
     },
     {
@@ -26001,7 +26121,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_callback_rejects_idp_error_without_code",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_callback_rejects_idp_error_without_code()"
     },
     {
@@ -26011,7 +26131,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_non_admin_group_creates_regular_user",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_non_admin_group_creates_regular_user()"
     },
     {
@@ -26021,7 +26141,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_py_path",
-      "community": 22,
+      "community": 49,
       "norm_label": "path"
     },
     {
@@ -26031,7 +26151,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_rejects_unverified_email",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_rejects_unverified_email()"
     },
     {
@@ -26041,7 +26161,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_admin_sync_is_upgrade_only",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_admin_sync_is_upgrade_only()"
     },
     {
@@ -26051,7 +26171,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_binds_to_subject_across_email_change",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_binds_to_subject_across_email_change()"
     },
     {
@@ -26061,7 +26181,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_rejects_email_bound_to_other_subject",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_rejects_email_bound_to_other_subject()"
     },
     {
@@ -26071,7 +26191,7 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_uses_configured_redirect_uri",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_uses_configured_redirect_uri()"
     },
     {
@@ -26081,7 +26201,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_state_cookie_secure_when_configured",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_state_cookie_secure_when_configured()"
     },
     {
@@ -26091,7 +26211,7 @@
       "source_location": "L167",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_state_cookie_not_secure_over_http_by_default",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_state_cookie_not_secure_over_http_by_default()"
     },
     {
@@ -26101,7 +26221,7 @@
       "source_location": "L177",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_test_sso_routes_absent_when_not_configured",
-      "community": 22,
+      "community": 49,
       "norm_label": "test_sso_routes_absent_when_not_configured()"
     },
     {
@@ -26111,7 +26231,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_sso_test_login_flow_rationale_1",
-      "community": 22,
+      "community": 49,
       "norm_label": "sso login/callback: jit provisioning, admin-group sync, subject binding, cookies"
     },
     {
@@ -26431,7 +26551,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tests_teams_conftest_fakeorgrepo",
-      "community": 2,
+      "community": 40,
       "norm_label": "fakeorgrepo"
     },
     {
@@ -26441,7 +26561,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "tests_teams_conftest_fakeorgrepo_init",
-      "community": 2,
+      "community": 40,
       "norm_label": ".__init__()"
     },
     {
@@ -26451,7 +26571,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "tests_teams_conftest_fakeorgrepo_add",
-      "community": 2,
+      "community": 40,
       "norm_label": ".add()"
     },
     {
@@ -26461,7 +26581,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "tests_teams_conftest_fakeorgrepo_get",
-      "community": 2,
+      "community": 40,
       "norm_label": ".get()"
     },
     {
@@ -26481,7 +26601,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "tests_teams_conftest_fakeorgrepo_list",
-      "community": 2,
+      "community": 40,
       "norm_label": ".list()"
     },
     {
@@ -26541,7 +26661,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "tests_teams_conftest_fakemembershiprepo",
-      "community": 24,
+      "community": 2,
       "norm_label": "fakemembershiprepo"
     },
     {
@@ -26551,7 +26671,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "tests_teams_conftest_fakemembershiprepo_init",
-      "community": 24,
+      "community": 2,
       "norm_label": ".__init__()"
     },
     {
@@ -26561,7 +26681,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "tests_teams_conftest_fakemembershiprepo_add",
-      "community": 24,
+      "community": 2,
       "norm_label": ".add()"
     },
     {
@@ -26571,7 +26691,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "tests_teams_conftest_fakemembershiprepo_get",
-      "community": 24,
+      "community": 2,
       "norm_label": ".get()"
     },
     {
@@ -26581,7 +26701,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "tests_teams_conftest_fakemembershiprepo_list_by_team",
-      "community": 24,
+      "community": 2,
       "norm_label": ".list_by_team()"
     },
     {
@@ -26601,7 +26721,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "tests_teams_conftest_fakemembershiprepo_update",
-      "community": 24,
+      "community": 2,
       "norm_label": ".update()"
     },
     {
@@ -26761,7 +26881,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "tests_teams_conftest_client",
-      "community": 2,
+      "community": 21,
       "norm_label": "client()"
     },
     {
@@ -26771,7 +26891,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_teams_conftest_py_path",
-      "community": 2,
+      "community": 21,
       "norm_label": "path"
     },
     {
@@ -27301,7 +27421,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_teams_test_membership_management",
-      "community": 45,
+      "community": 166,
       "norm_label": "test_membership_management.py"
     },
     {
@@ -27321,7 +27441,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "tests_teams_test_membership_management_test_last_admin_protected_when_admin_is_beyond_first_page",
-      "community": 45,
+      "community": 166,
       "norm_label": "test_last_admin_protected_when_admin_is_beyond_first_page()"
     },
     {
@@ -27331,7 +27451,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "tests_teams_test_membership_management_team_with_two_admins",
-      "community": 45,
+      "community": 166,
       "norm_label": "_team_with_two_admins()"
     },
     {
@@ -27341,7 +27461,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "tests_teams_test_membership_management_test_cannot_remove_last_admin",
-      "community": 45,
+      "community": 166,
       "norm_label": "test_cannot_remove_last_admin()"
     },
     {
@@ -27351,7 +27471,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "tests_teams_test_membership_management_test_cannot_demote_last_admin",
-      "community": 45,
+      "community": 166,
       "norm_label": "test_cannot_demote_last_admin()"
     },
     {
@@ -27361,7 +27481,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "tests_teams_test_membership_management_test_removing_a_member_never_triggers_last_admin_guard",
-      "community": 45,
+      "community": 166,
       "norm_label": "test_removing_a_member_never_triggers_last_admin_guard()"
     },
     {
@@ -27371,7 +27491,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_teams_test_membership_management_rationale_1",
-      "community": 45,
+      "community": 166,
       "norm_label": "teamservice: the last-admin guard on remove/demote, across membership pages."
     },
     {
@@ -27961,7 +28081,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_users_conftest",
-      "community": 14,
+      "community": 50,
       "norm_label": "conftest.py"
     },
     {
@@ -27971,7 +28091,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "tests_users_conftest_faketransaction",
-      "community": 14,
+      "community": 50,
       "norm_label": "faketransaction"
     },
     {
@@ -27981,7 +28101,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "tests_users_conftest_faketransaction_init",
-      "community": 14,
+      "community": 50,
       "norm_label": ".__init__()"
     },
     {
@@ -27991,7 +28111,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "tests_users_conftest_faketransaction_commit",
-      "community": 14,
+      "community": 50,
       "norm_label": ".commit()"
     },
     {
@@ -28001,7 +28121,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "tests_users_conftest_faketransaction_rollback",
-      "community": 14,
+      "community": 50,
       "norm_label": ".rollback()"
     },
     {
@@ -28031,7 +28151,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tests_users_conftest_fakeuserrepository_add",
-      "community": 54,
+      "community": 14,
       "norm_label": ".add()"
     },
     {
@@ -28051,7 +28171,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "tests_users_conftest_fakeuserrepository_get_by_sso_subject",
-      "community": 54,
+      "community": 14,
       "norm_label": ".get_by_sso_subject()"
     },
     {
@@ -28191,7 +28311,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "tests_users_conftest_fakeuserrepository_get_by_external_id",
-      "community": 54,
+      "community": 14,
       "norm_label": ".get_by_external_id()"
     },
     {
@@ -28201,7 +28321,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "tests_users_conftest_fakeuserrepository_list",
-      "community": 54,
+      "community": 14,
       "norm_label": ".list()"
     },
     {
@@ -28221,7 +28341,7 @@
       "source_location": "L137",
       "_origin": "ast",
       "id": "tests_users_conftest_fakeinviterepository",
-      "community": 14,
+      "community": 50,
       "norm_label": "fakeinviterepository"
     },
     {
@@ -28231,7 +28351,7 @@
       "source_location": "L138",
       "_origin": "ast",
       "id": "tests_users_conftest_fakeinviterepository_init",
-      "community": 14,
+      "community": 50,
       "norm_label": ".__init__()"
     },
     {
@@ -28241,7 +28361,7 @@
       "source_location": "L141",
       "_origin": "ast",
       "id": "tests_users_conftest_fakeinviterepository_add",
-      "community": 14,
+      "community": 8,
       "norm_label": ".add()"
     },
     {
@@ -28251,7 +28371,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "tests_users_conftest_fakeinviterepository_get_by_token_hash",
-      "community": 14,
+      "community": 8,
       "norm_label": ".get_by_token_hash()"
     },
     {
@@ -28271,7 +28391,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "tests_users_conftest_fakepasswordresetrepository",
-      "community": 14,
+      "community": 50,
       "norm_label": "fakepasswordresetrepository"
     },
     {
@@ -28281,7 +28401,7 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "tests_users_conftest_fakepasswordresetrepository_init",
-      "community": 14,
+      "community": 50,
       "norm_label": ".__init__()"
     },
     {
@@ -28291,7 +28411,7 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "tests_users_conftest_fakepasswordresetrepository_add",
-      "community": 14,
+      "community": 50,
       "norm_label": ".add()"
     },
     {
@@ -28301,7 +28421,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "tests_users_conftest_fakepasswordresetrepository_get_by_token_hash",
-      "community": 14,
+      "community": 50,
       "norm_label": ".get_by_token_hash()"
     },
     {
@@ -28321,7 +28441,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "tests_users_conftest_service",
-      "community": 14,
+      "community": 50,
       "norm_label": "service()"
     },
     {
@@ -28341,7 +28461,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_users_conftest_rationale_1",
-      "community": 14,
+      "community": 50,
       "norm_label": "shared fakes/fixtures for userservice unit tests (in-memory repositories)."
     },
     {
@@ -28351,7 +28471,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "tests_users_conftest_rationale_16",
-      "community": 14,
+      "community": 50,
       "norm_label": "counts commits/rollbacks; the fakes apply writes immediately."
     },
     {
@@ -28561,7 +28681,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_users_test_bootstrap",
-      "community": 14,
+      "community": 50,
       "norm_label": "test_bootstrap.py"
     },
     {
@@ -28581,7 +28701,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "tests_users_test_bootstrap_test_ensure_admin_creates_admin_with_master_key",
-      "community": 14,
+      "community": 50,
       "norm_label": "test_ensure_admin_creates_admin_with_master_key()"
     },
     {
@@ -28591,7 +28711,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "tests_users_test_bootstrap_test_ensure_admin_is_idempotent_when_users_exist",
-      "community": 14,
+      "community": 50,
       "norm_label": "test_ensure_admin_is_idempotent_when_users_exist()"
     },
     {
@@ -28601,7 +28721,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "tests_users_test_bootstrap_test_ensure_admin_tolerates_concurrent_replica_bootstrap",
-      "community": 14,
+      "community": 50,
       "norm_label": "test_ensure_admin_tolerates_concurrent_replica_bootstrap()"
     },
     {
@@ -28611,7 +28731,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_users_test_bootstrap_rationale_1",
-      "community": 14,
+      "community": 50,
       "norm_label": "userservice.ensure_admin: bootstrap the first platform admin from master_key."
     },
     {
@@ -28621,7 +28741,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "tests_users_test_bootstrap_rationale_44",
-      "community": 14,
+      "community": 50,
       "norm_label": "two replicas racing ensure_admin on an empty table: the loser's add() hits     t"
     },
     {
@@ -29361,7 +29481,7 @@
       "source_location": "L284",
       "_origin": "ast",
       "id": "tests_users_test_signup_integration_test_app_imports_and_routes",
-      "community": 55,
+      "community": 25,
       "norm_label": "test_app_imports_and_routes()"
     },
     {
@@ -30481,7 +30601,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_logging",
-      "community": 75,
+      "community": 187,
       "norm_label": "logging.md"
     },
     {
@@ -30491,7 +30611,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_logging_design_doc_structured_logging_error_hygiene",
-      "community": 75,
+      "community": 187,
       "norm_label": "design doc \u2014 structured logging & error hygiene"
     },
     {
@@ -30501,7 +30621,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "docs_logging_1_goal",
-      "community": 75,
+      "community": 187,
       "norm_label": "1. goal"
     },
     {
@@ -30511,7 +30631,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "docs_logging_2_plan",
-      "community": 75,
+      "community": 187,
       "norm_label": "2. plan"
     },
     {
@@ -30521,7 +30641,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "docs_logging_3_open_decisions",
-      "community": 75,
+      "community": 187,
       "norm_label": "3. open decisions"
     },
     {
@@ -30531,7 +30651,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "docs_logging_4_testing",
-      "community": 75,
+      "community": 187,
       "norm_label": "4. testing"
     },
     {
@@ -30541,7 +30661,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "docs_logging_5_rollout",
-      "community": 75,
+      "community": 187,
       "norm_label": "5. rollout"
     },
     {
@@ -30621,7 +30741,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "docs_next_steps_smart_routing_strategies_implement_in_this_order",
-      "community": 6,
+      "community": 188,
       "norm_label": "strategies (implement in this order)"
     },
     {
@@ -30631,7 +30751,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "docs_next_steps_smart_routing_s1_rule_based_complexity_port_from_litellm",
-      "community": 6,
+      "community": 188,
       "norm_label": "s1 \u2014 rule-based complexity (port from litellm)"
     },
     {
@@ -30641,7 +30761,7 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "docs_next_steps_smart_routing_s2_external_webhook",
-      "community": 6,
+      "community": 188,
       "norm_label": "s2 \u2014 external webhook"
     },
     {
@@ -30651,7 +30771,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "docs_next_steps_smart_routing_s3_embeddings_semantic_routes",
-      "community": 6,
+      "community": 188,
       "norm_label": "s3 \u2014 embeddings (semantic routes)"
     },
     {
@@ -30661,7 +30781,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "docs_next_steps_smart_routing_s4_llm_as_a_judge",
-      "community": 6,
+      "community": 188,
       "norm_label": "s4 \u2014 llm as a judge"
     },
     {
@@ -30671,7 +30791,7 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "docs_next_steps_smart_routing_s5_hybrid_gray_zone_composition_not_a_new_algorithm",
-      "community": 6,
+      "community": 188,
       "norm_label": "s5 \u2014 hybrid gray-zone (composition, not a new algorithm)"
     },
     {
@@ -30681,7 +30801,7 @@
       "source_location": "L137",
       "_origin": "ast",
       "id": "docs_next_steps_smart_routing_s6_distillation_data_collection_not_training",
-      "community": 6,
+      "community": 188,
       "norm_label": "s6 \u2014 distillation data collection (not training)"
     },
     {
@@ -31151,7 +31271,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_routing_webhook",
-      "community": 82,
+      "community": 189,
       "norm_label": "routing-webhook.md"
     },
     {
@@ -31161,7 +31281,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_routing_webhook_smart_routing_external_webhook_strategy_s2",
-      "community": 82,
+      "community": 189,
       "norm_label": "smart routing \u2014 external webhook strategy (s2)"
     },
     {
@@ -31171,7 +31291,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "docs_routing_webhook_router_config",
-      "community": 82,
+      "community": 189,
       "norm_label": "router config"
     },
     {
@@ -31181,7 +31301,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "docs_routing_webhook_the_contract_your_endpoint_implements",
-      "community": 82,
+      "community": 189,
       "norm_label": "the contract your endpoint implements"
     },
     {
@@ -31191,7 +31311,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "docs_routing_webhook_failure_semantics",
-      "community": 82,
+      "community": 189,
       "norm_label": "failure semantics"
     },
     {
@@ -31201,7 +31321,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "docs_routing_webhook_shadow_mode_6",
-      "community": 82,
+      "community": 189,
       "norm_label": "shadow mode (\u00a76)"
     },
     {
@@ -31497,7 +31617,7 @@
       "source_location": "L3",
       "weight": 1.0,
       "source": "src_litestar_gateway_app",
-      "target": "docs_logging",
+      "target": "src_litestar_gateway_infrastructure_logging",
       "confidence_score": 1.0
     },
     {
@@ -31636,6 +31756,17 @@
       "source_location": "L16",
       "weight": 1.0,
       "source": "tests_misc_test_rate_limit",
+      "target": "src_litestar_gateway_app",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation",
       "target": "src_litestar_gateway_app",
       "confidence_score": 1.0
     },
@@ -32473,6 +32604,17 @@
       "source_location": "L116",
       "weight": 1.0,
       "source": "tests_misc_test_rate_limit_test_rate_limit_uses_redis_store_when_configured",
+      "target": "src_litestar_gateway_app_create_app"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_client",
       "target": "src_litestar_gateway_app_create_app"
     },
     {
@@ -35772,7 +35914,7 @@
       "source_location": "L13",
       "weight": 1.0,
       "source": "src_litestar_gateway_application_routing_service",
-      "target": "docs_logging",
+      "target": "src_litestar_gateway_infrastructure_logging",
       "confidence_score": 1.0
     },
     {
@@ -37438,7 +37580,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/litestar_gateway/application/routing/weighted.py",
-      "source_location": "L23",
+      "source_location": "L25",
       "weight": 1.0,
       "source": "src_litestar_gateway_application_routing_weighted",
       "target": "src_litestar_gateway_application_routing_weighted_weightedstrategy",
@@ -37458,7 +37600,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/litestar_gateway/application/routing/weighted.py",
-      "source_location": "L24",
+      "source_location": "L26",
       "weight": 1.0,
       "source": "src_litestar_gateway_application_routing_weighted_weightedstrategy",
       "target": "src_litestar_gateway_application_routing_weighted_weightedstrategy_init",
@@ -37468,7 +37610,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/litestar_gateway/application/routing/weighted.py",
-      "source_location": "L28",
+      "source_location": "L30",
       "weight": 1.0,
       "source": "src_litestar_gateway_application_routing_weighted_weightedstrategy",
       "target": "src_litestar_gateway_application_routing_weighted_weightedstrategy_select",
@@ -37544,7 +37686,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "src/litestar_gateway/application/routing/weighted.py",
-      "source_location": "L24",
+      "source_location": "L26",
       "weight": 1.0,
       "source": "src_litestar_gateway_application_routing_weighted_weightedstrategy_init",
       "target": "src_litestar_gateway_application_routing_weighted_py_any",
@@ -37555,7 +37697,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "src/litestar_gateway/application/routing/weighted.py",
-      "source_location": "L28",
+      "source_location": "L30",
       "weight": 1.0,
       "source": "src_litestar_gateway_application_routing_weighted_weightedstrategy_select",
       "target": "src_litestar_gateway_domain_routing_candidatemodel",
@@ -37566,7 +37708,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "src/litestar_gateway/application/routing/weighted.py",
-      "source_location": "L28",
+      "source_location": "L30",
       "weight": 1.0,
       "source": "src_litestar_gateway_application_routing_weighted_weightedstrategy_select",
       "target": "src_litestar_gateway_domain_routing_routingcontext",
@@ -37577,7 +37719,7 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "src/litestar_gateway/application/routing/weighted.py",
-      "source_location": "L28",
+      "source_location": "L30",
       "weight": 1.0,
       "source": "src_litestar_gateway_application_routing_weighted_weightedstrategy_select",
       "target": "src_litestar_gateway_domain_routing_routingdecision",
@@ -41070,7 +41212,7 @@
       "source_location": "L13",
       "weight": 1.0,
       "source": "src_litestar_gateway_application_usage_meter",
-      "target": "docs_logging",
+      "target": "src_litestar_gateway_infrastructure_logging",
       "confidence_score": 1.0
     },
     {
@@ -42368,7 +42510,7 @@
       "source_location": "L11",
       "weight": 1.0,
       "source": "src_litestar_gateway_application_user_service",
-      "target": "docs_logging",
+      "target": "src_litestar_gateway_infrastructure_logging",
       "confidence_score": 1.0
     },
     {
@@ -44416,6 +44558,17 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation",
+      "target": "src_litestar_gateway_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "tests/models/test_models.py",
       "source_location": "L19",
       "weight": 1.0,
@@ -45628,6 +45781,17 @@
       "source_location": "L128",
       "weight": 1.0,
       "source": "tests_misc_test_rotation_lock_settings",
+      "target": "src_litestar_gateway_config_settings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_client",
       "target": "src_litestar_gateway_config_settings"
     },
     {
@@ -63952,7 +64116,7 @@
       "source_location": "L11",
       "weight": 1.0,
       "source": "src_litestar_gateway_infrastructure_locks",
-      "target": "docs_logging",
+      "target": "src_litestar_gateway_infrastructure_logging",
       "confidence_score": 1.0
     },
     {
@@ -64182,6 +64346,83 @@
       "source_location": "L1",
       "weight": 1.0,
       "source": "src_litestar_gateway_infrastructure_logging_rationale_1",
+      "target": "src_litestar_gateway_infrastructure_logging",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/litestar_gateway/infrastructure/observability/composite.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_litestar_gateway_infrastructure_observability_composite",
+      "target": "src_litestar_gateway_infrastructure_logging",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/litestar_gateway/infrastructure/observability/dispatcher.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "src_litestar_gateway_infrastructure_observability_dispatcher",
+      "target": "src_litestar_gateway_infrastructure_logging",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/litestar_gateway/infrastructure/observability/mlflow_metrics.py",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "src_litestar_gateway_infrastructure_observability_mlflow_metrics",
+      "target": "src_litestar_gateway_infrastructure_logging",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/litestar_gateway/infrastructure/persistence/usage_repository.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_litestar_gateway_infrastructure_persistence_usage_repository",
+      "target": "src_litestar_gateway_infrastructure_logging",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/litestar_gateway/infrastructure/rotation.py",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "src_litestar_gateway_infrastructure_rotation",
+      "target": "src_litestar_gateway_infrastructure_logging",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/litestar_gateway/infrastructure/usage_reconciler.py",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "src_litestar_gateway_infrastructure_usage_reconciler",
+      "target": "src_litestar_gateway_infrastructure_logging",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/config/test_startup_warnings.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "tests_config_test_startup_warnings",
       "target": "src_litestar_gateway_infrastructure_logging",
       "confidence_score": 1.0
     },
@@ -64439,17 +64680,6 @@
       "confidence_score": 1.0
     },
     {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "src/litestar_gateway/infrastructure/observability/composite.py",
-      "source_location": "L5",
-      "weight": 1.0,
-      "source": "src_litestar_gateway_infrastructure_observability_composite",
-      "target": "docs_logging",
-      "confidence_score": 1.0
-    },
-    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/litestar_gateway/infrastructure/observability/composite.py",
@@ -64539,17 +64769,6 @@
       "source": "tests_observability_test_mlflow_metrics_testpublisher",
       "target": "src_litestar_gateway_infrastructure_observability_composite_compositetracesink",
       "confidence_score": 0.5
-    },
-    {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "src/litestar_gateway/infrastructure/observability/dispatcher.py",
-      "source_location": "L13",
-      "weight": 1.0,
-      "source": "src_litestar_gateway_infrastructure_observability_dispatcher",
-      "target": "docs_logging",
-      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -64750,17 +64969,6 @@
       "weight": 1.0,
       "source": "tests_observability_test_observability_test_factory_returns_null_sink_without_tracking_uri",
       "target": "src_litestar_gateway_infrastructure_observability_factory_build_trace_sink"
-    },
-    {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "src/litestar_gateway/infrastructure/observability/mlflow_metrics.py",
-      "source_location": "L18",
-      "weight": 1.0,
-      "source": "src_litestar_gateway_infrastructure_observability_mlflow_metrics",
-      "target": "docs_logging",
-      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -69117,17 +69325,6 @@
       "confidence_score": 1.0
     },
     {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "src/litestar_gateway/infrastructure/persistence/usage_repository.py",
-      "source_location": "L5",
-      "weight": 1.0,
-      "source": "src_litestar_gateway_infrastructure_persistence_usage_repository",
-      "target": "docs_logging",
-      "confidence_score": 1.0
-    },
-    {
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
@@ -69878,17 +70075,6 @@
       "confidence_score": 1.0
     },
     {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "src/litestar_gateway/infrastructure/rotation.py",
-      "source_location": "L17",
-      "weight": 1.0,
-      "source": "src_litestar_gateway_infrastructure_rotation",
-      "target": "docs_logging",
-      "confidence_score": 1.0
-    },
-    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/litestar_gateway/infrastructure/rotation.py",
@@ -70466,17 +70652,6 @@
       "weight": 1.0,
       "source": "src_litestar_gateway_infrastructure_sso_oidc_oidcidentityprovider_verify_id_token",
       "target": "src_litestar_gateway_infrastructure_sso_oidc_oidcidentityprovider_fetch_key_set",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "src/litestar_gateway/infrastructure/usage_reconciler.py",
-      "source_location": "L21",
-      "weight": 1.0,
-      "source": "src_litestar_gateway_infrastructure_usage_reconciler",
-      "target": "docs_logging",
       "confidence_score": 1.0
     },
     {
@@ -81324,7 +81499,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L65",
+      "source_location": "L70",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_disabled_model_409",
       "target": "tests_completions_conftest_patch",
@@ -81335,7 +81510,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L41",
+      "source_location": "L46",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_missing_api_key_in_credential_400",
       "target": "tests_completions_conftest_patch",
@@ -81346,7 +81521,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L54",
+      "source_location": "L59",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_unknown_model_alias_404",
       "target": "tests_completions_conftest_patch",
@@ -81357,7 +81532,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L78",
+      "source_location": "L83",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_unsupported_provider_501",
       "target": "tests_completions_conftest_patch",
@@ -82094,7 +82269,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L70",
+      "source_location": "L75",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_disabled_model_409",
       "target": "tests_completions_conftest_bearer",
@@ -82105,7 +82280,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L46",
+      "source_location": "L51",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_missing_api_key_in_credential_400",
       "target": "tests_completions_conftest_bearer",
@@ -82116,7 +82291,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L59",
+      "source_location": "L64",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_unknown_model_alias_404",
       "target": "tests_completions_conftest_bearer",
@@ -82127,7 +82302,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L84",
+      "source_location": "L89",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_unsupported_provider_501",
       "target": "tests_completions_conftest_bearer",
@@ -82939,7 +83114,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L66",
+      "source_location": "L71",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_disabled_model_409",
       "target": "tests_completions_conftest_setup",
@@ -82950,7 +83125,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L42",
+      "source_location": "L47",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_missing_api_key_in_credential_400",
       "target": "tests_completions_conftest_setup",
@@ -82961,7 +83136,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L55",
+      "source_location": "L60",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_unknown_model_alias_404",
       "target": "tests_completions_conftest_setup",
@@ -82972,7 +83147,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L80",
+      "source_location": "L85",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_unsupported_provider_501",
       "target": "tests_completions_conftest_setup",
@@ -84039,7 +84214,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L64",
+      "source_location": "L69",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths",
       "target": "tests_completions_test_error_paths_test_disabled_model_409",
@@ -84059,7 +84234,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L51",
+      "source_location": "L56",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths",
       "target": "tests_completions_test_error_paths_test_unknown_model_alias_404",
@@ -84069,7 +84244,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L75",
+      "source_location": "L80",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths",
       "target": "tests_completions_test_error_paths_test_unsupported_provider_501",
@@ -84122,7 +84297,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L64",
+      "source_location": "L69",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_disabled_model_409",
       "target": "tests_completions_test_error_paths_py_asynctestclient",
@@ -84144,7 +84319,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L51",
+      "source_location": "L56",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_unknown_model_alias_404",
       "target": "tests_completions_test_error_paths_py_asynctestclient",
@@ -84155,7 +84330,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L75",
+      "source_location": "L80",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_unsupported_provider_501",
       "target": "tests_completions_test_error_paths_py_asynctestclient",
@@ -84166,7 +84341,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L64",
+      "source_location": "L69",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_disabled_model_409",
       "target": "tests_completions_test_error_paths_py_monkeypatch",
@@ -84188,7 +84363,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L51",
+      "source_location": "L56",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_unknown_model_alias_404",
       "target": "tests_completions_test_error_paths_py_monkeypatch",
@@ -84199,7 +84374,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "tests/completions/test_error_paths.py",
-      "source_location": "L75",
+      "source_location": "L80",
       "weight": 1.0,
       "source": "tests_completions_test_error_paths_test_unsupported_provider_501",
       "target": "tests_completions_test_error_paths_py_monkeypatch",
@@ -88270,17 +88445,6 @@
       "confidence_score": 1.0
     },
     {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "tests/config/test_startup_warnings.py",
-      "source_location": "L11",
-      "weight": 1.0,
-      "source": "tests_config_test_startup_warnings",
-      "target": "docs_logging",
-      "confidence_score": 1.0
-    },
-    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tests/config/test_startup_warnings.py",
@@ -90230,6 +90394,261 @@
       "weight": 1.0,
       "source": "tests_misc_test_usage_outbox_test_transient_failure_is_retried_and_settles",
       "target": "tests_routing_test_judge_hybrid_export_stubescalation_select"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation",
+      "target": "tests_models_test_credential_validation_admin_token",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation",
+      "target": "tests_models_test_credential_validation_bearer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation",
+      "target": "tests_models_test_credential_validation_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L44",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation",
+      "target": "tests_models_test_credential_validation_create",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L99",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation",
+      "target": "tests_models_test_credential_validation_test_error_names_the_offending_keys",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L93",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation",
+      "target": "tests_models_test_credential_validation_test_invalid_values_rejected_with_400",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L112",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation",
+      "target": "tests_models_test_credential_validation_test_provider_without_rules_is_accepted",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L73",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation",
+      "target": "tests_models_test_credential_validation_test_valid_values_accepted",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_rationale_1",
+      "target": "tests_models_test_credential_validation",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_client",
+      "target": "tests_models_test_credential_validation_py_asynctestclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_client",
+      "target": "tests_models_test_credential_validation_py_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_admin_token",
+      "target": "tests_models_test_credential_validation_py_asynctestclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L44",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_create",
+      "target": "tests_models_test_credential_validation_py_asynctestclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L99",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_test_error_names_the_offending_keys",
+      "target": "tests_models_test_credential_validation_py_asynctestclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L93",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_test_invalid_values_rejected_with_400",
+      "target": "tests_models_test_credential_validation_py_asynctestclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L112",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_test_provider_without_rules_is_accepted",
+      "target": "tests_models_test_credential_validation_py_asynctestclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L73",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_test_valid_values_accepted",
+      "target": "tests_models_test_credential_validation_py_asynctestclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L49",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_create",
+      "target": "tests_models_test_credential_validation_bearer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L104",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_test_error_names_the_offending_keys",
+      "target": "tests_models_test_credential_validation_bearer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_create",
+      "target": "tests_models_test_credential_validation_admin_token",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L100",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_test_error_names_the_offending_keys",
+      "target": "tests_models_test_credential_validation_admin_token",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L96",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_test_invalid_values_rejected_with_400",
+      "target": "tests_models_test_credential_validation_create",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L114",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_test_provider_without_rules_is_accepted",
+      "target": "tests_models_test_credential_validation_create",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/models/test_credential_validation.py",
+      "source_location": "L76",
+      "weight": 1.0,
+      "source": "tests_models_test_credential_validation_test_valid_values_accepted",
+      "target": "tests_models_test_credential_validation_create",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -109686,5 +110105,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "c352e69884892ea29bd2f0a783fb84af79a74fa9"
+  "built_at_commit": "f4fd3dbd46492c6c7486c94a6503eec3b3aaaf85"
 }

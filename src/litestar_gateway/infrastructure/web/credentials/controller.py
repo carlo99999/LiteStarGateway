@@ -36,10 +36,14 @@ salt key and can never be read back — only metadata is returned.
 - `openai`: `api_key` (`api_base`, `organization`)
 - `anthropic`: `api_key` (`api_base`)
 - `azure_openai`: `api_key`, `api_base`, `api_version` (`deployment`)
-- `vertex_ai`: `vertex_project`, `vertex_location`, `vertex_credentials`
+- `vertex_ai`: `vertex_project`, `vertex_location` (`vertex_credentials` —
+  falls back to Application Default Credentials when omitted)
 - `bedrock`: `aws_access_key_id`, `aws_secret_access_key`, `aws_region_name`
   (`aws_session_token`)
 - `databricks`: `api_key`, `api_base`
+
+`values` are validated on creation: a missing/blank required key or a key not
+listed above returns **400** (`bedrock` is not validated yet — no adapter).
 
 Requires a platform-admin JWT.
 """
