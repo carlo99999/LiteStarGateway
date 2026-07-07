@@ -75,6 +75,8 @@ def provide_completion_service(
             models=SQLAlchemyModelRepository(db_session),
             decisions=SQLAlchemyRoutingDecisionLog(db_session),
             shadow_decisions=shadow_decision_log_factory,
+            credentials=SQLAlchemyCredentialRepository(db_session, keyring),
+            gateway=llm_gateway,
         ),
         meter=UsageMeter(
             usage=SQLAlchemyUsageRepository(db_session),

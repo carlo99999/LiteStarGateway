@@ -18,8 +18,13 @@
 > candidate are captured at decision time; the request's actual token usage is
 > attached to the decision after settlement (streams not attached yet), so
 > savings = Σ (Δ unit cost × actual tokens) without touching the billing
-> pipeline. Phases 4-6 (embeddings, LLM judge, hybrid, export) are not yet
-> implemented.
+> pipeline.
+> **Phase 4 implemented**: S3 semantic routes via embeddings
+> (`application/routing/embeddings.py`): routes declared in the strategy
+> config, user text embedded through the gateway's own `LLMGateway` port with
+> the team's embedding model, cosine vs lazily-cached utterance embeddings,
+> below-threshold → `default_model`. Phases 5-6 (LLM judge, hybrid, export)
+> are not yet implemented.
 
 You are implementing **smart routing** for this LLM gateway (Litestar, hexagonal architecture, `src/litestar_gateway/`). Smart routing lets an admin define a **virtual model** (a "router") backed by N candidate models; every incoming request to the virtual model is dispatched to the best candidate according to a configurable strategy.
 

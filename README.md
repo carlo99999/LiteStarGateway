@@ -282,7 +282,10 @@ on their own branch (linked). Order within a phase is a recommendation.
   and **shadow mode** (validate a strategy on live traffic without activating it).
   Phase 3 adds **decision observability**: per-router decision log, model/tier
   distribution stats, and **estimated savings** vs the most expensive capable
-  candidate, computed from each request's actual token usage.
+  candidate, computed from each request's actual token usage. Phase 4 adds
+  **semantic routes** (embeddings strategy): example utterances per route,
+  embedded through the gateway's own embedding models, cosine similarity with
+  per-route thresholds.
   [design](docs/next-steps/smart-routing.md)
 - ✅ **Structured outputs** _(shipped)_ — first-class, cross-provider
   `response_format` (and the Responses API's `text.format`): native for
