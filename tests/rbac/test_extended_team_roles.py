@@ -1,0 +1,156 @@
+"""Extended team roles end-to-end: model-manager, key-issuer, billing-viewer,
+plus member/admin unchanged and the last-admin guard against demotion."""
+
+from __future__ import annotations
+
+from litestar.status_codes import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_204_NO_CONTENT,
+    HTTP_403_FORBIDDEN,
+    HTTP_409_CONFLICT,
+)
+from litestar.testing import AsyncTestClient
+
+from .conftest import (
+    ADMIN_EMAIL,
+    _admin,
+    _bearer,
+    _credential,
+    _member_token,
+    _model_payload,
+    _team,
+)
+
+
+async def test_model_manager_manages_models_and_nothing_else(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    cred = await _credential(client, admin)
+    token = await _member_token(client, admin, team, "mm@corp.com", "model-manager")
+
+    created = await client.post(
+        f"/teams/{team}/models", json=_model_payload(cred), headers=_bearer(token)
+    )
+    assert created.status_code == HTTP_201_CREATED, created.text
+    assert (
+        await client.get(f"/teams/{team}/models", headers=_bearer(token))
+    ).status_code == HTTP_200_OK
+
+    denied = [
+        client.post(
+            f"/teams/{team}/members",
+            json={"email": ADMIN_EMAIL, "role": "member"},
+            headers=_bearer(token),
+        ),
+        client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(token)),
+        client.get(f"/teams/{team}/usage", headers=_bearer(token)),
+        client.post(
+            f"/teams/{team}/service-principals", json={"name": "sp"}, headers=_bearer(token)
+        ),
+        client.get(f"/teams/{team}/members", headers=_bearer(token)),
+    ]
+    for request in denied:
+        assert (await request).status_code == HTTP_403_FORBIDDEN
+
+
+async def test_key_issuer_mints_lists_and_revokes_keys_only(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    cred = await _credential(client, admin)
+    token = await _member_token(client, admin, team, "ki@corp.com", "key-issuer")
+
+    minted = await client.post(f"/teams/{team}/keys", json={"name": "app"}, headers=_bearer(token))
+    assert minted.status_code == HTTP_201_CREATED, minted.text
+    key_id = minted.json()["id"]
+    assert (
+        await client.get(f"/teams/{team}/keys", headers=_bearer(token))
+    ).status_code == HTTP_200_OK
+    revoked = await client.delete(f"/teams/{team}/keys/{key_id}", headers=_bearer(token))
+    assert revoked.status_code == HTTP_204_NO_CONTENT
+
+    for request in (
+        client.post(f"/teams/{team}/models", json=_model_payload(cred), headers=_bearer(token)),
+        client.get(f"/teams/{team}/usage", headers=_bearer(token)),
+        client.get(f"/teams/{team}/members", headers=_bearer(token)),
+    ):
+        assert (await request).status_code == HTTP_403_FORBIDDEN
+
+
+async def test_billing_viewer_reads_usage_budget_and_spend_only(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    cred = await _credential(client, admin)
+    set_budget = await client.put(
+        f"/teams/{team}/budget",
+        json={"limit_cost": 100.0, "window": "monthly"},
+        headers=_bearer(admin),
+    )
+    assert set_budget.status_code in (HTTP_200_OK, HTTP_201_CREATED), set_budget.text
+    token = await _member_token(client, admin, team, "bv@corp.com", "billing-viewer")
+
+    for request in (
+        client.get(f"/teams/{team}/usage", headers=_bearer(token)),
+        client.get(f"/teams/{team}/budget", headers=_bearer(token)),
+        client.get(f"/teams/{team}/keys/spending", headers=_bearer(token)),
+    ):
+        assert (await request).status_code == HTTP_200_OK
+
+    for request in (
+        client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(token)),
+        client.post(f"/teams/{team}/models", json=_model_payload(cred), headers=_bearer(token)),
+        client.put(
+            f"/teams/{team}/budget",
+            json={"limit_cost": 1.0, "window": "monthly"},
+            headers=_bearer(token),
+        ),
+        client.get(f"/teams/{team}/members", headers=_bearer(token)),
+    ):
+        assert (await request).status_code == HTTP_403_FORBIDDEN
+
+
+async def test_plain_member_is_still_denied_all_management(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    token = await _member_token(client, admin, team, "plain@corp.com", "member")
+
+    for request in (
+        client.get(f"/teams/{team}/members", headers=_bearer(token)),
+        client.get(f"/teams/{team}/models", headers=_bearer(token)),
+        client.get(f"/teams/{team}/keys", headers=_bearer(token)),
+        client.get(f"/teams/{team}/usage", headers=_bearer(token)),
+        client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(token)),
+    ):
+        assert (await request).status_code == HTTP_403_FORBIDDEN
+
+
+async def test_team_admin_keeps_full_access(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    cred = await _credential(client, admin)
+    token = await _member_token(client, admin, team, "lead@corp.com", "admin")
+
+    assert (
+        await client.post(
+            f"/teams/{team}/models", json=_model_payload(cred), headers=_bearer(token)
+        )
+    ).status_code == HTTP_201_CREATED
+    assert (
+        await client.get(f"/teams/{team}/members", headers=_bearer(token))
+    ).status_code == HTTP_200_OK
+    assert (
+        await client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(token))
+    ).status_code == HTTP_201_CREATED
+
+
+async def test_last_admin_cannot_be_demoted_to_extended_role(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    admin_id = (await client.get("/me", headers=_bearer(admin))).json()["id"]
+
+    resp = await client.patch(
+        f"/teams/{team}/members/{admin_id}",
+        json={"role": "billing-viewer"},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_409_CONFLICT
