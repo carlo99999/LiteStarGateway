@@ -14,6 +14,7 @@ from litestar_gateway.domain.entities import Model, Provider
 from litestar_gateway.domain.exceptions import UnsupportedOperation
 from litestar_gateway.infrastructure.llm.anthropic_adapter import AnthropicAdapter
 from litestar_gateway.infrastructure.llm.azure_adapter import AzureOpenAIAdapter
+from litestar_gateway.infrastructure.llm.bedrock_adapter import BedrockAdapter
 from litestar_gateway.infrastructure.llm.errors import (
     arun_translated,
     run_translated,
@@ -57,6 +58,12 @@ class LLMGatewayImpl:
             # Vertex/Gemini: chat + emulated Responses + embeddings + images (Imagen).
             Provider.VERTEX_AI: (
                 ChatToResponsesAdapter(VertexAdapter(resilience)),
+                frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES}),
+            ),
+            # Bedrock: Converse chat + emulated Responses + invoke_model
+            # embeddings (Titan/Cohere) and images (Titan Image Generator).
+            Provider.BEDROCK: (
+                ChatToResponsesAdapter(BedrockAdapter(resilience)),
                 frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES}),
             ),
         }
