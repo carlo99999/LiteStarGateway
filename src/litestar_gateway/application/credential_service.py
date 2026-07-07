@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from litestar_gateway.domain.credential_policy import validate_credential_values
 from litestar_gateway.domain.entities import Credential, Provider, User
 from litestar_gateway.domain.exceptions import (
     CredentialNameExists,
@@ -37,6 +38,7 @@ class CredentialService:
         self, actor: User, name: str, provider: Provider, values: dict[str, str]
     ) -> Credential:
         _require_platform_admin(actor)
+        validate_credential_values(provider, values)
         if await self._repo.get_by_name(name) is not None:
             raise CredentialNameExists(name)
         credential = Credential(id=uuid4(), name=name, provider=provider, created_at=_now())

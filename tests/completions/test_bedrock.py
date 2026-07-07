@@ -494,6 +494,12 @@ async def test_bedrock_unknown_embedding_family_501(
 async def test_bedrock_missing_region_400(
     client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # Creation-time validation would reject a region-less credential now, so
+    # bypass it to simulate a legacy row created before validation existed:
+    # the adapter must still yield a clean 400 at call time (defense in depth).
+    from litestar_gateway.application import credential_service
+
+    monkeypatch.setattr(credential_service, "validate_credential_values", lambda *_: None)
     _patch(monkeypatch)
     _patch_bedrock(monkeypatch)
     api_key = await _setup(

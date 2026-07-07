@@ -36,10 +36,14 @@ salt key and can never be read back — only metadata is returned.
 - `openai`: `api_key` (`api_base`, `organization`)
 - `anthropic`: `api_key` (`api_base`)
 - `azure_openai`: `api_key`, `api_base`, `api_version` (`deployment`)
-- `vertex_ai`: `vertex_project`, `vertex_location`, `vertex_credentials`
-- `bedrock`: `aws_access_key_id`, `aws_secret_access_key`, `aws_region_name`
+- `vertex_ai`: `vertex_project`, `vertex_location` (`vertex_credentials` —
+  falls back to Application Default Credentials when omitted)
+- `bedrock`: `region`, `aws_access_key_id`, `aws_secret_access_key`
   (`aws_session_token`)
 - `databricks`: `api_key`, `api_base`
+
+`values` are validated on creation: a missing/blank required key or a key not
+listed above returns **400**.
 
 Requires a platform-admin JWT.
 """
@@ -55,9 +59,9 @@ _CREATE_EXAMPLES = [
             "name": "prod-bedrock",
             "provider": "bedrock",
             "values": {
+                "region": "us-east-1",
                 "aws_access_key_id": "AKIA...",
                 "aws_secret_access_key": "...",
-                "aws_region_name": "us-east-1",
             },
         },
     ),
