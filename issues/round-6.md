@@ -31,9 +31,9 @@ IdP.
 
 New counts: **2 CRITICAL · 6 HIGH · 12 MEDIUM · 5 LOW**.
 
-### CRITICAL
+## CRITICAL
 
-#### R6-C2 — Routing-decision export is gated on `usage:read`, leaking raw prompts to billing-only roles org-wide
+### R6-C2 — Routing-decision export is gated on `usage:read`, leaking raw prompts to billing-only roles org-wide
 
 - **Where:** `infrastructure/web/routing/controller.py:324` (gate) + `:333-343` (payload); `domain/authorization.py:40,47` (`BILLING_VIEWER` and `AUDITOR_TEAM_PERMISSIONS` both hold `USAGE_READ`); auditor cross-team bypass in `application/team_service.py:108-126`.
 - **Issue:** `GET /teams/{id}/routers/{id}/decisions/export` dumps `{"text": r.user_text, "system_prompt": r.system_prompt, ...}` — the actual end-user prompt and system prompt — but is gated only on `Permission.USAGE_READ`, the same permission meant for token/cost aggregates. `TeamRole.BILLING_VIEWER` holds `USAGE_READ`, and `User.is_auditor` is granted `USAGE_READ` in **every team without membership**. So a "billing-only" viewer, and any platform auditor across **all** organizations, can exfiltrate raw prompt/system-prompt content (routinely PII, business-confidential text, pasted secrets). **Verified:** gate and payload read directly; `USAGE_READ` membership in both roles confirmed in `authorization.py`.
