@@ -82,6 +82,9 @@ class RoutingContext:
     requested_max_tokens: int | None
     team_id: UUID | None = None
     api_key_id: UUID | None = None
+    # The router's safety net, visible to strategies that need a "no match"
+    # outcome distinct from failure (e.g. semantic routes below threshold).
+    default_model: str | None = None
 
 
 @dataclass(frozen=True)

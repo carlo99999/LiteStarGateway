@@ -9,6 +9,7 @@ misconfiguration and does fail the request (`NoRoutableCandidate`).
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 from datetime import UTC, datetime
 from time import perf_counter
@@ -16,6 +17,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from litestar_gateway.application.routing.complexity import ComplexityStrategy
+from litestar_gateway.application.routing.embeddings import EmbeddingsStrategy
 from litestar_gateway.application.routing.webhook import WebhookStrategy
 from litestar_gateway.domain.entities import ModelType
 from litestar_gateway.domain.exceptions import (
@@ -25,6 +27,8 @@ from litestar_gateway.domain.exceptions import (
     RouterNotFound,
 )
 from litestar_gateway.domain.ports import (
+    CredentialRepository,
+    LLMGateway,
     ModelRepository,
     RouterRepository,
     RoutingDecisionLog,
@@ -41,7 +45,11 @@ from litestar_gateway.domain.routing import (
 
 logger = logging.getLogger("litestar_gateway.routing")
 
-STRATEGIES: dict[str, type] = {"complexity": ComplexityStrategy, "webhook": WebhookStrategy}
+STRATEGIES: dict[str, type] = {
+    "complexity": ComplexityStrategy,
+    "webhook": WebhookStrategy,
+    "embeddings": EmbeddingsStrategy,
+}
 
 # Hard time budget for a strategy call. The rule-based strategy is local and
 # sub-millisecond; the budget exists so future network strategies (webhook,
@@ -65,11 +73,15 @@ class RouterService:
         models: ModelRepository,
         decisions: RoutingDecisionLog,
         shadow_decisions: RoutingDecisionLogFactory | None = None,
+        credentials: CredentialRepository | None = None,
+        gateway: LLMGateway | None = None,
     ) -> None:
         self._routers = routers
         self._models = models
         self._decisions = decisions
         self._shadow_decisions = shadow_decisions
+        self._credentials = credentials
+        self._gateway = gateway
         # The persisted record id of this request's routing decision (the
         # service is request-scoped), so settlement can attach actual usage.
         self.last_decision_record_id: UUID | None = None
@@ -116,6 +128,24 @@ class RouterService:
                 raise InvalidRouterConfig(
                     f"Candidate '{name}' is not an enabled chat model of this team"
                 )
+        if router.strategy == "embeddings":
+            await self._validate_embeddings_config(router, router.strategy_config)
+        if router.shadow_strategy == "embeddings":
+            await self._validate_embeddings_config(router, router.strategy_config.get("shadow", {}))
+
+    async def _validate_embeddings_config(self, router: RouterConfig, config: dict) -> None:
+        model_name = config.get("embedding_model")
+        model = await self._models.get_by_name(router.team_id, model_name) if model_name else None
+        if model is None or not model.enabled or model.type is not ModelType.EMBEDDINGS:
+            raise InvalidRouterConfig(
+                f"'{model_name}' is not an enabled embeddings model of this team"
+            )
+        candidate_names = {candidate.model_name for candidate in router.candidates}
+        for route in config.get("routes", []):
+            if route.get("target_model") not in candidate_names:
+                raise InvalidRouterConfig(
+                    f"route '{route.get('name')}' targets a non-candidate model"
+                )
 
     async def create(self, router: RouterConfig) -> RouterConfig:
         await self._validate(router)
@@ -156,6 +186,7 @@ class RouterService:
         Raises only `NoRoutableCandidate` (a config problem); every strategy
         failure falls back to `default_model` per §4."""
         ctx = build_routing_context(request, team_id=router.team_id, api_key_id=api_key_id)
+        ctx = dataclasses.replace(ctx, default_model=router.default_model)
         capable = filter_candidates(ctx, router.candidates)
         if not capable:
             raise NoRoutableCandidate(
@@ -185,11 +216,37 @@ class RouterService:
             task.add_done_callback(_SHADOW_TASKS.discard)
         return decision
 
+    async def _embed_texts(
+        self, team_id: UUID, model_name: str, texts: list[str]
+    ) -> list[list[float]]:
+        """Embed via the gateway's own port, using the team's embedding model."""
+        if self._gateway is None or self._credentials is None:
+            raise ValueError("embeddings strategy is not wired (no gateway/credentials)")
+        model = await self._models.get_by_name(team_id, model_name)
+        if model is None or not model.enabled or model.type is not ModelType.EMBEDDINGS:
+            raise ValueError(f"'{model_name}' is not an enabled embeddings model of this team")
+        values = await self._credentials.get_values(model.credential_id)
+        if values is None:
+            raise ValueError(f"credential missing for embedding model '{model_name}'")
+        response = await self._gateway.aembeddings(
+            {"model": model_name, "input": texts}, model, values
+        )
+        return [item["embedding"] for item in response["data"]]
+
+    def _build_strategy(self, router: RouterConfig, name: str, config: dict[str, Any]):
+        if name == "embeddings":
+
+            async def embed(model_name: str, texts: list[str]) -> list[list[float]]:
+                return await self._embed_texts(router.team_id, model_name, texts)
+
+            return EmbeddingsStrategy(config, embed=embed)
+        return STRATEGIES[name](config)
+
     async def _run_strategy(self, router, ctx, capable) -> tuple[RoutingDecision, bool]:
         start = perf_counter()
         budget_ms = router.strategy_config.get("time_budget_ms", DEFAULT_TIME_BUDGET_MS)
         try:
-            strategy = STRATEGIES[router.strategy](router.strategy_config)
+            strategy = self._build_strategy(router, router.strategy, router.strategy_config)
             async with asyncio.timeout(budget_ms / 1000):
                 decision = await strategy.select(ctx, capable)
             if any(decision.model_name == c.model_name for c in capable):
@@ -226,7 +283,7 @@ class RouterService:
         try:
             shadow_config = router.strategy_config.get("shadow", {})
             budget_ms = shadow_config.get("time_budget_ms", DEFAULT_TIME_BUDGET_MS)
-            strategy = STRATEGIES[router.shadow_strategy](shadow_config)
+            strategy = self._build_strategy(router, router.shadow_strategy, shadow_config)
             async with asyncio.timeout(budget_ms / 1000):
                 decision = await strategy.select(ctx, capable)
             if self._shadow_decisions is None:  # pragma: no cover - guarded by caller
