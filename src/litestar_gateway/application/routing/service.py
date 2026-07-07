@@ -21,6 +21,7 @@ from litestar_gateway.application.routing.embeddings import EmbeddingsStrategy
 from litestar_gateway.application.routing.hybrid import HybridStrategy
 from litestar_gateway.application.routing.judge import JudgeStrategy
 from litestar_gateway.application.routing.webhook import WebhookStrategy
+from litestar_gateway.application.routing.weighted import WeightedStrategy
 from litestar_gateway.domain.entities import ModelType
 from litestar_gateway.domain.exceptions import (
     InvalidRouterConfig,
@@ -53,6 +54,7 @@ STRATEGIES: dict[str, type] = {
     "embeddings": EmbeddingsStrategy,
     "judge": JudgeStrategy,
     "hybrid": HybridStrategy,
+    "weighted": WeightedStrategy,
 }
 
 # Hard time budget for a strategy call. The rule-based strategy is local and
@@ -145,11 +147,21 @@ class RouterService:
             await self._validate_embeddings_config(router, config)
         if name == "judge":
             await self._validate_judge_config(router, config)
+        if name == "weighted":
+            self._validate_weighted_candidates(router)
         if name == "hybrid":
             shell = HybridStrategy(config)
             await self._validate_strategy_deps(
                 router, shell.escalation_name, shell.escalation_config
             )
+
+    def _validate_weighted_candidates(self, router: RouterConfig) -> None:
+        for candidate in router.candidates:
+            if not isinstance(candidate.weight, (int, float)) or candidate.weight <= 0:
+                raise InvalidRouterConfig(
+                    f"weighted strategy requires a positive 'weight' on every "
+                    f"candidate; '{candidate.model_name}' has {candidate.weight!r}"
+                )
 
     async def _validate_judge_config(self, router: RouterConfig, config: dict) -> None:
         judge_name = config.get("judge_model")
