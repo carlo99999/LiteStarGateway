@@ -270,22 +270,21 @@ on their own branch (linked). Order within a phase is a recommendation.
 
 ### v2 (after v1)
 
-- 🟡 **Smart routing** _(phase 1 shipped)_ — admin-defined **virtual models**
+- ✅ **Smart routing** _(shipped)_ — admin-defined **virtual models**
   (`POST /teams/{id}/routers`): N candidate models with declared profiles
   (quality tier, vision/tools/json_schema, context window, costs); each request
-  is dispatched by a pluggable strategy after hard capability filters. Phase 1
-  ships the rule-based complexity strategy (7 weighted signals, EN+IT keywords,
-  ported from LiteLLM's complexity router, MIT), decision logging
-  (`routing_decision`), and a strict never-fail policy: any strategy error
-  falls back to the router's `default_model`. Phase 2 adds the **external
-  webhook strategy** (bring your own picker — [contract](docs/routing-webhook.md))
-  and **shadow mode** (validate a strategy on live traffic without activating it).
-  Phase 3 adds **decision observability**: per-router decision log, model/tier
-  distribution stats, and **estimated savings** vs the most expensive capable
-  candidate, computed from each request's actual token usage. Phase 4 adds
-  **semantic routes** (embeddings strategy): example utterances per route,
-  embedded through the gateway's own embedding models, cosine similarity with
-  per-route thresholds.
+  is dispatched by a pluggable strategy after hard capability filters, with a
+  strict never-fail policy — any strategy error falls back to the router's
+  `default_model`. Strategies: **rule-based complexity** (7 weighted signals,
+  EN+IT keywords, ported from LiteLLM's complexity router, MIT), **external
+  webhook** (bring your own picker — [contract](docs/routing-webhook.md)),
+  **semantic routes** (embeddings, cosine similarity against example
+  utterances), **LLM judge** (constrained structured output over the candidate
+  names), and **hybrid** (rule-based first, judge/webhook escalation only near
+  tier boundaries). Plus **shadow mode** (validate a strategy on live traffic
+  without activating it), **decision observability** (per-router decision log,
+  model/tier distribution stats, estimated savings vs the most expensive
+  capable candidate), and a **JSONL distillation export** of judge decisions.
   [design](docs/next-steps/smart-routing.md)
 - ✅ **Structured outputs** _(shipped)_ — first-class, cross-provider
   `response_format` (and the Responses API's `text.format`): native for
@@ -297,8 +296,6 @@ on their own branch (linked). Order within a phase is a recommendation.
   [`adding-bedrock`](https://github.com/carlo99999/LiteStarGateway/blob/adding-bedrock/docs/bedrock.md)
 - **Weighted multi-model routing** — an alias splitting traffic across ≤5 models by percentage.
   [`adding-weighted-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-weighted-routing/docs/weighted-routing.md)
-- **Smart (judge-based) routing** — four difficulty tiers + a swappable judge adapter.
-  [`adding-smart-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-smart-routing/docs/smart-routing.md)
 - **Web UI** — SPA over the JSON API for login + admin + usage dashboards.
   [`adding-web-ui`](https://github.com/carlo99999/LiteStarGateway/blob/adding-web-ui/docs/web-ui.md)
 - ✅ **LICENSE & repo hygiene** _(shipped)_ — Apache 2.0 [`LICENSE`](LICENSE),
