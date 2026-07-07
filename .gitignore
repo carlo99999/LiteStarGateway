@@ -19,3 +19,7 @@ graphify-out/*
 
 # Claude Code session worktrees (machine-local, never committed)
 .claude/worktrees/
+
+.ruff_cache
+.rumdl_cache
+.claude-plugin
