@@ -189,6 +189,7 @@ class RouterModel(base.UUIDAuditBase):
                     context_window_tokens=c.get("context_window_tokens"),
                     input_cost_per_token=c.get("input_cost_per_token"),
                     output_cost_per_token=c.get("output_cost_per_token"),
+                    weight=c.get("weight"),
                 )
                 for c in self.candidates
             ),

@@ -280,8 +280,10 @@ on their own branch (linked). Order within a phase is a recommendation.
   webhook** (bring your own picker — [contract](docs/routing-webhook.md)),
   **semantic routes** (embeddings, cosine similarity against example
   utterances), **LLM judge** (constrained structured output over the candidate
-  names), and **hybrid** (rule-based first, judge/webhook escalation only near
-  tier boundaries). Plus **shadow mode** (validate a strategy on live traffic
+  names), **hybrid** (rule-based first, judge/webhook escalation only near
+  tier boundaries), and **weighted** (percentage traffic split across
+  candidates, e.g. A/B testing or gradual rollout — [design](docs/weighted-routing.md)).
+  Plus **shadow mode** (validate a strategy on live traffic
   without activating it), **decision observability** (per-router decision log,
   model/tier distribution stats, estimated savings vs the most expensive
   capable candidate), and a **JSONL distillation export** of judge decisions.
@@ -294,8 +296,6 @@ on their own branch (linked). Order within a phase is a recommendation.
   (native and emulated), streaming included (#129, #130, #131).
 - **AWS Bedrock provider** — Converse API + boto3 (no hand-rolled SigV4), responses emulated.
   [`adding-bedrock`](https://github.com/carlo99999/LiteStarGateway/blob/adding-bedrock/docs/bedrock.md)
-- **Weighted multi-model routing** — an alias splitting traffic across ≤5 models by percentage.
-  [`adding-weighted-routing`](https://github.com/carlo99999/LiteStarGateway/blob/adding-weighted-routing/docs/weighted-routing.md)
 - **Web UI** — SPA over the JSON API for login + admin + usage dashboards.
   [`adding-web-ui`](https://github.com/carlo99999/LiteStarGateway/blob/adding-web-ui/docs/web-ui.md)
 - ✅ **LICENSE & repo hygiene** _(shipped)_ — Apache 2.0 [`LICENSE`](LICENSE),

@@ -50,6 +50,9 @@ class CandidateModel:
     context_window_tokens: int | None = None
     input_cost_per_token: float | None = None
     output_cost_per_token: float | None = None
+    # Relative traffic share for the weighted strategy (any positive number —
+    # not required to sum to 100; the strategy normalizes over survivors).
+    weight: float | None = None
 
 
 @dataclass(frozen=True)

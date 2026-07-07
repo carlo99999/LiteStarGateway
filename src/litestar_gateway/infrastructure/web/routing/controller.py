@@ -39,6 +39,8 @@ class CandidateRequest:
     context_window_tokens: int | None = None
     input_cost_per_token: float | None = None
     output_cost_per_token: float | None = None
+    # Relative traffic share for the "weighted" strategy (§ weighted routing).
+    weight: float | None = None
 
     def to_entity(self) -> CandidateModel:
         try:
@@ -56,6 +58,7 @@ class CandidateRequest:
             context_window_tokens=self.context_window_tokens,
             input_cost_per_token=self.input_cost_per_token,
             output_cost_per_token=self.output_cost_per_token,
+            weight=self.weight,
         )
 
 

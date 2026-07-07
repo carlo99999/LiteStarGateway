@@ -33,6 +33,16 @@
 > stored text — the intended path is judge → dataset → small local classifier).
 > Remaining: §8 semantic cache (optional; assess reuse of the S3 embedding
 > path) — training/serving a distilled classifier stays out of scope.
+>
+> **Weighted routing added** (not part of the original phased plan — folded
+> into this router/strategy infrastructure instead of the standalone
+> `ModelBlend` entity once proposed in `docs/weighted-routing.md`):
+> `application/routing/weighted.py`. Each candidate declares a relative
+> `weight`; one weighted random draw per request splits traffic across
+> whatever survives the hard capability filters (weights need not sum to
+> 100 — a filtered-out member's share is redistributed proportionally among
+> the rest). Reuses the existing router CRUD, RBAC, audit, decision log, and
+> shadow mode — no new entity, no new endpoints.
 
 You are implementing **smart routing** for this LLM gateway (Litestar, hexagonal architecture, `src/litestar_gateway/`). Smart routing lets an admin define a **virtual model** (a "router") backed by N candidate models; every incoming request to the virtual model is dispatched to the best candidate according to a configurable strategy.
 
