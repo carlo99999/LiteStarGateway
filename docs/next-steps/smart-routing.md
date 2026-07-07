@@ -6,7 +6,7 @@
 > (`application/routing/complexity.py`, EN+IT keywords, ported from LiteLLM,
 > MIT), decision persistence (`routing_decision` table), router CRUD
 > (`/teams/{id}/routers`, `models:manage`), §4 fallback policy, and the offline
-> eval harness (`tests/test_routing_eval.py`). Integration point is
+> eval harness (`tests/routing/test_eval.py`). Integration point is
 > `CompletionService._prepare` as prescribed.
 > **Phase 2 implemented**: S2 external webhook strategy
 > (`application/routing/webhook.py`, contract in `docs/routing-webhook.md`)
