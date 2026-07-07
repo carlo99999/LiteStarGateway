@@ -40,6 +40,11 @@ class UserRepository(Protocol):
         the user's existing sessions."""
         ...
 
+    async def set_auditor(self, user_id: UUID, is_auditor: bool) -> None:
+        """Grant/revoke the read-only platform-auditor role. Read live per
+        request like the admin flag, so it takes effect immediately."""
+        ...
+
     async def set_admin(self, user_id: UUID, is_admin: bool) -> None:
         """Grant/revoke the account's platform-admin role. Read live per request
         (not carried in the JWT), so it takes effect immediately — no token bump."""

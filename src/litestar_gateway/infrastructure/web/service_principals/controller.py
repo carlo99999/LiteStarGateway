@@ -1,7 +1,7 @@
 """Team service principals + their keys.
 
 Administration is JWT-only (a human team admin or platform admin, via
-`TeamService.ensure_can_manage_team`) — deliberately NOT dual-auth: a key must
+`TeamService.ensure_team_permission`) — deliberately NOT dual-auth: a key must
 never be able to create service principals or mint keys, so a leaked key
 cannot self-replicate. The keys issued here are the only ones allowed to hold
 management scope.
@@ -17,6 +17,7 @@ from litestar.params import FromPath, FromQuery
 
 from litestar_gateway.application.service_principal_service import ServicePrincipalService
 from litestar_gateway.application.team_service import TeamService
+from litestar_gateway.domain.authorization import Permission
 from litestar_gateway.domain.entities import KeyScope, User
 from litestar_gateway.domain.exceptions import InvalidKeyScope
 from litestar_gateway.domain.pagination import resolve_page
@@ -49,7 +50,9 @@ class ServicePrincipalController(Controller):
         service_principal_service: NamedDependency[ServicePrincipalService],
         audit_log: NamedDependency[AuditLog],
     ) -> ServicePrincipalResponse:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_team_permission(
+            current_user, team_id, Permission.SERVICE_PRINCIPALS_MANAGE
+        )
         sp = await service_principal_service.create(team_id, data.name)
         await record_audit(
             audit_log,
@@ -72,7 +75,9 @@ class ServicePrincipalController(Controller):
         limit: FromQuery[int | None] = None,
         offset: FromQuery[int | None] = None,
     ) -> list[ServicePrincipalResponse]:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_team_permission(
+            current_user, team_id, Permission.SERVICE_PRINCIPALS_MANAGE
+        )
         page_limit, page_offset = resolve_page(limit, offset)
         sps = await service_principal_service.list(team_id, limit=page_limit, offset=page_offset)
         return [ServicePrincipalResponse.from_entity(s) for s in sps]
@@ -89,7 +94,9 @@ class ServicePrincipalController(Controller):
         service_principal_service: NamedDependency[ServicePrincipalService],
         audit_log: NamedDependency[AuditLog],
     ) -> ServicePrincipalResponse:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_team_permission(
+            current_user, team_id, Permission.SERVICE_PRINCIPALS_MANAGE
+        )
         sp = await service_principal_service.set_enabled(team_id, sp_id, data.enabled)
         await record_audit(
             audit_log,
@@ -112,7 +119,9 @@ class ServicePrincipalController(Controller):
         service_principal_service: NamedDependency[ServicePrincipalService],
         audit_log: NamedDependency[AuditLog],
     ) -> None:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_team_permission(
+            current_user, team_id, Permission.SERVICE_PRINCIPALS_MANAGE
+        )
         await service_principal_service.delete(team_id, sp_id)
         await record_audit(
             audit_log,
@@ -135,7 +144,9 @@ class ServicePrincipalController(Controller):
         service_principal_service: NamedDependency[ServicePrincipalService],
         audit_log: NamedDependency[AuditLog],
     ) -> CreatedKeyResponse:
-        await team_service.ensure_can_manage_team(current_user, team_id)
+        await team_service.ensure_team_permission(
+            current_user, team_id, Permission.SERVICE_PRINCIPALS_MANAGE
+        )
         try:
             scope = KeyScope(data.scope)
         except ValueError:

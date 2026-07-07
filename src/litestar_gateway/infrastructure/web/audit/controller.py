@@ -1,4 +1,4 @@
-"""Read API for the audit trail — platform-admin only."""
+"""Read API for the audit trail — platform admins and auditors."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from litestar.params import FromQuery
 from litestar_gateway.domain.entities import AuditEvent, User
 from litestar_gateway.domain.pagination import resolve_page
 from litestar_gateway.domain.ports import AuditLog
-from litestar_gateway.infrastructure.web.session.dependencies import provide_current_admin
+from litestar_gateway.infrastructure.web.session.dependencies import provide_audit_reader
 
 
 @dataclass(frozen=True)
@@ -48,12 +48,12 @@ class AuditEventResponse:
 class AuditController(Controller):
     path = "/audit"
     tags = ["audit"]
-    dependencies = {"current_admin": Provide(provide_current_admin)}
+    dependencies = {"audit_reader": Provide(provide_audit_reader)}
 
     @get(summary="List recent audit events (most recent first)")
     async def list_audit(
         self,
-        current_admin: NamedDependency[User],
+        audit_reader: NamedDependency[User],
         audit_log: NamedDependency[AuditLog],
         limit: FromQuery[int | None] = None,
         offset: FromQuery[int | None] = None,

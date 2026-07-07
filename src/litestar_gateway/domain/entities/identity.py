@@ -39,6 +39,10 @@ class User:
     # The IdP's SCIM `externalId` for this account, once provisioned/adopted via
     # SCIM. None for accounts the IdP does not manage.
     external_id: str | None = None
+    # Platform auditor: read-only access to the audit log and to every team's
+    # usage/budget figures. Granted/revoked by a platform admin; never implies
+    # any write access. Orthogonal to is_admin (an admin already sees it all).
+    is_auditor: bool = False
     # Per-account brute-force defense: consecutive failed password logins, and a
     # temporary lock once the threshold is hit. Reset on successful login.
     failed_login_attempts: int = 0

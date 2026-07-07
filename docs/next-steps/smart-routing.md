@@ -55,9 +55,10 @@ A routing failure must **never** fail the user request. Any strategy exception, 
 
 ### S1 — Rule-based complexity (port from LiteLLM)
 
-Port `litellm/router_strategy/complexity_router/` (`complexity_router.py` + `config.py`, MIT licensed — keep attribution; upstream: https://github.com/BerriAI/litellm, itself inspired by ClawRouter). Weighted scoring over 7 dimensions (token count, code keywords, reasoning markers, technical terms, simple indicators with negative weight, multi-step regex patterns, question count), word-boundary keyword matching, reasoning-override at 2+ reasoning markers, configurable tier boundaries mapping score → SIMPLE/MEDIUM/COMPLEX/REASONING → candidate model.
+Port `litellm/router_strategy/complexity_router/` (`complexity_router.py` + `config.py`, MIT licensed — keep attribution; upstream: <https://github.com/BerriAI/litellm>, itself inspired by ClawRouter). Weighted scoring over 7 dimensions (token count, code keywords, reasoning markers, technical terms, simple indicators with negative weight, multi-step regex patterns, question count), word-boundary keyword matching, reasoning-override at 2+ reasoning markers, configurable tier boundaries mapping score → SIMPLE/MEDIUM/COMPLEX/REASONING → candidate model.
 
 Adaptations required:
+
 - rewrite to this repo's conventions (frozen dataclasses, no mutation, typed, DI) — do not copy code style, copy the algorithm
 - default keyword lists are English-only: **add Italian equivalents** for all four lists (code, reasoning, technical, simple) as part of the defaults
 - tier → model mapping comes from candidate profiles' `quality_tier`, with explicit per-tier override in strategy config
@@ -66,7 +67,7 @@ Adaptations required:
 
 Admin configures a URL (+ optional bearer token header). Contract:
 
-```
+```text
 POST <url>              timeout: configurable, default 2s
 { "task": "<user text>", "system_prompt": "<or null>",
   "models": ["m1", "m2", ...], "metadata": { "estimated_tokens": 123 } }

@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from litestar_gateway.application.team_service import TeamService
+from litestar_gateway.domain.authorization import Permission
 from litestar_gateway.domain.entities import (
     Organization,
     Team,
@@ -223,7 +224,7 @@ async def test_ensure_can_manage_unknown_team(service, repos) -> None:  # noqa: 
     admin = _user("admin@b.com", is_admin=True)
     users.add_user(admin)
     with pytest.raises(TeamNotFound):
-        await service.ensure_can_manage_team(admin, uuid4())
+        await service.ensure_team_permission(admin, uuid4(), Permission.MEMBERS_MANAGE)
 
 
 async def test_last_admin_protected_when_admin_is_beyond_first_page(service, repos) -> None:  # noqa: ANN001, E501

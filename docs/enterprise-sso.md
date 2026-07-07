@@ -5,9 +5,10 @@
 > (`infrastructure/persistence/audit_repository.py`, `infrastructure/web/audit/`,
 > wired into invites / password-reset / unlock / set-active), SCIM 2.0 Users
 > provisioning is implemented (`application/scim_service.py`,
-> `infrastructure/web/scim/`), and SSO group→team mapping is implemented
-> (`SSO_TEAM_MAPPING`, §5). Extended RBAC and SAML remain parked. The rest of
-> this doc is the broader enterprise plan.
+> `infrastructure/web/scim/`), SSO group→team mapping is implemented
+> (`SSO_TEAM_MAPPING`, §5), and extended RBAC is implemented
+> (`domain/authorization.py`, §6). SAML remains parked. The rest of this doc is
+> the broader enterprise plan.
 
 ## 0. OIDC SSO — implementation plan (refined after studying LiteLLM)
 
@@ -236,14 +237,35 @@ stripped or demoted by reconciliation, to avoid orphaning the team.
 Not yet done: a per-org (rather than global) mapping, and reconciliation driven
 by SCIM sync (§3) in addition to interactive login.
 
-## 6. Extended RBAC
+## 6. Extended RBAC — **implemented**
 
-Today: platform-admin / team-admin / member. Enterprise needs finer control:
+A small, declarative permission model (`domain/authorization.py`): a
+`Permission` enum (members/models/keys/service-principals/usage/budget, split
+read vs manage) and a `ROLE_PERMISSIONS` mapping that is the single source of
+truth for what each role may do. Enforcement is centralized in
+`TeamService.ensure_team_permission` (humans) and
+`ensure_principal_team_permission` (JWT or management-scoped API key) — every
+management endpoint declares the one permission it needs; no role names are
+re-checked inline.
 
-- Introduce a small **permission model** (roles → permissions), still enforced in
-  the services (the API stays the source of truth; SSO/SCIM only populate
-  identity). Keep it declarative and centrally checked, not scattered.
-- Examples: "billing viewer", "model manager", "key issuer", read-only auditor.
+**Team roles** (per-membership, also assignable via `SSO_TEAM_MAPPING` §5):
+
+| Role | Permissions |
+|------|-------------|
+| `admin` | everything in the team (unchanged) |
+| `member` | none — receives personal keys and runs inference (unchanged) |
+| `model-manager` | create/update/delete/list the team's models |
+| `key-issuer` | mint/revoke/list the team's API keys |
+| `billing-viewer` | read usage, per-key spend, and budget |
+
+**Platform auditor** (`User.is_auditor`): read-only access to the audit log and
+to *every* team's usage/spend/budget, without being a member. Granted/revoked by
+a platform admin via `PATCH /users/{id}/auditor` (audited as
+`user.grant_auditor`/`user.revoke_auditor`); never grants any write. Platform
+admin (`is_admin`) remains the binary superuser and bypasses every check;
+management-scoped service-principal keys keep full management of their own team.
+
+Not yet done: custom (DB-defined) roles, per-org roles.
 
 ## 7. Audit log
 

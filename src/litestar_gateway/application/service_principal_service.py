@@ -1,7 +1,7 @@
 """Application service for team service principals + their keys.
 
 Administration is JWT-only (a human team admin, enforced by the controller via
-`TeamService.ensure_can_manage_team`) — a key, even a management one, can never
+`TeamService.ensure_team_permission`) — a key, even a management one, can never
 create service principals or mint keys, so a leaked key cannot self-replicate.
 """
 

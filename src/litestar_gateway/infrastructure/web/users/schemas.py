@@ -38,10 +38,16 @@ class SetUserAdminRequest:
 
 
 @dataclass(frozen=True)
+class SetUserAuditorRequest:
+    is_auditor: bool
+
+
+@dataclass(frozen=True)
 class UserResponse:
     id: UUID
     email: str
     is_admin: bool
+    is_auditor: bool
     is_active: bool
     created_at: datetime
 
@@ -51,6 +57,7 @@ class UserResponse:
             id=user.id,
             email=user.email,
             is_admin=user.is_admin,
+            is_auditor=user.is_auditor,
             is_active=user.is_active,
             created_at=user.created_at,
         )

@@ -49,6 +49,8 @@ class UserModel(base.UUIDAuditBase):
     # The IdP's SCIM externalId, once SCIM-provisioned/adopted. Unique so two IdP
     # records can't bind to the same local account.
     external_id: Mapped[str | None] = mapped_column(default=None, unique=True, index=True)
+    # Read-only platform auditor (audit log + every team's usage/budget).
+    is_auditor: Mapped[bool] = mapped_column(default=False)
     failed_login_attempts: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[datetime | None] = mapped_column(default=None)
     lockout_cycles: Mapped[int] = mapped_column(default=0)
@@ -64,6 +66,7 @@ class UserModel(base.UUIDAuditBase):
             sso_subject=self.sso_subject,
             is_active=self.is_active,
             external_id=self.external_id,
+            is_auditor=self.is_auditor,
             failed_login_attempts=self.failed_login_attempts,
             locked_until=self.locked_until,
             lockout_cycles=self.lockout_cycles,

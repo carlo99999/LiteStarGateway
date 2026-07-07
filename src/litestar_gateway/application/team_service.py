@@ -1,8 +1,14 @@
 """Application service for teams and memberships.
 
-Authorization model:
-  * Platform admin (User.is_admin) may manage any team.
-  * Team admin (membership role ADMIN) may manage only their own team.
+Authorization model (extended RBAC — see domain/authorization.py):
+  * Platform admin (User.is_admin) holds every permission in every team.
+  * Platform auditor (User.is_auditor) holds the read-only auditor subset
+    (usage/budget) in every team.
+  * Otherwise the actor's membership role grants a declared permission set:
+    admin → everything in the team; member → nothing; the extended roles
+    (model-manager, key-issuer, billing-viewer) → one capability domain each.
+All checks funnel through `ensure_team_permission` (humans) and
+`ensure_principal_team_permission` (JWT or management-scoped API key).
 Only platform admins may create teams. On creation the platform admin becomes
 the team's first admin, plus a named team-admin (by email); a freshly created
 team therefore has two admins (one, if the named lead IS the platform admin).
@@ -22,6 +28,11 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from litestar_gateway.domain.authorization import (
+    AUDITOR_TEAM_PERMISSIONS,
+    Permission,
+    role_grants,
+)
 from litestar_gateway.domain.entities import Principal, Team, TeamMembership, TeamRole, User
 from litestar_gateway.domain.exceptions import (
     AlreadyMember,
@@ -94,24 +105,35 @@ class TeamService:
             return False
         return await self._memberships.count_admins(team_id) == 1
 
-    async def ensure_can_manage_team(self, actor: User, team_id: UUID) -> Team:
-        """Return the team if `actor` may manage it, else raise."""
+    async def ensure_team_permission(
+        self, actor: User, team_id: UUID, permission: Permission
+    ) -> Team:
+        """Return the team if `actor` holds `permission` in it, else raise.
+
+        Platform admins hold every permission; a platform auditor holds the
+        read-only auditor subset in every team; anyone else needs a membership
+        whose role grants the permission (domain/authorization.py)."""
         team = await self._teams.get(team_id)
         if team is None:
             raise TeamNotFound(str(team_id))
         if actor.is_admin:
             return team
+        if actor.is_auditor and permission in AUDITOR_TEAM_PERMISSIONS:
+            return team
         membership = await self._memberships.get(team_id, actor.id)
-        if membership is None or not membership.is_admin:
-            raise PermissionDenied("Team admin privileges required")
+        if membership is None or not role_grants(membership.role, permission):
+            raise PermissionDenied(f"Requires '{permission}' in this team")
         return team
 
-    async def ensure_principal_can_manage_team(self, principal: Principal, team_id: UUID) -> Team:
-        """Principal-aware variant: a human goes through the user rules; a key
-        (team service principal) manages its own team only, and only with a
-        management-capable scope. A key is never a platform admin."""
+    async def ensure_principal_team_permission(
+        self, principal: Principal, team_id: UUID, permission: Permission
+    ) -> Team:
+        """Principal-aware variant: a human goes through the user/role rules; a
+        key (team service principal) acts in its own team only, and only with a
+        management-capable scope — which carries every team permission, exactly
+        as before roles were extended. A key is never a platform admin."""
         if principal.user is not None:
-            return await self.ensure_can_manage_team(principal.user, team_id)
+            return await self.ensure_team_permission(principal.user, team_id, permission)
         key = principal.api_key
         if key is None:  # pragma: no cover - Principal always carries one side
             raise PermissionDenied("Unauthenticated principal")
@@ -161,13 +183,13 @@ class TeamService:
     async def list_members(
         self, actor: User, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
     ) -> list[TeamMembership]:
-        await self.ensure_can_manage_team(actor, team_id)
+        await self.ensure_team_permission(actor, team_id, Permission.MEMBERS_READ)
         return await self._memberships.list_by_team(team_id, limit=limit, offset=offset)
 
     async def add_member(
         self, actor: User, team_id: UUID, email: str, role: TeamRole
     ) -> TeamMembership:
-        await self.ensure_can_manage_team(actor, team_id)
+        await self.ensure_team_permission(actor, team_id, Permission.MEMBERS_MANAGE)
         user = await self._users.get_by_email(_normalize_email(email))
         if user is None:
             raise UserNotFound(email)
@@ -188,7 +210,7 @@ class TeamService:
     async def set_role(
         self, actor: User, team_id: UUID, user_id: UUID, role: TeamRole
     ) -> TeamMembership:
-        await self.ensure_can_manage_team(actor, team_id)
+        await self.ensure_team_permission(actor, team_id, Permission.MEMBERS_MANAGE)
         membership = await self._memberships.get(team_id, user_id)
         if membership is None:
             raise MembershipNotFound(str(user_id))
@@ -204,7 +226,7 @@ class TeamService:
         return updated
 
     async def remove_member(self, actor: User, team_id: UUID, user_id: UUID) -> None:
-        await self.ensure_can_manage_team(actor, team_id)
+        await self.ensure_team_permission(actor, team_id, Permission.MEMBERS_MANAGE)
         membership = await self._memberships.get(team_id, user_id)
         if membership is None:
             raise MembershipNotFound(str(user_id))
