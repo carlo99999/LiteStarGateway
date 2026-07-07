@@ -110,6 +110,6 @@ async def test_error_names_the_offending_keys(client: AsyncTestClient) -> None:
 
 
 async def test_provider_without_rules_is_accepted(client: AsyncTestClient) -> None:
-    # bedrock has no adapter yet, so no field rules apply: accept as before.
+    # bedrock has no field rules yet: accept as before.
     status = await _create(client, "bedrock-any", "bedrock", {"anything": "goes"})
     assert status == HTTP_201_CREATED

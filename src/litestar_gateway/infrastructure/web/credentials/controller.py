@@ -43,7 +43,7 @@ salt key and can never be read back — only metadata is returned.
 - `databricks`: `api_key`, `api_base`
 
 `values` are validated on creation: a missing/blank required key or a key not
-listed above returns **400** (`bedrock` is not validated yet — no adapter).
+listed above returns **400** (`bedrock` is not validated yet).
 
 Requires a platform-admin JWT.
 """
