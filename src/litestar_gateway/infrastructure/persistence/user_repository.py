@@ -27,6 +27,7 @@ class SQLAlchemyUserRepository:
             token_version=user.token_version,
             sso_subject=user.sso_subject,
             is_active=user.is_active,
+            external_id=user.external_id,
         )
         self._session.add(model)
         try:
@@ -128,6 +129,40 @@ class SQLAlchemyUserRepository:
             select(UserModel).where(UserModel.sso_subject == subject)
         )
         return model.to_entity() if model else None
+
+    async def get_by_external_id(self, external_id: str) -> User | None:
+        model = await self._session.scalar(
+            select(UserModel).where(UserModel.external_id == external_id)
+        )
+        return model.to_entity() if model else None
+
+    async def list(self, *, offset: int, limit: int) -> list[User]:
+        result = await self._session.scalars(
+            select(UserModel)
+            .order_by(UserModel.created_at, UserModel.id)
+            .offset(offset)
+            .limit(limit)
+        )
+        return [model.to_entity() for model in result]
+
+    async def update_scim_identity(
+        self, user_id: UUID, email: str, external_id: str | None
+    ) -> User:
+        try:
+            await self._session.execute(
+                update(UserModel)
+                .where(UserModel.id == user_id)
+                .values(email=email, external_id=external_id)
+            )
+            await self._session.commit()
+        except IntegrityError as exc:
+            # email or external_id already belongs to another account.
+            await self._session.rollback()
+            raise EmailAlreadyRegistered(email) from exc
+        model = await self._session.get(UserModel, user_id)
+        if model is None:
+            raise UserNotFound(str(user_id))
+        return model.to_entity()
 
     async def bind_sso(self, user_id: UUID, sso_subject: str, is_admin: bool) -> User:
         await self._session.execute(

@@ -52,6 +52,11 @@ from litestar_gateway.infrastructure.web.organizations.dependencies import (
     provide_organization_service,
     provide_team_service,
 )
+from litestar_gateway.infrastructure.web.scim import (
+    create_scim_router,
+    create_scim_tokens_router,
+)
+from litestar_gateway.infrastructure.web.scim.dependencies import provide_scim_service
 from litestar_gateway.infrastructure.web.service_principals import ServicePrincipalController
 from litestar_gateway.infrastructure.web.service_principals.dependencies import (
     provide_service_principal_service,
@@ -109,6 +114,8 @@ def create_app(
         ServicePrincipalController,  # team-admin: service principals + their keys
         CredentialController,  # platform-admin: encrypted provider credentials
         AuditController,  # platform-admin: read the audit trail
+        create_scim_router(),  # IdP-facing SCIM 2.0 Users (provisioning-token auth)
+        create_scim_tokens_router(),  # platform-admin: mint/revoke SCIM tokens
     ]
     dependencies = {
         "api_key_service": Provide(provide_api_key_service, sync_to_thread=False),
@@ -121,6 +128,7 @@ def create_app(
         "service_principal_service": Provide(
             provide_service_principal_service, sync_to_thread=False
         ),
+        "scim_service": Provide(provide_scim_service, sync_to_thread=False),
         "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
         "budget_repository": Provide(provide_budget_repository, sync_to_thread=False),
         "audit_log": Provide(provide_audit_log, sync_to_thread=False),

@@ -16,8 +16,10 @@ from .identity import (
     Invite,
     IssuedInvite,
     IssuedPasswordReset,
+    IssuedScimToken,
     PasswordReset,
     Principal,
+    ScimToken,
     User,
 )
 from .model import Credential, Model
@@ -49,8 +51,10 @@ __all__ = [
     "Invite",
     "IssuedInvite",
     "IssuedPasswordReset",
+    "IssuedScimToken",
     "PasswordReset",
     "Principal",
+    "ScimToken",
     "User",
     # Model
     "Credential",

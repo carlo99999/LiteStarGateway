@@ -50,6 +50,14 @@ class UserNotFound(DomainError):
     """No user exists for the given identifier/email."""
 
 
+class InvalidScimToken(DomainError):
+    """The SCIM provisioning token is missing, unknown, or revoked."""
+
+
+class ScimTokenNotFound(DomainError):
+    """No SCIM provisioning token exists for the given identifier."""
+
+
 class SSOIdentityConflict(DomainError):
     """The SSO email already belongs to an account linked to a different IdP
     subject — refuse to let one identity adopt another's account (e.g. a recycled

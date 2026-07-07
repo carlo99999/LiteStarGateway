@@ -12,6 +12,7 @@ from litestar_gateway.domain.ports.llm_gateway import LLMGateway
 from litestar_gateway.domain.ports.lock import DistributedLock
 from litestar_gateway.domain.ports.model import ModelRepository
 from litestar_gateway.domain.ports.organization import OrganizationRepository
+from litestar_gateway.domain.ports.scim_token import ScimTokenRepository
 from litestar_gateway.domain.ports.secret_key import SecretKeyRepository
 from litestar_gateway.domain.ports.service_principal import ServicePrincipalRepository
 from litestar_gateway.domain.ports.team import TeamMembershipRepository, TeamRepository
@@ -32,6 +33,7 @@ __all__ = [
     "ModelRepository",
     "OrganizationRepository",
     "PasswordResetRepository",
+    "ScimTokenRepository",
     "SecretKeyRepository",
     "ServicePrincipalRepository",
     "TeamMembershipRepository",
