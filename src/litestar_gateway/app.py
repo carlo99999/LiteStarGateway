@@ -2,7 +2,7 @@
 
 import logging
 
-from litestar import Litestar, Response, get
+from litestar import Litestar, Request, Response, get
 from litestar.di import NamedDependency, Provide
 from litestar.openapi.config import OpenAPIConfig
 from litestar.openapi.plugins import ScalarRenderPlugin, StoplightRenderPlugin, SwaggerRenderPlugin
@@ -53,7 +53,10 @@ from litestar_gateway.infrastructure.web.organizations.dependencies import (
     provide_team_service,
 )
 from litestar_gateway.infrastructure.web.routing import RouterController
-from litestar_gateway.infrastructure.web.routing.dependencies import provide_router_service
+from litestar_gateway.infrastructure.web.routing.dependencies import (
+    make_shadow_log_factory,
+    provide_router_service,
+)
 from litestar_gateway.infrastructure.web.scim import (
     create_scim_router,
     create_scim_tokens_router,
@@ -96,6 +99,13 @@ def create_app(
     scalar_plugin = ScalarRenderPlugin(version="1.19.5", path="/scalar")
     stoplight_plugin = StoplightRenderPlugin(version="7.7.18", path="/elements")
 
+    def provide_shadow_log_factory(request: Request):
+        # The session maker lands in app.state under the AA config's (possibly
+        # suffixed) key — same trick as the auth middleware, read lazily.
+        return make_shadow_log_factory(
+            request.app.state[database.config.session_maker_app_state_key]
+        )
+
     def provide_keyring(db_session: NamedDependency[AsyncSession]) -> Keyring:
         # Per-purpose masters: SALT_KEY wraps credential keys, JWT_SECRET wraps JWT
         # keys. Credential ops raise SaltKeyMissing (503) if SALT_KEY is unset; the
@@ -133,6 +143,7 @@ def create_app(
         ),
         "scim_service": Provide(provide_scim_service, sync_to_thread=False),
         "router_service": Provide(provide_router_service, sync_to_thread=False),
+        "shadow_decision_log_factory": Provide(provide_shadow_log_factory, sync_to_thread=False),
         "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
         "budget_repository": Provide(provide_budget_repository, sync_to_thread=False),
         "audit_log": Provide(provide_audit_log, sync_to_thread=False),

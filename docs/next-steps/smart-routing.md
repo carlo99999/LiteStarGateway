@@ -7,9 +7,12 @@
 > MIT), decision persistence (`routing_decision` table), router CRUD
 > (`/teams/{id}/routers`, `models:manage`), §4 fallback policy, and the offline
 > eval harness (`tests/test_routing_eval.py`). Integration point is
-> `CompletionService._prepare` as prescribed. Phases 2-6 (webhook, shadow mode,
-> observability endpoints + savings, embeddings, LLM judge, hybrid, export)
-> are not yet implemented.
+> `CompletionService._prepare` as prescribed.
+> **Phase 2 implemented**: S2 external webhook strategy
+> (`application/routing/webhook.py`, contract in `docs/routing-webhook.md`)
+> and shadow mode (fire-and-forget, persisted with `is_shadow`, failures
+> swallowed). Phases 3-6 (observability endpoints + savings, embeddings,
+> LLM judge, hybrid, export) are not yet implemented.
 
 You are implementing **smart routing** for this LLM gateway (Litestar, hexagonal architecture, `src/litestar_gateway/`). Smart routing lets an admin define a **virtual model** (a "router") backed by N candidate models; every incoming request to the virtual model is dispatched to the best candidate according to a configurable strategy.
 
