@@ -66,6 +66,9 @@ class RouterRequest:
     strategy: str = "complexity"
     strategy_config: dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
+    # Shadow strategy (§6): runs fire-and-forget after the active one; its
+    # config lives under strategy_config["shadow"].
+    shadow_strategy: str | None = None
 
     def to_entity(self, team_id: UUID, router_id: UUID | None = None) -> RouterConfig:
         return RouterConfig(
@@ -78,6 +81,7 @@ class RouterRequest:
             strategy_config=self.strategy_config,
             enabled=self.enabled,
             created_at=datetime.now(UTC),
+            shadow_strategy=self.shadow_strategy,
         )
 
 
@@ -91,6 +95,7 @@ class RouterResponse:
     strategy_config: dict[str, Any]
     enabled: bool
     created_at: datetime
+    shadow_strategy: str | None
 
     @classmethod
     def from_entity(cls, router: RouterConfig) -> RouterResponse:
@@ -105,6 +110,7 @@ class RouterResponse:
             strategy_config=router.strategy_config,
             enabled=router.enabled,
             created_at=router.created_at,
+            shadow_strategy=router.shadow_strategy,
         )
 
 

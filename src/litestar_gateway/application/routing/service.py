@@ -16,6 +16,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from litestar_gateway.application.routing.complexity import ComplexityStrategy
+from litestar_gateway.application.routing.webhook import WebhookStrategy
 from litestar_gateway.domain.entities import ModelType
 from litestar_gateway.domain.exceptions import (
     InvalidRouterConfig,
@@ -23,7 +24,12 @@ from litestar_gateway.domain.exceptions import (
     RouterNameExists,
     RouterNotFound,
 )
-from litestar_gateway.domain.ports import ModelRepository, RouterRepository, RoutingDecisionLog
+from litestar_gateway.domain.ports import (
+    ModelRepository,
+    RouterRepository,
+    RoutingDecisionLog,
+    RoutingDecisionLogFactory,
+)
 from litestar_gateway.domain.routing import (
     RouterConfig,
     RoutingDecision,
@@ -34,7 +40,7 @@ from litestar_gateway.domain.routing import (
 
 logger = logging.getLogger("litestar_gateway.routing")
 
-STRATEGIES: dict[str, type] = {"complexity": ComplexityStrategy}
+STRATEGIES: dict[str, type] = {"complexity": ComplexityStrategy, "webhook": WebhookStrategy}
 
 # Hard time budget for a strategy call. The rule-based strategy is local and
 # sub-millisecond; the budget exists so future network strategies (webhook,
@@ -46,16 +52,23 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+# Strong refs to in-flight shadow tasks: a bare create_task() result may be
+# garbage-collected mid-flight, silently cancelling the shadow run.
+_SHADOW_TASKS: set[asyncio.Task] = set()
+
+
 class RouterService:
     def __init__(
         self,
         routers: RouterRepository,
         models: ModelRepository,
         decisions: RoutingDecisionLog,
+        shadow_decisions: RoutingDecisionLogFactory | None = None,
     ) -> None:
         self._routers = routers
         self._models = models
         self._decisions = decisions
+        self._shadow_decisions = shadow_decisions
 
     # ── CRUD (validated) ─────────────────────────────────────────────────────
 
@@ -64,6 +77,25 @@ class RouterService:
             raise InvalidRouterConfig(
                 f"Unknown strategy '{router.strategy}'; available: {sorted(STRATEGIES)}"
             )
+        try:
+            STRATEGIES[router.strategy](router.strategy_config)
+        except Exception as exc:
+            raise InvalidRouterConfig(
+                f"Invalid config for strategy '{router.strategy}': {exc}"
+            ) from exc
+        if router.shadow_strategy is not None:
+            if router.shadow_strategy not in STRATEGIES:
+                raise InvalidRouterConfig(
+                    f"Unknown shadow strategy '{router.shadow_strategy}'; "
+                    f"available: {sorted(STRATEGIES)}"
+                )
+            # The shadow strategy's config lives under strategy_config["shadow"].
+            try:
+                STRATEGIES[router.shadow_strategy](router.strategy_config.get("shadow", {}))
+            except Exception as exc:
+                raise InvalidRouterConfig(
+                    f"Invalid config for shadow strategy '{router.shadow_strategy}': {exc}"
+                ) from exc
         if not router.candidates:
             raise InvalidRouterConfig("A router needs at least one candidate")
         names = [candidate.model_name for candidate in router.candidates]
@@ -141,6 +173,12 @@ class RouterService:
             decision, fallback_used = await self._run_strategy(router, ctx, capable)
 
         await self._persist(router, decision, fallback_used, api_key_id)
+        if router.shadow_strategy is not None and self._shadow_decisions is not None:
+            # §6: fire-and-forget — the shadow's would-be decision is persisted
+            # alongside the real one, never blocking or failing the request.
+            task = asyncio.create_task(self._run_shadow(router, ctx, capable, api_key_id))
+            _SHADOW_TASKS.add(task)
+            task.add_done_callback(_SHADOW_TASKS.discard)
         return decision
 
     async def _run_strategy(self, router, ctx, capable) -> tuple[RoutingDecision, bool]:
@@ -177,6 +215,43 @@ class RouterService:
             ),
             True,
         )
+
+    async def _run_shadow(self, router, ctx, capable, api_key_id) -> None:
+        """Run the shadow strategy and persist its verdict with is_shadow=True.
+        Same time budget as an active strategy; failures logged and swallowed."""
+        try:
+            shadow_config = router.strategy_config.get("shadow", {})
+            budget_ms = shadow_config.get("time_budget_ms", DEFAULT_TIME_BUDGET_MS)
+            strategy = STRATEGIES[router.shadow_strategy](shadow_config)
+            async with asyncio.timeout(budget_ms / 1000):
+                decision = await strategy.select(ctx, capable)
+            if self._shadow_decisions is None:  # pragma: no cover - guarded by caller
+                return
+            async with self._shadow_decisions() as log:
+                await log.record(
+                    RoutingDecisionRecord(
+                        id=uuid4(),
+                        team_id=router.team_id,
+                        router_name=router.name,
+                        strategy=decision.strategy,
+                        chosen_model=decision.model_name,
+                        tier=decision.tier,
+                        score=decision.score,
+                        signals=decision.signals,
+                        decision_ms=decision.decision_ms,
+                        is_shadow=True,
+                        fallback_used=False,
+                        api_key_id=api_key_id,
+                        created_at=_now(),
+                    )
+                )
+        except Exception:
+            logger.warning(
+                "router %s: shadow strategy %s failed (swallowed)",
+                router.name,
+                router.shadow_strategy,
+                exc_info=True,
+            )
 
     async def _persist(self, router, decision, fallback_used, api_key_id) -> None:
         """Decision observability must never fail the request."""

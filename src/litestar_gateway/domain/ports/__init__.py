@@ -12,7 +12,11 @@ from litestar_gateway.domain.ports.llm_gateway import LLMGateway
 from litestar_gateway.domain.ports.lock import DistributedLock
 from litestar_gateway.domain.ports.model import ModelRepository
 from litestar_gateway.domain.ports.organization import OrganizationRepository
-from litestar_gateway.domain.ports.routing import RouterRepository, RoutingDecisionLog
+from litestar_gateway.domain.ports.routing import (
+    RouterRepository,
+    RoutingDecisionLog,
+    RoutingDecisionLogFactory,
+)
 from litestar_gateway.domain.ports.scim_token import ScimTokenRepository
 from litestar_gateway.domain.ports.secret_key import SecretKeyRepository
 from litestar_gateway.domain.ports.service_principal import ServicePrincipalRepository
@@ -36,6 +40,7 @@ __all__ = [
     "PasswordResetRepository",
     "RouterRepository",
     "RoutingDecisionLog",
+    "RoutingDecisionLogFactory",
     "ScimTokenRepository",
     "SecretKeyRepository",
     "ServicePrincipalRepository",

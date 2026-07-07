@@ -9,7 +9,12 @@ from litestar_gateway.application.completion_service import CompletionService
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import InFlightSpend, UsageMeter
 from litestar_gateway.config import Settings
-from litestar_gateway.domain.ports import BudgetRepository, LLMGateway, UsageRepository
+from litestar_gateway.domain.ports import (
+    BudgetRepository,
+    LLMGateway,
+    RoutingDecisionLogFactory,
+    UsageRepository,
+)
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
@@ -59,6 +64,7 @@ def provide_completion_service(
     keyring: NamedDependency[Keyring],
     llm_gateway: NamedDependency[LLMGateway],
     trace_dispatcher: NamedDependency[TraceDispatcher],
+    shadow_decision_log_factory: NamedDependency[RoutingDecisionLogFactory],
 ) -> CompletionService:
     return CompletionService(
         models=SQLAlchemyModelRepository(db_session),
@@ -68,6 +74,7 @@ def provide_completion_service(
             routers=SQLAlchemyRouterRepository(db_session),
             models=SQLAlchemyModelRepository(db_session),
             decisions=SQLAlchemyRoutingDecisionLog(db_session),
+            shadow_decisions=shadow_decision_log_factory,
         ),
         meter=UsageMeter(
             usage=SQLAlchemyUsageRepository(db_session),
