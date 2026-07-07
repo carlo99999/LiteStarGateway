@@ -15,6 +15,7 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID
 
+from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.entities import Model, ModelType
 from litestar_gateway.domain.exceptions import (
@@ -38,11 +39,13 @@ class CompletionService:
         credentials: CredentialRepository,
         gateway: LLMGateway,
         meter: UsageMeter,
+        router_service: RouterService | None = None,
     ) -> None:
         self._models = models
         self._credentials = credentials
         self._gateway = gateway
         self._meter = meter
+        self._router_service = router_service
 
     async def _dispatch(
         self,
@@ -77,10 +80,28 @@ class CompletionService:
             self._meter.release(team_id, reservation)
 
     async def _prepare(
-        self, team_id: UUID, operation: str, request: dict[str, Any], expected_type: ModelType
+        self,
+        team_id: UUID,
+        operation: str,
+        request: dict[str, Any],
+        expected_type: ModelType,
+        api_key_id: UUID | None = None,
     ) -> tuple[Model, dict[str, str], float, dict[str, Any]]:
         alias = request.get("model")
         model = await self._models.get_by_name(team_id, alias) if alias else None
+        if (
+            model is None
+            and alias
+            and self._router_service is not None
+            and expected_type is ModelType.CHAT
+        ):
+            # Smart routing: the alias may name a router (virtual model). The
+            # strategy only rewrites the model name; the rest of the pipeline
+            # (clamping, budget admission, metering) runs on the chosen model.
+            router = await self._router_service.get_enabled_by_name(team_id, alias)
+            if router is not None:
+                decision = await self._router_service.route(router, request, api_key_id=api_key_id)
+                model = await self._models.get_by_name(team_id, decision.model_name)
         if model is None:
             raise ModelNotFound(str(alias))
         if not model.enabled:
@@ -107,7 +128,7 @@ class CompletionService:
     ) -> dict[str, Any]:
         clean = sanitize_request("chat.completions", request)
         model, values, reservation, clean = await self._prepare(
-            team_id, "chat.completions", clean, ModelType.CHAT
+            team_id, "chat.completions", clean, ModelType.CHAT, api_key_id
         )
         return await self._dispatch(
             team_id,
@@ -124,7 +145,7 @@ class CompletionService:
     ) -> dict[str, Any]:
         clean = sanitize_request("responses", request)
         model, values, reservation, clean = await self._prepare(
-            team_id, "responses", clean, ModelType.CHAT
+            team_id, "responses", clean, ModelType.CHAT, api_key_id
         )
         return await self._dispatch(
             team_id,
@@ -144,7 +165,7 @@ class CompletionService:
         streaming starts so resolution errors surface as HTTP status codes."""
         clean = sanitize_request("chat.completions", request)
         model, values, reservation, clean = await self._prepare(
-            team_id, "chat.completions", clean, ModelType.CHAT
+            team_id, "chat.completions", clean, ModelType.CHAT, api_key_id
         )
         try:
             stream = await self._gateway.astream_chat_completion(clean, model, values)
@@ -162,7 +183,7 @@ class CompletionService:
         Responses-API stream events, metered for usage."""
         clean = sanitize_request("responses", request)
         model, values, reservation, clean = await self._prepare(
-            team_id, "responses", clean, ModelType.CHAT
+            team_id, "responses", clean, ModelType.CHAT, api_key_id
         )
         try:
             stream = await self._gateway.astream_responses(clean, model, values)
