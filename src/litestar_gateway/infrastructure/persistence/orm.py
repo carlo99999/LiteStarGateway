@@ -215,6 +215,12 @@ class RoutingDecisionModel(base.UUIDAuditBase):
     is_shadow: Mapped[bool] = mapped_column(default=False)
     fallback_used: Mapped[bool] = mapped_column(default=False)
     api_key_id: Mapped[UUID | None] = mapped_column(default=None)
+    chosen_input_cost: Mapped[float | None] = mapped_column(default=None)
+    chosen_output_cost: Mapped[float | None] = mapped_column(default=None)
+    alt_input_cost: Mapped[float | None] = mapped_column(default=None)
+    alt_output_cost: Mapped[float | None] = mapped_column(default=None)
+    prompt_tokens: Mapped[int | None] = mapped_column(default=None)
+    completion_tokens: Mapped[int | None] = mapped_column(default=None)
 
     def to_entity(self) -> RoutingDecisionRecord:
         return RoutingDecisionRecord(
@@ -231,6 +237,12 @@ class RoutingDecisionModel(base.UUIDAuditBase):
             fallback_used=self.fallback_used,
             api_key_id=self.api_key_id,
             created_at=self.created_at,
+            chosen_input_cost=self.chosen_input_cost,
+            chosen_output_cost=self.chosen_output_cost,
+            alt_input_cost=self.alt_input_cost,
+            alt_output_cost=self.alt_output_cost,
+            prompt_tokens=self.prompt_tokens,
+            completion_tokens=self.completion_tokens,
         )
 
 

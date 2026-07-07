@@ -11,8 +11,15 @@
 > **Phase 2 implemented**: S2 external webhook strategy
 > (`application/routing/webhook.py`, contract in `docs/routing-webhook.md`)
 > and shadow mode (fire-and-forget, persisted with `is_shadow`, failures
-> swallowed). Phases 3-6 (observability endpoints + savings, embeddings,
-> LLM judge, hybrid, export) are not yet implemented.
+> swallowed).
+> **Phase 3 implemented**: decision observability endpoints
+> (`GET /teams/{id}/routers/{rid}/decisions|stats|savings`, `usage:read` RBAC).
+> Savings design: unit costs of the chosen and of the most expensive capable
+> candidate are captured at decision time; the request's actual token usage is
+> attached to the decision after settlement (streams not attached yet), so
+> savings = Σ (Δ unit cost × actual tokens) without touching the billing
+> pipeline. Phases 4-6 (embeddings, LLM judge, hybrid, export) are not yet
+> implemented.
 
 You are implementing **smart routing** for this LLM gateway (Litestar, hexagonal architecture, `src/litestar_gateway/`). Smart routing lets an admin define a **virtual model** (a "router") backed by N candidate models; every incoming request to the virtual model is dispatched to the best candidate according to a configurable strategy.
 

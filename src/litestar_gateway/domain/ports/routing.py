@@ -26,9 +26,38 @@ class RouterRepository(Protocol):
 
 
 class RoutingDecisionLog(Protocol):
-    """Append-only log of routing decisions (observability, §7)."""
+    """Log of routing decisions (observability, §7): append + read/aggregate."""
 
     async def record(self, decision: RoutingDecisionRecord) -> None: ...
+
+    async def update_usage(
+        self, decision_id: UUID, prompt_tokens: int, completion_tokens: int
+    ) -> None:
+        """Attach the request's actual token usage after settlement."""
+        ...
+
+    async def list_decisions(
+        self,
+        team_id: UUID,
+        router_name: str,
+        *,
+        strategy: str | None = None,
+        chosen_model: str | None = None,
+        is_shadow: bool | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[RoutingDecisionRecord]: ...
+
+    async def distribution(
+        self, team_id: UUID, router_name: str
+    ) -> list[tuple[str, str | None, bool, int]]:
+        """(chosen_model, tier, is_shadow, count) rows for the router."""
+        ...
+
+    async def savings(self, team_id: UUID, router_name: str) -> tuple[float, int, int]:
+        """(total_estimated_savings, decisions_counted, decisions_without_usage)
+        over non-shadow decisions: Σ (alt−chosen unit cost) × actual tokens."""
+        ...
 
 
 @runtime_checkable

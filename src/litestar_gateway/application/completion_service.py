@@ -75,9 +75,22 @@ class CompletionService:
             await self._meter.settle_ok(
                 team_id, api_key_id, model, operation, response, latency_ms, request
             )
+            await self._attach_routing_usage(response)
             return response
         finally:
             self._meter.release(team_id, reservation)
+
+    async def _attach_routing_usage(self, response: dict[str, Any]) -> None:
+        """Savings observability (§7): give the routing decision, if one was
+        made for this request, its actual token usage. Streams are settled
+        inside the meter and are not attached in this phase."""
+        if self._router_service is None:
+            return
+        usage = response.get("usage") or {}
+        prompt = usage.get("prompt_tokens", usage.get("input_tokens"))
+        completion = usage.get("completion_tokens", usage.get("output_tokens"))
+        if isinstance(prompt, int) and isinstance(completion, int):
+            await self._router_service.record_usage(prompt, completion)
 
     async def _prepare(
         self,

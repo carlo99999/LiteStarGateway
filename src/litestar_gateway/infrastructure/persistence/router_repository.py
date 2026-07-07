@@ -6,7 +6,7 @@ import dataclasses
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -110,6 +110,105 @@ class SQLAlchemyRoutingDecisionLog:
                 is_shadow=decision.is_shadow,
                 fallback_used=decision.fallback_used,
                 api_key_id=decision.api_key_id,
+                chosen_input_cost=decision.chosen_input_cost,
+                chosen_output_cost=decision.chosen_output_cost,
+                alt_input_cost=decision.alt_input_cost,
+                alt_output_cost=decision.alt_output_cost,
+                prompt_tokens=decision.prompt_tokens,
+                completion_tokens=decision.completion_tokens,
             )
         )
         await self._session.commit()
+
+    async def update_usage(
+        self, decision_id: UUID, prompt_tokens: int, completion_tokens: int
+    ) -> None:
+        await self._session.execute(
+            update(RoutingDecisionModel)
+            .where(RoutingDecisionModel.id == decision_id)
+            .values(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+        )
+        await self._session.commit()
+
+    async def list_decisions(
+        self,
+        team_id: UUID,
+        router_name: str,
+        *,
+        strategy: str | None = None,
+        chosen_model: str | None = None,
+        is_shadow: bool | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[RoutingDecisionRecord]:
+        stmt = select(RoutingDecisionModel).where(
+            RoutingDecisionModel.team_id == team_id,
+            RoutingDecisionModel.router_name == router_name,
+        )
+        if strategy is not None:
+            stmt = stmt.where(RoutingDecisionModel.strategy == strategy)
+        if chosen_model is not None:
+            stmt = stmt.where(RoutingDecisionModel.chosen_model == chosen_model)
+        if is_shadow is not None:
+            stmt = stmt.where(RoutingDecisionModel.is_shadow == is_shadow)
+        stmt = stmt.order_by(RoutingDecisionModel.created_at.desc()).offset(offset).limit(limit)
+        return [model.to_entity() for model in await self._session.scalars(stmt)]
+
+    async def distribution(
+        self, team_id: UUID, router_name: str
+    ) -> list[tuple[str, str | None, bool, int]]:
+        stmt = (
+            select(
+                RoutingDecisionModel.chosen_model,
+                RoutingDecisionModel.tier,
+                RoutingDecisionModel.is_shadow,
+                func.count(),
+            )
+            .where(
+                RoutingDecisionModel.team_id == team_id,
+                RoutingDecisionModel.router_name == router_name,
+            )
+            .group_by(
+                RoutingDecisionModel.chosen_model,
+                RoutingDecisionModel.tier,
+                RoutingDecisionModel.is_shadow,
+            )
+        )
+        return [tuple(row) for row in await self._session.execute(stmt)]
+
+    async def savings(self, team_id: UUID, router_name: str) -> tuple[float, int, int]:
+        # Σ over non-shadow decisions with usage AND both cost profiles:
+        # (alt − chosen) unit cost × the request's actual tokens.
+        base = (
+            RoutingDecisionModel.team_id == team_id,
+            RoutingDecisionModel.router_name == router_name,
+            RoutingDecisionModel.is_shadow.is_(False),
+        )
+        counted = (
+            *base,
+            RoutingDecisionModel.prompt_tokens.is_not(None),
+            RoutingDecisionModel.alt_input_cost.is_not(None),
+            RoutingDecisionModel.chosen_input_cost.is_not(None),
+        )
+        total = await self._session.scalar(
+            select(
+                func.coalesce(
+                    func.sum(
+                        (
+                            RoutingDecisionModel.alt_input_cost
+                            - RoutingDecisionModel.chosen_input_cost
+                        )
+                        * RoutingDecisionModel.prompt_tokens
+                        + (
+                            func.coalesce(RoutingDecisionModel.alt_output_cost, 0.0)
+                            - func.coalesce(RoutingDecisionModel.chosen_output_cost, 0.0)
+                        )
+                        * RoutingDecisionModel.completion_tokens
+                    ),
+                    0.0,
+                )
+            ).where(*counted)
+        )
+        counted_n = await self._session.scalar(select(func.count()).where(*counted)) or 0
+        all_n = await self._session.scalar(select(func.count()).where(*base)) or 0
+        return float(total or 0.0), int(counted_n), int(all_n - counted_n)
