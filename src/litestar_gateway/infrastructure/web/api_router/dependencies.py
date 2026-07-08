@@ -73,7 +73,7 @@ def provide_completion_service(
         credentials=SQLAlchemyCredentialRepository(db_session, keyring),
         gateway=llm_gateway,
         router_service=RouterService(
-            routers=SQLAlchemyRouterRepository(db_session),
+            routers=SQLAlchemyRouterRepository(db_session, keyring),
             models=SQLAlchemyModelRepository(db_session),
             decisions=SQLAlchemyRoutingDecisionLog(db_session),
             shadow_decisions=shadow_decision_log_factory,

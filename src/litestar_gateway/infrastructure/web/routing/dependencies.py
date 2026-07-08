@@ -30,9 +30,11 @@ from litestar_gateway.infrastructure.persistence.router_repository import (
 )
 
 
-def provide_router_service(db_session: NamedDependency[AsyncSession]) -> RouterService:
+def provide_router_service(
+    db_session: NamedDependency[AsyncSession], keyring: NamedDependency[Keyring]
+) -> RouterService:
     return RouterService(
-        routers=SQLAlchemyRouterRepository(db_session),
+        routers=SQLAlchemyRouterRepository(db_session, keyring),
         models=SQLAlchemyModelRepository(db_session),
         decisions=SQLAlchemyRoutingDecisionLog(db_session),
     )
