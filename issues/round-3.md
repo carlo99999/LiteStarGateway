@@ -19,7 +19,7 @@ built to provide.
 
 New counts: **0 CRITICAL · 1 HIGH · 5 MEDIUM · 8 LOW**.
 
-### Resolution status (Round 3, updated after remediation)
+## Resolution status (Round 3, updated after remediation)
 
 **Fixed & merged to `main`:**
 

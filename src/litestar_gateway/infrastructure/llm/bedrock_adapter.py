@@ -5,9 +5,9 @@ Pure translators (`to_converse_request` / `from_converse_response`) do the
 schema work; the adapter is a thin boto3 wrapper. Responses are provided by
 wrapping this adapter in `ChatToResponsesAdapter`.
 
-boto3 is synchronous: the async surface delegates to a worker thread via
-`asyncio.to_thread`, including the streaming EventStream (iterated one event
-per thread hop so the event loop is never blocked).
+boto3 is synchronous: the async surface delegates to a worker thread on a
+dedicated bounded executor, including the streaming EventStream (iterated one
+event per thread hop so the event loop is never blocked).
 
 Scope: text-in/text-out, plus structured outputs (`response_format`) translated
 to a forced tool — streaming included (partial tool-input JSON is relayed as
@@ -20,7 +20,8 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import boto3
@@ -30,6 +31,11 @@ from litestar_gateway.domain.entities import Model
 from litestar_gateway.domain.exceptions import CredentialMisconfigured, UnsupportedOperation
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.llm.structured_output import parse_response_format
+
+# Titan has no batch embeddings endpoint (one invoke_model call per text), so
+# multi-input requests fan out concurrently; bound the parallelism so a large
+# batch cannot monopolize the worker-thread pool or upstream connections.
+_TITAN_EMBED_FANOUT = 8
 
 _FINISH_REASON = {
     "end_turn": "stop",
@@ -42,6 +48,19 @@ _FINISH_REASON = {
     "content_filtered": "content_filter",
     "guardrail_intervened": "content_filter",
 }
+
+
+# Streaming does one thread hop per EventStream event, so a few concurrent
+# Bedrock streams issue many tiny hops; a dedicated bounded pool keeps them
+# from saturating the loop's process-wide default executor and slowing
+# unrelated requests (R6-M45). Module-level because the adapter is built once
+# per LLMGatewayImpl registry: one shared pool covers every instance.
+_BEDROCK_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="bedrock")
+
+
+async def _run[T](func: Callable[..., T], /, *args: Any) -> T:
+    """Run a blocking boto3 call on the dedicated Bedrock executor."""
+    return await asyncio.get_running_loop().run_in_executor(_BEDROCK_EXECUTOR, func, *args)
 
 
 def _next_event(events: Iterator[dict[str, Any]]) -> dict[str, Any] | None:
@@ -217,6 +236,33 @@ def _require_aws(credentials: dict[str, str]) -> tuple[str, str, str, str | None
     )
 
 
+def _titan_embeddings_response(payloads: list[dict[str, Any]], model_id: str) -> dict[str, Any]:
+    data = []
+    prompt_tokens = 0
+    counted = False
+    for index, payload in enumerate(payloads):
+        data.append(
+            {
+                "object": "embedding",
+                "index": index,
+                "embedding": payload.get("embedding") or [],
+            }
+        )
+        count = payload.get("inputTextTokenCount")
+        if isinstance(count, int):
+            prompt_tokens += count
+            counted = True
+    return {
+        "object": "list",
+        "data": data,
+        "model": model_id,
+        "usage": {
+            "prompt_tokens": prompt_tokens if counted else None,
+            "total_tokens": prompt_tokens if counted else None,
+        },
+    }
+
+
 def _embedding_inputs(effective: dict[str, Any]) -> list[str]:
     raw = effective.get("input")
     if isinstance(raw, str):
@@ -264,12 +310,12 @@ class BedrockAdapter:
     async def achat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        return await asyncio.to_thread(self.chat_completion, request, model, credentials)
+        return await _run(self.chat_completion, request, model, credentials)
 
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        client = await asyncio.to_thread(self._client, credentials)
+        client = await _run(self._client, credentials)
         base = {
             "id": "chatcmpl-bedrock",
             "object": "chat.completion.chunk",
@@ -282,12 +328,12 @@ class BedrockAdapter:
         output_tokens = 0
         # Keep the client open for the whole stream; close on completion/disconnect.
         try:
-            response = await asyncio.to_thread(
+            response = await _run(
                 lambda: client.converse_stream(**to_converse_request(request, model))
             )
             events: Iterator[dict[str, Any]] = iter(response["stream"])
             while True:
-                event = await asyncio.to_thread(_next_event, events)
+                event = await _run(_next_event, events)
                 if event is None:
                     break
                 usage = (event.get("metadata") or {}).get("usage") or {}
@@ -311,7 +357,7 @@ class BedrockAdapter:
                 },
             }
         finally:
-            await asyncio.to_thread(client.close)
+            await _run(client.close)
 
     # ── embeddings (invoke_model) ───────────────────────────────────────────
 
@@ -324,24 +370,10 @@ class BedrockAdapter:
         client = self._client(credentials)
         try:
             if model_id.startswith("amazon.titan-embed"):
-                data = []
-                prompt_tokens = 0
-                counted = False
                 # Titan embeds one text per call.
-                for index, text in enumerate(texts):
-                    payload = _invoke(client, model_id, {"inputText": text})
-                    data.append(
-                        {
-                            "object": "embedding",
-                            "index": index,
-                            "embedding": payload.get("embedding") or [],
-                        }
-                    )
-                    count = payload.get("inputTextTokenCount")
-                    if isinstance(count, int):
-                        prompt_tokens += count
-                        counted = True
-            elif model_id.startswith("cohere.embed"):
+                payloads = [_invoke(client, model_id, {"inputText": text}) for text in texts]
+                return _titan_embeddings_response(payloads, model_id)
+            if model_id.startswith("cohere.embed"):
                 payload = _invoke(
                     client, model_id, {"texts": texts, "input_type": "search_document"}
                 )
@@ -349,31 +381,58 @@ class BedrockAdapter:
                     {"object": "embedding", "index": index, "embedding": embedding}
                     for index, embedding in enumerate(payload.get("embeddings") or [])
                 ]
-                # Cohere reports no token count: leave usage None so the meter's
-                # estimation fallback kicks in rather than billing zero (H14).
-                prompt_tokens = 0
-                counted = False
-            else:
-                raise UnsupportedOperation(
-                    f"Bedrock embeddings for '{model_id}' are not supported"
-                    " (amazon.titan-embed-* and cohere.embed-* only)"
-                )
+                return {
+                    "object": "list",
+                    "data": data,
+                    "model": model_id,
+                    # Cohere reports no token count: leave usage None so the meter's
+                    # estimation fallback kicks in rather than billing zero (H14).
+                    "usage": {"prompt_tokens": None, "total_tokens": None},
+                }
+            raise UnsupportedOperation(
+                f"Bedrock embeddings for '{model_id}' are not supported"
+                " (amazon.titan-embed-* and cohere.embed-* only)"
+            )
         finally:
             client.close()
-        return {
-            "object": "list",
-            "data": data,
-            "model": model_id,
-            "usage": {
-                "prompt_tokens": prompt_tokens if counted else None,
-                "total_tokens": prompt_tokens if counted else None,
-            },
-        }
 
     async def aembeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        return await asyncio.to_thread(self.embeddings, request, model, credentials)
+        if model.provider_model_id.startswith("amazon.titan-embed"):
+            return await self._titan_aembeddings(request, model, credentials)
+        return await _run(self.embeddings, request, model, credentials)
+
+    async def _titan_aembeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        """Titan embeds one text per call: fan the per-text invokes out over
+        worker threads instead of paying N sequential round trips."""
+        effective = model.merge_params(request)
+        texts = _embedding_inputs(effective)
+        model_id = model.provider_model_id
+        client = await _run(self._client, credentials)
+        semaphore = asyncio.Semaphore(_TITAN_EMBED_FANOUT)
+
+        async def embed_one(text: str) -> dict[str, Any]:
+            async with semaphore:
+                return await _run(_invoke, client, model_id, {"inputText": text})
+
+        try:
+            # return_exceptions so every in-flight call finishes before the
+            # client is closed; the first failure in input order is re-raised
+            # below, matching the sequential path.
+            results = await asyncio.gather(
+                *(embed_one(text) for text in texts), return_exceptions=True
+            )
+        finally:
+            await _run(client.close)
+        payloads: list[dict[str, Any]] = []
+        for result in results:
+            if isinstance(result, BaseException):
+                raise result
+            payloads.append(result)
+        return _titan_embeddings_response(payloads, model_id)
 
     # ── images (invoke_model, Titan Image Generator) ────────────────────────
 
@@ -396,7 +455,7 @@ class BedrockAdapter:
     async def aimages(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        return await asyncio.to_thread(self.images, request, model, credentials)
+        return await _run(self.images, request, model, credentials)
 
 
 def _invoke(client: Any, model_id: str, body: dict[str, Any]) -> dict[str, Any]:

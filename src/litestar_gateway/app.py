@@ -55,6 +55,7 @@ from litestar_gateway.infrastructure.web.organizations.dependencies import (
 from litestar_gateway.infrastructure.web.routing import RouterController
 from litestar_gateway.infrastructure.web.routing.dependencies import (
     make_shadow_log_factory,
+    make_shadow_repos_factory,
     provide_router_service,
 )
 from litestar_gateway.infrastructure.web.scim import (
@@ -145,6 +146,19 @@ def _make_keyring_provider(settings: Settings):
     return provide_keyring
 
 
+def _make_shadow_repos_provider(session_maker_state_key: str, keyring_provider):
+    def provide_shadow_repos_factory(request: Request):
+        # Same own-session care as the shadow decision log: the shadow
+        # strategy's model/credential lookups race the request coroutine,
+        # which is still using the request-scoped session.
+        return make_shadow_repos_factory(
+            request.app.state[session_maker_state_key],
+            keyring_provider,
+        )
+
+    return provide_shadow_repos_factory
+
+
 def _build_route_handlers(database: Database) -> list:
     return [
         health,  # public liveness
@@ -170,6 +184,8 @@ def _build_dependencies(
     trace_dispatcher: TraceDispatcher,
     llm_gateway: LLMGateway,
 ) -> dict[str, Provide]:
+    session_maker_key = database.config.session_maker_app_state_key
+    keyring_provider = _make_keyring_provider(settings)
     return {
         "api_key_service": Provide(provide_api_key_service, sync_to_thread=False),
         "user_service": Provide(provide_user_service, sync_to_thread=False),
@@ -184,7 +200,11 @@ def _build_dependencies(
         "scim_service": Provide(provide_scim_service, sync_to_thread=False),
         "router_service": Provide(provide_router_service, sync_to_thread=False),
         "shadow_decision_log_factory": Provide(
-            _make_shadow_log_provider(database.config.session_maker_app_state_key),
+            _make_shadow_log_provider(session_maker_key),
+            sync_to_thread=False,
+        ),
+        "shadow_repos_factory": Provide(
+            _make_shadow_repos_provider(session_maker_key, keyring_provider),
             sync_to_thread=False,
         ),
         "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
@@ -192,7 +212,7 @@ def _build_dependencies(
         "audit_log": Provide(provide_audit_log, sync_to_thread=False),
         "trace_dispatcher": Provide(lambda: trace_dispatcher, sync_to_thread=False),
         "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
-        "keyring": Provide(_make_keyring_provider(settings), sync_to_thread=False),
+        "keyring": Provide(keyring_provider, sync_to_thread=False),
     }
 
 
