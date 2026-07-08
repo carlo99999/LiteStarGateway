@@ -32,6 +32,11 @@ class QualityTier(StrEnum):
 
 _TIER_ORDER = (QualityTier.SIMPLE, QualityTier.MEDIUM, QualityTier.COMPLEX, QualityTier.REASONING)
 
+# The webhook strategy's `bearer_token` in `strategy_config` is a secret: API
+# responses replace it with this sentinel, and an update that sends the
+# sentinel back preserves the token already stored.
+BEARER_TOKEN_MASK = "***"
+
 
 @dataclass(frozen=True)
 class CandidateModel:
