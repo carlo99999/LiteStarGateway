@@ -23,6 +23,13 @@ RateUnit = Literal["second", "minute", "hour", "day"]
 INFERENCE_RATE_LIMIT: tuple[RateUnit, int] = ("minute", 120)
 # Auth (`/login`, `/signup`): per IP — bounds brute force and account spam.
 AUTH_RATE_LIMIT: tuple[RateUnit, int] = ("minute", 20)
+# SCIM (`/scim/v2/*`): per IP — the provisioning-token surface authenticates by a
+# DB-backed token-hash lookup *before* any other check, so an unauthenticated
+# caller flooding garbage tokens forces one DB round-trip per request (M49). More
+# generous than the human auth limit (machine IdP provisioning is paced but can
+# burst) while still bounding the flood; its own store, so SCIM traffic and login
+# don't consume each other's bucket.
+SCIM_RATE_LIMIT: tuple[RateUnit, int] = ("minute", 60)
 
 
 def _inference_identifier(request: Request[Any, Any, Any]) -> str:
@@ -50,4 +57,14 @@ def build_auth_rate_limit() -> RateLimitConfig:
     return RateLimitConfig(
         rate_limit=AUTH_RATE_LIMIT,
         store="rate_limit_auth",
+    )
+
+
+def build_scim_rate_limit() -> RateLimitConfig:
+    """Per-IP limiter for the IdP-facing SCIM surface (provisioning-token auth
+    runs a DB lookup before anything else, so it must be throttled like the other
+    pre-auth surfaces)."""
+    return RateLimitConfig(
+        rate_limit=SCIM_RATE_LIMIT,
+        store="rate_limit_scim",
     )
