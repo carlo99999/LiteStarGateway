@@ -1,7 +1,8 @@
 """RouterService — router CRUD (validated) + the routing decision itself.
 
 Failure policy (§4): a strategy failure must never fail the user request —
-any exception or timeout falls back to `default_model` and is recorded with
+any exception or timeout falls back to `default_model` (or, when the §3 filters
+excluded it, the first capable candidate) and is recorded with
 `fallback_used=True`. Zero capable candidates, by contrast, is a router
 misconfiguration and does fail the request (`NoRoutableCandidate`).
 """
@@ -358,13 +359,28 @@ class RouterService:
                 router.default_model,
                 exc_info=True,
             )
+        # §4 fallback must respect the §3 hard filters: use default_model only
+        # if it is capable; otherwise pick the first capable candidate (in
+        # declared order — deterministic) and record why it was skipped.
+        fallback_model = router.default_model
+        signals: tuple[str, ...] = ("fallback",)
+        if not any(fallback_model == c.model_name for c in capable):
+            fallback_model = capable[0].model_name
+            signals = ("fallback", "default_model skipped: lacks required capability")
+            logger.warning(
+                "router %s: default_model %r lacks a required capability; "
+                "falling back to first capable candidate %r",
+                router.name,
+                router.default_model,
+                fallback_model,
+            )
         return (
             RoutingDecision(
-                model_name=router.default_model,
+                model_name=fallback_model,
                 strategy=router.strategy,
                 tier=None,
                 score=None,
-                signals=("fallback",),
+                signals=signals,
                 decision_ms=(perf_counter() - start) * 1000,
             ),
             True,
