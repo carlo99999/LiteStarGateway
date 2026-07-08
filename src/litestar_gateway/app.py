@@ -1,6 +1,8 @@
 """Composition root: wires settings, persistence, services and the web layer."""
 
 import logging
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from litestar import Litestar, Request, Response, get
 from litestar.di import NamedDependency, Provide
@@ -12,6 +14,7 @@ from litestar.stores.redis import RedisStore
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from litestar_gateway.application.routing.service import drain_shadow_tasks
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.exceptions import DomainError
 from litestar_gateway.domain.ports import IdentityProvider, LLMGateway
@@ -94,7 +97,7 @@ def create_app(
         route_handlers.append(create_sso_router())
         dependencies.update(_build_sso_dependencies(settings, idp))
 
-    return Litestar(
+    app = Litestar(
         route_handlers=route_handlers,
         openapi_config=_build_openapi_config(settings),
         plugins=[database.plugin],
@@ -105,6 +108,29 @@ def create_app(
         stores=_build_rate_limit_stores(settings),
         exception_handlers={DomainError: domain_exception_handler},
     )
+    _register_shadow_drain(app)
+    return app
+
+
+@asynccontextmanager
+async def _shadow_drain_lifespan(_app: Litestar) -> AsyncGenerator[None]:
+    """Await in-flight shadow-routing tasks on shutdown before the SQLAlchemy
+    plugin disposes the engine (R7-M51), so their unit of work settles instead
+    of racing engine teardown."""
+    try:
+        yield
+    finally:
+        await drain_shadow_tasks()
+
+
+def _register_shadow_drain(app: Litestar) -> None:
+    # Ordering matters: the SQLAlchemy plugin appends its engine-disposal
+    # lifespan during `on_app_init` (always last, via its init sub-plugin), and
+    # Litestar unwinds lifespans LIFO. A lifespan passed to the constructor would
+    # therefore tear down *after* the engine is gone — too late. Appending here,
+    # after construction, makes the drain the last manager entered and so the
+    # first to unwind, i.e. before the engine is disposed.
+    app._lifespan_managers.append(_shadow_drain_lifespan)
 
 
 def _build_observability(

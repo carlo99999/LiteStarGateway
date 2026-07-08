@@ -74,6 +74,35 @@ def _now() -> datetime:
 # garbage-collected mid-flight, silently cancelling the shadow run.
 _SHADOW_TASKS: set[asyncio.Task] = set()
 
+# How long shutdown waits for in-flight shadow tasks before cancelling them.
+SHADOW_DRAIN_TIMEOUT_S = 5.0
+
+
+async def drain_shadow_tasks(timeout: float | None = None) -> None:
+    """Await in-flight fire-and-forget shadow tasks on shutdown (R7-M51).
+
+    Each shadow run does its own `session_maker()` unit of work; if it is still
+    in flight when the SQLAlchemy plugin disposes the engine, the write races
+    teardown and the shadow decision/usage row is silently lost. The
+    infrastructure lifespan calls this before engine disposal so those tasks
+    settle (or are cancelled) instead of being abandoned.
+
+    Bounded by `timeout` seconds (defaults to `SHADOW_DRAIN_TIMEOUT_S`); any
+    task still running past the deadline is cancelled. Pure asyncio — no
+    framework imports — so the `infrastructure` layer can call it without the
+    `application` layer reaching back into `infrastructure`/`litestar`.
+    """
+    deadline = SHADOW_DRAIN_TIMEOUT_S if timeout is None else timeout
+    tasks = list(_SHADOW_TASKS)
+    if not tasks:
+        return
+    try:
+        await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=deadline)
+    except TimeoutError:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
 
 class RouterService:
     def __init__(
