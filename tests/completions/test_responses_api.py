@@ -6,6 +6,8 @@ import pytest
 from litestar.status_codes import HTTP_200_OK
 from litestar.testing import AsyncTestClient
 
+from litestar_gateway.config import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
+
 from .conftest import (
     ANTHROPIC_VALUES,
     AZURE_VALUES,
@@ -116,6 +118,9 @@ async def test_anthropic_chat_translation(
         headers=_bearer(api_key),
     )
     assert resp.status_code == HTTP_200_OK
+    # Client built with the gateway's resilience config (timeout + retries).
+    assert FakeAnthropic.last_init["timeout"] == DEFAULT_REQUEST_TIMEOUT
+    assert FakeAnthropic.last_init["max_retries"] == DEFAULT_MAX_RETRIES
     # Request: system extracted, only user/assistant in messages, max_tokens defaulted.
     assert FakeAnthropic.last_kwargs["system"] == "be brief"
     assert FakeAnthropic.last_kwargs["messages"] == [{"role": "user", "content": "hi"}]
@@ -175,6 +180,8 @@ async def test_vertex_chat_translation(
     assert FakeGenaiClient.last_init["vertexai"] is True
     assert FakeGenaiClient.last_init["project"] == "p"
     assert FakeGenaiClient.last_init["location"] == "us-central1"
+    # Client built with the gateway's resilience config (timeout, as HttpOptions ms).
+    assert FakeGenaiClient.last_init["http_options"].timeout == int(DEFAULT_REQUEST_TIMEOUT * 1000)
     # Request: system -> system_instruction, assistant role would map to "model".
     assert FakeGenaiClient.last_kwargs["model"] == "gemini-1.5-pro"
     assert FakeGenaiClient.last_kwargs["config"]["system_instruction"] == "be brief"

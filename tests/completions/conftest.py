@@ -327,6 +327,18 @@ def _patch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(azure_adapter, "AsyncAzureOpenAI", FakeClient)
     monkeypatch.setattr(anthropic_adapter, "AsyncAnthropic", FakeAnthropic)
     monkeypatch.setattr(vertex_adapter.genai, "Client", FakeGenaiClient)
+    # The fakes capture call args on the class (not an instance) because the
+    # adapter under test constructs the SDK client itself, so no test ever
+    # holds a reference to instantiate against. Reset before every test so a
+    # test that forgets to trigger the call under test fails on a KeyError
+    # instead of silently reading a stale value left by the previous test.
+    FakeClient.last_init = {}
+    FakeClient.last_kwargs = {}
+    FakeAnthropic.last_init = {}
+    FakeAnthropic.last_kwargs = {}
+    FakeGenaiClient.last_init = {}
+    FakeGenaiClient.last_kwargs = {}
+    FakeGenaiClient.closed = False
 
 
 @pytest.fixture

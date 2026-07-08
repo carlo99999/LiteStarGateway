@@ -1,4 +1,11 @@
-"""Ports — interfaces the application depends on. Adapters implement these."""
+"""Ports — interfaces the application depends on. Adapters implement these.
+
+Most ports here (persistence, identity, locking) have exactly one production
+adapter; their value is enabling fast in-memory fakes in `tests/`, not backend
+swappability — there's no near-term plan for a second real implementation.
+`LLMGateway` is the exception (five real provider adapters) and is where the
+pattern earns its abstraction beyond testability.
+"""
 
 from __future__ import annotations
 
