@@ -446,9 +446,16 @@ class RouterService:
     ) -> tuple[float | None, float | None, float | None, float | None]:
         """(chosen_in, chosen_out, alt_in, alt_out) unit costs for savings (§7):
         `alt` is the most expensive capable candidate — what the request would
-        have cost without routing. None when profiles carry no costs."""
+        have cost without routing. A candidate counts as priced when either
+        cost is set; its missing side reads as 0.0 so partially-priced
+        candidates still compete (and survive the savings query's NOT NULL
+        filter). None when profiles carry no costs."""
         chosen = next((c for c in candidates if c.model_name == chosen_name), None)
-        priced = [c for c in candidates if c.input_cost_per_token is not None]
+        priced = [
+            c
+            for c in candidates
+            if c.input_cost_per_token is not None or c.output_cost_per_token is not None
+        ]
         alt = max(
             priced,
             key=lambda c: (c.input_cost_per_token or 0) + (c.output_cost_per_token or 0),
@@ -457,8 +464,8 @@ class RouterService:
         return (
             chosen.input_cost_per_token if chosen else None,
             chosen.output_cost_per_token if chosen else None,
-            alt.input_cost_per_token if alt else None,
-            alt.output_cost_per_token if alt else None,
+            (alt.input_cost_per_token or 0.0) if alt else None,
+            (alt.output_cost_per_token or 0.0) if alt else None,
         )
 
     async def record_usage(self, prompt_tokens: int, completion_tokens: int) -> None:

@@ -14,7 +14,9 @@ from litestar.testing import AsyncTestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from litestar_gateway.app import create_app
+from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.config import Settings
+from litestar_gateway.domain.routing import CandidateModel, QualityTier
 from litestar_gateway.infrastructure.llm import openai_adapter
 from litestar_gateway.infrastructure.persistence.orm import RoutingDecisionModel
 from litestar_gateway.infrastructure.persistence.router_repository import (
@@ -194,6 +196,41 @@ async def test_savings_use_actual_tokens_and_unit_cost_delta(
     assert body["decisions_counted"] == 2
     assert body["decisions_without_usage"] == 0
     assert body["estimated_savings"] == pytest.approx(1.8e-4)
+
+
+def _candidate(
+    name: str, input_cost: float | None = None, output_cost: float | None = None
+) -> CandidateModel:
+    return CandidateModel(
+        model_name=name,
+        description=name,
+        quality_tier=QualityTier.SIMPLE,
+        input_cost_per_token=input_cost,
+        output_cost_per_token=output_cost,
+    )
+
+
+def test_unit_costs_alt_includes_output_only_priced_candidate() -> None:
+    """R6-M41: a candidate priced only on output tokens still competes for the
+    most-expensive-alternative slot; its missing input side reads as 0.0."""
+    candidates = (
+        _candidate("cheap", input_cost=1e-6, output_cost=2e-6),
+        _candidate("out-only", output_cost=5e-5),
+    )
+    assert RouterService._unit_costs("cheap", candidates) == (1e-6, 2e-6, 0.0, 5e-5)
+
+
+def test_unit_costs_excludes_fully_unpriced_candidates() -> None:
+    candidates = (_candidate("a"), _candidate("b"))
+    assert RouterService._unit_costs("a", candidates) == (None, None, None, None)
+
+
+def test_unit_costs_fully_priced_candidates_unchanged() -> None:
+    candidates = (
+        _candidate("cheap", input_cost=1e-6, output_cost=2e-6),
+        _candidate("big", input_cost=1e-5, output_cost=2e-5),
+    )
+    assert RouterService._unit_costs("cheap", candidates) == (1e-6, 2e-6, 1e-5, 2e-5)
 
 
 @pytest.fixture
