@@ -243,14 +243,17 @@ class VertexAdapter:
         # Keep the client open for the whole stream; close on completion/disconnect
         # (finally runs on generator close).
         try:
-            # Gemini has no separate "start" event; emit the role delta ourselves.
+            # Open the provider stream first, so a start-of-stream failure
+            # surfaces as an HTTP status (via priming) instead of after a
+            # fabricated "started" chunk (R7-H24). Only then synthesize the role
+            # delta Gemini has no separate "start" event for.
+            stream: Any = await client.aio.models.generate_content_stream(
+                **to_gemini_request(request, model)
+            )
             yield {
                 **base,
                 "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
             }
-            stream: Any = await client.aio.models.generate_content_stream(
-                **to_gemini_request(request, model)
-            )
             # Gemini reports (cumulative) usage_metadata on stream chunks; keep
             # the latest and emit a trailing OpenAI-style usage chunk so
             # streamed calls can be metered.
