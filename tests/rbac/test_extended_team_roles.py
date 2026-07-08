@@ -109,6 +109,31 @@ async def test_billing_viewer_reads_usage_budget_and_spend_only(client: AsyncTes
         assert (await request).status_code == HTTP_403_FORBIDDEN
 
 
+async def test_billing_viewer_spending_redacts_key_identity(client: AsyncTestClient) -> None:
+    """usage:read alone yields spend figures with the key inventory redacted;
+    keys:read (here via team admin) unlocks the identity fields (R6-M43)."""
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    minted = await client.post(f"/teams/{team}/keys", json={"name": "app"}, headers=_bearer(admin))
+    assert minted.status_code == HTTP_201_CREATED, minted.text
+    token = await _member_token(client, admin, team, "bv@corp.com", "billing-viewer")
+
+    rows = (await client.get(f"/teams/{team}/keys/spending", headers=_bearer(token))).json()
+    assert len(rows) == 1
+    assert rows[0]["id"] == minted.json()["id"]
+    assert rows[0]["calls"] == 0
+    assert rows[0]["cost"] == 0.0
+    for field in ("name", "prefix", "is_active", "created_at", "revoked_at"):
+        assert rows[0][field] is None
+
+    # The admin holds keys:read as well, so the identity block stays visible.
+    full = (await client.get(f"/teams/{team}/keys/spending", headers=_bearer(admin))).json()
+    assert full[0]["name"] == "app"
+    assert full[0]["prefix"] == minted.json()["prefix"]
+    assert full[0]["is_active"] is True
+    assert full[0]["created_at"] is not None
+
+
 async def test_plain_member_is_still_denied_all_management(client: AsyncTestClient) -> None:
     admin = await _admin(client)
     team = await _team(client, admin)

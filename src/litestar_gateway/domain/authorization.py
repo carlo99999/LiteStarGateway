@@ -26,6 +26,9 @@ class Permission(StrEnum):
     SERVICE_PRINCIPALS_MANAGE = "service-principals:manage"
     USAGE_READ = "usage:read"
     BUDGET_READ = "budget:read"
+    # Routing-decision content (raw prompts, §S6 export) — deliberately split
+    # from `usage:read`, which only covers token/cost aggregates.
+    DECISIONS_READ = "decisions:read"
 
 
 # The single source of truth for what each team role may do. `admin` holds
@@ -35,14 +38,17 @@ class Permission(StrEnum):
 ROLE_PERMISSIONS: dict[TeamRole, frozenset[Permission]] = {
     TeamRole.ADMIN: frozenset(Permission),
     TeamRole.MEMBER: frozenset(),
-    TeamRole.MODEL_MANAGER: frozenset({Permission.MODELS_READ, Permission.MODELS_MANAGE}),
+    TeamRole.MODEL_MANAGER: frozenset(
+        {Permission.MODELS_READ, Permission.MODELS_MANAGE, Permission.DECISIONS_READ}
+    ),
     TeamRole.KEY_ISSUER: frozenset({Permission.KEYS_READ, Permission.KEYS_ISSUE}),
     TeamRole.BILLING_VIEWER: frozenset({Permission.USAGE_READ, Permission.BUDGET_READ}),
 }
 
 # What a platform auditor (User.is_auditor) may do in ANY team without being a
 # member: strictly read-only billing visibility. Mutating permissions are never
-# granted this way.
+# granted this way, and neither is `decisions:read` — decision exports carry
+# raw end-user prompts, not billing aggregates.
 AUDITOR_TEAM_PERMISSIONS: frozenset[Permission] = frozenset(
     {Permission.USAGE_READ, Permission.BUDGET_READ}
 )

@@ -16,6 +16,7 @@ import asyncio
 import hashlib
 import json
 import math
+from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from time import perf_counter
@@ -31,8 +32,10 @@ DEFAULT_THRESHOLD = 0.80
 
 # (cache_key) → list of (route_name, target_model, threshold, [vectors]).
 # Keyed by a hash of the routes config + embedding model, so editing the router
-# invalidates naturally. Bounded by the number of distinct router configs.
-_ROUTE_CACHE: dict[str, list[tuple[str, str, float, list[list[float]]]]] = {}
+# invalidates naturally. LRU-bounded at MAX_CACHE_ENTRIES so stale configs
+# (and their locks) don't accumulate for the process lifetime.
+MAX_CACHE_ENTRIES = 32
+_ROUTE_CACHE: OrderedDict[str, list[tuple[str, str, float, list[list[float]]]]] = OrderedDict()
 _CACHE_LOCKS: dict[str, asyncio.Lock] = {}
 
 
@@ -107,17 +110,22 @@ class EmbeddingsStrategy:
     ) -> list[tuple[str, str, float, list[list[float]]]]:
         cached = _ROUTE_CACHE.get(self._cache_key)
         if cached is not None:
+            _ROUTE_CACHE.move_to_end(self._cache_key)
             return cached
         lock = _CACHE_LOCKS.setdefault(self._cache_key, asyncio.Lock())
         async with lock:
             cached = _ROUTE_CACHE.get(self._cache_key)
             if cached is not None:
+                _ROUTE_CACHE.move_to_end(self._cache_key)
                 return cached
             entries = []
             for route in self._routes:
                 vectors = await embed(self._embedding_model, list(route.utterances))
                 entries.append((route.name, route.target_model, route.threshold, vectors))
             _ROUTE_CACHE[self._cache_key] = entries
+            while len(_ROUTE_CACHE) > MAX_CACHE_ENTRIES:
+                evicted_key, _ = _ROUTE_CACHE.popitem(last=False)
+                _CACHE_LOCKS.pop(evicted_key, None)
             return entries
 
     async def select(

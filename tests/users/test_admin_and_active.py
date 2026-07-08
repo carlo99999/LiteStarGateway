@@ -23,6 +23,18 @@ async def test_set_user_active_disables_and_revokes(service: UserService) -> Non
     assert updated.token_version == target.token_version + 1  # sessions revoked
 
 
+async def test_set_user_active_records_and_clears_deactivated_by(service: UserService) -> None:
+    admin = _account("admin@b.com", is_admin=True)
+    target = _account("bob@b.com")
+    await service._users.add(admin)
+    await service._users.add(target)
+
+    disabled = await service.set_user_active(admin, target.id, is_active=False)
+    assert disabled.deactivated_by == "admin"
+    enabled = await service.set_user_active(admin, target.id, is_active=True)
+    assert enabled.deactivated_by is None
+
+
 async def test_set_user_active_requires_platform_admin(service: UserService) -> None:
     non_admin = _account("nope@b.com")
     other = _account("other@b.com")
