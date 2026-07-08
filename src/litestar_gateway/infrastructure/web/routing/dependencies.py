@@ -1,8 +1,8 @@
-"""Dependency wiring: RouterService + the shadow-mode decision-log factory."""
+"""Dependency wiring: RouterService + the shadow-mode own-session factories."""
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -10,7 +10,17 @@ from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.application.routing.service import RouterService
-from litestar_gateway.domain.ports import RoutingDecisionLog, RoutingDecisionLogFactory
+from litestar_gateway.domain.ports import (
+    CredentialRepository,
+    ModelRepository,
+    RoutingDecisionLog,
+    RoutingDecisionLogFactory,
+    RoutingRepositoryFactory,
+)
+from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.persistence.credential_repository import (
+    SQLAlchemyCredentialRepository,
+)
 from litestar_gateway.infrastructure.persistence.model_repository import (
     SQLAlchemyModelRepository,
 )
@@ -38,3 +48,21 @@ def make_shadow_log_factory(session_maker: Any) -> RoutingDecisionLogFactory:
             yield SQLAlchemyRoutingDecisionLog(session)
 
     return open_log
+
+
+def make_shadow_repos_factory(
+    session_maker: Any, keyring_factory: Callable[[AsyncSession], Keyring]
+) -> RoutingRepositoryFactory:
+    """Model/credential repositories with their own session/unit of work: the
+    shadow strategy's DB lookups (judge/embeddings) race the request coroutine,
+    which is still issuing statements on the request-scoped session."""
+
+    @asynccontextmanager
+    async def open_repos() -> AsyncIterator[tuple[ModelRepository, CredentialRepository]]:
+        async with session_maker() as session:
+            yield (
+                SQLAlchemyModelRepository(session),
+                SQLAlchemyCredentialRepository(session, keyring_factory(session)),
+            )
+
+    return open_repos
