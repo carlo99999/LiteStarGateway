@@ -18,7 +18,7 @@ introduced by #103 over-bills in the one case it didn't consider.
 
 New counts: **0 CRITICAL · 1 HIGH · 7 MEDIUM · 8 LOW**.
 
-### Resolution status (Round 4, updated after remediation)
+## Resolution status (Round 4, updated after remediation)
 
 **Fixed & merged to `main`:**
 

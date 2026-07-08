@@ -16,6 +16,7 @@ from litestar_gateway.domain.ports.routing import (
     RouterRepository,
     RoutingDecisionLog,
     RoutingDecisionLogFactory,
+    RoutingRepositoryFactory,
 )
 from litestar_gateway.domain.ports.scim_token import ScimTokenRepository
 from litestar_gateway.domain.ports.secret_key import SecretKeyRepository
@@ -41,6 +42,7 @@ __all__ = [
     "RouterRepository",
     "RoutingDecisionLog",
     "RoutingDecisionLogFactory",
+    "RoutingRepositoryFactory",
     "ScimTokenRepository",
     "SecretKeyRepository",
     "ServicePrincipalRepository",
