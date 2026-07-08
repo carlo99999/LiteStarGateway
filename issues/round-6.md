@@ -59,11 +59,12 @@ re-read against the finding it claims to close; the suite re-run at 615 passed, 
 | M46 — Titan embeddings ran fully sequential | `b0bf46d` | Fanned out via `asyncio.gather` + semaphore (bound 8), order preserved, failure semantics unchanged. |
 | M47 — `create_app()` 175-line god-function | `33d5049` | Extracted into named `_build_*` helpers; pure extraction, full suite green. |
 | M48 — `metered_stream` nesting depth 5 | `91f1492` | Finally-block billing logic extracted into `_finalize_stream_billing`; `metered_stream` itself back to depth ≤3. |
+| L32 — class-attribute state in test doubles | (this PR) | Two of the four originally-cited sites (`test_webhook_shadow.py`, `test_judge_hybrid_export.py`) turned out to be function-local `dict`s on re-inspection, not shared class state — no fix needed there. The two real sites (`tests/completions/conftest.py`'s `FakeClient`/`FakeAnthropic`/`FakeGenaiClient`, `tests/completions/test_bedrock.py`'s `FakeBedrockRuntime`) capture on the class because the adapter under test constructs the SDK client itself, so no test holds an instance to read from — a full instance-based rewrite isn't achievable without a bigger registry redesign. Instead, `_patch`/`_patch_bedrock` now reset the captured state before every test, so a test that forgets to trigger the call under test fails on a `KeyError` instead of silently reading the previous test's value. (xdist-across-workers risk from the original finding doesn't apply — worker processes don't share class state; the real risk was same-process stale-read masking, which this closes.) |
 
 **Not yet addressed (LOW, deliberately deferred — see original entries above):** L30
-(`resilience.py` has no test coverage), L31 (float money math, no property tests), L32
-(class-attribute state in test doubles), L33 (dead `keys_match` + stale docstring), L34
-(ports-with-one-adapter is a documented tradeoff, not a defect).
+(`resilience.py` has no test coverage), L31 (float money math, no property tests), L33
+(dead `keys_match` + stale docstring), L34 (ports-with-one-adapter is a documented
+tradeoff, not a defect).
 
 **Updated overall assessment: 8.5/10.** Every CRITICAL and HIGH from this round is closed
 with a targeted fix and a genuine regression test (not just a happy-path patch) — SSRF
