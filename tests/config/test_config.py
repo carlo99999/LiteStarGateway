@@ -249,6 +249,35 @@ def test_team_mapping_parses_groups_and_defaults_role_to_member(
     assert mapping["qa"] == (TeamGrant(UUID(_TEAM_ID), TeamRole.MEMBER),)
 
 
+def test_team_mapping_rejects_conflicting_non_admin_roles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Two groups granting the same team two different non-admin roles would make
+    # the resolved role depend on the IdP's group ordering; fail at load instead.
+    monkeypatch.setenv(
+        "SSO_TEAM_MAPPING",
+        json.dumps(
+            {
+                "eng": [{"team": _TEAM_ID, "role": "member"}],
+                "ops": [{"team": _TEAM_ID, "role": "model-manager"}],
+            }
+        ),
+    )
+    with pytest.raises(InsecureConfigurationError, match="conflicting roles"):
+        _env_team_mapping("SSO_TEAM_MAPPING")
+
+
+def test_team_mapping_allows_same_team_same_role_in_two_groups(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "SSO_TEAM_MAPPING",
+        json.dumps({"eng": [{"team": _TEAM_ID}], "qa": [{"team": _TEAM_ID, "role": "member"}]}),
+    )
+    mapping = _env_team_mapping("SSO_TEAM_MAPPING")
+    assert mapping["eng"] == mapping["qa"] == (TeamGrant(UUID(_TEAM_ID), TeamRole.MEMBER),)
+
+
 @pytest.mark.parametrize(
     "raw",
     [

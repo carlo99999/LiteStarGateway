@@ -41,9 +41,15 @@ async def test_auditor_reads_audit_and_any_team_usage_but_mutates_nothing(
     assert (
         await client.get(f"/teams/{team}/usage", headers=_bearer(token))
     ).status_code == HTTP_200_OK
-    assert (
-        await client.get(f"/teams/{team}/keys/spending", headers=_bearer(token))
-    ).status_code == HTTP_200_OK
+    await client.post(f"/teams/{team}/keys", json={"name": "app"}, headers=_bearer(admin))
+    spending = await client.get(f"/teams/{team}/keys/spending", headers=_bearer(token))
+    assert spending.status_code == HTTP_200_OK
+    # The auditor holds usage:read but not keys:read, so spend figures come
+    # back with the key-identity block redacted (R6-M43).
+    for row in spending.json():
+        assert row["id"] is not None
+        for field in ("name", "prefix", "is_active", "created_at", "revoked_at"):
+            assert row[field] is None
 
     for request in (
         client.post(f"/teams/{team}/models", json=_model_payload(cred), headers=_bearer(token)),

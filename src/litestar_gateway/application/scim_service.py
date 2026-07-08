@@ -10,7 +10,8 @@ Deactivation mirrors the admin lever (`UserService.set_user_active`): existing
 sessions are revoked (token_version bump) and the user's personal API keys die
 with their access. Platform admins are the one exception — the gateway, not the
 IdP, governs admins (same philosophy as the upgrade-only SSO admin flag), so a
-SCIM deactivation of an admin account is refused.
+SCIM deactivation of an admin account is refused — as is any change to an
+admin's identity (userName/externalId).
 """
 
 from __future__ import annotations
@@ -155,10 +156,22 @@ class ScimService:
             raise PermissionDenied(
                 "SCIM cannot deactivate a platform admin; demote via the admin API first"
             )
+        # SCIM may only undo its own deactivations: an admin disabled the account
+        # for cause, and a routine IdP full-sync with active:true must not
+        # silently resurrect it (same philosophy as the admin guard above).
+        if target_active and not user.is_active and user.deactivated_by == "admin":
+            raise PermissionDenied(
+                "SCIM cannot reactivate an account disabled by an admin; "
+                "re-enable via the admin API first"
+            )
 
         new_email = _normalize_email(email) if email else user.email
         new_external_id = user.external_id if external_id is None else external_id
         if new_email != user.email or new_external_id != user.external_id:
+            if user.is_admin:
+                raise PermissionDenied(
+                    "SCIM cannot change a platform admin's identity; demote via the admin API first"
+                )
             user = await self._users.update_scim_identity(user_id, new_email, new_external_id)
 
         if target_active != user.is_active:
@@ -166,7 +179,9 @@ class ScimService:
             # riskier credential (personal keys) before flipping the account.
             if not target_active and self._api_keys is not None:
                 await self._api_keys.revoke_personal_keys_for_user(user_id, _now())
-            await self._users.set_active(user_id, target_active)
+            await self._users.set_active(
+                user_id, target_active, deactivated_by=None if target_active else "scim"
+            )
             user = await self.get_user(user_id)
         return user
 

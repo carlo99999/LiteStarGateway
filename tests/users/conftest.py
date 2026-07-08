@@ -65,12 +65,17 @@ class FakeUserRepository:
                     user, password_hash=password_hash, token_version=user.token_version + 1
                 )
 
-    async def set_active(self, user_id: UUID, is_active: bool) -> None:
+    async def set_active(
+        self, user_id: UUID, is_active: bool, *, deactivated_by: str | None = None
+    ) -> None:
         for email, user in self._by_email.items():
             if user.id == user_id:
                 tv = user.token_version + (0 if is_active else 1)
                 self._by_email[email] = dataclasses.replace(
-                    user, is_active=is_active, token_version=tv
+                    user,
+                    is_active=is_active,
+                    token_version=tv,
+                    deactivated_by=None if is_active else deactivated_by,
                 )
 
     async def set_admin(self, user_id: UUID, is_admin: bool) -> None:
