@@ -27,6 +27,7 @@ from google.oauth2 import service_account
 
 from litestar_gateway.domain.entities import Model
 from litestar_gateway.domain.exceptions import CredentialMisconfigured
+from litestar_gateway.infrastructure.llm.feature_support import ensure_translatable_chat_request
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.llm.structured_output import parse_response_format
 
@@ -52,6 +53,7 @@ def _text(content: Any) -> str:
 
 def to_gemini_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
     effective = model.merge_params(request)
+    ensure_translatable_chat_request(effective, model.provider.value)
 
     system_parts: list[str] = []
     contents: list[dict[str, Any]] = []

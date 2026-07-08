@@ -29,6 +29,7 @@ from botocore.config import Config as BotoConfig
 
 from litestar_gateway.domain.entities import Model
 from litestar_gateway.domain.exceptions import CredentialMisconfigured, UnsupportedOperation
+from litestar_gateway.infrastructure.llm.feature_support import ensure_translatable_chat_request
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.llm.structured_output import parse_response_format
 
@@ -81,6 +82,7 @@ def _text(content: Any) -> str:
 
 def to_converse_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
     effective = model.merge_params(request)
+    ensure_translatable_chat_request(effective, model.provider.value)
     structured = parse_response_format(effective)
 
     system_parts: list[str] = []
