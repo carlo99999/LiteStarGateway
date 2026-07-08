@@ -10,10 +10,16 @@ from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
 )
+from litestar_gateway.infrastructure.persistence.model_repository import (
+    SQLAlchemyModelRepository,
+)
 
 
 def provide_credential_service(
     db_session: NamedDependency[AsyncSession],
     keyring: NamedDependency[Keyring],
 ) -> CredentialService:
-    return CredentialService(SQLAlchemyCredentialRepository(db_session, keyring))
+    return CredentialService(
+        SQLAlchemyCredentialRepository(db_session, keyring),
+        SQLAlchemyModelRepository(db_session),
+    )

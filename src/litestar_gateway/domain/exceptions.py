@@ -104,6 +104,11 @@ class CredentialNameExists(DomainError):
     """A credential with this name already exists."""
 
 
+class CredentialInUse(DomainError):
+    """The credential is still referenced by one or more models and cannot be
+    deleted — doing so would orphan those models' `credential_id`."""
+
+
 class SaltKeyMissing(DomainError):
     """SALT_KEY is not configured; credential encryption is unavailable."""
 

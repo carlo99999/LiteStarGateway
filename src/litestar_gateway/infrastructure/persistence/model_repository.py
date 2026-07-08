@@ -81,3 +81,9 @@ class SQLAlchemyModelRepository:
     async def remove(self, model_id: UUID) -> None:
         await self._session.execute(delete(ModelRecord).where(ModelRecord.id == model_id))
         await self._session.commit()
+
+    async def exists_for_credential(self, credential_id: UUID) -> bool:
+        record = await self._session.scalar(
+            select(ModelRecord.id).where(ModelRecord.credential_id == credential_id).limit(1)
+        )
+        return record is not None
