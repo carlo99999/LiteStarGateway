@@ -97,3 +97,46 @@ jobs:
       # throwaway database (see tests/models/conftest.py).
       - name: Tests against Postgres (persistence subset)
         run: uv run pytest -q tests/models
+
+  # The `checks` job runs the app in-process; it never proves the shipped
+  # Dockerfile (multi-stage uv build, slim runtime, HEALTHCHECK) actually boots.
+  # A broken slim-stage or HEALTHCHECK regression would otherwise surface for
+  # the first time on deploy. This job builds the real image and smoke-tests it
+  # the same way HEALTHCHECK does: an HTTP GET against /health.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t lsg-citest .
+
+      - name: Run container
+        run: |
+          docker run -d --name lsg-citest \
+            -p 8000:8000 \
+            -e ENVIRONMENT=development \
+            -e DATABASE_URL="sqlite+aiosqlite:////data/citest.db" \
+            -e MIGRATE_ON_START=false \
+            -e MASTER_KEY=change-me-please \
+            -e SALT_KEY=change-me-strong-random \
+            lsg-citest
+
+      - name: Wait for readiness and smoke-test /health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health; then
+              echo "health check passed"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "container failed to become healthy" >&2
+          docker logs lsg-citest || true
+          exit 1
+
+      - name: Teardown
+        if: always()
+        run: |
+          docker logs lsg-citest || true
+          docker rm -f lsg-citest || true
