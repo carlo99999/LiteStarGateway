@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 .mkdocs-docs
 .mkdocs-site
+.hypothesis
 # Coverage artifacts (pytest-cov)
 .coverage
 .coverage.*
