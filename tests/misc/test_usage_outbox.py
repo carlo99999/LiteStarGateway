@@ -207,3 +207,59 @@ async def test_record_preserves_event_time(session: AsyncSession) -> None:
 
     assert await repo.spend_since(event.team_id, happened_at - timedelta(days=1)) == 0.12
     assert await repo.spend_since(event.team_id, happened_at + timedelta(days=1)) == 0.0
+
+
+async def test_reconciler_loop_ticks_survives_errors_and_shuts_down_cleanly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The reconcile_pending logic is covered above; this covers the loop WIRING
+    # (create_task on startup, the fail-safe try/except, cancellation on
+    # shutdown), which billing convergence depends on and nothing else exercised.
+    import asyncio
+
+    from litestar import Litestar
+
+    import litestar_gateway.infrastructure.usage_reconciler as reconciler_mod
+    from litestar_gateway.config import Settings
+    from litestar_gateway.infrastructure.persistence.database import create_database
+
+    settings = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'recon.db'}",
+        admin_email="admin@example.com",
+        master_key="master-secret",
+        jwt_secret="test-secret-key-0123456789-abcdefghij",  # pragma: allowlist secret
+        salt_key="test-salt-key",
+    )
+    database = create_database(settings)
+
+    state = {"ticks": 0}
+    reached = asyncio.Event()
+
+    class FakeUsageRepository:
+        def __init__(self, _session: object) -> None:
+            pass
+
+        async def reconcile_pending(self, limit: int) -> int:
+            state["ticks"] += 1
+            if state["ticks"] == 2:
+                raise RuntimeError("transient reconcile failure")  # must not kill the loop
+            if state["ticks"] >= 3:
+                reached.set()
+            return 0
+
+    monkeypatch.setattr(reconciler_mod, "_RECONCILE_INTERVAL_SECONDS", 0.01)
+    monkeypatch.setattr(reconciler_mod, "SQLAlchemyUsageRepository", FakeUsageRepository)
+
+    # Real Litestar app carrying the session maker the loop reads from app.state.
+    engine = create_async_engine(settings.database_url)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    app = Litestar(route_handlers=[])
+    app.state[database.config.session_maker_app_state_key] = maker
+
+    lifespan = reconciler_mod.make_usage_reconciler(database, settings)
+    async with lifespan(app):
+        # (a) ticks at least once and (c) keeps ticking past a raised tick.
+        await asyncio.wait_for(reached.wait(), timeout=5)
+    # (b) leaving the context cancelled the loop task without raising = clean shutdown.
+    assert state["ticks"] >= 3
+    await engine.dispose()
