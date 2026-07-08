@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.domain.ports import RoutingDecisionLog, RoutingDecisionLogFactory
+from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.persistence.model_repository import (
     SQLAlchemyModelRepository,
 )
@@ -20,9 +21,11 @@ from litestar_gateway.infrastructure.persistence.router_repository import (
 )
 
 
-def provide_router_service(db_session: NamedDependency[AsyncSession]) -> RouterService:
+def provide_router_service(
+    db_session: NamedDependency[AsyncSession], keyring: NamedDependency[Keyring]
+) -> RouterService:
     return RouterService(
-        routers=SQLAlchemyRouterRepository(db_session),
+        routers=SQLAlchemyRouterRepository(db_session, keyring),
         models=SQLAlchemyModelRepository(db_session),
         decisions=SQLAlchemyRoutingDecisionLog(db_session),
     )

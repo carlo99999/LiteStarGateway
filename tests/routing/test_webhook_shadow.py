@@ -282,6 +282,130 @@ async def test_failing_shadow_never_touches_the_request(
     assert _decisions(tmp_path) == [("complexity", "cheap-model", 0, 0)]
 
 
+# ── R6-H19: bearer_token encrypted at rest + redacted from responses ─────────
+
+WEBHOOK_TOKEN = "s3cret-webhook-token"  # pragma: allowlist secret
+WEBHOOK_CONFIG = {"url": "https://picker.example/route", "bearer_token": WEBHOOK_TOKEN}
+
+
+def _capture_auth(monkeypatch: pytest.MonkeyPatch, seen: dict) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers.get("Authorization")
+        return httpx.Response(200, json={"choice": 2})
+
+    _mock_webhook(monkeypatch, handler)
+
+
+def _raw_config(tmp_path: Path) -> str:
+    return (
+        sqlite3.connect(tmp_path / "phase2.db")
+        .execute("SELECT strategy_config FROM router")
+        .fetchone()[0]
+    )
+
+
+async def test_webhook_token_is_encrypted_at_rest(client: AsyncTestClient, tmp_path: Path) -> None:
+    await _setup(
+        client,
+        {
+            "strategy": "webhook",
+            "strategy_config": {**WEBHOOK_CONFIG, "shadow": dict(WEBHOOK_CONFIG)},
+            "shadow_strategy": "webhook",
+        },
+    )
+    raw = _raw_config(tmp_path)
+    assert WEBHOOK_TOKEN not in raw
+    stored = json.loads(raw)
+    assert set(stored["bearer_token"]) == {"key_id", "token"}
+    assert set(stored["shadow"]["bearer_token"]) == {"key_id", "token"}
+
+
+async def test_responses_mask_webhook_token(client: AsyncTestClient) -> None:
+    _, team, admin = await _setup(
+        client, {"strategy": "webhook", "strategy_config": dict(WEBHOOK_CONFIG)}
+    )
+    body = {
+        "name": "auto2",
+        "default_model": "big-model",
+        "candidates": [
+            {"model_name": "cheap-model", "description": "small", "quality_tier": "SIMPLE"},
+            {"model_name": "big-model", "description": "large", "quality_tier": "COMPLEX"},
+        ],
+        "strategy": "webhook",
+        "strategy_config": {**WEBHOOK_CONFIG, "shadow": dict(WEBHOOK_CONFIG)},
+        "shadow_strategy": "webhook",
+    }
+    create = await client.post(f"/teams/{team}/routers", json=body, headers=_bearer(admin))
+    assert create.status_code == HTTP_201_CREATED, create.text
+    assert WEBHOOK_TOKEN not in create.text
+    config = create.json()["strategy_config"]
+    assert config["bearer_token"] == "***"
+    assert config["shadow"]["bearer_token"] == "***"
+
+    listing = await client.get(f"/teams/{team}/routers", headers=_bearer(admin))
+    assert WEBHOOK_TOKEN not in listing.text
+
+    updated = await client.put(
+        f"/teams/{team}/routers/{create.json()['id']}", json=body, headers=_bearer(admin)
+    )
+    assert updated.status_code == HTTP_200_OK, updated.text
+    assert WEBHOOK_TOKEN not in updated.text
+
+
+async def test_webhook_gets_decrypted_token_and_masked_update_preserves_it(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict = {}
+    _capture_auth(monkeypatch, seen)
+    key, team, admin = await _setup(
+        client, {"strategy": "webhook", "strategy_config": dict(WEBHOOK_CONFIG)}
+    )
+    await _chat(client, key)
+    assert seen["auth"] == f"Bearer {WEBHOOK_TOKEN}"
+
+    # A client naturally echoes the masked config back on update: the stored
+    # token must survive, not be overwritten with the mask.
+    router_id = (await client.get(f"/teams/{team}/routers", headers=_bearer(admin))).json()[0]["id"]
+    body = {
+        "name": "auto",
+        "default_model": "big-model",
+        "candidates": [
+            {"model_name": "cheap-model", "description": "small", "quality_tier": "SIMPLE"},
+            {"model_name": "big-model", "description": "large", "quality_tier": "COMPLEX"},
+        ],
+        "strategy": "webhook",
+        "strategy_config": {"url": WEBHOOK_CONFIG["url"], "bearer_token": "***"},
+    }
+    resp = await client.put(f"/teams/{team}/routers/{router_id}", json=body, headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+
+    seen.clear()
+    await _chat(client, key)
+    assert seen["auth"] == f"Bearer {WEBHOOK_TOKEN}"
+
+
+async def test_legacy_plaintext_token_still_works_and_is_masked(
+    client: AsyncTestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict = {}
+    _capture_auth(monkeypatch, seen)
+    key, team, admin = await _setup(
+        client, {"strategy": "webhook", "strategy_config": dict(WEBHOOK_CONFIG)}
+    )
+    # Simulate a row written before encryption existed: raw plaintext token.
+    conn = sqlite3.connect(tmp_path / "phase2.db")
+    conn.execute("UPDATE router SET strategy_config = ?", (json.dumps(WEBHOOK_CONFIG),))
+    conn.commit()
+    conn.close()
+
+    await _chat(client, key)
+    assert seen["auth"] == f"Bearer {WEBHOOK_TOKEN}"
+
+    listing = await client.get(f"/teams/{team}/routers", headers=_bearer(admin))
+    assert WEBHOOK_TOKEN not in listing.text
+    assert listing.json()[0]["strategy_config"]["bearer_token"] == "***"
+
+
 async def test_router_validation_rejects_bad_webhook_and_shadow(
     client: AsyncTestClient,
 ) -> None:

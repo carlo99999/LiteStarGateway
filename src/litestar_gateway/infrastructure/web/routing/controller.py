@@ -23,7 +23,12 @@ from litestar_gateway.domain.authorization import Permission
 from litestar_gateway.domain.entities import User
 from litestar_gateway.domain.exceptions import InvalidRouterConfig
 from litestar_gateway.domain.ports import AuditLog
-from litestar_gateway.domain.routing import CandidateModel, QualityTier, RouterConfig
+from litestar_gateway.domain.routing import (
+    BEARER_TOKEN_MASK,
+    CandidateModel,
+    QualityTier,
+    RouterConfig,
+)
 from litestar_gateway.infrastructure.web.audit.recorder import record_audit
 from litestar_gateway.infrastructure.web.session.dependencies import provide_current_user
 
@@ -89,6 +94,19 @@ class RouterRequest:
         )
 
 
+def _mask_strategy_config(config: dict[str, Any]) -> dict[str, Any]:
+    """The webhook `bearer_token` is a secret and is never echoed back (same
+    posture as credential values). Updates that resend the mask keep the
+    stored token."""
+    masked = dict(config)
+    if "bearer_token" in masked:
+        masked["bearer_token"] = BEARER_TOKEN_MASK
+    shadow = masked.get("shadow")
+    if isinstance(shadow, dict) and "bearer_token" in shadow:
+        masked["shadow"] = {**shadow, "bearer_token": BEARER_TOKEN_MASK}
+    return masked
+
+
 @dataclass(frozen=True)
 class RouterResponse:
     id: UUID
@@ -111,7 +129,7 @@ class RouterResponse:
             candidates=[dataclasses.asdict(candidate) for candidate in router.candidates],
             default_model=router.default_model,
             strategy=router.strategy,
-            strategy_config=router.strategy_config,
+            strategy_config=_mask_strategy_config(router.strategy_config),
             enabled=router.enabled,
             created_at=router.created_at,
             shadow_strategy=router.shadow_strategy,
