@@ -40,7 +40,7 @@ declined to build).
 
 | Endpoint | Wire shape | Backing provider | Client SDK |
 | --- | --- | --- | --- |
-| `POST /v1/messages` | Anthropic Messages | `anthropic` | `Anthropic(base_url=…, api_key="lsk_…")` |
+| `POST /v1/messages` | Anthropic Messages | `anthropic` | `Anthropic(base_url=…, api_key=<gateway-key>)` |
 | `POST /v1/messages` (`stream:true`) | Anthropic SSE | `anthropic` | same |
 | `POST /gemini/v1beta/models/{model}:generateContent` | Gemini `generateContent` | `vertex_ai` | `google-genai` `HttpOptions(base_url=…)` |
 | `:streamGenerateContent` | Gemini SSE | `vertex_ai` | same |
