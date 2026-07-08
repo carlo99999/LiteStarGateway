@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.exceptions import DomainError
-from litestar_gateway.domain.ports import IdentityProvider
+from litestar_gateway.domain.ports import IdentityProvider, LLMGateway
 from litestar_gateway.infrastructure.bootstrap import make_bootstrap_admin
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.logging import build_logging_config
@@ -23,7 +23,7 @@ from litestar_gateway.infrastructure.observability.composite import CompositeTra
 from litestar_gateway.infrastructure.observability.dispatcher import TraceDispatcher
 from litestar_gateway.infrastructure.observability.factory import build_trace_sink
 from litestar_gateway.infrastructure.observability.mlflow_metrics import make_metrics_publisher
-from litestar_gateway.infrastructure.persistence.database import create_database
+from litestar_gateway.infrastructure.persistence.database import Database, create_database
 from litestar_gateway.infrastructure.persistence.secret_key_repository import (
     SQLAlchemySecretKeyRepository,
 )
@@ -84,6 +84,32 @@ def create_app(
     settings = settings or Settings.from_env()
     database = create_database(settings)
     llm_gateway = build_llm_gateway(settings)  # shared, stateless; built once
+    metrics_aggregator, trace_dispatcher = _build_observability(settings)
+
+    route_handlers = _build_route_handlers(database)
+    dependencies = _build_dependencies(settings, database, trace_dispatcher, llm_gateway)
+
+    idp = _resolve_identity_provider(settings, identity_provider)
+    if idp is not None:
+        route_handlers.append(create_sso_router())
+        dependencies.update(_build_sso_dependencies(settings, idp))
+
+    return Litestar(
+        route_handlers=route_handlers,
+        openapi_config=_build_openapi_config(settings),
+        plugins=[database.plugin],
+        logging_config=build_logging_config(settings),
+        on_startup=[make_bootstrap_admin(database, settings)],
+        lifespan=_build_lifespan(database, settings, trace_dispatcher, metrics_aggregator),
+        dependencies=dependencies,
+        stores=_build_rate_limit_stores(settings),
+        exception_handlers={DomainError: domain_exception_handler},
+    )
+
+
+def _build_observability(
+    settings: Settings,
+) -> tuple[MetricsAggregator | None, TraceDispatcher]:
     # Observability lives on MLflow (MLFLOW_TRACKING_URI: the compose server or
     # any external one): per-call traces via the MLflow sink, fleet-level ops
     # metrics via an in-process aggregator published to a "gateway-metrics" run.
@@ -96,17 +122,19 @@ def create_app(
         trace_sink,
         on_drop=metrics_aggregator.record_dropped_trace if metrics_aggregator else None,
     )
-    swagger_plugin = SwaggerRenderPlugin(version="5.18.2", path="/")
-    scalar_plugin = ScalarRenderPlugin(version="1.19.5", path="/scalar")
-    stoplight_plugin = StoplightRenderPlugin(version="7.7.18", path="/elements")
+    return metrics_aggregator, trace_dispatcher
 
+
+def _make_shadow_log_provider(session_maker_state_key: str):
     def provide_shadow_log_factory(request: Request):
         # The session maker lands in app.state under the AA config's (possibly
         # suffixed) key — same trick as the auth middleware, read lazily.
-        return make_shadow_log_factory(
-            request.app.state[database.config.session_maker_app_state_key]
-        )
+        return make_shadow_log_factory(request.app.state[session_maker_state_key])
 
+    return provide_shadow_log_factory
+
+
+def _make_keyring_provider(settings: Settings):
     def provide_keyring(db_session: NamedDependency[AsyncSession]) -> Keyring:
         # Per-purpose masters: SALT_KEY wraps credential keys, JWT_SECRET wraps JWT
         # keys. Credential ops raise SaltKeyMissing (503) if SALT_KEY is unset; the
@@ -115,16 +143,24 @@ def create_app(
             SQLAlchemySecretKeyRepository(db_session), settings.salt_key, settings.jwt_secret
         )
 
+    return provide_keyring
+
+
+def _make_shadow_repos_provider(session_maker_state_key: str, keyring_provider):
     def provide_shadow_repos_factory(request: Request):
         # Same own-session care as the shadow decision log: the shadow
         # strategy's model/credential lookups race the request coroutine,
         # which is still using the request-scoped session.
         return make_shadow_repos_factory(
-            request.app.state[database.config.session_maker_app_state_key],
-            provide_keyring,
+            request.app.state[session_maker_state_key],
+            keyring_provider,
         )
 
-    route_handlers: list = [
+    return provide_shadow_repos_factory
+
+
+def _build_route_handlers(database: Database) -> list:
+    return [
         health,  # public liveness
         readiness,  # public readiness (DB check)
         create_api_router(database.config),  # the protected "api-endpoint" group
@@ -140,7 +176,17 @@ def create_app(
         create_scim_router(),  # IdP-facing SCIM 2.0 Users (provisioning-token auth)
         create_scim_tokens_router(),  # platform-admin: mint/revoke SCIM tokens
     ]
-    dependencies = {
+
+
+def _build_dependencies(
+    settings: Settings,
+    database: Database,
+    trace_dispatcher: TraceDispatcher,
+    llm_gateway: LLMGateway,
+) -> dict[str, Provide]:
+    session_maker_key = database.config.session_maker_app_state_key
+    keyring_provider = _make_keyring_provider(settings)
+    return {
         "api_key_service": Provide(provide_api_key_service, sync_to_thread=False),
         "user_service": Provide(provide_user_service, sync_to_thread=False),
         "organization_service": Provide(provide_organization_service, sync_to_thread=False),
@@ -153,67 +199,76 @@ def create_app(
         ),
         "scim_service": Provide(provide_scim_service, sync_to_thread=False),
         "router_service": Provide(provide_router_service, sync_to_thread=False),
-        "shadow_decision_log_factory": Provide(provide_shadow_log_factory, sync_to_thread=False),
-        "shadow_repos_factory": Provide(provide_shadow_repos_factory, sync_to_thread=False),
+        "shadow_decision_log_factory": Provide(
+            _make_shadow_log_provider(session_maker_key),
+            sync_to_thread=False,
+        ),
+        "shadow_repos_factory": Provide(
+            _make_shadow_repos_provider(session_maker_key, keyring_provider),
+            sync_to_thread=False,
+        ),
         "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
         "budget_repository": Provide(provide_budget_repository, sync_to_thread=False),
         "audit_log": Provide(provide_audit_log, sync_to_thread=False),
         "trace_dispatcher": Provide(lambda: trace_dispatcher, sync_to_thread=False),
         "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
-        "keyring": Provide(provide_keyring, sync_to_thread=False),
+        "keyring": Provide(keyring_provider, sync_to_thread=False),
     }
 
+
+def _resolve_identity_provider(
+    settings: Settings, identity_provider: IdentityProvider | None
+) -> IdentityProvider | None:
     # SSO (OIDC) is registered only when configured (or an identity provider is
     # injected, e.g. a fake in tests), so its routes/DI are absent otherwise.
-    idp = identity_provider
-    if idp is None and settings.sso_enabled:
-        idp = OIDCIdentityProvider(
+    if identity_provider is None and settings.sso_enabled:
+        return OIDCIdentityProvider(
             settings.oidc_discovery_url,  # type: ignore[arg-type]  # non-None: sso_enabled
             settings.oidc_client_id,  # type: ignore[arg-type]
             settings.oidc_client_secret,
             settings.oidc_scopes,
         )
-    if idp is not None:
-        route_handlers.append(create_sso_router())
-        dependencies["identity_provider"] = Provide(lambda: idp, sync_to_thread=False)
-        dependencies["sso_admin_groups"] = Provide(
-            lambda: settings.oidc_admin_groups, sync_to_thread=False
-        )
-        dependencies["sso_default_admin"] = Provide(
-            lambda: settings.default_admin, sync_to_thread=False
-        )
-        dependencies["sso_team_mapping"] = Provide(
-            lambda: settings.oidc_team_mapping, sync_to_thread=False
-        )
-        dependencies["sso_redirect_uri"] = Provide(
-            lambda: settings.oidc_redirect_uri, sync_to_thread=False
-        )
-        dependencies["sso_cookie_secure"] = Provide(
-            lambda: settings.session_cookie_secure, sync_to_thread=False
-        )
+    return identity_provider
 
+
+def _build_sso_dependencies(settings: Settings, idp: IdentityProvider) -> dict[str, Provide]:
+    return {
+        "identity_provider": Provide(lambda: idp, sync_to_thread=False),
+        "sso_admin_groups": Provide(lambda: settings.oidc_admin_groups, sync_to_thread=False),
+        "sso_default_admin": Provide(lambda: settings.default_admin, sync_to_thread=False),
+        "sso_team_mapping": Provide(lambda: settings.oidc_team_mapping, sync_to_thread=False),
+        "sso_redirect_uri": Provide(lambda: settings.oidc_redirect_uri, sync_to_thread=False),
+        "sso_cookie_secure": Provide(lambda: settings.session_cookie_secure, sync_to_thread=False),
+    }
+
+
+def _build_openapi_config(settings: Settings) -> OpenAPIConfig | None:
     # Public, unauthenticated when enabled — operators disable it in production
     # (OPENAPI_ENABLED=false) so the full API surface isn't exposed.
-    openapi_config = (
-        OpenAPIConfig(
-            title="Litestar Gateway API",
-            version="1.0.0",
-            description=(
-                "A gateway for LLM inference, model deployments, and API key "
-                "management.\n\n"
-                "**Docs viewers:**\n\n"
-                "- [Swagger UI](/)\n"
-                "- [Scalar](/scalar)\n"
-                "- [Stoplight Elements](/elements)\n"
-                "- [OpenAPI schema](/openapi.json)\n"
-            ),
-            path="/",
-            render_plugins=[swagger_plugin, scalar_plugin, stoplight_plugin],
-        )
-        if settings.openapi_enabled
-        else None
+    if not settings.openapi_enabled:
+        return None
+    return OpenAPIConfig(
+        title="Litestar Gateway API",
+        version="1.0.0",
+        description=(
+            "A gateway for LLM inference, model deployments, and API key "
+            "management.\n\n"
+            "**Docs viewers:**\n\n"
+            "- [Swagger UI](/)\n"
+            "- [Scalar](/scalar)\n"
+            "- [Stoplight Elements](/elements)\n"
+            "- [OpenAPI schema](/openapi.json)\n"
+        ),
+        path="/",
+        render_plugins=[
+            SwaggerRenderPlugin(version="5.18.2", path="/"),
+            ScalarRenderPlugin(version="1.19.5", path="/scalar"),
+            StoplightRenderPlugin(version="7.7.18", path="/elements"),
+        ],
     )
 
+
+def _build_rate_limit_stores(settings: Settings) -> dict[str, Store]:
     # Rate-limit stores. Default (empty dict) → Litestar creates in-memory stores
     # per name (per-process). With REDIS_URL, back them with a shared Redis store so
     # limits hold across replicas. Namespaced per limiter, one client.
@@ -234,34 +289,32 @@ def create_app(
             "rate_limit_inference": redis.with_namespace("rl_inference"),
             "rate_limit_auth": redis.with_namespace("rl_auth"),
         }
+    return stores
 
-    return Litestar(
-        route_handlers=route_handlers,
-        openapi_config=openapi_config,
-        plugins=[database.plugin],
-        logging_config=build_logging_config(settings),
-        on_startup=[make_bootstrap_admin(database, settings)],
-        lifespan=[
-            make_rotation_scheduler(database, settings),
-            make_usage_reconciler(database, settings),
-            trace_dispatcher.run,
-            *(
-                [
-                    make_metrics_publisher(
-                        metrics_aggregator,
-                        tracking_uri=settings.mlflow_tracking_uri,  # type: ignore[arg-type]
-                        experiment_name=settings.mlflow_experiment,
-                        interval_seconds=settings.mlflow_metrics_interval,
-                    )
-                ]
-                if metrics_aggregator is not None
-                else []
-            ),
-        ],
-        dependencies=dependencies,
-        stores=stores,
-        exception_handlers={DomainError: domain_exception_handler},
-    )
+
+def _build_lifespan(
+    database: Database,
+    settings: Settings,
+    trace_dispatcher: TraceDispatcher,
+    metrics_aggregator: MetricsAggregator | None,
+) -> list:
+    return [
+        make_rotation_scheduler(database, settings),
+        make_usage_reconciler(database, settings),
+        trace_dispatcher.run,
+        *(
+            [
+                make_metrics_publisher(
+                    metrics_aggregator,
+                    tracking_uri=settings.mlflow_tracking_uri,  # type: ignore[arg-type]
+                    experiment_name=settings.mlflow_experiment,
+                    interval_seconds=settings.mlflow_metrics_interval,
+                )
+            ]
+            if metrics_aggregator is not None
+            else []
+        ),
+    ]
 
 
 @get("/health")
