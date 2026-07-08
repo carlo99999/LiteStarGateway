@@ -30,14 +30,43 @@ justfile recipe that re-introduces a fixed vuln).
 
 New counts: **0 CRITICAL · 3 HIGH · 10 MEDIUM · 6 LOW**.
 
-## Resolution status (in progress)
+## Resolution status — CLOSED
 
-Fixes land one PR per finding, each with a regression test written first (RED→GREEN) and the
-full suite + `ruff` + `pyrefly` kept clean.
+**All 3 HIGH and all 10 MEDIUM findings are fixed and merged to `main`.** Each fix had a
+regression test written first (RED→GREEN). The HIGHs and the first two MEDIUMs (M49, M52)
+landed one-PR-per-finding; the remaining eight were then developed **in parallel across
+isolated git worktrees** (one agent per lane, partitioned by the file-level conflict graph)
+and merged as a grouped batch — M54+M55 share one PR/migration to avoid an Alembic multi-head.
 
-| Finding | Status | Fix |
-| --- | --- | --- |
-| R7-H22 — unmetered judge/embeddings provider spend | **Fixed** | Active-path judge/embeddings calls now run through `UsageMeter` (admit→settle→release) under `routing.judge`/`routing.embeddings` operation labels, so they are budget-gated and billed like any user-facing call; the shadow path stays unmetered by design (detached task + separate session — it cannot share the request-scoped meter, the C3 constraint). Tests: `tests/routing/test_strategy_call_metering.py` (judge call billed as a usage event; over-budget team does not run the judge). |
+**Final gate on merged `main` (HEAD after all merges):** full suite **663 passed**, `ruff`
+clean, `pyrefly` **0 errors**, all 12 `pre-commit` hooks pass. The 6 LOWs are deferred to a
+follow-up.
+
+| Finding | Status | PR | Fix |
+| --- | --- | --- | --- |
+| R7-H22 — unmetered judge/embeddings provider spend | **Fixed** | #178 | Active-path judge/embeddings calls run through `UsageMeter` (admit→settle→release) under `routing.judge`/`routing.embeddings` labels; shadow path stays unmetered by design (C3). |
+| R7-H23 — `tools`/vision silently dropped on Anthropic/Vertex/Bedrock | **Fixed** | #179 | `ensure_translatable_chat_request` rejects untranslatable `tools`/`tool_choice`/non-text content with `UnsupportedOperation` (501) instead of returning a confident wrong answer. |
+| R7-H24 — start-of-stream provider errors never reached the client | **Fixed** | #180 | Stream is primed (first chunk pulled) before the SSE 200 commits, so an open-time provider error surfaces as a real HTTP status; metered generator still bills/releases via its `finally`. |
+| R7-M49 — IdP-facing SCIM surface unthrottled | **Fixed** | #181 | Dedicated SCIM rate limiter (60/min, own store, redis-backed) on both SCIM routers. |
+| R7-M50 — budget reservation ×`n` for providers that ignore `n` | **Fixed** | #186 | `n>1` on a provider whose translator ignores it is rejected (501) at `_prepare`, before admission; `Provider.honors_n` gates OpenAI/Azure/Databricks vs Anthropic/Vertex/Bedrock. |
+| R7-M51 — shadow tasks never drained on shutdown | **Fixed** | #189 | `drain_shadow_tasks` (bounded-timeout gather+cancel) registered as the last lifespan manager so it runs before the DB engine is disposed. |
+| R7-M52 — check-then-insert races surfaced as 500 | **Fixed** | #182 | `IntegrityError` → domain 409 (`ModelNameExists`/`CredentialNameExists`/`AlreadyMember`) in the three repositories, boundary-preserving. |
+| R7-M53 — credential delete unguarded + SQLite/Postgres FK divergence | **Fixed** | #188 | In-use guard (`ModelRepository.exists_for_credential` → `CredentialInUse` 409) plus a connect-time `PRAGMA foreign_keys=ON` listener so dev matches prod. |
+| R7-M54 — `api_key.created_by` unindexed | **Fixed** | #185 | `index=True` on `created_by` + migration. |
+| R7-M55 — `routing_decision` missing composite index | **Fixed** | #185 | Two single-column indexes replaced by composite `(team_id, router_name, created_at)` + migration. |
+| R7-M56 — `just serve` re-introduced `--forwarded-allow-ips "*"` | **Fixed** | #183 | Recipe now uses `${FORWARDED_ALLOW_IPS:-127.0.0.1}`, mirroring the Docker entrypoint. |
+| R7-M57 — CI never ran Postgres or real migrations | **Fixed** | #187 | New `postgres` CI job runs the real `alembic upgrade head` path + a persistence test subset against Postgres. *(CI job validated on GitHub, not locally.)* |
+| R7-M58 — embed fan-out shared the stream event-pull executor | **Fixed** | #184 | Titan embed fan-out gets its own `_BEDROCK_EMBED_EXECUTOR`, keeping the stream `_next_event` pool uncontended. |
+| R7-L35–L40 | **Deferred** | — | Not addressed this round (Bedrock error table, pagination tiebreakers, reconciler-loop lifecycle tests, MLflow sink test, CI docker build, Dependabot). |
+
+**Support PRs (not findings):** #190 fixed a pre-existing detect-secrets false positive (a doc
+snippet `api_key="lsk_…"`) that had turned `main` CI red; #191 fixed 4 `pyrefly` errors that
+only surfaced once the round-7 test files were merged together; #192 refreshed the
+detect-secrets baseline (line-number drift only) and a `ruff format` gap.
+
+**Newly surfaced (candidate for a future round):** `just migration-check` fails on `main`
+independently of these fixes — pre-existing autogenerate drift (`model.params_enforced`
+nullability + a `team_budget` unique constraint not reflected in a migration). Left untouched.
 
 ## HIGH
 
