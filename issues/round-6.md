@@ -31,6 +31,49 @@ IdP.
 
 New counts: **2 CRITICAL · 6 HIGH · 12 MEDIUM · 5 LOW**.
 
+## Resolution status (2026-07-08)
+
+**All 18 actionable findings fixed and independently re-verified against source** (each fix
+re-read against the finding it claims to close; the suite re-run at 615 passed, up from 557 —
+58 new regression tests added). No fix introduced a regression. `ruff`/`pyrefly` stay clean.
+
+| Finding | Commit | Verified fix |
+|---|---|---|
+| C2 — decisions export leaked via `usage:read` | `a6c15af` | New `Permission.DECISIONS_READ`, granted only to `ADMIN`/`MODEL_MANAGER`, excluded from `AUDITOR_TEAM_PERMISSIONS`; negative tests for billing-viewer and auditor (403) in `tests/rbac/test_decisions_export_rbac.py`. |
+| C3 — shadow routing shared the request-scoped `AsyncSession` | `1ae8b1b` | New `RoutingRepositoryFactory` opens an independent session per shadow run, mirroring the existing `shadow_decisions` pattern; `tests/routing/test_shadow_session_isolation.py` asserts no shadow lookup touches the request session. |
+| H16 — SCIM could rewrite an admin's `userName`/`externalId` | `dd65e8e` | Admin guard now also covers email/external_id changes, with correct no-op passthrough when the value is unchanged; `tests/scim/test_users_update.py`. |
+| H17 — routing fallback ignored the capability filter | `bbfae0d` | Fallback checks `default_model in capable`, else substitutes `capable[0]` and records a skip signal; `tests/routing/test_fallback_capability.py`. |
+| H18 — webhook strategy had no SSRF guard | `2ef2df0` | Blocks private/loopback/link-local/multicast literal IPs at config time **and** re-resolves + re-validates the hostname on every call (closes DNS rebinding); redirects disabled. `tests/routing/test_webhook_shadow.py`. |
+| H19 — webhook `bearer_token` stored/returned in plaintext | `86a19ea` | Token now stored via the existing keyring envelope (with legacy-plaintext upgrade-on-write), and `strategy_config` is masked in every response; update flow preserves the real token when the client echoes the mask back. |
+| H20 — SSO privilege changes were never audited | `d096045` | `record_audit` now fires for JIT admin creation, admin upgrade, and each membership add/update/remove from SSO reconciliation — only on actual change, not on no-op logins. `tests/sso/test_sso_audit_trail.py`. |
+| H21 — Bedrock mid-stream errors surfaced as opaque 500s | `3d528c6` | `_status_code` now falls back to an AWS-error-code table when `ResponseMetadata` is absent (the real `EventStreamError` shape); new test constructs an actual `botocore.exceptions.EventStreamError`, not a synthetic mock. |
+| M37 — SCIM PATCH skipped type validation | `4a47f22` | `_set_attr` now rejects non-string `userName`/`externalId` with a SCIM 400 instead of coercing via `str(value)`. |
+| M38 — SCIM PUT defaulted `active` to `True` on omission | `b827a94` | Omitted `active` now preserves current state. |
+| M39 — SCIM could resurrect an admin-disabled account | `484a260` | New `deactivated_by` column distinguishes admin- vs SCIM-initiated deactivation; SCIM reactivation of an admin-disabled account is rejected, and a distinct `scim.user.reactivate` audit action was added as a bonus (closes part of H20's spirit for this path too). |
+| M40 — savings SUM silently dropped counted-but-NULL rows | `6374fff` | `counted` now requires `completion_tokens` and both output costs non-null; no more asymmetric coalescing. |
+| M41 — alt-candidate selection dropped partially-priced candidates | `176993d` | A candidate is priced if *either* cost field is set. |
+| M42 — unbounded embeddings routing cache | `7f2e2b7` | `_ROUTE_CACHE` is now an `OrderedDict` LRU bounded at 32 entries, locks evicted in lockstep. |
+| M43 — `/keys/spending` leaked key identity under `usage:read` | `2046517` | Identity fields (`name`/`prefix`/`is_active`/timestamps) are now nulled out for callers lacking `KEYS_READ`; spend figures and `id` remain visible. |
+| M44 — non-deterministic SSO role resolution on group conflicts | `107370f` | `_env_team_mapping` now rejects (at config-load time) a team mapped to two different non-admin roles across groups, eliminating IdP-claim-order dependence. |
+| M45 — Bedrock per-event thread hops risked shared-pool exhaustion | `25a15e6` | Dedicated bounded `ThreadPoolExecutor` (8 workers) for all Bedrock blocking calls, replacing the shared default pool. |
+| M46 — Titan embeddings ran fully sequential | `b0bf46d` | Fanned out via `asyncio.gather` + semaphore (bound 8), order preserved, failure semantics unchanged. |
+| M47 — `create_app()` 175-line god-function | `33d5049` | Extracted into named `_build_*` helpers; pure extraction, full suite green. |
+| M48 — `metered_stream` nesting depth 5 | `91f1492` | Finally-block billing logic extracted into `_finalize_stream_billing`; `metered_stream` itself back to depth ≤3. |
+
+**Not yet addressed (LOW, deliberately deferred — see original entries above):** L30
+(`resilience.py` has no test coverage), L31 (float money math, no property tests), L32
+(class-attribute state in test doubles), L33 (dead `keys_match` + stale docstring), L34
+(ports-with-one-adapter is a documented tradeoff, not a defect).
+
+**Updated overall assessment: 8.5/10.** Every CRITICAL and HIGH from this round is closed
+with a targeted fix and a genuine regression test (not just a happy-path patch) — SSRF
+closure covers DNS rebinding, the audit fix correctly suppresses no-op logins, the webhook
+encryption handles legacy plaintext rows and masked-update round-trips, and the Bedrock error
+mapping was tested against a real `EventStreamError` rather than a synthetic one. The five
+remaining LOW items are legitimate but genuinely low-stakes hardening (test-coverage gaps and
+one dead-code cleanup), consistent with the team's pattern in prior rounds of deferring LOW
+findings deliberately rather than by oversight.
+
 ## CRITICAL
 
 ### R6-C2 — Routing-decision export is gated on `usage:read`, leaking raw prompts to billing-only roles org-wide
