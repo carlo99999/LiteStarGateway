@@ -288,6 +288,7 @@ def _build_rate_limit_stores(settings: Settings) -> dict[str, Store]:
         stores = {
             "rate_limit_inference": redis.with_namespace("rl_inference"),
             "rate_limit_auth": redis.with_namespace("rl_auth"),
+            "rate_limit_scim": redis.with_namespace("rl_scim"),
         }
     return stores
 

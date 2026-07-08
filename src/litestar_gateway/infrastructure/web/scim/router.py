@@ -10,6 +10,7 @@ from litestar.di import Provide
 from litestar.router import Router
 
 from litestar_gateway.domain.exceptions import DomainError
+from litestar_gateway.infrastructure.web.rate_limit import build_scim_rate_limit
 from litestar_gateway.infrastructure.web.scim.controller import (
     create_scim_user,
     delete_scim_user,
@@ -44,6 +45,9 @@ def create_scim_router() -> Router:
         dependencies={"scim_actor": Provide(provide_scim_actor)},
         # SCIM clients expect RFC 7644 Error resources, not {"detail": ...}.
         exception_handlers={DomainError: scim_domain_exception_handler},
+        # Per-IP guardrail: auth is a DB-backed token-hash lookup, so an
+        # unauthenticated flood must be throttled before it reaches it (M49).
+        middleware=[build_scim_rate_limit().middleware],
         tags=["scim"],
     )
 
@@ -53,5 +57,8 @@ def create_scim_tokens_router() -> Router:
     return Router(
         path="/",
         route_handlers=[create_scim_token, list_scim_tokens, revoke_scim_token],
+        # Defense-in-depth: already JWT-gated, but the only admin surface that
+        # otherwise had no limiter (M49).
+        middleware=[build_scim_rate_limit().middleware],
         tags=["scim"],
     )
