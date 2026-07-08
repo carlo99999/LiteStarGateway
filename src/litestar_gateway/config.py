@@ -98,6 +98,20 @@ def _env_team_mapping(name: str) -> dict[str, tuple[TeamGrant, ...]]:
                 ) from exc
             parsed.append(TeamGrant(team_id=team_id, role=role))
         mapping[group] = tuple(parsed)
+    # Two different non-admin roles for one team would make the resolved role
+    # depend on the IdP's group ordering (ADMIN always wins, so pairing it with
+    # another role stays deterministic). Reject the ambiguity at startup.
+    non_admin_roles: dict[UUID, TeamRole] = {}
+    for grants_ in mapping.values():
+        for grant_ in grants_:
+            if grant_.role is TeamRole.ADMIN:
+                continue
+            seen = non_admin_roles.setdefault(grant_.team_id, grant_.role)
+            if seen is not grant_.role:
+                raise InsecureConfigurationError(
+                    f"{name} maps team {grant_.team_id} to conflicting roles "
+                    f"'{seen}' and '{grant_.role}'; grant one non-admin role per team"
+                )
     return mapping
 
 
