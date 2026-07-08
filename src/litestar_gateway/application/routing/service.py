@@ -23,6 +23,7 @@ from litestar_gateway.application.routing.hybrid import HybridStrategy
 from litestar_gateway.application.routing.judge import JudgeStrategy
 from litestar_gateway.application.routing.webhook import WebhookStrategy
 from litestar_gateway.application.routing.weighted import WeightedStrategy
+from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.entities import ModelType
 from litestar_gateway.domain.exceptions import (
     InvalidRouterConfig,
@@ -84,6 +85,7 @@ class RouterService:
         credentials: CredentialRepository | None = None,
         gateway: LLMGateway | None = None,
         shadow_repos: RoutingRepositoryFactory | None = None,
+        meter: UsageMeter | None = None,
     ) -> None:
         self._routers = routers
         self._models = models
@@ -92,6 +94,10 @@ class RouterService:
         self._credentials = credentials
         self._gateway = gateway
         self._shadow_repos = shadow_repos
+        # Judge/embeddings strategies call the provider for real; the active path
+        # meters those calls (budget-gated + billed). Shadow runs on a detached
+        # task with its own session and cannot share this request-scoped meter.
+        self._meter = meter
         # The persisted record id of this request's routing decision (the
         # service is request-scoped), so settlement can attach actual usage.
         self.last_decision_record_id: UUID | None = None
@@ -256,6 +262,46 @@ class RouterService:
             task.add_done_callback(_SHADOW_TASKS.discard)
         return decision
 
+    async def _metered_call(
+        self,
+        meter: UsageMeter | None,
+        api_key_id: UUID | None,
+        team_id: UUID,
+        model,
+        operation: str,
+        request: dict[str, Any],
+        call: Any,
+    ) -> dict[str, Any]:
+        """Run one internal strategy provider call through the meter — budget-gated
+        at admission, billed + traced at settlement — mirroring
+        `CompletionService._dispatch`. Without a meter/api_key_id (library use, or
+        the shadow path, which runs on a detached task and cannot share the
+        request-scoped meter) the call passes through unmetered."""
+        if meter is None or api_key_id is None:
+            return await call()
+        reservation = await meter.admit(team_id, model, request)
+        start = perf_counter()
+        try:
+            try:
+                response = await call()
+            except Exception as exc:
+                meter.trace_error(
+                    team_id, api_key_id, model, operation, (perf_counter() - start) * 1000, exc
+                )
+                raise
+            await meter.settle_ok(
+                team_id,
+                api_key_id,
+                model,
+                operation,
+                response,
+                (perf_counter() - start) * 1000,
+                request,
+            )
+            return response
+        finally:
+            meter.release(team_id, reservation)
+
     async def _embed_texts(
         self,
         team_id: UUID,
@@ -263,6 +309,8 @@ class RouterService:
         texts: list[str],
         models: ModelRepository,
         credentials: CredentialRepository | None,
+        meter: UsageMeter | None = None,
+        api_key_id: UUID | None = None,
     ) -> list[list[float]]:
         """Embed via the gateway's own port, using the team's embedding model."""
         if self._gateway is None or credentials is None:
@@ -273,8 +321,15 @@ class RouterService:
         values = await credentials.get_values(model.credential_id)
         if values is None:
             raise ValueError(f"credential missing for embedding model '{model_name}'")
-        response = await self._gateway.aembeddings(
-            {"model": model_name, "input": texts}, model, values
+        request = {"model": model_name, "input": texts}
+        response = await self._metered_call(
+            meter,
+            api_key_id,
+            team_id,
+            model,
+            "routing.embeddings",
+            request,
+            lambda: self._gateway.aembeddings(request, model, values),
         )
         return [item["embedding"] for item in response["data"]]
 
@@ -285,6 +340,8 @@ class RouterService:
         request: dict[str, Any],
         models: ModelRepository,
         credentials: CredentialRepository | None,
+        meter: UsageMeter | None = None,
+        api_key_id: UUID | None = None,
     ) -> dict[str, Any]:
         """One non-streamed chat call to the judge, via the gateway's own port."""
         if self._gateway is None or credentials is None:
@@ -295,7 +352,15 @@ class RouterService:
         values = await credentials.get_values(model.credential_id)
         if values is None:
             raise ValueError(f"credential missing for judge model '{model_name}'")
-        return await self._gateway.achat_completion(request, model, values)
+        return await self._metered_call(
+            meter,
+            api_key_id,
+            team_id,
+            model,
+            "routing.judge",
+            request,
+            lambda: self._gateway.achat_completion(request, model, values),
+        )
 
     def _build_strategy(
         self,
@@ -305,6 +370,8 @@ class RouterService:
         *,
         models: ModelRepository | None = None,
         credentials: CredentialRepository | None = None,
+        meter: UsageMeter | None = None,
+        api_key_id: UUID | None = None,
     ):
         models = self._models if models is None else models
         credentials = self._credentials if credentials is None else credentials
@@ -312,7 +379,7 @@ class RouterService:
 
             async def embed(model_name: str, texts: list[str]) -> list[list[float]]:
                 return await self._embed_texts(
-                    router.team_id, model_name, texts, models, credentials
+                    router.team_id, model_name, texts, models, credentials, meter, api_key_id
                 )
 
             return EmbeddingsStrategy(config, embed=embed)
@@ -320,7 +387,7 @@ class RouterService:
 
             async def complete(model_name: str, request: dict[str, Any]) -> dict[str, Any]:
                 return await self._judge_complete(
-                    router.team_id, model_name, request, models, credentials
+                    router.team_id, model_name, request, models, credentials, meter, api_key_id
                 )
 
             return JudgeStrategy(config, complete=complete)
@@ -332,6 +399,8 @@ class RouterService:
                 shell.escalation_config,
                 models=models,
                 credentials=credentials,
+                meter=meter,
+                api_key_id=api_key_id,
             )
             return HybridStrategy(config, escalation=escalation)
         return STRATEGIES[name](config)
@@ -340,7 +409,13 @@ class RouterService:
         start = perf_counter()
         budget_ms = router.strategy_config.get("time_budget_ms", DEFAULT_TIME_BUDGET_MS)
         try:
-            strategy = self._build_strategy(router, router.strategy, router.strategy_config)
+            strategy = self._build_strategy(
+                router,
+                router.strategy,
+                router.strategy_config,
+                meter=self._meter,
+                api_key_id=ctx.api_key_id,
+            )
             async with asyncio.timeout(budget_ms / 1000):
                 decision = await strategy.select(ctx, capable)
             if any(decision.model_name == c.model_name for c in capable):
