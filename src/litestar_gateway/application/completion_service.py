@@ -23,6 +23,7 @@ from litestar_gateway.domain.exceptions import (
     ModelDisabled,
     ModelNotFound,
     ModelTypeMismatch,
+    UnsupportedOperation,
 )
 from litestar_gateway.domain.ports import (
     CredentialRepository,
@@ -30,6 +31,63 @@ from litestar_gateway.domain.ports import (
     ModelRepository,
 )
 from litestar_gateway.domain.request_policy import clamp_output_tokens, sanitize_request
+
+
+def _reject_unsupported_n(operation: str, model: Model, request: dict[str, Any]) -> None:
+    """Reject a chat request asking for more than one completion (`n>1`) on a
+    provider whose translator ignores `n`. Anthropic/Vertex/Bedrock always
+    return exactly one completion, so honoring the request would silently
+    under-deliver while the budget reservation charged the output ceiling
+    per requested choice (up to MAX_N×), spuriously tripping BudgetExceeded
+    for teams nowhere near their cap. Rejecting keeps the reservation and the
+    provider's actual behavior in agreement (R7-M50). `n` lives only on the
+    chat allowlist; other operations pass through untouched."""
+    if operation != "chat.completions" or model.provider.honors_n:
+        return
+    n = request.get("n")
+    if isinstance(n, int) and not isinstance(n, bool) and n > 1:
+        raise UnsupportedOperation(
+            f"Provider '{model.provider.value}' does not support multiple completions "
+            f"(n={n}); it returns exactly one completion per request"
+        )
+
+
+async def _empty_stream() -> AsyncIterator[dict[str, Any]]:
+    """An async iterator that yields nothing (empty provider stream)."""
+    return
+    yield  # unreachable — makes this a generator, not a plain coroutine
+
+
+async def _rechain(
+    first: dict[str, Any], rest: AsyncIterator[dict[str, Any]]
+) -> AsyncIterator[dict[str, Any]]:
+    """Re-emit an already-pulled first chunk, then delegate to the rest of the
+    stream. The `finally` closes `rest` so the metered generator's billing/
+    release settlement still runs when a client disconnects (`aclose()` on this
+    wrapper): a bare `async for` does not propagate the close to `rest`."""
+    try:
+        yield first
+        async for chunk in rest:
+            yield chunk
+    finally:
+        aclose = getattr(rest, "aclose", None)
+        if aclose is not None:
+            await aclose()
+
+
+async def _prime(gen: AsyncIterator[dict[str, Any]]) -> AsyncIterator[dict[str, Any]]:
+    """Pull the first chunk now so a provider error at stream *open* raises here
+    — before the controller commits the SSE `200 OK` — instead of mid-response
+    where it can only abort the connection (the behaviour the endpoint comment
+    always claimed but only half-delivered, R7-H24). The metered generator's own
+    finally still bills/releases on both the error and normal-completion paths,
+    so priming changes only *when* the first provider round-trip happens, not the
+    accounting."""
+    try:
+        first = await anext(gen)
+    except StopAsyncIteration:
+        return _empty_stream()
+    return _rechain(first, gen)
 
 
 class CompletionService:
@@ -123,6 +181,7 @@ class CompletionService:
             raise ModelTypeMismatch(
                 f"Model '{model.name}' is type '{model.type}', not '{expected_type}'"
             )
+        _reject_unsupported_n(operation, model, request)
         # Per-model output ceiling: clamp/inject now that the model is known, and
         # reserve from the clamped request so admission and the provider call agree.
         clean = clamp_output_tokens(operation, request, model.max_output_tokens)
@@ -185,9 +244,10 @@ class CompletionService:
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        return self._metered(
+        gen = self._metered(
             team_id, api_key_id, model, "chat.completions", stream, clean, reservation
         )
+        return await _prime(gen)
 
     async def open_responses_stream(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
@@ -203,7 +263,8 @@ class CompletionService:
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        return self._metered(team_id, api_key_id, model, "responses", stream, clean, reservation)
+        gen = self._metered(team_id, api_key_id, model, "responses", stream, clean, reservation)
+        return await _prime(gen)
 
     def _metered(
         self,

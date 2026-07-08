@@ -131,6 +131,116 @@ async def test_missing_salt_key_returns_503(database_url: str) -> None:
         assert resp.status_code == HTTP_503_SERVICE_UNAVAILABLE
 
 
+async def _team(client: AsyncTestClient, admin: str) -> str:
+    org_id = (
+        await client.post("/organizations", json={"name": "Acme"}, headers=_bearer(admin))
+    ).json()["id"]
+    return (
+        await client.post(
+            f"/organizations/{org_id}/teams",
+            json={"name": "Core", "admin_email": ADMIN_EMAIL},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+
+
+async def test_delete_in_use_credential_conflicts(client: AsyncTestClient) -> None:
+    # A credential referenced by a model must not be deletable: doing so would
+    # orphan the model. The guard surfaces a 409 rather than a 500 (Postgres) or
+    # a silent dangling FK (SQLite).
+    admin = await _admin_token(client)
+    cred = (
+        await client.post(
+            "/credentials",
+            json={"name": "in-use", "provider": "openai", "values": {"api_key": "x"}},
+            headers=_bearer(admin),
+        )
+    ).json()
+    team = await _team(client, admin)
+    model = await client.post(
+        f"/teams/{team}/models",
+        json={
+            "name": "chat",
+            "provider": "openai",
+            "credential_id": cred["id"],
+            "type": "chat",
+            "provider_model_id": "gpt-4o",
+        },
+        headers=_bearer(admin),
+    )
+    assert model.status_code == HTTP_201_CREATED
+
+    resp = await client.delete(f"/credentials/{cred['id']}", headers=_bearer(admin))
+    assert resp.status_code == HTTP_409_CONFLICT
+    # The credential must survive the rejected delete.
+    listing = await client.get("/credentials", headers=_bearer(admin))
+    assert [c["name"] for c in listing.json()] == ["in-use"]
+
+
+async def test_delete_unreferenced_credential_succeeds(client: AsyncTestClient) -> None:
+    admin = await _admin_token(client)
+    cred = (
+        await client.post(
+            "/credentials",
+            json={"name": "free", "provider": "openai", "values": {"api_key": "x"}},
+            headers=_bearer(admin),
+        )
+    ).json()
+    resp = await client.delete(f"/credentials/{cred['id']}", headers=_bearer(admin))
+    assert resp.status_code in (200, 204)
+    assert (await client.get("/credentials", headers=_bearer(admin))).json() == []
+
+
+async def test_sqlite_engine_enforces_foreign_keys(tmp_path: Path) -> None:
+    # Dev/test parity with Postgres: the connect-time PRAGMA must make aiosqlite
+    # enforce FKs, so an orphaning delete raises IntegrityError at the DB boundary
+    # instead of silently succeeding and leaving a dangling model.credential_id.
+    from uuid import uuid4
+
+    from sqlalchemy import delete
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from litestar_gateway.infrastructure.persistence.database import create_database
+    from litestar_gateway.infrastructure.persistence.orm import (
+        CredentialModel,
+        SecretKeyModel,
+        base,
+    )
+
+    # SQLite-specific parity check: force a SQLite URL even when the Postgres CI
+    # job sets DATABASE_URL — this test asserts the aiosqlite FK-enforcement PRAGMA.
+    settings = _settings(f"sqlite+aiosqlite:///{tmp_path / 'fk.db'}")
+    engine = create_database(settings).config.get_engine()
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(base.UUIDAuditBase.metadata.create_all)
+
+        # A credential references its encryption key via credential.key_id ->
+        # secret_key.id. Deleting the still-referenced key must be rejected.
+        key_id = uuid4()
+        async with AsyncSession(engine) as session:
+            session.add(SecretKeyModel(id=key_id, purpose="credential", material="m"))
+            await session.flush()
+            session.add(
+                CredentialModel(
+                    id=uuid4(),
+                    name="c",
+                    provider="openai",
+                    encrypted_values="x",
+                    key_id=key_id,
+                )
+            )
+            await session.commit()
+
+        async with AsyncSession(engine) as session:
+            with pytest.raises(IntegrityError):
+                await session.execute(delete(SecretKeyModel).where(SecretKeyModel.id == key_id))
+                await session.commit()
+    finally:
+        await engine.dispose()
+
+
 async def test_values_are_encrypted_at_rest_and_round_trip(database_url: str) -> None:
     # Stored ciphertext must not contain the secret; decryption restores it.
     from sqlalchemy import select

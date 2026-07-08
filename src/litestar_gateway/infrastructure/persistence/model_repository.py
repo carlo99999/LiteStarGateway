@@ -5,9 +5,11 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import Model
+from litestar_gateway.domain.exceptions import ModelNameExists
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.infrastructure.persistence.orm import ModelRecord
 
@@ -34,7 +36,14 @@ class SQLAlchemyModelRepository:
             enabled=model.enabled,
         )
         self._session.add(record)
-        await self._session.commit()
+        try:
+            await self._session.commit()
+        except IntegrityError as exc:
+            # Loser of a concurrent create with the same (team_id, name): the
+            # service's pre-check passed for both, the unique constraint catches
+            # the race. Translate to the domain 409 instead of an opaque 500.
+            await self._session.rollback()
+            raise ModelNameExists(model.name) from exc
         await self._session.refresh(record)
         return record.to_entity()
 
@@ -81,3 +90,9 @@ class SQLAlchemyModelRepository:
     async def remove(self, model_id: UUID) -> None:
         await self._session.execute(delete(ModelRecord).where(ModelRecord.id == model_id))
         await self._session.commit()
+
+    async def exists_for_credential(self, credential_id: UUID) -> bool:
+        record = await self._session.scalar(
+            select(ModelRecord.id).where(ModelRecord.credential_id == credential_id).limit(1)
+        )
+        return record is not None

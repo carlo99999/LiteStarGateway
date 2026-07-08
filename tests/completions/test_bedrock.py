@@ -387,6 +387,34 @@ async def test_bedrock_blocking_calls_run_on_dedicated_executor(
     assert all(name.startswith("bedrock") for name in thread_names), thread_names
 
 
+async def test_titan_embed_fanout_uses_dedicated_pool_separate_from_stream_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The Titan embed fan-out must run on its own executor, not
+    `_BEDROCK_EXECUTOR` — otherwise a large embed batch (>=8 texts) can occupy
+    every worker for the duration of its network round trips, stalling
+    concurrent chat streams' `_next_event` pulls, which share that pool
+    (R7-M58)."""
+    assert bedrock_adapter._BEDROCK_EMBED_EXECUTOR is not bedrock_adapter._BEDROCK_EXECUTOR
+
+    thread_names: list[str] = []
+
+    class RecordingTitanRuntime(_TrackingTitanRuntime):
+        def invoke_model(self, **kwargs: Any) -> dict:
+            thread_names.append(threading.current_thread().name)
+            return super().invoke_model(**kwargs)
+
+    runtime = RecordingTitanRuntime()
+    _patch_titan(monkeypatch, runtime)
+    texts = ["x" * (i + 1) for i in range(6)]
+    await bedrock_adapter.BedrockAdapter().aembeddings(
+        {"input": texts}, _model("amazon.titan-embed-text-v2:0"), BEDROCK_VALUES
+    )
+
+    assert thread_names, "expected embed invokes to be recorded"
+    assert all(name.startswith("bedrock-embed") for name in thread_names), thread_names
+
+
 # ── Integration through the endpoints ────────────────────────────────────────
 
 

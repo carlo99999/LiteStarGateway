@@ -13,12 +13,13 @@ from uuid import UUID, uuid4
 from litestar_gateway.domain.credential_policy import validate_credential_values
 from litestar_gateway.domain.entities import Credential, Provider, User
 from litestar_gateway.domain.exceptions import (
+    CredentialInUse,
     CredentialNameExists,
     CredentialNotFound,
     PermissionDenied,
 )
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_gateway.domain.ports import CredentialRepository
+from litestar_gateway.domain.ports import CredentialRepository, ModelRepository
 
 
 def _now() -> datetime:
@@ -31,8 +32,9 @@ def _require_platform_admin(actor: User) -> None:
 
 
 class CredentialService:
-    def __init__(self, repository: CredentialRepository) -> None:
+    def __init__(self, repository: CredentialRepository, models: ModelRepository) -> None:
         self._repo = repository
+        self._models = models
 
     async def create(
         self, actor: User, name: str, provider: Provider, values: dict[str, str]
@@ -54,6 +56,10 @@ class CredentialService:
         _require_platform_admin(actor)
         if await self._repo.get(credential_id) is None:
             raise CredentialNotFound(str(credential_id))
+        # Guard the FK: deleting an in-use credential would raise IntegrityError on
+        # Postgres and silently orphan models on SQLite. Reject it as a 409 instead.
+        if await self._models.exists_for_credential(credential_id):
+            raise CredentialInUse(str(credential_id))
         await self._repo.remove(credential_id)
 
     async def reveal_values(self, actor: User, credential_id: UUID) -> dict[str, str]:

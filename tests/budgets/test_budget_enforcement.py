@@ -26,18 +26,18 @@ from litestar_gateway.domain.entities import (
     TraceRecord,
     UsageEvent,
 )
-from litestar_gateway.domain.exceptions import BudgetExceeded
+from litestar_gateway.domain.exceptions import BudgetExceeded, UnsupportedOperation
 
 TEAM_ID = uuid4()
 KEY_ID = uuid4()
 
 
-def _model() -> Model:
+def _model(provider: Provider = Provider.OPENAI) -> Model:
     return Model(
         id=uuid4(),
         team_id=TEAM_ID,
         name="m",
-        provider=Provider.OPENAI,
+        provider=provider,
         credential_id=uuid4(),
         type=ModelType.CHAT,
         provider_model_id="gpt-4o",
@@ -121,10 +121,11 @@ def _service(
     gateway: CountingGateway,
     usage: FakeUsage,
     budgets: FakeBudgets | None,
+    model: Model | None = None,
 ) -> CompletionService:
     traces: list[TraceRecord] = []
     return CompletionService(
-        models=FakeModels(_model()),  # type: ignore[arg-type]
+        models=FakeModels(model or _model()),  # type: ignore[arg-type]
         credentials=FakeCredentials(),  # type: ignore[arg-type]
         gateway=gateway,  # type: ignore[arg-type]
         meter=UsageMeter(
@@ -345,3 +346,46 @@ async def test_reservation_uses_the_clamped_max_tokens() -> None:
 
     async for _ in stream:
         pass
+
+
+@pytest.mark.parametrize("provider", [Provider.ANTHROPIC, Provider.VERTEX_AI, Provider.BEDROCK])
+async def test_n_gt_1_rejected_for_provider_that_ignores_n(provider: Provider) -> None:
+    # R7-M50: Anthropic/Vertex/Bedrock chat translators never forward `n` and
+    # always return exactly one completion, yet the reservation multiplied the
+    # output ceiling by n (up to MAX_N=8), spuriously tripping BudgetExceeded.
+    # A chat request with n>1 on those providers is rejected before dispatch —
+    # never reaching the provider and never taking an inflated reservation.
+    gateway = CountingGateway()
+    service = _service(
+        gateway, FakeUsage(spent=0.0), FakeBudgets(_budget(1.0)), model=_model(provider)
+    )
+
+    with pytest.raises(UnsupportedOperation):
+        await service.chat_completion(TEAM_ID, KEY_ID, {**MAX_TOKENS_REQUEST, "n": 4})
+
+    assert gateway.calls == 0  # never dispatched
+    assert service._meter._in_flight.total(TEAM_ID) == 0  # no over-reservation held
+
+
+async def test_n_1_allowed_for_provider_that_ignores_n() -> None:
+    # n=1 (or absent) is fine everywhere — only n>1 is rejected on those providers.
+    gateway = CountingGateway()
+    service = _service(
+        gateway, FakeUsage(spent=0.0), FakeBudgets(_budget(1.0)), model=_model(Provider.ANTHROPIC)
+    )
+
+    await service.chat_completion(TEAM_ID, KEY_ID, {**MAX_TOKENS_REQUEST, "n": 1})
+    await service.chat_completion(TEAM_ID, KEY_ID, dict(MAX_TOKENS_REQUEST))  # n absent
+    assert gateway.calls == 2
+
+
+async def test_n_gt_1_still_allowed_for_openai() -> None:
+    # OpenAI/Azure/Databricks forward `n`, so multi-completion requests keep
+    # working and legitimately reserve output per choice.
+    gateway = CountingGateway()
+    service = _service(
+        gateway, FakeUsage(spent=0.0), FakeBudgets(_budget(100.0)), model=_model(Provider.OPENAI)
+    )
+
+    await service.chat_completion(TEAM_ID, KEY_ID, {**MAX_TOKENS_REQUEST, "n": 4})
+    assert gateway.calls == 1
