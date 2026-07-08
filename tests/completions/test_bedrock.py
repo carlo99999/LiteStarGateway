@@ -6,6 +6,7 @@ from __future__ import annotations
 import base64
 import json
 import threading
+import time
 from typing import Any
 
 import pytest
@@ -608,6 +609,83 @@ async def test_bedrock_missing_region_400(
         headers=_bearer(api_key),
     )
     assert resp.status_code == HTTP_400_BAD_REQUEST
+
+
+# ── Titan embeddings fan-out (unit) ──────────────────────────────────────────
+
+
+class _TrackingTitanRuntime:
+    """Fake bedrock-runtime whose invoke_model blocks briefly and records the
+    maximum number of concurrent in-flight calls."""
+
+    def __init__(self, fail_text: str | None = None) -> None:
+        self._lock = threading.Lock()
+        self._in_flight = 0
+        self._fail_text = fail_text
+        self.max_in_flight = 0
+
+    def invoke_model(self, **kwargs: Any) -> dict:
+        body = json.loads(kwargs["body"])
+        with self._lock:
+            self._in_flight += 1
+            self.max_in_flight = max(self.max_in_flight, self._in_flight)
+        time.sleep(0.02)
+        try:
+            if body["inputText"] == self._fail_text:
+                raise RuntimeError("titan exploded")
+            return {
+                "body": _Body(
+                    {"embedding": [float(len(body["inputText"]))], "inputTextTokenCount": 1}
+                )
+            }
+        finally:
+            with self._lock:
+                self._in_flight -= 1
+
+    def close(self) -> None:
+        return None
+
+
+def _patch_titan(monkeypatch: pytest.MonkeyPatch, runtime: _TrackingTitanRuntime) -> None:
+    monkeypatch.setattr(bedrock_adapter.boto3, "client", lambda service, **kwargs: runtime)
+
+
+async def test_titan_embeddings_fan_out_preserves_input_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = _TrackingTitanRuntime()
+    _patch_titan(monkeypatch, runtime)
+    texts = ["x" * (i + 1) for i in range(10)]
+    body = await bedrock_adapter.BedrockAdapter().aembeddings(
+        {"input": texts}, _model("amazon.titan-embed-text-v2:0"), BEDROCK_VALUES
+    )
+    assert [d["index"] for d in body["data"]] == list(range(10))
+    # The fake embeds each text as [len(text)], so order is observable.
+    assert [d["embedding"] for d in body["data"]] == [[float(i + 1)] for i in range(10)]
+    assert body["usage"] == {"prompt_tokens": 10, "total_tokens": 10}
+    assert runtime.max_in_flight >= 2  # calls actually overlapped
+
+
+async def test_titan_embeddings_fan_out_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    runtime = _TrackingTitanRuntime()
+    _patch_titan(monkeypatch, runtime)
+    texts = ["x" * (i + 1) for i in range(20)]
+    await bedrock_adapter.BedrockAdapter().aembeddings(
+        {"input": texts}, _model("amazon.titan-embed-text-v2:0"), BEDROCK_VALUES
+    )
+    assert 2 <= runtime.max_in_flight <= bedrock_adapter._TITAN_EMBED_FANOUT
+
+
+async def test_titan_embeddings_fan_out_propagates_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = _TrackingTitanRuntime(fail_text="xxx")
+    _patch_titan(monkeypatch, runtime)
+    texts = ["x" * (i + 1) for i in range(6)]
+    with pytest.raises(RuntimeError, match="titan exploded"):
+        await bedrock_adapter.BedrockAdapter().aembeddings(
+            {"input": texts}, _model("amazon.titan-embed-text-v2:0"), BEDROCK_VALUES
+        )
 
 
 def test_gateway_still_rejects_unregistered_providers() -> None:

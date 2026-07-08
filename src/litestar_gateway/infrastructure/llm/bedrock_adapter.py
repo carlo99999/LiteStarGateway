@@ -32,6 +32,11 @@ from litestar_gateway.domain.exceptions import CredentialMisconfigured, Unsuppor
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.llm.structured_output import parse_response_format
 
+# Titan has no batch embeddings endpoint (one invoke_model call per text), so
+# multi-input requests fan out concurrently; bound the parallelism so a large
+# batch cannot monopolize the worker-thread pool or upstream connections.
+_TITAN_EMBED_FANOUT = 8
+
 _FINISH_REASON = {
     "end_turn": "stop",
     "max_tokens": "length",
@@ -231,6 +236,33 @@ def _require_aws(credentials: dict[str, str]) -> tuple[str, str, str, str | None
     )
 
 
+def _titan_embeddings_response(payloads: list[dict[str, Any]], model_id: str) -> dict[str, Any]:
+    data = []
+    prompt_tokens = 0
+    counted = False
+    for index, payload in enumerate(payloads):
+        data.append(
+            {
+                "object": "embedding",
+                "index": index,
+                "embedding": payload.get("embedding") or [],
+            }
+        )
+        count = payload.get("inputTextTokenCount")
+        if isinstance(count, int):
+            prompt_tokens += count
+            counted = True
+    return {
+        "object": "list",
+        "data": data,
+        "model": model_id,
+        "usage": {
+            "prompt_tokens": prompt_tokens if counted else None,
+            "total_tokens": prompt_tokens if counted else None,
+        },
+    }
+
+
 def _embedding_inputs(effective: dict[str, Any]) -> list[str]:
     raw = effective.get("input")
     if isinstance(raw, str):
@@ -338,24 +370,10 @@ class BedrockAdapter:
         client = self._client(credentials)
         try:
             if model_id.startswith("amazon.titan-embed"):
-                data = []
-                prompt_tokens = 0
-                counted = False
                 # Titan embeds one text per call.
-                for index, text in enumerate(texts):
-                    payload = _invoke(client, model_id, {"inputText": text})
-                    data.append(
-                        {
-                            "object": "embedding",
-                            "index": index,
-                            "embedding": payload.get("embedding") or [],
-                        }
-                    )
-                    count = payload.get("inputTextTokenCount")
-                    if isinstance(count, int):
-                        prompt_tokens += count
-                        counted = True
-            elif model_id.startswith("cohere.embed"):
+                payloads = [_invoke(client, model_id, {"inputText": text}) for text in texts]
+                return _titan_embeddings_response(payloads, model_id)
+            if model_id.startswith("cohere.embed"):
                 payload = _invoke(
                     client, model_id, {"texts": texts, "input_type": "search_document"}
                 )
@@ -363,31 +381,58 @@ class BedrockAdapter:
                     {"object": "embedding", "index": index, "embedding": embedding}
                     for index, embedding in enumerate(payload.get("embeddings") or [])
                 ]
-                # Cohere reports no token count: leave usage None so the meter's
-                # estimation fallback kicks in rather than billing zero (H14).
-                prompt_tokens = 0
-                counted = False
-            else:
-                raise UnsupportedOperation(
-                    f"Bedrock embeddings for '{model_id}' are not supported"
-                    " (amazon.titan-embed-* and cohere.embed-* only)"
-                )
+                return {
+                    "object": "list",
+                    "data": data,
+                    "model": model_id,
+                    # Cohere reports no token count: leave usage None so the meter's
+                    # estimation fallback kicks in rather than billing zero (H14).
+                    "usage": {"prompt_tokens": None, "total_tokens": None},
+                }
+            raise UnsupportedOperation(
+                f"Bedrock embeddings for '{model_id}' are not supported"
+                " (amazon.titan-embed-* and cohere.embed-* only)"
+            )
         finally:
             client.close()
-        return {
-            "object": "list",
-            "data": data,
-            "model": model_id,
-            "usage": {
-                "prompt_tokens": prompt_tokens if counted else None,
-                "total_tokens": prompt_tokens if counted else None,
-            },
-        }
 
     async def aembeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
+        if model.provider_model_id.startswith("amazon.titan-embed"):
+            return await self._titan_aembeddings(request, model, credentials)
         return await _run(self.embeddings, request, model, credentials)
+
+    async def _titan_aembeddings(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        """Titan embeds one text per call: fan the per-text invokes out over
+        worker threads instead of paying N sequential round trips."""
+        effective = model.merge_params(request)
+        texts = _embedding_inputs(effective)
+        model_id = model.provider_model_id
+        client = await _run(self._client, credentials)
+        semaphore = asyncio.Semaphore(_TITAN_EMBED_FANOUT)
+
+        async def embed_one(text: str) -> dict[str, Any]:
+            async with semaphore:
+                return await _run(_invoke, client, model_id, {"inputText": text})
+
+        try:
+            # return_exceptions so every in-flight call finishes before the
+            # client is closed; the first failure in input order is re-raised
+            # below, matching the sequential path.
+            results = await asyncio.gather(
+                *(embed_one(text) for text in texts), return_exceptions=True
+            )
+        finally:
+            await _run(client.close)
+        payloads: list[dict[str, Any]] = []
+        for result in results:
+            if isinstance(result, BaseException):
+                raise result
+            payloads.append(result)
+        return _titan_embeddings_response(payloads, model_id)
 
     # ── images (invoke_model, Titan Image Generator) ────────────────────────
 
