@@ -18,7 +18,7 @@ def _index_column_names(index: object) -> tuple[str, ...]:
 def test_api_key_created_by_is_indexed() -> None:
     indexed_columns = {
         column_name
-        for index in APIKeyModel.__table__.indexes
+        for index in APIKeyModel.__table__.indexes  # type: ignore[missing-attribute]
         for column_name in _index_column_names(index)
     }
 
@@ -26,7 +26,7 @@ def test_api_key_created_by_is_indexed() -> None:
 
 
 def test_routing_decision_has_composite_team_router_created_at_index() -> None:
-    indexes = RoutingDecisionModel.__table__.indexes
+    indexes = RoutingDecisionModel.__table__.indexes  # type: ignore[missing-attribute]
 
     composite = [
         index
@@ -43,7 +43,7 @@ def test_routing_decision_has_no_independent_single_column_indexes() -> None:
     """The composite index replaces the two single-column indexes (R7-M55)."""
     single_column_index_columns = {
         _index_column_names(index)[0]
-        for index in RoutingDecisionModel.__table__.indexes
+        for index in RoutingDecisionModel.__table__.indexes  # type: ignore[missing-attribute]
         if len(_index_column_names(index)) == 1
     }
 

@@ -11,7 +11,7 @@ before the DB engine is disposed.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -23,7 +23,7 @@ from litestar_gateway.config import Settings
 
 
 @pytest.fixture(autouse=True)
-def _clear_shadow_tasks() -> AsyncIterator[None]:
+def _clear_shadow_tasks() -> Iterator[None]:
     _SHADOW_TASKS.clear()
     yield
     _SHADOW_TASKS.clear()
