@@ -19,6 +19,7 @@ from botocore.exceptions import (
 from litestar.status_codes import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from litestar.testing import AsyncTestClient
 
+from litestar_gateway.config import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
 from litestar_gateway.domain.entities import Model, ModelType, Provider
 from litestar_gateway.domain.exceptions import (
     UnsupportedOperation,
@@ -414,6 +415,11 @@ async def test_bedrock_chat_completions(
     assert FakeBedrockRuntime.last_client_kwargs["region_name"] == "eu-west-1"
     assert FakeBedrockRuntime.last_client_kwargs["aws_access_key_id"] == "AKIAEXAMPLE"
     assert FakeBedrockRuntime.last_kwargs["modelId"] == "anthropic.claude-3-5-sonnet-v2:0"
+    # Client built with the gateway's resilience config (timeout + retries).
+    boto_config = FakeBedrockRuntime.last_client_kwargs["config"]
+    assert boto_config.read_timeout == DEFAULT_REQUEST_TIMEOUT
+    assert boto_config.connect_timeout == DEFAULT_REQUEST_TIMEOUT
+    assert boto_config.retries["max_attempts"] == DEFAULT_MAX_RETRIES
 
 
 async def test_bedrock_structured_output_forces_a_tool(
