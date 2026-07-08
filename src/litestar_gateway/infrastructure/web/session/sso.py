@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from litestar import Request, get
 from litestar.datastructures import Cookie
@@ -26,8 +27,8 @@ from litestar.router import Router
 from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.application.user_service import UserService
 from litestar_gateway.config import TeamGrant
-from litestar_gateway.domain.entities import TeamRole
-from litestar_gateway.domain.ports import IdentityProvider
+from litestar_gateway.domain.entities import AuditEvent, TeamRole, User
+from litestar_gateway.domain.ports import AuditLog, IdentityProvider
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.web.rate_limit import build_auth_rate_limit
 from litestar_gateway.infrastructure.web.session.jwt import issue_access_token
@@ -59,6 +60,36 @@ def _resolve_team_grants(
             if desired.get(grant.team_id) is None or grant.role is TeamRole.ADMIN:
                 desired[grant.team_id] = grant.role
     return desired, governed
+
+
+async def _record_sso_audit(
+    audit_log: AuditLog,
+    request: Request,
+    user: User,
+    action: str,
+    *,
+    target_type: str,
+    target_id: UUID,
+    detail: str | None = None,
+) -> None:
+    """SSO changes are IdP-driven, not an authenticated API call: the actor is the
+    logging-in user's verified SSO identity, marked `actor_type="sso"` (mirrors
+    SCIM's `scim_token` convention) so escalations granted by IdP group membership
+    are attributable to the SSO path in the trail."""
+    await audit_log.record(
+        AuditEvent(
+            id=uuid4(),
+            action=action,
+            actor_id=user.id,
+            actor_type="sso",
+            actor_email=f"sso:{user.email}",
+            target_type=target_type,
+            target_id=str(target_id),
+            ip=request.client.host if request.client else None,
+            detail=detail,
+            created_at=datetime.now(UTC),
+        )
+    )
 
 
 def _redirect_uri(request: Request, configured: str | None) -> str:
@@ -125,6 +156,7 @@ async def sso_callback(
     sso_default_admin: NamedDependency[bool],
     sso_team_mapping: NamedDependency[dict[str, tuple[TeamGrant, ...]]],
     sso_redirect_uri: NamedDependency[str | None],
+    audit_log: NamedDependency[AuditLog],
     code: FromQuery[str | None] = None,
     # `state` is a reserved kwarg in Litestar (the app State), so alias the query.
     flow_state: Annotated[str | None, QueryParameter(name="state")] = None,
@@ -149,14 +181,47 @@ async def sso_callback(
     group_admin = bool(set(identity.groups) & set(sso_admin_groups))
     # Email/verification, subject binding, and the upgrade-only admin sync live in
     # the service; DEFAULT_ROLE seeds only a brand-new account's platform role.
-    user = await user_service.upsert_sso_user(
+    result = await user_service.upsert_sso_user(
         identity, group_admin=group_admin, default_admin=sso_default_admin
     )
+    user = result.user
+    # Audit what this login actually changed (R6-H20): JIT creation and admin
+    # escalation are the moves an attacker with IdP group control would make.
+    if result.created:
+        await _record_sso_audit(
+            audit_log, request, user, "sso.user.create", target_type="user", target_id=user.id
+        )
+    if result.admin_granted:
+        await _record_sso_audit(
+            audit_log,
+            request,
+            user,
+            "sso.user.grant_admin",
+            target_type="user",
+            target_id=user.id,
+            detail="via IdP admin group" if group_admin else "via DEFAULT_ROLE",
+        )
     # Group → team/role mapping: reconcile the user's memberships in SSO-governed
     # teams to their current IdP groups (add/update/remove); a no-op when unset.
     desired, governed = _resolve_team_grants(identity.groups, sso_team_mapping)
     if governed:
-        await team_service.reconcile_sso_memberships(user.id, desired, governed)
+        changes = await team_service.reconcile_sso_memberships(user.id, desired, governed)
+        for change in changes:
+            if change.change == "add":
+                action, detail = "sso.team.member.add", f"{user.email} as {change.role}"
+            elif change.change == "update":
+                action, detail = "sso.team.member.set_role", f"user {user.id} -> {change.role}"
+            else:
+                action, detail = "sso.team.member.remove", f"user {user.id}"
+            await _record_sso_audit(
+                audit_log,
+                request,
+                user,
+                action,
+                target_type="team",
+                target_id=change.team_id,
+                detail=detail,
+            )
     secret = await keyring.active_jwt_secret()
     access_token, expires_in = issue_access_token(str(user.id), secret, user.token_version)
     return TokenResponse(access_token=access_token, token_type="bearer", expires_in=expires_in)

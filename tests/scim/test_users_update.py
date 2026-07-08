@@ -229,3 +229,71 @@ async def test_scim_cannot_deactivate_platform_admin(client: AsyncTestClient) ->
         resp = await request
         assert resp.status_code == HTTP_403_FORBIDDEN
         assert resp.json()["schemas"] == [ERROR_URN]
+
+
+async def test_scim_cannot_rewrite_platform_admin_identity(client: AsyncTestClient) -> None:
+    headers = await _scim_headers(client)
+    found = (
+        await client.get(f'/scim/v2/Users?filter=userName eq "{ADMIN_EMAIL}"', headers=headers)
+    ).json()
+    admin_id = found["Resources"][0]["id"]
+
+    def patch_op(path: str, value: str) -> dict:
+        return {
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": path, "value": value}],
+        }
+
+    for request in (
+        client.patch(
+            f"/scim/v2/Users/{admin_id}",
+            json=patch_op("userName", "evil@corp.com"),
+            headers=headers,
+        ),
+        client.patch(
+            f"/scim/v2/Users/{admin_id}",
+            json=patch_op("externalId", "evil-ext"),
+            headers=headers,
+        ),
+        client.put(
+            f"/scim/v2/Users/{admin_id}",
+            json={"schemas": [USER_URN], "userName": "evil@corp.com", "active": True},
+            headers=headers,
+        ),
+    ):
+        resp = await request
+        assert resp.status_code == HTTP_403_FORBIDDEN
+        assert resp.json()["schemas"] == [ERROR_URN]
+
+    # The admin's identity is untouched.
+    fetched = (await client.get(f"/scim/v2/Users/{admin_id}", headers=headers)).json()
+    assert fetched["userName"] == ADMIN_EMAIL
+
+
+async def test_scim_noop_identity_update_on_platform_admin_succeeds(
+    client: AsyncTestClient,
+) -> None:
+    headers = await _scim_headers(client)
+    found = (
+        await client.get(f'/scim/v2/Users?filter=userName eq "{ADMIN_EMAIL}"', headers=headers)
+    ).json()
+    admin_id = found["Resources"][0]["id"]
+
+    patched = await client.patch(
+        f"/scim/v2/Users/{admin_id}",
+        json={
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "userName", "value": ADMIN_EMAIL}],
+        },
+        headers=headers,
+    )
+    assert patched.status_code == HTTP_200_OK, patched.text
+    assert patched.json()["userName"] == ADMIN_EMAIL
+
+    replaced = await client.put(
+        f"/scim/v2/Users/{admin_id}",
+        json={"schemas": [USER_URN], "userName": ADMIN_EMAIL, "active": True},
+        headers=headers,
+    )
+    assert replaced.status_code == HTTP_200_OK, replaced.text
+    assert replaced.json()["userName"] == ADMIN_EMAIL
