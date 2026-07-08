@@ -10,7 +10,12 @@ import time
 from typing import Any
 
 import pytest
-from botocore.exceptions import ClientError, ConnectTimeoutError, ReadTimeoutError
+from botocore.exceptions import (
+    ClientError,
+    ConnectTimeoutError,
+    EventStreamError,
+    ReadTimeoutError,
+)
 from litestar.status_codes import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from litestar.testing import AsyncTestClient
 
@@ -18,6 +23,7 @@ from litestar_gateway.domain.entities import Model, ModelType, Provider
 from litestar_gateway.domain.exceptions import (
     UnsupportedOperation,
     UpstreamRateLimited,
+    UpstreamRequestRejected,
     UpstreamTimeout,
     UpstreamUnavailable,
 )
@@ -27,7 +33,7 @@ from litestar_gateway.infrastructure.llm.bedrock_adapter import (
     from_converse_response,
     to_converse_request,
 )
-from litestar_gateway.infrastructure.llm.errors import translate_upstream_error
+from litestar_gateway.infrastructure.llm.errors import translate_stream, translate_upstream_error
 
 from .conftest import _bearer, _patch, _setup, _setup_team, _team_usage
 
@@ -214,6 +220,47 @@ def test_botocore_errors_translate_to_domain_errors() -> None:
     )
 
 
+def _event_stream_error(code: str) -> EventStreamError:
+    # Mid-stream failures come from botocore's event-stream parser, whose error
+    # response carries only Error (no ResponseMetadata, hence no HTTP status).
+    error_response: Any = {"Error": {"Code": code, "Message": "x"}}
+    return EventStreamError(error_response, "ConverseStream")
+
+
+def test_mid_stream_errors_translate_like_non_streaming() -> None:
+    # 5xx-class stream errors map to the same domain error as the equivalent
+    # non-streaming ClientError (502 to the client, retryable).
+    for code, status in (
+        ("InternalServerException", 500),
+        ("ModelStreamErrorException", 502),
+        ("ServiceUnavailableException", 503),
+    ):
+        mapped = translate_upstream_error(_event_stream_error(code))
+        assert isinstance(mapped, UpstreamUnavailable), code
+        assert type(mapped) is type(translate_upstream_error(_client_error(status, code)))
+    # ValidationException is the client's 400 on both paths (not retryable).
+    rejected = translate_upstream_error(_event_stream_error("ValidationException"))
+    assert isinstance(rejected, UpstreamRequestRejected)
+    assert type(rejected) is type(
+        translate_upstream_error(_client_error(400, "ValidationException"))
+    )
+    # Throttling keeps being rescued by error code, exactly as before.
+    assert isinstance(
+        translate_upstream_error(_event_stream_error("ThrottlingException")), UpstreamRateLimited
+    )
+
+
+async def test_translate_stream_maps_mid_stream_bedrock_error() -> None:
+    async def stream() -> Any:
+        yield {"chunk": 1}
+        raise _event_stream_error("ModelStreamErrorException")
+
+    chunks = translate_stream(stream())
+    assert await anext(chunks) == {"chunk": 1}
+    with pytest.raises(UpstreamUnavailable):
+        await anext(chunks)
+
+
 # ── Fake boto3 bedrock-runtime client ────────────────────────────────────────
 
 
@@ -284,6 +331,53 @@ def _fake_boto3_client(service: str, **kwargs: Any) -> FakeBedrockRuntime:
 
 def _patch_bedrock(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(bedrock_adapter.boto3, "client", _fake_boto3_client)
+
+
+# ── Dedicated executor (R6-M45) ──────────────────────────────────────────────
+
+
+async def test_bedrock_blocking_calls_run_on_dedicated_executor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every blocking boto3 hop — non-streaming call, stream open, and each
+    per-event pull — must run on the bounded Bedrock pool (identified by its
+    thread-name prefix), not the loop's process-wide default executor."""
+    from litestar_gateway.infrastructure.llm.bedrock_adapter import BedrockAdapter
+
+    thread_names: list[str] = []
+
+    def _record() -> None:
+        thread_names.append(threading.current_thread().name)
+
+    class RecordingBedrockRuntime(FakeBedrockRuntime):
+        def converse(self, **kwargs: Any) -> dict:
+            _record()
+            return super().converse(**kwargs)
+
+        def converse_stream(self, **kwargs: Any) -> dict:
+            _record()
+            events = super().converse_stream(**kwargs)["stream"]
+
+            def recording_events() -> Any:
+                for event in events:
+                    _record()  # runs inside the per-event next() hop
+                    yield event
+
+            return {"stream": recording_events()}
+
+    monkeypatch.setattr(
+        bedrock_adapter.boto3, "client", lambda service, **kwargs: RecordingBedrockRuntime()
+    )
+    adapter = BedrockAdapter()
+    request = {"messages": [{"role": "user", "content": "hi"}]}
+
+    await adapter.achat_completion(request, _model(), BEDROCK_VALUES)
+    stream = adapter.astream_chat_completion({**request, "stream": True}, _model(), BEDROCK_VALUES)
+    async for _ in stream:
+        pass
+
+    assert thread_names, "expected blocking boto3 calls to be recorded"
+    assert all(name.startswith("bedrock") for name in thread_names), thread_names
 
 
 # ── Integration through the endpoints ────────────────────────────────────────

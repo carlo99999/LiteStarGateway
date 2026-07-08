@@ -5,9 +5,9 @@ Pure translators (`to_converse_request` / `from_converse_response`) do the
 schema work; the adapter is a thin boto3 wrapper. Responses are provided by
 wrapping this adapter in `ChatToResponsesAdapter`.
 
-boto3 is synchronous: the async surface delegates to a worker thread via
-`asyncio.to_thread`, including the streaming EventStream (iterated one event
-per thread hop so the event loop is never blocked).
+boto3 is synchronous: the async surface delegates to a worker thread on a
+dedicated bounded executor, including the streaming EventStream (iterated one
+event per thread hop so the event loop is never blocked).
 
 Scope: text-in/text-out, plus structured outputs (`response_format`) translated
 to a forced tool — streaming included (partial tool-input JSON is relayed as
@@ -20,7 +20,8 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import boto3
@@ -47,6 +48,19 @@ _FINISH_REASON = {
     "content_filtered": "content_filter",
     "guardrail_intervened": "content_filter",
 }
+
+
+# Streaming does one thread hop per EventStream event, so a few concurrent
+# Bedrock streams issue many tiny hops; a dedicated bounded pool keeps them
+# from saturating the loop's process-wide default executor and slowing
+# unrelated requests (R6-M45). Module-level because the adapter is built once
+# per LLMGatewayImpl registry: one shared pool covers every instance.
+_BEDROCK_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="bedrock")
+
+
+async def _run[T](func: Callable[..., T], /, *args: Any) -> T:
+    """Run a blocking boto3 call on the dedicated Bedrock executor."""
+    return await asyncio.get_running_loop().run_in_executor(_BEDROCK_EXECUTOR, func, *args)
 
 
 def _next_event(events: Iterator[dict[str, Any]]) -> dict[str, Any] | None:
@@ -296,12 +310,12 @@ class BedrockAdapter:
     async def achat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        return await asyncio.to_thread(self.chat_completion, request, model, credentials)
+        return await _run(self.chat_completion, request, model, credentials)
 
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        client = await asyncio.to_thread(self._client, credentials)
+        client = await _run(self._client, credentials)
         base = {
             "id": "chatcmpl-bedrock",
             "object": "chat.completion.chunk",
@@ -314,12 +328,12 @@ class BedrockAdapter:
         output_tokens = 0
         # Keep the client open for the whole stream; close on completion/disconnect.
         try:
-            response = await asyncio.to_thread(
+            response = await _run(
                 lambda: client.converse_stream(**to_converse_request(request, model))
             )
             events: Iterator[dict[str, Any]] = iter(response["stream"])
             while True:
-                event = await asyncio.to_thread(_next_event, events)
+                event = await _run(_next_event, events)
                 if event is None:
                     break
                 usage = (event.get("metadata") or {}).get("usage") or {}
@@ -343,7 +357,7 @@ class BedrockAdapter:
                 },
             }
         finally:
-            await asyncio.to_thread(client.close)
+            await _run(client.close)
 
     # ── embeddings (invoke_model) ───────────────────────────────────────────
 
@@ -387,7 +401,7 @@ class BedrockAdapter:
     ) -> dict[str, Any]:
         if model.provider_model_id.startswith("amazon.titan-embed"):
             return await self._titan_aembeddings(request, model, credentials)
-        return await asyncio.to_thread(self.embeddings, request, model, credentials)
+        return await _run(self.embeddings, request, model, credentials)
 
     async def _titan_aembeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -397,12 +411,12 @@ class BedrockAdapter:
         effective = model.merge_params(request)
         texts = _embedding_inputs(effective)
         model_id = model.provider_model_id
-        client = await asyncio.to_thread(self._client, credentials)
+        client = await _run(self._client, credentials)
         semaphore = asyncio.Semaphore(_TITAN_EMBED_FANOUT)
 
         async def embed_one(text: str) -> dict[str, Any]:
             async with semaphore:
-                return await asyncio.to_thread(_invoke, client, model_id, {"inputText": text})
+                return await _run(_invoke, client, model_id, {"inputText": text})
 
         try:
             # return_exceptions so every in-flight call finishes before the
@@ -412,7 +426,7 @@ class BedrockAdapter:
                 *(embed_one(text) for text in texts), return_exceptions=True
             )
         finally:
-            await asyncio.to_thread(client.close)
+            await _run(client.close)
         payloads: list[dict[str, Any]] = []
         for result in results:
             if isinstance(result, BaseException):
@@ -441,7 +455,7 @@ class BedrockAdapter:
     async def aimages(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        return await asyncio.to_thread(self.images, request, model, credentials)
+        return await _run(self.images, request, model, credentials)
 
 
 def _invoke(client: Any, model_id: str, body: dict[str, Any]) -> dict[str, Any]:
