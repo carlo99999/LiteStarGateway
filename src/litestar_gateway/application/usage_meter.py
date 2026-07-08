@@ -411,77 +411,102 @@ class UsageMeter:
             # and the settlement's first checkpoint (the DB commit) would
             # re-raise CancelledError — no ledger row, no outbox, no trace.
             with anyio.CancelScope(shield=True):
-                latency_ms = (perf_counter() - start) * 1000
-                # A provider that rejects the request before emitting anything
-                # (error, zero streamed output, no usage reported) consumed
-                # nothing upstream — don't fabricate a prompt estimate to bill it
-                # (M26). A client disconnect (no error) still estimates and bills:
-                # there the provider did consume the prompt. A mid-stream failure
-                # after some output also bills — those tokens were paid upstream.
-                produced_nothing = (
-                    error is not None and streamed_chars == 0 and not _has_tokens(usage)
+                await self._finalize_stream_billing(
+                    team_id,
+                    api_key_id,
+                    model,
+                    operation,
+                    request,
+                    usage,
+                    streamed_chars,
+                    error,
+                    start,
                 )
-                if not _has_tokens(usage) and not produced_nothing:
-                    estimate = {
-                        "prompt_tokens": _estimate_tokens(len(_request_text(request))),
-                        "completion_tokens": _estimate_tokens(streamed_chars),
-                    }
-                    if _has_tokens(estimate):
-                        usage = estimate
-                        logger.warning(
-                            "stream ended without authoritative usage; billing estimate: "
-                            "team=%s model=%s op=%s prompt=%s completion=%s",
-                            team_id,
-                            model.name,
-                            operation,
-                            usage["prompt_tokens"],
-                            usage["completion_tokens"],
-                        )
-                # Bound the DB settlement: the shield above (correctly) makes it
-                # uncancellable by a client disconnect, but without a deadline a
-                # stalled DB would leave this coroutine — and its pool connection
-                # — orphaned forever, piling up under degradation and hanging
-                # graceful shutdown (M29). On timeout the spend for this one
-                # settlement is dropped with an ERROR (a Postgres statement
-                # timeout would instead surface as a failure the outbox catches).
-                with anyio.move_on_after(self._settlement_timeout) as settle_scope:
-                    if error is not None:
-                        # Bill what was seen (nothing, if the provider produced
-                        # nothing), but keep the honest error trace instead of a
-                        # fake 'ok' one — carrying the billed usage.
-                        prompt, completion, cost = _parse_usage(model, usage)
-                        if _has_tokens(usage):
-                            await self._bill(
-                                team_id,
-                                api_key_id,
-                                model,
-                                operation,
-                                prompt,
-                                completion,
-                                cost,
-                                datetime.now(UTC),
-                            )
-                        self.trace_error(
-                            team_id,
-                            api_key_id,
-                            model,
-                            operation,
-                            latency_ms,
-                            error,
-                            prompt_tokens=prompt,
-                            completion_tokens=completion,
-                            cost=cost,
-                        )
-                    else:
-                        await self.settle_ok(
-                            team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
-                        )
-                if settle_scope.cancelled_caught:
-                    logger.error(
-                        "stream settlement timed out after %ss; spend may be unrecorded: "
-                        "team=%s model=%s op=%s",
-                        self._settlement_timeout,
+
+    async def _finalize_stream_billing(
+        self,
+        team_id: UUID,
+        api_key_id: UUID,
+        model: Model,
+        operation: str,
+        request: dict[str, Any],
+        usage: dict[str, Any],
+        streamed_chars: int,
+        error: Exception | None,
+        start: float,
+    ) -> None:
+        """Post-stream settlement: estimate usage if none arrived, bill, and
+        trace. Runs inside `metered_stream`'s shielded finally — callers must
+        already hold the cancellation shield."""
+        latency_ms = (perf_counter() - start) * 1000
+        # A provider that rejects the request before emitting anything
+        # (error, zero streamed output, no usage reported) consumed
+        # nothing upstream — don't fabricate a prompt estimate to bill it
+        # (M26). A client disconnect (no error) still estimates and bills:
+        # there the provider did consume the prompt. A mid-stream failure
+        # after some output also bills — those tokens were paid upstream.
+        produced_nothing = error is not None and streamed_chars == 0 and not _has_tokens(usage)
+        if not _has_tokens(usage) and not produced_nothing:
+            estimate = {
+                "prompt_tokens": _estimate_tokens(len(_request_text(request))),
+                "completion_tokens": _estimate_tokens(streamed_chars),
+            }
+            if _has_tokens(estimate):
+                usage = estimate
+                logger.warning(
+                    "stream ended without authoritative usage; billing estimate: "
+                    "team=%s model=%s op=%s prompt=%s completion=%s",
+                    team_id,
+                    model.name,
+                    operation,
+                    usage["prompt_tokens"],
+                    usage["completion_tokens"],
+                )
+        # Bound the DB settlement: the caller's shield (correctly) makes it
+        # uncancellable by a client disconnect, but without a deadline a
+        # stalled DB would leave this coroutine — and its pool connection
+        # — orphaned forever, piling up under degradation and hanging
+        # graceful shutdown (M29). On timeout the spend for this one
+        # settlement is dropped with an ERROR (a Postgres statement
+        # timeout would instead surface as a failure the outbox catches).
+        with anyio.move_on_after(self._settlement_timeout) as settle_scope:
+            if error is not None:
+                # Bill what was seen (nothing, if the provider produced
+                # nothing), but keep the honest error trace instead of a
+                # fake 'ok' one — carrying the billed usage.
+                prompt, completion, cost = _parse_usage(model, usage)
+                if _has_tokens(usage):
+                    await self._bill(
                         team_id,
-                        model.name,
+                        api_key_id,
+                        model,
                         operation,
+                        prompt,
+                        completion,
+                        cost,
+                        datetime.now(UTC),
                     )
+                self.trace_error(
+                    team_id,
+                    api_key_id,
+                    model,
+                    operation,
+                    latency_ms,
+                    error,
+                    prompt_tokens=prompt,
+                    completion_tokens=completion,
+                    cost=cost,
+                )
+            else:
+                await self.settle_ok(
+                    team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
+                )
+        if settle_scope.cancelled_caught:
+            logger.error(
+                "stream settlement timed out after %ss; spend may be unrecorded: "
+                "team=%s model=%s op=%s",
+                self._settlement_timeout,
+                team_id,
+                model.name,
+                operation,
+            )
