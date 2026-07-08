@@ -15,6 +15,7 @@ from .conftest import (
     ADMIN_EMAIL,
     ERROR_URN,
     USER_URN,
+    _admin_headers,
     _create_user,
     _scim_headers,
     _signup_password_user,
@@ -147,6 +148,47 @@ async def test_delete_deactivates_instead_of_deleting(client: AsyncTestClient) -
     fetched = await client.get(f"/scim/v2/Users/{created['id']}", headers=headers)
     assert fetched.status_code == HTTP_200_OK
     assert fetched.json()["active"] is False
+
+
+async def test_scim_cannot_reactivate_admin_disabled_account(client: AsyncTestClient) -> None:
+    await _signup_password_user(client, "hank@corp.com", "Sup3r-Secret!")
+    admin = await _admin_headers(client)
+    headers = await _scim_headers(client)
+    found = (
+        await client.get('/scim/v2/Users?filter=userName eq "hank@corp.com"', headers=headers)
+    ).json()
+    user_id = found["Resources"][0]["id"]
+
+    def patch_active(value: bool) -> dict:
+        return {
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "active", "value": value}],
+        }
+
+    disabled = await client.patch(f"/users/{user_id}", json={"is_active": False}, headers=admin)
+    assert disabled.status_code == HTTP_200_OK, disabled.text
+
+    # A routine IdP full-sync with active:true must not resurrect the account.
+    for request in (
+        client.patch(f"/scim/v2/Users/{user_id}", json=patch_active(True), headers=headers),
+        client.put(
+            f"/scim/v2/Users/{user_id}",
+            json={"schemas": [USER_URN], "userName": "hank@corp.com", "active": True},
+            headers=headers,
+        ),
+    ):
+        resp = await request
+        assert resp.status_code == HTTP_403_FORBIDDEN, resp.text
+        assert resp.json()["schemas"] == [ERROR_URN]
+
+    # The admin lever is unaffected: re-enable via the admin API...
+    reenabled = await client.patch(f"/users/{user_id}", json={"is_active": True}, headers=admin)
+    assert reenabled.status_code == HTTP_200_OK, reenabled.text
+    # ...after which the IdP governs the account again.
+    redisabled = await client.patch(
+        f"/scim/v2/Users/{user_id}", json=patch_active(False), headers=headers
+    )
+    assert redisabled.status_code == HTTP_200_OK, redisabled.text
 
 
 async def test_scim_cannot_deactivate_platform_admin(client: AsyncTestClient) -> None:
