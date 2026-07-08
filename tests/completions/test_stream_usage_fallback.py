@@ -326,17 +326,17 @@ class FailingUpfrontGateway(StreamGateway):
 
 
 async def test_provider_reject_before_output_bills_nothing() -> None:
-    # M26: a provider that rejects the request before producing anything consumed
-    # nothing upstream — bill nothing (don't fabricate a prompt estimate), but
-    # still emit an honest status='error' trace with zeroed usage.
+    # M26 + R7-H24: a provider that rejects the request before producing anything
+    # consumed nothing upstream — bill nothing (don't fabricate a prompt
+    # estimate), but still emit an honest status='error' trace with zeroed usage.
+    # Since the stream is primed at open, the upfront rejection now surfaces from
+    # open_chat_stream itself (so it becomes an HTTP status, not a mid-SSE abort).
     traces: list[TraceRecord] = []
     usage = FakeUsage()
     service = _service(FailingUpfrontGateway(_chat_chunks()), usage, traces)
 
-    stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(CHAT_REQUEST))
     with pytest.raises(RuntimeError):
-        async for _ in stream:
-            pass
+        await service.open_chat_stream(TEAM_ID, KEY_ID, dict(CHAT_REQUEST))
 
     assert usage.events == []  # nothing billed for a zero-consumption rejection
     assert [t.status for t in traces] == ["error"]

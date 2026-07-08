@@ -32,6 +32,44 @@ from litestar_gateway.domain.ports import (
 from litestar_gateway.domain.request_policy import clamp_output_tokens, sanitize_request
 
 
+async def _empty_stream() -> AsyncIterator[dict[str, Any]]:
+    """An async iterator that yields nothing (empty provider stream)."""
+    return
+    yield  # unreachable — makes this a generator, not a plain coroutine
+
+
+async def _rechain(
+    first: dict[str, Any], rest: AsyncIterator[dict[str, Any]]
+) -> AsyncIterator[dict[str, Any]]:
+    """Re-emit an already-pulled first chunk, then delegate to the rest of the
+    stream. The `finally` closes `rest` so the metered generator's billing/
+    release settlement still runs when a client disconnects (`aclose()` on this
+    wrapper): a bare `async for` does not propagate the close to `rest`."""
+    try:
+        yield first
+        async for chunk in rest:
+            yield chunk
+    finally:
+        aclose = getattr(rest, "aclose", None)
+        if aclose is not None:
+            await aclose()
+
+
+async def _prime(gen: AsyncIterator[dict[str, Any]]) -> AsyncIterator[dict[str, Any]]:
+    """Pull the first chunk now so a provider error at stream *open* raises here
+    — before the controller commits the SSE `200 OK` — instead of mid-response
+    where it can only abort the connection (the behaviour the endpoint comment
+    always claimed but only half-delivered, R7-H24). The metered generator's own
+    finally still bills/releases on both the error and normal-completion paths,
+    so priming changes only *when* the first provider round-trip happens, not the
+    accounting."""
+    try:
+        first = await anext(gen)
+    except StopAsyncIteration:
+        return _empty_stream()
+    return _rechain(first, gen)
+
+
 class CompletionService:
     def __init__(
         self,
@@ -185,9 +223,10 @@ class CompletionService:
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        return self._metered(
+        gen = self._metered(
             team_id, api_key_id, model, "chat.completions", stream, clean, reservation
         )
+        return await _prime(gen)
 
     async def open_responses_stream(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
@@ -203,7 +242,8 @@ class CompletionService:
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        return self._metered(team_id, api_key_id, model, "responses", stream, clean, reservation)
+        gen = self._metered(team_id, api_key_id, model, "responses", stream, clean, reservation)
+        return await _prime(gen)
 
     def _metered(
         self,
