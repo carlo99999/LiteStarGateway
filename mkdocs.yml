@@ -1,0 +1,58 @@
+site_name: Litestar Gateway
+site_description: OpenAI-compatible LLM gateway documentation
+
+docs_dir: .mkdocs-docs
+site_dir: .mkdocs-site
+
+theme:
+  name: readthedocs
+  highlightjs: true
+
+markdown_extensions:
+  - admonition
+  - fenced_code
+  - tables
+  - toc:
+      permalink: true
+
+validation:
+  links:
+    not_found: ignore
+    unrecognized_links: ignore
+    anchors: warn
+
+nav:
+  - Overview:
+      - README: index.md
+      - Examples: EXAMPLES.md
+      - Contributing: CONTRIBUTING.md
+      - Security: SECURITY.md
+  - Operations:
+      - Deployment: docs/deployment.md
+      - PostgreSQL: docs/postgres.md
+      - Database migrations: docs/db-migrations.md
+      - CI: docs/ci.md
+      - Logging: docs/logging.md
+      - Secrets rotation: docs/secrets-rotation.md
+  - Gateway:
+      - Usage and cost: docs/usage-cost.md
+      - Observability: docs/observability.md
+      - Parameter allowlist: docs/param-allowlist.md
+      - Provider resilience: docs/provider-resilience.md
+      - Bedrock: docs/bedrock.md
+  - Identity and access:
+      - Enterprise SSO: docs/enterprise-sso.md
+      - Account recovery: docs/account-recovery.md
+  - Routing:
+      - Smart routing: docs/next-steps/smart-routing.md
+      - Semantic embeddings: docs/routing-embeddings.md
+      - Webhook routing: docs/routing-webhook.md
+      - Weighted routing: docs/weighted-routing.md
+  - Review issues:
+      - Index: issues/INDEX.md
+      - Round 6: issues/round-6.md
+      - Round 5: issues/round-5.md
+      - Round 4: issues/round-4.md
+      - Round 3: issues/round-3.md
+      - Round 2: issues/round-2.md
+      - Round 1: issues/round-1.md

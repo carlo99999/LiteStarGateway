@@ -94,6 +94,26 @@ run:
 serve:
     uv run uvicorn {{app}} --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips "*"
 
+# ── Documentation ─────────────────────────────────────────────────────────────
+
+# Prepare the MkDocs source projection without duplicating canonical docs.
+docs-prepare:
+    mkdir -p .mkdocs-docs
+    ln -sfn ../README.md .mkdocs-docs/index.md
+    ln -sfn ../EXAMPLES.md .mkdocs-docs/EXAMPLES.md
+    ln -sfn ../CONTRIBUTING.md .mkdocs-docs/CONTRIBUTING.md
+    ln -sfn ../SECURITY.md .mkdocs-docs/SECURITY.md
+    ln -sfn ../docs .mkdocs-docs/docs
+    ln -sfn ../issues .mkdocs-docs/issues
+
+# Build the MkDocs documentation site.
+docs-build: docs-prepare
+    uv run mkdocs build --strict
+
+# Serve the MkDocs documentation site locally.
+docs-serve: docs-prepare
+    uv run mkdocs serve
+
 # ── Aggregates ─────────────────────────────────────────────────────────────────
 
 # Run the full CI gate locally: hooks (lint/format/secrets) + types + tests.

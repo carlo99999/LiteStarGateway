@@ -3,8 +3,10 @@
 .venv/
 __pycache__/
 .pytest_cache/
-.mkdocs-docs
-.mkdocs-site
+
+# MkDocs generated source projection and build output
+.mkdocs-docs/
+.mkdocs-site/
 .hypothesis
 # Coverage artifacts (pytest-cov)
 .coverage
