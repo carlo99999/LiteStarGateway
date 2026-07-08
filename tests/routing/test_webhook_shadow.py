@@ -42,11 +42,16 @@ def _ctx(text: str = "hello") -> RoutingContext:
     )
 
 
+async def _public_resolver(host: str) -> list[str]:
+    return ["93.184.216.34"]
+
+
 def _mock_webhook(monkeypatch: pytest.MonkeyPatch, handler) -> None:
     def factory(timeout_seconds: float) -> httpx.AsyncClient:
         return httpx.AsyncClient(timeout=timeout_seconds, transport=httpx.MockTransport(handler))
 
     monkeypatch.setattr(webhook_module, "_client_factory", factory)
+    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", _public_resolver)
 
 
 # ── S2 webhook: unit ─────────────────────────────────────────────────────────
@@ -111,6 +116,81 @@ def test_webhook_requires_http_url() -> None:
     for bad in ({}, {"url": None}, {"url": "ftp://x"}, {"url": 3}):
         with pytest.raises(ValueError):
             WebhookStrategy(bad)
+
+
+# ── S2 webhook: SSRF guard (R6-H18) ──────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "bad_url",
+    [
+        "http://169.254.169.254/latest/meta-data",  # cloud metadata (link-local)
+        "http://127.0.0.1:9/route",  # loopback
+        "http://10.0.0.5/route",  # private 10/8
+        "http://172.16.0.1/route",  # private 172.16/12
+        "http://192.168.1.1/route",  # private 192.168/16
+        "http://[::1]/route",  # IPv6 loopback
+        "http://[fe80::1]/route",  # IPv6 link-local
+        "http://[fc00::1]/route",  # IPv6 unique-local
+        "http://0.0.0.0/route",  # unspecified
+        "http://224.0.0.1/route",  # multicast
+    ],
+)
+def test_webhook_rejects_blocked_literal_ip_at_config_time(bad_url: str) -> None:
+    with pytest.raises(ValueError):
+        WebhookStrategy({"url": bad_url})
+
+
+async def test_webhook_rejects_hostname_resolving_to_private(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        called.append(request)
+        return httpx.Response(200, json={"choice": 1})
+
+    _mock_webhook(monkeypatch, handler)
+
+    async def private_resolver(host: str) -> list[str]:
+        return ["10.1.2.3"]
+
+    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", private_resolver)
+    with pytest.raises(ValueError):
+        await WebhookStrategy({"url": "https://picker.example/route"}).select(_ctx(), CANDIDATES)
+    assert called == []  # blocked before any bytes leave the gateway
+
+
+async def test_webhook_rejects_hostname_with_any_private_address(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_webhook(monkeypatch, lambda r: httpx.Response(200, json={"choice": 1}))
+
+    async def mixed_resolver(host: str) -> list[str]:
+        return ["93.184.216.34", "192.168.1.10"]  # DNS-rebind style mix
+
+    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", mixed_resolver)
+    with pytest.raises(ValueError):
+        await WebhookStrategy({"url": "https://picker.example/route"}).select(_ctx(), CANDIDATES)
+
+
+async def test_webhook_public_hostname_passes_guard(monkeypatch: pytest.MonkeyPatch) -> None:
+    _mock_webhook(monkeypatch, lambda r: httpx.Response(200, json={"choice": 1}))
+    decision = await WebhookStrategy({"url": "https://picker.example/route"}).select(
+        _ctx(), CANDIDATES
+    )
+    assert decision.model_name == "m1"
+
+
+async def test_webhook_redirect_is_not_followed_and_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_webhook(
+        monkeypatch,
+        lambda r: httpx.Response(302, headers={"Location": "http://169.254.169.254/"}),
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        await WebhookStrategy({"url": "https://x/r"}).select(_ctx(), CANDIDATES)
 
 
 # ── Integration: webhook fallback + shadow mode ──────────────────────────────
@@ -240,11 +320,34 @@ async def test_unreachable_webhook_falls_back_to_default(
         client,
         {
             "strategy": "webhook",
-            "strategy_config": {"url": "http://127.0.0.1:9/route", "timeout_ms": 200},
+            # RFC 2606: .invalid never resolves — creation passes, the call fails.
+            "strategy_config": {"url": "http://picker.invalid:9/route", "timeout_ms": 200},
         },
     )
     body = await _chat(client, key)
     assert body["model"] == "gpt-4o"  # default_model
+    assert ("webhook", "big-model", 0, 1) in _decisions(tmp_path)
+
+
+async def test_blocked_webhook_target_falls_back_to_default(
+    client: AsyncTestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R6-H18: a hostname that resolves to a private address (DNS-rebind style)
+    is blocked at request time and takes the normal fallback path."""
+
+    async def private_resolver(host: str) -> list[str]:
+        return ["10.0.0.5"]
+
+    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", private_resolver)
+    key, _, _ = await _setup(
+        client,
+        {
+            "strategy": "webhook",
+            "strategy_config": {"url": "http://picker.example/route", "timeout_ms": 200},
+        },
+    )
+    body = await _chat(client, key)
+    assert body["model"] == "gpt-4o"  # default_model, request never failed
     assert ("webhook", "big-model", 0, 1) in _decisions(tmp_path)
 
 
@@ -273,7 +376,9 @@ async def test_failing_shadow_never_touches_the_request(
         client,
         {
             "shadow_strategy": "webhook",
-            "strategy_config": {"shadow": {"url": "http://127.0.0.1:9/route", "timeout_ms": 100}},
+            "strategy_config": {
+                "shadow": {"url": "http://picker.invalid/route", "timeout_ms": 100}
+            },
         },
     )
     body = await _chat(client, key)
@@ -290,6 +395,16 @@ async def test_router_validation_rejects_bad_webhook_and_shadow(
         {"name": "r2", "strategy": "webhook"},  # webhook without url
         {"name": "r3", "shadow_strategy": "nope"},  # unknown shadow strategy
         {"name": "r4", "shadow_strategy": "webhook"},  # shadow webhook without url
+        {  # SSRF guard: cloud metadata target rejected at save time (R6-H18)
+            "name": "r5",
+            "strategy": "webhook",
+            "strategy_config": {"url": "http://169.254.169.254/latest/meta-data"},
+        },
+        {  # SSRF guard applies to the shadow webhook too
+            "name": "r6",
+            "shadow_strategy": "webhook",
+            "strategy_config": {"shadow": {"url": "http://127.0.0.1:9/route"}},
+        },
     ):
         body = {
             "default_model": "big-model",
