@@ -32,8 +32,9 @@ repos:
         # keyword detector); they hold no secrets. issues/*.md / README.md are prose
         # that names env vars (JWT_SECRET/MASTER_KEY) — the keyword detector
         # false-positives on them and every doc edit shifts line numbers, churning
-        # the baseline, so they're excluded too.
-        exclude: (?x)^(uv\.lock|\.secrets\.baseline|migrations/.*|graphify-out/(graph\.json|GRAPH_REPORT\.md)|issues/.*\.md|README\.md)$
+        # the baseline, so they're excluded too. Next-step docs include
+        # copy-paste credential placeholders for gateway clients.
+        exclude: (?x)^(uv\.lock|\.secrets\.baseline|migrations/.*|graphify-out/(graph\.json|GRAPH_REPORT\.md)|issues/.*\.md|docs/next-steps/.*\.md|README\.md)$
 
   # Lint + format, reusing the project's pinned ruff (single source of truth,
   # same as CI) rather than a separately versioned mirror.
