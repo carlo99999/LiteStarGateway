@@ -332,6 +332,12 @@ def _fake_boto3_client(service: str, **kwargs: Any) -> FakeBedrockRuntime:
 
 def _patch_bedrock(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(bedrock_adapter.boto3, "client", _fake_boto3_client)
+    # See conftest._patch: captured call args live on the class because boto3
+    # constructs the client internally. Reset before every test so a test
+    # that forgets to trigger the call under test fails on a KeyError instead
+    # of silently reading a stale value left by the previous test.
+    FakeBedrockRuntime.last_client_kwargs = {}
+    FakeBedrockRuntime.last_kwargs = {}
 
 
 # ── Dedicated executor (R6-M45) ──────────────────────────────────────────────
