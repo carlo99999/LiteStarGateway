@@ -60,10 +60,12 @@ re-read against the finding it claims to close; the suite re-run at 615 passed, 
 | M47 — `create_app()` 175-line god-function | `33d5049` | Extracted into named `_build_*` helpers; pure extraction, full suite green. |
 | M48 — `metered_stream` nesting depth 5 | `91f1492` | Finally-block billing logic extracted into `_finalize_stream_billing`; `metered_stream` itself back to depth ≤3. |
 
-**Not yet addressed (LOW, deliberately deferred — see original entries above):** L30
-(`resilience.py` has no test coverage), L31 (float money math, no property tests), L32
-(class-attribute state in test doubles), L33 (dead `keys_match` + stale docstring), L34
-(ports-with-one-adapter is a documented tradeoff, not a defect).
+| L30 — `resilience.py` had no test coverage | (this PR) | `ResilienceConfig.client_kwargs`/`timeout_ms` were already asserted for OpenAI (`test_chat.py`); added the same assertions for Anthropic (`last_init["timeout"]`/`["max_retries"]`), Vertex (`last_init["http_options"].timeout`), and Bedrock (`boto_config.read_timeout`/`connect_timeout`/`retries["max_attempts"]`) in their existing client-construction tests — a refactor that stops wiring resilience into any adapter now fails a test instead of only failing in production during an upstream outage. |
+
+**Not yet addressed (LOW, deliberately deferred — see original entries above):** L31
+(float money math, no property tests), L32 (class-attribute state in test doubles), L33
+(dead `keys_match` + stale docstring), L34 (ports-with-one-adapter is a documented
+tradeoff, not a defect).
 
 **Updated overall assessment: 8.5/10.** Every CRITICAL and HIGH from this round is closed
 with a targeted fix and a genuine regression test (not just a happy-path patch) — SSRF
