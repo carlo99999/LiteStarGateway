@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import pytest
 from litestar.status_codes import (
@@ -24,9 +23,9 @@ JWT_SECRET = "test-secret-key-0123456789-abcdefghij"
 SALT_KEY = "unit-test-salt-key"
 
 
-def _settings(tmp_path: Path, *, salt_key: str | None = SALT_KEY) -> Settings:
+def _settings(database_url: str, *, salt_key: str | None = SALT_KEY) -> Settings:
     return Settings(
-        database_url=f"sqlite+aiosqlite:///{tmp_path / 'cred.db'}",
+        database_url=database_url,
         admin_email=ADMIN_EMAIL,
         master_key=MASTER_KEY,
         jwt_secret=JWT_SECRET,
@@ -35,8 +34,8 @@ def _settings(tmp_path: Path, *, salt_key: str | None = SALT_KEY) -> Settings:
 
 
 @pytest.fixture
-async def client(tmp_path: Path) -> AsyncIterator[AsyncTestClient]:
-    async with AsyncTestClient(app=create_app(_settings(tmp_path))) as test_client:
+async def client(database_url: str) -> AsyncIterator[AsyncTestClient]:
+    async with AsyncTestClient(app=create_app(_settings(database_url))) as test_client:
         yield test_client
 
 
@@ -121,8 +120,8 @@ async def test_non_admin_forbidden(client: AsyncTestClient) -> None:
     assert resp.status_code == HTTP_403_FORBIDDEN
 
 
-async def test_missing_salt_key_returns_503(tmp_path: Path) -> None:
-    async with AsyncTestClient(app=create_app(_settings(tmp_path, salt_key=None))) as client:
+async def test_missing_salt_key_returns_503(database_url: str) -> None:
+    async with AsyncTestClient(app=create_app(_settings(database_url, salt_key=None))) as client:
         admin = await _admin_token(client)
         resp = await client.post(
             "/credentials",
@@ -132,7 +131,7 @@ async def test_missing_salt_key_returns_503(tmp_path: Path) -> None:
         assert resp.status_code == HTTP_503_SERVICE_UNAVAILABLE
 
 
-async def test_values_are_encrypted_at_rest_and_round_trip(tmp_path: Path) -> None:
+async def test_values_are_encrypted_at_rest_and_round_trip(database_url: str) -> None:
     # Stored ciphertext must not contain the secret; decryption restores it.
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import create_async_engine
@@ -140,7 +139,7 @@ async def test_values_are_encrypted_at_rest_and_round_trip(tmp_path: Path) -> No
     from litestar_gateway.infrastructure.crypto import DataCipher, MasterCipher
     from litestar_gateway.infrastructure.persistence.orm import CredentialModel, SecretKeyModel
 
-    settings = _settings(tmp_path)
+    settings = _settings(database_url)
     async with AsyncTestClient(app=create_app(settings)) as client:
         admin = await _admin_token(client)
         await client.post(
