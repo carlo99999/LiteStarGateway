@@ -10,7 +10,8 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 | Round | Focus | New findings (C·H·M·L) | Status |
 |---|---|---|---|
-| [Round 6](round-6.md) — 2026-07-08 | New-feature deep review (routing, SCIM, Bedrock, RBAC/SSO, maintainability) | 2·6·12·5 | Open |
+| [Round 7](round-7.md) — 2026-07-08 | Fresh-eyes full-tree review (5 lenses: web/auth, concurrency, adapters, persistence, ops/tests) | 0·3·10·6 | Open |
+| [Round 6](round-6.md) — 2026-07-08 | New-feature deep review (routing, SCIM, Bedrock, RBAC/SSO, maintainability) | 2·6·12·5 | Fully remediated |
 | [Round 5](round-5.md) — 2026-07-06 | Graph-guided full-project review | 0·1·4·3 | Fully remediated |
 | [Round 4](round-4.md) — 2026-07-06 | Full-project review (money/concurrency edges) | 0·1·7·8 | Remediated except L25 (deferred) |
 | [Round 3](round-3.md) — 2026-07-03 | Money & concurrency review | 0·1·5·8 | Remediated except L15 (deferred) |
@@ -19,9 +20,12 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 ## Overall
 
-**As of Round 6: 6.5/10** — see [round-6.md](round-6.md#category-scores-this-round) for the
-category breakdown. The architecture and money/security core (parameterized queries, pinned
-JWT alg, tenant scoping, no secret leakage in response DTOs) have held up across all six
-rounds; the open work is concentrated in Round 6's governance/data-exposure findings (C2, C3,
-and the six HIGHs) plus each round's own deferred items (larger refactors or product
-decisions, listed in that round's "Resolution status" section).
+**As of Round 7: 7.5/10** — see [round-7.md](round-7.md#category-scores-this-round) for the
+category breakdown. The security core (parameterized queries, pinned JWT alg, tenant scoping,
+RBAC gates, SSO/OIDC hardening, no secret leakage in response DTOs) has now survived seven
+passes, and Round 7 found no CRITICAL and no new authz hole. The open work moved down a tier
+to functional correctness: unmetered judge/embeddings provider spend (H22), silently dropped
+`tools`/vision content on three providers (H23), stream-start errors never reaching clients
+as HTTP statuses (H24), plus uneven constraint/index/race handling in persistence and
+prod-vs-dev divergences (SQLite FKs, CI without Postgres). Each round's own deferred items
+remain listed in that round's "Resolution status" section.
