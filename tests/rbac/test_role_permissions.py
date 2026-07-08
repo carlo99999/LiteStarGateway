@@ -27,7 +27,7 @@ def test_admin_holds_every_permission_and_member_none() -> None:
 
 def test_new_roles_are_scoped_to_their_domain() -> None:
     assert ROLE_PERMISSIONS[TeamRole.MODEL_MANAGER] == frozenset(
-        {Permission.MODELS_READ, Permission.MODELS_MANAGE}
+        {Permission.MODELS_READ, Permission.MODELS_MANAGE, Permission.DECISIONS_READ}
     )
     assert ROLE_PERMISSIONS[TeamRole.KEY_ISSUER] == frozenset(
         {Permission.KEYS_READ, Permission.KEYS_ISSUE}
@@ -39,6 +39,8 @@ def test_new_roles_are_scoped_to_their_domain() -> None:
 
 def test_auditor_bypass_is_read_only() -> None:
     assert AUDITOR_TEAM_PERMISSIONS == frozenset({Permission.USAGE_READ, Permission.BUDGET_READ})
+    # R6-C2: never raw prompt content via the cross-team bypass.
+    assert Permission.DECISIONS_READ not in AUDITOR_TEAM_PERMISSIONS
 
 
 def test_sso_team_mapping_accepts_extended_roles(monkeypatch: pytest.MonkeyPatch) -> None:
