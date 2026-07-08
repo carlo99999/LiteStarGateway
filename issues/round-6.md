@@ -60,10 +60,11 @@ re-read against the finding it claims to close; the suite re-run at 615 passed, 
 | M47 — `create_app()` 175-line god-function | `33d5049` | Extracted into named `_build_*` helpers; pure extraction, full suite green. |
 | M48 — `metered_stream` nesting depth 5 | `91f1492` | Finally-block billing logic extracted into `_finalize_stream_billing`; `metered_stream` itself back to depth ≤3. |
 
-**Not yet addressed (LOW, deliberately deferred — see original entries above):** L30
-(`resilience.py` has no test coverage), L31 (float money math, no property tests), L32
-(class-attribute state in test doubles), L33 (dead `keys_match` + stale docstring), L34
-(ports-with-one-adapter is a documented tradeoff, not a defect).
+| L31 — float money math had no property-based tests | (this PR) | Added `tests/budgets/test_money_math_properties.py` (new `hypothesis` dev dependency): `InFlightSpend` add/remove round-trips to ~0 regardless of order and never goes negative, `_parse_usage` cost is non-negative and monotonic in completion tokens and agrees across the chat/Responses token-shape aliases, `_reservation_cost` is non-negative and monotonic in the output-token ceiling. Per owner decision, this is property tests only — no `Decimal`/schema migration (the original finding itself said "flag only if invoice-grade accounting becomes a goal"). |
+
+**All 5 LOW findings from this round are now also fixed** (L30–L34, each as its own PR):
+resilience-config test coverage, money-math property tests, fake-client state reset,
+dead-code removal, and the ports-design note above.
 
 **Updated overall assessment: 8.5/10.** Every CRITICAL and HIGH from this round is closed
 with a targeted fix and a genuine regression test (not just a happy-path patch) — SSRF
