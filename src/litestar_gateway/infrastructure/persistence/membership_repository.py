@@ -5,9 +5,11 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import TeamMembership, TeamRole
+from litestar_gateway.domain.exceptions import AlreadyMember
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.infrastructure.persistence.orm import TeamMembershipModel
 
@@ -25,7 +27,14 @@ class SQLAlchemyTeamMembershipRepository:
             role=membership.role.value,
         )
         self._session.add(model)
-        await self._session.flush()
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            # Loser of a concurrent add of the same (team_id, user_id): the
+            # service's pre-check passed for both, the unique constraint catches
+            # the race. Raise the domain 409 (no rollback here — the service's
+            # unit-of-work owns the transaction and rolls back on this error).
+            raise AlreadyMember(str(membership.user_id)) from exc
         await self._session.refresh(model)
         return model.to_entity()
 
