@@ -60,10 +60,11 @@ re-read against the finding it claims to close; the suite re-run at 615 passed, 
 | M47 — `create_app()` 175-line god-function | `33d5049` | Extracted into named `_build_*` helpers; pure extraction, full suite green. |
 | M48 — `metered_stream` nesting depth 5 | `91f1492` | Finally-block billing logic extracted into `_finalize_stream_billing`; `metered_stream` itself back to depth ≤3. |
 
+| L34 — persistence/identity/lock ports have exactly one adapter | (this PR) | Documented in `domain/ports/__init__.py`: intentional — the value here is fast in-memory test doubles, not backend swappability; `LLMGateway` (5 real adapters) is the one port that earns extensibility. No code change otherwise (not a defect). |
+
 **Not yet addressed (LOW, deliberately deferred — see original entries above):** L30
 (`resilience.py` has no test coverage), L31 (float money math, no property tests), L32
-(class-attribute state in test doubles), L33 (dead `keys_match` + stale docstring), L34
-(ports-with-one-adapter is a documented tradeoff, not a defect).
+(class-attribute state in test doubles), L33 (dead `keys_match` + stale docstring).
 
 **Updated overall assessment: 8.5/10.** Every CRITICAL and HIGH from this round is closed
 with a targeted fix and a genuine regression test (not just a happy-path patch) — SSRF
