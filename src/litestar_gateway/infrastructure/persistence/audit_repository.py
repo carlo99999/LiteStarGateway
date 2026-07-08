@@ -40,7 +40,7 @@ class SQLAlchemyAuditLog:
     ) -> list[AuditEvent]:
         rows = await self._session.scalars(
             select(AuditEventModel)
-            .order_by(AuditEventModel.created_at.desc())
+            .order_by(AuditEventModel.created_at.desc(), AuditEventModel.id.desc())
             .limit(limit)
             .offset(offset)
         )

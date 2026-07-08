@@ -240,7 +240,11 @@ class SQLAlchemyRoutingDecisionLog:
             stmt = stmt.where(RoutingDecisionModel.chosen_model == chosen_model)
         if is_shadow is not None:
             stmt = stmt.where(RoutingDecisionModel.is_shadow == is_shadow)
-        stmt = stmt.order_by(RoutingDecisionModel.created_at.desc()).offset(offset).limit(limit)
+        stmt = (
+            stmt.order_by(RoutingDecisionModel.created_at.desc(), RoutingDecisionModel.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
         return [model.to_entity() for model in await self._session.scalars(stmt)]
 
     async def distribution(
