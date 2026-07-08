@@ -189,8 +189,11 @@ class SQLAlchemyRoutingDecisionLog:
         counted = (
             *base,
             RoutingDecisionModel.prompt_tokens.is_not(None),
+            RoutingDecisionModel.completion_tokens.is_not(None),
             RoutingDecisionModel.alt_input_cost.is_not(None),
             RoutingDecisionModel.chosen_input_cost.is_not(None),
+            RoutingDecisionModel.alt_output_cost.is_not(None),
+            RoutingDecisionModel.chosen_output_cost.is_not(None),
         )
         total = await self._session.scalar(
             select(
@@ -202,8 +205,8 @@ class SQLAlchemyRoutingDecisionLog:
                         )
                         * RoutingDecisionModel.prompt_tokens
                         + (
-                            func.coalesce(RoutingDecisionModel.alt_output_cost, 0.0)
-                            - func.coalesce(RoutingDecisionModel.chosen_output_cost, 0.0)
+                            RoutingDecisionModel.alt_output_cost
+                            - RoutingDecisionModel.chosen_output_cost
                         )
                         * RoutingDecisionModel.completion_tokens
                     ),

@@ -5,14 +5,21 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import UUID, uuid4
 
 import pytest
+from advanced_alchemy.extensions.litestar import base
 from litestar.status_codes import HTTP_200_OK, HTTP_403_FORBIDDEN
 from litestar.testing import AsyncTestClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from litestar_gateway.app import create_app
 from litestar_gateway.config import Settings
 from litestar_gateway.infrastructure.llm import openai_adapter
+from litestar_gateway.infrastructure.persistence.orm import RoutingDecisionModel
+from litestar_gateway.infrastructure.persistence.router_repository import (
+    SQLAlchemyRoutingDecisionLog,
+)
 
 MASTER_KEY = "master-secret"  # pragma: allowlist secret
 ADMIN_EMAIL = "admin@example.com"
@@ -187,6 +194,82 @@ async def test_savings_use_actual_tokens_and_unit_cost_delta(
     assert body["decisions_counted"] == 2
     assert body["decisions_without_usage"] == 0
     assert body["estimated_savings"] == pytest.approx(1.8e-4)
+
+
+@pytest.fixture
+async def session(tmp_path: Path) -> AsyncIterator[AsyncSession]:
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'savings.db'}")
+    async with engine.begin() as conn:
+        await conn.run_sync(base.UUIDAuditBase.metadata.create_all)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with maker() as s:
+        yield s
+    await engine.dispose()
+
+
+def _decision(team_id: UUID, **overrides: object) -> RoutingDecisionModel:
+    fields: dict[str, object] = {
+        "id": uuid4(),
+        "team_id": team_id,
+        "router_name": "auto",
+        "strategy": "heuristic",
+        "chosen_model": "cheap-model",
+        "chosen_input_cost": 1e-6,
+        "chosen_output_cost": 2e-6,
+        "alt_input_cost": 1e-5,
+        "alt_output_cost": 2e-5,
+        "prompt_tokens": 10,
+        "completion_tokens": 5,
+        **overrides,
+    }
+    return RoutingDecisionModel(**fields)
+
+
+async def test_savings_excludes_row_with_null_completion_tokens(session: AsyncSession) -> None:
+    team_id = uuid4()
+    session.add(_decision(team_id))
+    session.add(_decision(team_id, completion_tokens=None))
+    await session.commit()
+
+    total, counted, without_usage = await SQLAlchemyRoutingDecisionLog(session).savings(
+        team_id, "auto"
+    )
+    # The NULL-completion row cannot be priced: out of the SUM *and* the count.
+    assert counted == 1
+    assert without_usage == 1
+    assert total == pytest.approx(1.8e-4)
+
+
+@pytest.mark.parametrize("field", ["alt_output_cost", "chosen_output_cost"])
+async def test_savings_excludes_one_sided_output_cost_symmetrically(
+    session: AsyncSession, field: str
+) -> None:
+    team_id = uuid4()
+    session.add(_decision(team_id))
+    session.add(_decision(team_id, **{field: None}))
+    await session.commit()
+
+    total, counted, without_usage = await SQLAlchemyRoutingDecisionLog(session).savings(
+        team_id, "auto"
+    )
+    # A NULL output cost on either side excludes the row the same way.
+    assert counted == 1
+    assert without_usage == 1
+    assert total == pytest.approx(1.8e-4)
+
+
+async def test_savings_counts_fully_priced_rows(session: AsyncSession) -> None:
+    team_id = uuid4()
+    session.add(_decision(team_id))
+    session.add(_decision(team_id))
+    await session.commit()
+
+    total, counted, without_usage = await SQLAlchemyRoutingDecisionLog(session).savings(
+        team_id, "auto"
+    )
+    assert counted == 2
+    assert without_usage == 0
+    assert total == pytest.approx(3.6e-4)
 
 
 async def test_observability_requires_usage_read(client: AsyncTestClient) -> None:
