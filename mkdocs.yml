@@ -49,6 +49,7 @@ nav:
       - Webhook routing: docs/routing-webhook.md
       - Weighted routing: docs/weighted-routing.md
   - Next steps:
+      - Agent framework compatibility: docs/next-steps/agent-framework-compatibility.md
       - Provider-native endpoints: docs/next-steps/native-provider-endpoints.md
   - Review issues:
       - Index: issues/INDEX.md
