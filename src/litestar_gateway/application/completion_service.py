@@ -23,6 +23,7 @@ from litestar_gateway.domain.exceptions import (
     ModelDisabled,
     ModelNotFound,
     ModelTypeMismatch,
+    UnsupportedOperation,
 )
 from litestar_gateway.domain.ports import (
     CredentialRepository,
@@ -30,6 +31,25 @@ from litestar_gateway.domain.ports import (
     ModelRepository,
 )
 from litestar_gateway.domain.request_policy import clamp_output_tokens, sanitize_request
+
+
+def _reject_unsupported_n(operation: str, model: Model, request: dict[str, Any]) -> None:
+    """Reject a chat request asking for more than one completion (`n>1`) on a
+    provider whose translator ignores `n`. Anthropic/Vertex/Bedrock always
+    return exactly one completion, so honoring the request would silently
+    under-deliver while the budget reservation charged the output ceiling
+    per requested choice (up to MAX_N×), spuriously tripping BudgetExceeded
+    for teams nowhere near their cap. Rejecting keeps the reservation and the
+    provider's actual behavior in agreement (R7-M50). `n` lives only on the
+    chat allowlist; other operations pass through untouched."""
+    if operation != "chat.completions" or model.provider.honors_n:
+        return
+    n = request.get("n")
+    if isinstance(n, int) and not isinstance(n, bool) and n > 1:
+        raise UnsupportedOperation(
+            f"Provider '{model.provider.value}' does not support multiple completions "
+            f"(n={n}); it returns exactly one completion per request"
+        )
 
 
 async def _empty_stream() -> AsyncIterator[dict[str, Any]]:
@@ -161,6 +181,7 @@ class CompletionService:
             raise ModelTypeMismatch(
                 f"Model '{model.name}' is type '{model.type}', not '{expected_type}'"
             )
+        _reject_unsupported_n(operation, model, request)
         # Per-model output ceiling: clamp/inject now that the model is known, and
         # reserve from the clamped request so admission and the provider call agree.
         clean = clamp_output_tokens(operation, request, model.max_output_tokens)

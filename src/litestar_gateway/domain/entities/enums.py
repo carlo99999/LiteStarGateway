@@ -54,6 +54,20 @@ class Provider(StrEnum):
     BEDROCK = "bedrock"
     DATABRICKS = "databricks"
 
+    @property
+    def honors_n(self) -> bool:
+        """Whether this provider's chat path forwards the OpenAI `n` (multiple
+        completions) upstream. The OpenAI-compatible providers splat the request
+        into the SDK, so `n` is honored; the Anthropic/Vertex/Bedrock
+        translators never read `n` and always return exactly one completion.
+        Requesting n>1 there is rejected rather than silently under-delivering
+        and over-reserving budget by up to MAX_N× (R7-M50)."""
+        return self in _PROVIDERS_HONORING_N
+
+
+# OpenAI-compatible surfaces (OpenAI, Azure, Databricks share the OpenAI SDK).
+_PROVIDERS_HONORING_N = frozenset({Provider.OPENAI, Provider.AZURE_OPENAI, Provider.DATABRICKS})
+
 
 class ModelType(StrEnum):
     CHAT = "chat"
