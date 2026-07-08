@@ -140,9 +140,7 @@ async def _setup_judge_router(client: AsyncTestClient) -> tuple[str, str, str]:
     return key, team, admin
 
 
-async def test_judge_call_is_billed_as_usage_event(
-    client: AsyncTestClient, tmp_path: Path
-) -> None:
+async def test_judge_call_is_billed_as_usage_event(client: AsyncTestClient, tmp_path: Path) -> None:
     key, _, _ = await _setup_judge_router(client)
     resp = await client.post(
         "/v1/chat/completions",
