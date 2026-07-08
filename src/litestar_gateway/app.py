@@ -55,6 +55,7 @@ from litestar_gateway.infrastructure.web.organizations.dependencies import (
 from litestar_gateway.infrastructure.web.routing import RouterController
 from litestar_gateway.infrastructure.web.routing.dependencies import (
     make_shadow_log_factory,
+    make_shadow_repos_factory,
     provide_router_service,
 )
 from litestar_gateway.infrastructure.web.scim import (
@@ -114,6 +115,15 @@ def create_app(
             SQLAlchemySecretKeyRepository(db_session), settings.salt_key, settings.jwt_secret
         )
 
+    def provide_shadow_repos_factory(request: Request):
+        # Same own-session care as the shadow decision log: the shadow
+        # strategy's model/credential lookups race the request coroutine,
+        # which is still using the request-scoped session.
+        return make_shadow_repos_factory(
+            request.app.state[database.config.session_maker_app_state_key],
+            provide_keyring,
+        )
+
     route_handlers: list = [
         health,  # public liveness
         readiness,  # public readiness (DB check)
@@ -144,6 +154,7 @@ def create_app(
         "scim_service": Provide(provide_scim_service, sync_to_thread=False),
         "router_service": Provide(provide_router_service, sync_to_thread=False),
         "shadow_decision_log_factory": Provide(provide_shadow_log_factory, sync_to_thread=False),
+        "shadow_repos_factory": Provide(provide_shadow_repos_factory, sync_to_thread=False),
         "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
         "budget_repository": Provide(provide_budget_repository, sync_to_thread=False),
         "audit_log": Provide(provide_audit_log, sync_to_thread=False),

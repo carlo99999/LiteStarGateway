@@ -6,6 +6,8 @@ from contextlib import AbstractAsyncContextManager
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
+from litestar_gateway.domain.ports.credential import CredentialRepository
+from litestar_gateway.domain.ports.model import ModelRepository
 from litestar_gateway.domain.routing import RouterConfig, RoutingDecisionRecord
 
 
@@ -67,3 +69,15 @@ class RoutingDecisionLogFactory(Protocol):
     closed by the time a fire-and-forget shadow run persists its verdict)."""
 
     def __call__(self) -> AbstractAsyncContextManager[RoutingDecisionLog]: ...
+
+
+@runtime_checkable
+class RoutingRepositoryFactory(Protocol):
+    """Opens model/credential repositories with their OWN unit of work — for
+    shadow-mode strategy lookups (judge/embeddings): the fire-and-forget
+    shadow task races the request coroutine, whose scoped session is not
+    safe for concurrent cross-task use."""
+
+    def __call__(
+        self,
+    ) -> AbstractAsyncContextManager[tuple[ModelRepository, CredentialRepository]]: ...

@@ -146,7 +146,7 @@ async def create_scim_user(
     user = await scim_service.create_user(
         email=attrs.user_name,  # type: ignore[arg-type]  # non-None: userName required
         external_id=attrs.external_id,
-        active=attrs.active,
+        active=True if attrs.active is None else attrs.active,
     )
     await _record_scim_audit(audit_log, request, scim_actor, "scim.user.create", user.id)
     return _scim_response(scim_user_resource(user), HTTP_201_CREATED)
