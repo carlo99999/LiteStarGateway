@@ -51,12 +51,32 @@ pre-commit:
 test *args:
     uv run pytest -q {{args}}
 
+# Run the Postgres CI checks locally (mirrors the CI `postgres` job): spin up a
+# throwaway Postgres 17, apply the real migration chain (the same command the
+# Docker entrypoint runs on deploy), then run the persistence test subset against
+# it — the paths most likely to differ Postgres-vs-SQLite. Requires Docker; the
+# container is always removed on exit. ENVIRONMENT stays "development" so Settings
+# needs only DATABASE_URL, exactly like the CI job.
+test-postgres:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    name=lsg-ci-pg
+    docker rm -f "$name" >/dev/null 2>&1 || true
+    docker run -d --name "$name" -e POSTGRES_USER=gateway -e POSTGRES_PASSWORD=gateway -e POSTGRES_DB=gateway -p 5433:5432 postgres:17 >/dev/null  # pragma: allowlist secret
+    trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+    echo "waiting for postgres to accept connections…"
+    until docker exec "$name" pg_isready -U gateway >/dev/null 2>&1; do sleep 1; done
+    export DATABASE_URL="postgresql+asyncpg://gateway:gateway@localhost:5433/gateway"  # pragma: allowlist secret
+    uv run litestar --app {{app}} database upgrade --no-prompt
+    uv run pytest -q tests/models
+
 # Runs all the pr coverage checks (pre-commit, typecheck, pip-audit, pytest coverage).
 pr-coverage:
     uv run pre-commit run --all-files
     uv run pyrefly check
     uv run --with pip-audit pip-audit
     uv run pytest --cov=src/litestar_gateway --cov-fail-under=80
+    just test-postgres
 
 # ── Migrations (advanced-alchemy / Alembic via the Litestar CLI) ────────────────
 

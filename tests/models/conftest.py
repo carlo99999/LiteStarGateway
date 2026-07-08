@@ -35,7 +35,10 @@ async def database_url(tmp_path: Path) -> AsyncIterator[str]:
         async with admin_engine.connect() as conn:
             await conn.execute(text(f'CREATE DATABASE "{db_name}"'))
         try:
-            yield str(make_url(base_dsn).set(database=db_name))
+            # render_as_string(hide_password=False): plain str(URL) masks the
+            # password as '***', which would reach the app as a literal password
+            # and fail auth against the throwaway database.
+            yield make_url(base_dsn).set(database=db_name).render_as_string(hide_password=False)
         finally:
             async with admin_engine.connect() as conn:
                 await conn.execute(text(f'DROP DATABASE IF EXISTS "{db_name}" WITH (FORCE)'))
