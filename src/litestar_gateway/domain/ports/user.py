@@ -35,9 +35,12 @@ class UserRepository(Protocol):
 
     async def count(self) -> int: ...
 
-    async def set_active(self, user_id: UUID, is_active: bool) -> None:
+    async def set_active(
+        self, user_id: UUID, is_active: bool, *, deactivated_by: str | None = None
+    ) -> None:
         """Enable/disable the account; disabling also bumps token_version to revoke
-        the user's existing sessions."""
+        the user's existing sessions. `deactivated_by` records which lever disabled
+        the account ("admin" or "scim"); it is cleared on reactivation."""
         ...
 
     async def set_auditor(self, user_id: UUID, is_auditor: bool) -> None:

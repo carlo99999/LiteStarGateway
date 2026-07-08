@@ -97,6 +97,17 @@ async def _record_scim_audit(
     )
 
 
+def _update_action(was_active: bool, now_active: bool) -> str:
+    """Audit action for a PUT/PATCH: lifecycle flips get their own action so an
+    IdP (re)enabling or disabling an account is distinguishable from attribute
+    churn in the audit trail."""
+    if was_active and not now_active:
+        return "scim.user.deactivate"
+    if not was_active and now_active:
+        return "scim.user.reactivate"
+    return "scim.user.update"
+
+
 @get("/ServiceProviderConfig")
 async def service_provider_config(scim_actor: NamedDependency[ScimToken]) -> Response:
     """Capability discovery: Users only — no bulk, no sorting, no /Groups
@@ -135,7 +146,7 @@ async def create_scim_user(
     user = await scim_service.create_user(
         email=attrs.user_name,  # type: ignore[arg-type]  # non-None: userName required
         external_id=attrs.external_id,
-        active=attrs.active,
+        active=True if attrs.active is None else attrs.active,
     )
     await _record_scim_audit(audit_log, request, scim_actor, "scim.user.create", user.id)
     return _scim_response(scim_user_resource(user), HTTP_201_CREATED)
@@ -197,7 +208,7 @@ async def replace_scim_user(
     user = await scim_service.update_user(
         user_id, email=attrs.user_name, external_id=attrs.external_id, active=attrs.active
     )
-    action = "scim.user.deactivate" if was_active and not user.is_active else "scim.user.update"
+    action = _update_action(was_active, user.is_active)
     await _record_scim_audit(audit_log, request, scim_actor, action, user.id)
     return _scim_response(scim_user_resource(user))
 
@@ -225,9 +236,7 @@ async def patch_scim_user(
     updated = await scim_service.update_user(
         user_id, email=desired.user_name, external_id=desired.external_id, active=desired.active
     )
-    action = (
-        "scim.user.deactivate" if user.is_active and not updated.is_active else "scim.user.update"
-    )
+    action = _update_action(user.is_active, updated.is_active)
     await _record_scim_audit(audit_log, request, scim_actor, action, updated.id)
     return _scim_response(scim_user_resource(updated))
 

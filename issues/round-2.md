@@ -10,7 +10,7 @@ IDs continue the round-1 sequence to avoid collision.
 
 New counts: **0 CRITICAL · 7 HIGH · 7 MEDIUM · 4 LOW** + an enterprise-gap roadmap.
 
-### Resolution status (Round 2, updated after remediation)
+## Resolution status (Round 2, updated after remediation)
 
 **Fixed (PRs open/merged):**
 
