@@ -26,6 +26,7 @@ import dataclasses
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID, uuid4
 
 from litestar_gateway.domain.authorization import (
@@ -59,6 +60,16 @@ def _now() -> datetime:
 
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+@dataclasses.dataclass(frozen=True)
+class SsoMembershipChange:
+    """One mutation applied by `reconcile_sso_memberships`, reported so the SSO
+    callback can audit it (no-op reconciliations report nothing) — R6-H20."""
+
+    team_id: UUID
+    change: Literal["add", "update", "remove"]
+    role: TeamRole | None  # the new role; None for removals
 
 
 class TeamService:
@@ -241,7 +252,7 @@ class TeamService:
         user_id: UUID,
         desired: dict[UUID, TeamRole],
         governed_team_ids: set[UUID],
-    ) -> None:
+    ) -> list[SsoMembershipChange]:
         """Sync an SSO user's memberships to their IdP groups (no human actor).
 
         This is a system operation invoked from the SSO login path, so it skips
@@ -256,7 +267,10 @@ class TeamService:
         (to teams the mapping doesn't govern) survive. The last admin of a team is
         never stripped or demoted — that would leave the team unmanageable; such a
         membership is left as-is and can be changed through the normal team API.
+
+        Returns the changes actually applied so the caller can audit them.
         """
+        changes: list[SsoMembershipChange] = []
         async with self._unit_of_work():
             for team_id in governed_team_ids:
                 if await self._teams.get(team_id) is None:
@@ -268,6 +282,7 @@ class TeamService:
                         existing.is_admin and await self._is_last_admin(team_id, user_id)
                     ):
                         await self._memberships.remove(team_id, user_id)
+                        changes.append(SsoMembershipChange(team_id, "remove", None))
                     continue
                 if existing is None:
                     await self._memberships.add(
@@ -279,9 +294,12 @@ class TeamService:
                             created_at=_now(),
                         )
                     )
+                    changes.append(SsoMembershipChange(team_id, "add", role))
                 elif existing.role is not role and not (
                     existing.is_admin
                     and role is not TeamRole.ADMIN
                     and await self._is_last_admin(team_id, user_id)
                 ):
                     await self._memberships.update(dataclasses.replace(existing, role=role))
+                    changes.append(SsoMembershipChange(team_id, "update", role))
+        return changes

@@ -41,10 +41,17 @@ class SQLAlchemyUserRepository:
         await self._session.refresh(model)
         return model.to_entity()
 
-    async def set_active(self, user_id: UUID, is_active: bool) -> None:
+    async def set_active(
+        self, user_id: UUID, is_active: bool, *, deactivated_by: str | None = None
+    ) -> None:
         # Disabling revokes existing sessions too (bump token_version), so the
         # account is locked out immediately, not just barred from new logins.
-        values: dict[str, object] = {"is_active": is_active}
+        # deactivated_by only describes the current disabled state, so
+        # reactivation always clears it.
+        values: dict[str, object] = {
+            "is_active": is_active,
+            "deactivated_by": None if is_active else deactivated_by,
+        }
         if not is_active:
             values["token_version"] = UserModel.token_version + 1
         await self._session.execute(
