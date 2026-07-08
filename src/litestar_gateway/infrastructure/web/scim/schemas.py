@@ -32,7 +32,7 @@ class ScimUserAttrs:
 
     user_name: str | None
     external_id: str | None
-    active: bool
+    active: bool | None  # None = not sent; the stored value must be preserved
 
 
 def parse_filter(expression: str) -> tuple[str, str]:
@@ -48,7 +48,8 @@ def parse_filter(expression: str) -> tuple[str, str]:
 
 
 def parse_user_payload(payload: dict[str, Any], *, require_user_name: bool = True) -> ScimUserAttrs:
-    """Extract the stored attributes from a POST/PUT User resource."""
+    """Extract the stored attributes from a POST/PUT User resource. An omitted
+    `active` comes back as None so callers preserve the stored value."""
     user_name = payload.get("userName")
     if user_name is not None and not isinstance(user_name, str):
         raise ValueError("userName must be a string")
@@ -57,10 +58,11 @@ def parse_user_payload(payload: dict[str, Any], *, require_user_name: bool = Tru
     external_id = payload.get("externalId")
     if external_id is not None:
         external_id = str(external_id)
+    active = payload.get("active")
     return ScimUserAttrs(
         user_name=user_name,
         external_id=external_id,
-        active=_as_bool(payload.get("active", True)),
+        active=None if active is None else _as_bool(active),
     )
 
 
@@ -93,9 +95,13 @@ def _set_attr(attrs: ScimUserAttrs, path: str, value: Any) -> ScimUserAttrs:
     if attr == "active":
         return replace(attrs, active=_as_bool(value))
     if attr == "username":
-        return replace(attrs, user_name=str(value))
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("userName must be a non-empty string")
+        return replace(attrs, user_name=value)
     if attr == "externalid":
-        return replace(attrs, external_id=str(value))
+        if not isinstance(value, str):
+            raise ValueError("externalId must be a string")
+        return replace(attrs, external_id=value)
     return attrs
 
 

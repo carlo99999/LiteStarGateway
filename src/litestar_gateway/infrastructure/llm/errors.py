@@ -50,6 +50,17 @@ _AWS_THROTTLE_CODES = frozenset(
     {"ThrottlingException", "TooManyRequestsException", "ProvisionedThroughputExceededException"}
 )
 
+# Mid-stream Bedrock failures arrive as botocore's EventStreamError, whose
+# parsed response carries only Error.Code (no ResponseMetadata, hence no HTTP
+# status), so the status must be derived from the code. Statuses mirror what
+# the same errors carry on the non-streaming Converse call.
+_AWS_ERROR_CODE_STATUS = {
+    "InternalServerException": 500,
+    "ModelStreamErrorException": 502,
+    "ServiceUnavailableException": 503,
+    "ValidationException": 400,
+}
+
 
 def _aws_error_code(exc: Exception) -> str | None:
     # botocore's ClientError carries the parsed error response as a dict.
@@ -73,6 +84,9 @@ def _status_code(exc: Exception) -> int | None:
         value = (response.get("ResponseMetadata") or {}).get("HTTPStatusCode")
         if isinstance(value, int):
             return value
+        # No ResponseMetadata: an EventStreamError (mid-stream Bedrock failure).
+        # Fall back to the AWS error code so it doesn't escape as an opaque 500.
+        return _AWS_ERROR_CODE_STATUS.get(_aws_error_code(exc) or "")
     return None
 
 

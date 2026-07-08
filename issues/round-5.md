@@ -24,7 +24,7 @@ and two audit/observability gaps.
 
 New counts: **0 CRITICAL · 1 HIGH · 4 MEDIUM · 3 LOW**.
 
-### Resolution status (Round 5)
+## Resolution status (Round 5)
 
 **Fixed (this pass):**
 

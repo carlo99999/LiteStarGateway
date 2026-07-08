@@ -52,6 +52,8 @@ class UserModel(base.UUIDAuditBase):
     # accounts). Unique so two identities can't bind to the same local account.
     sso_subject: Mapped[str | None] = mapped_column(default=None, unique=True, index=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # Which lever disabled the account ("admin" or "scim"); NULL while active.
+    deactivated_by: Mapped[str | None] = mapped_column(default=None)
     # The IdP's SCIM externalId, once SCIM-provisioned/adopted. Unique so two IdP
     # records can't bind to the same local account.
     external_id: Mapped[str | None] = mapped_column(default=None, unique=True, index=True)
@@ -71,6 +73,7 @@ class UserModel(base.UUIDAuditBase):
             token_version=self.token_version,
             sso_subject=self.sso_subject,
             is_active=self.is_active,
+            deactivated_by=self.deactivated_by,
             external_id=self.external_id,
             is_auditor=self.is_auditor,
             failed_login_attempts=self.failed_login_attempts,

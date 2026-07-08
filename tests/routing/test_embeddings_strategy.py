@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections import OrderedDict
 from collections.abc import AsyncIterator
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,6 +14,7 @@ from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_RE
 from litestar.testing import AsyncTestClient
 
 from litestar_gateway.app import create_app
+from litestar_gateway.application.routing import embeddings
 from litestar_gateway.application.routing.embeddings import EmbeddingsStrategy
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.routing import CandidateModel, QualityTier, RoutingContext
@@ -95,6 +98,54 @@ async def test_utterance_embeddings_are_cached_lazily() -> None:
     utterance_batches = [c for c in calls if len(c) == 2]
     assert len(utterance_batches) == 1
     assert len(calls) == 3
+
+
+def _fresh_caches(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(embeddings, "_ROUTE_CACHE", OrderedDict())
+    monkeypatch.setattr(embeddings, "_CACHE_LOCKS", {})
+
+
+async def test_insertion_past_bound_evicts_oldest_entry_and_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _fresh_caches(monkeypatch)
+    strategies = [_strategy(_config()) for _ in range(embeddings.MAX_CACHE_ENTRIES + 1)]
+    for strategy in strategies:
+        await strategy.select(_ctx("Ciao!"), CANDIDATES)
+    oldest = strategies[0]._cache_key
+    assert oldest not in embeddings._ROUTE_CACHE
+    assert oldest not in embeddings._CACHE_LOCKS
+    assert len(embeddings._ROUTE_CACHE) == embeddings.MAX_CACHE_ENTRIES
+    assert strategies[-1]._cache_key in embeddings._ROUTE_CACHE
+
+
+async def test_cache_hit_refreshes_recency(monkeypatch: pytest.MonkeyPatch) -> None:
+    _fresh_caches(monkeypatch)
+    first = _strategy(_config())
+    await first.select(_ctx("Ciao!"), CANDIDATES)
+    others = [_strategy(_config()) for _ in range(embeddings.MAX_CACHE_ENTRIES - 1)]
+    for strategy in others:
+        await strategy.select(_ctx("Ciao!"), CANDIDATES)
+    # Cache is full and `first` is oldest; a hit must refresh its recency.
+    await first.select(_ctx("Ciao!"), CANDIDATES)
+    await _strategy(_config()).select(_ctx("Ciao!"), CANDIDATES)
+    assert first._cache_key in embeddings._ROUTE_CACHE
+    assert others[0]._cache_key not in embeddings._ROUTE_CACHE
+
+
+async def test_concurrent_access_computes_config_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    _fresh_caches(monkeypatch)
+    calls: list[list[str]] = []
+
+    async def embed(model_name: str, texts: list[str]) -> list[list[float]]:
+        calls.append(list(texts))
+        await asyncio.sleep(0)
+        return [_vec(t) for t in texts]
+
+    strategy = EmbeddingsStrategy(_config(), embed=embed)
+    await asyncio.gather(*(strategy.select(_ctx("Ciao!"), CANDIDATES) for _ in range(5)))
+    utterance_batches = [c for c in calls if len(c) == 2]
+    assert len(utterance_batches) == 1
 
 
 @pytest.mark.parametrize(

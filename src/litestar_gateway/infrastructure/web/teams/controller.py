@@ -208,14 +208,23 @@ class TeamController(Controller):
     ) -> list[KeySpendingResponse]:
         """Every API key of the team — active and revoked — with its accumulated
         token/cost totals, so past keys and their spend stay visible.
-        Accepts a JWT or a management-scoped API key (own team only)."""
+        Accepts a JWT or a management-scoped API key (own team only).
+        Callers without keys:read get the key-identity block redacted (R6-M43)."""
         await team_service.ensure_principal_team_permission(
             principal, team_id, Permission.USAGE_READ
+        )
+        include_identity = await team_service.principal_has_team_permission(
+            principal, team_id, Permission.KEYS_READ
         )
         page_limit, page_offset = resolve_page(limit, offset)
         keys = await api_key_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
         spend = {s.api_key_id: s for s in await usage_repository.spend_by_api_key(team_id)}
-        return [KeySpendingResponse.from_key_and_spend(k, spend.get(k.id)) for k in keys]
+        return [
+            KeySpendingResponse.from_key_and_spend(
+                k, spend.get(k.id), include_identity=include_identity
+            )
+            for k in keys
+        ]
 
     @delete("/{team_id:uuid}/keys/{key_id:uuid}")
     async def revoke_key(

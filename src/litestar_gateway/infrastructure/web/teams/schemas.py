@@ -183,13 +183,17 @@ class KeyResponse:
 
 @dataclass(frozen=True)
 class KeySpendingResponse:
-    """An API key (active or revoked) with its accumulated spend."""
+    """An API key (active or revoked) with its accumulated spend.
+
+    The identity block (name, prefix, is_active, created_at, revoked_at) is
+    `None` for callers holding usage:read but not keys:read — `id` remains as
+    an opaque correlation handle alongside the spend figures (R6-M43)."""
 
     id: UUID
     name: str | None
-    prefix: str
-    is_active: bool
-    created_at: datetime
+    prefix: str | None
+    is_active: bool | None
+    created_at: datetime | None
     revoked_at: datetime | None
     prompt_tokens: int
     completion_tokens: int
@@ -198,16 +202,18 @@ class KeySpendingResponse:
     calls: int
 
     @classmethod
-    def from_key_and_spend(cls, key: APIKey, spend: ApiKeySpend | None) -> KeySpendingResponse:
+    def from_key_and_spend(
+        cls, key: APIKey, spend: ApiKeySpend | None, *, include_identity: bool = True
+    ) -> KeySpendingResponse:
         prompt = spend.prompt_tokens if spend else 0
         completion = spend.completion_tokens if spend else 0
         return cls(
             id=key.id,
-            name=key.name,
-            prefix=key.prefix,
-            is_active=key.is_active,
-            created_at=key.created_at,
-            revoked_at=key.revoked_at,
+            name=key.name if include_identity else None,
+            prefix=key.prefix if include_identity else None,
+            is_active=key.is_active if include_identity else None,
+            created_at=key.created_at if include_identity else None,
+            revoked_at=key.revoked_at if include_identity else None,
             prompt_tokens=prompt,
             completion_tokens=completion,
             total_tokens=prompt + completion,
