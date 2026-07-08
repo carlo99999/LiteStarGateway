@@ -14,6 +14,8 @@ I/O.
 
 from __future__ import annotations
 
+from typing import Any
+
 import mlflow
 from mlflow import MlflowClient
 
@@ -21,10 +23,14 @@ from litestar_gateway.domain.entities import TraceRecord
 
 
 class MLflowTraceSink:
-    def __init__(self, tracking_uri: str, experiment_name: str) -> None:
-        # The async exporter uses the *global* tracking URI, so set it here.
-        mlflow.set_tracking_uri(tracking_uri)
-        self._client = MlflowClient()
+    def __init__(self, tracking_uri: str, experiment_name: str, client: Any | None = None) -> None:
+        # `client` is an injection seam for tests (a fake MlflowClient); in prod
+        # it stays None and the real client is built here. The async exporter
+        # uses the *global* tracking URI, so set it only when we own the client.
+        if client is None:
+            mlflow.set_tracking_uri(tracking_uri)
+            client = MlflowClient()
+        self._client = client
         self._experiment_name = experiment_name
         self._experiment_id: str | None = None
 

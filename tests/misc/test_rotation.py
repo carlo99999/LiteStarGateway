@@ -187,3 +187,52 @@ async def test_redis_lock_outage_skips_without_leaking_the_client(
     async with RedisDistributedLock("redis://x").hold("k", ttl=timedelta(seconds=1)) as acquired:
         assert acquired is False  # skip the guarded section, don't crash it
     assert closed == [True]
+
+
+async def test_rotation_loop_ticks_survives_errors_and_shuts_down_cleanly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # rotate_all/guarded_rotate are covered above; this covers the loop WIRING
+    # (create_task on startup, the fail-safe try/except, cancellation on
+    # shutdown), which nothing else exercised.
+    import asyncio
+
+    from litestar import Litestar
+
+    import litestar_gateway.infrastructure.rotation as rotation_mod
+    from litestar_gateway.config import Settings
+    from litestar_gateway.infrastructure.persistence.database import create_database
+
+    settings = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'rotloop.db'}",
+        admin_email="admin@example.com",
+        master_key="master-secret",
+        jwt_secret="test-secret-key-0123456789-abcdefghij",  # pragma: allowlist secret
+        salt_key="test-salt-key",
+        rotation_enabled=True,
+        rotation_time="00:00",
+    )
+    database = create_database(settings)
+
+    state = {"ticks": 0}
+    reached = asyncio.Event()
+
+    async def fake_guarded_rotate(_lock: object, _rotate: object) -> bool:
+        state["ticks"] += 1
+        if state["ticks"] == 2:
+            raise RuntimeError("transient rotation failure")  # must not kill the loop
+        if state["ticks"] >= 3:
+            reached.set()
+        return True
+
+    # Fire each tick immediately instead of sleeping until the daily UTC time.
+    monkeypatch.setattr(rotation_mod, "seconds_until", lambda target, now: 0.01)
+    monkeypatch.setattr(rotation_mod, "guarded_rotate", fake_guarded_rotate)
+
+    app = Litestar(route_handlers=[])
+    lifespan = rotation_mod.make_rotation_scheduler(database, settings)
+    async with lifespan(app):
+        # (a) ticks at least once and (c) keeps ticking past a raised tick.
+        await asyncio.wait_for(reached.wait(), timeout=5)
+    # (b) leaving the context cancelled the loop task without raising = clean shutdown.
+    assert state["ticks"] >= 3
