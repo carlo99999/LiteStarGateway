@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
 from typing import Any
 
 import pytest
@@ -282,6 +283,53 @@ def _fake_boto3_client(service: str, **kwargs: Any) -> FakeBedrockRuntime:
 
 def _patch_bedrock(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(bedrock_adapter.boto3, "client", _fake_boto3_client)
+
+
+# ── Dedicated executor (R6-M45) ──────────────────────────────────────────────
+
+
+async def test_bedrock_blocking_calls_run_on_dedicated_executor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every blocking boto3 hop — non-streaming call, stream open, and each
+    per-event pull — must run on the bounded Bedrock pool (identified by its
+    thread-name prefix), not the loop's process-wide default executor."""
+    from litestar_gateway.infrastructure.llm.bedrock_adapter import BedrockAdapter
+
+    thread_names: list[str] = []
+
+    def _record() -> None:
+        thread_names.append(threading.current_thread().name)
+
+    class RecordingBedrockRuntime(FakeBedrockRuntime):
+        def converse(self, **kwargs: Any) -> dict:
+            _record()
+            return super().converse(**kwargs)
+
+        def converse_stream(self, **kwargs: Any) -> dict:
+            _record()
+            events = super().converse_stream(**kwargs)["stream"]
+
+            def recording_events() -> Any:
+                for event in events:
+                    _record()  # runs inside the per-event next() hop
+                    yield event
+
+            return {"stream": recording_events()}
+
+    monkeypatch.setattr(
+        bedrock_adapter.boto3, "client", lambda service, **kwargs: RecordingBedrockRuntime()
+    )
+    adapter = BedrockAdapter()
+    request = {"messages": [{"role": "user", "content": "hi"}]}
+
+    await adapter.achat_completion(request, _model(), BEDROCK_VALUES)
+    stream = adapter.astream_chat_completion({**request, "stream": True}, _model(), BEDROCK_VALUES)
+    async for _ in stream:
+        pass
+
+    assert thread_names, "expected blocking boto3 calls to be recorded"
+    assert all(name.startswith("bedrock") for name in thread_names), thread_names
 
 
 # ── Integration through the endpoints ────────────────────────────────────────
