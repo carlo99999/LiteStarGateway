@@ -10,8 +10,14 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_gateway.domain.exceptions import RouterNameExists, RouterNotFound
-from litestar_gateway.domain.routing import RouterConfig, RoutingDecisionRecord
+from litestar_gateway.domain.exceptions import (
+    CredentialMisconfigured,
+    RouterNameExists,
+    RouterNotFound,
+    SaltKeyMissing,
+)
+from litestar_gateway.domain.routing import BEARER_TOKEN_MASK, RouterConfig, RoutingDecisionRecord
+from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.persistence.orm import RouterModel, RoutingDecisionModel
 
 
@@ -19,9 +25,87 @@ def _candidates_json(router: RouterConfig) -> list[dict]:
     return [dataclasses.asdict(candidate) for candidate in router.candidates]
 
 
+# The webhook strategy's `bearer_token` is a secret. At rest it is replaced by
+# an **envelope**: the token encrypted with a keyring credential data key, plus
+# the id of the key that produced it (same scheme as `CredentialRepository`).
+# A plain string is a legacy plaintext row and is passed through on read; it is
+# upgraded to an envelope the next time the router is written.
+_TOKEN_KEY = "bearer_token"
+_ENVELOPE_KEYS = frozenset({"key_id", "token"})
+
+
+def _is_envelope(value: object) -> bool:
+    return isinstance(value, dict) and set(value) == _ENVELOPE_KEYS
+
+
 class SQLAlchemyRouterRepository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, keyring: Keyring | None = None) -> None:
+        # `keyring` encrypts/decrypts the webhook `bearer_token` inside
+        # `strategy_config`; it is only needed when such a token is present.
         self._session = session
+        self._keyring = keyring
+
+    def _require_keyring(self) -> Keyring:
+        if self._keyring is None:
+            raise SaltKeyMissing("SALT_KEY is not configured")
+        return self._keyring
+
+    # --- bearer_token envelope encryption (top level and under "shadow") ---
+
+    async def _encrypt_section(self, section: dict) -> dict:
+        token = section.get(_TOKEN_KEY)
+        if not isinstance(token, str):
+            return section  # absent, or already an envelope (preserved on update)
+        key_id, cipher = await self._require_keyring().active_credential_cipher()
+        envelope = {"key_id": str(key_id), "token": cipher.encrypt({_TOKEN_KEY: token})}
+        return {**section, _TOKEN_KEY: envelope}
+
+    async def _decrypt_section(self, section: dict) -> dict:
+        token = section.get(_TOKEN_KEY)
+        if not _is_envelope(token):
+            return section  # absent, or a legacy plaintext row: pass through
+        assert isinstance(token, dict)  # narrowed by _is_envelope
+        cipher = await self._require_keyring().credential_cipher_for(UUID(token["key_id"]))
+        if cipher is None:  # pragma: no cover - a missing key row is not expected
+            raise CredentialMisconfigured("encryption key for webhook bearer token is missing")
+        return {**section, _TOKEN_KEY: cipher.decrypt(token["token"])[_TOKEN_KEY]}
+
+    @staticmethod
+    def _preserve_section(section: dict, stored: object) -> dict:
+        """An update that echoes the mask keeps the token already stored."""
+        if section.get(_TOKEN_KEY) != BEARER_TOKEN_MASK:
+            return section
+        stored_token = stored.get(_TOKEN_KEY) if isinstance(stored, dict) else None
+        if stored_token is None:
+            return section
+        return {**section, _TOKEN_KEY: stored_token}
+
+    async def _map_config(self, config: dict, transform) -> dict:
+        result = await transform(config)
+        shadow = result.get("shadow")
+        if isinstance(shadow, dict):
+            new_shadow = await transform(shadow)
+            if new_shadow is not shadow:
+                result = {**result, "shadow": new_shadow}
+        return result
+
+    def _preserve_masked_tokens(self, config: dict, stored: dict) -> dict:
+        result = self._preserve_section(config, stored)
+        shadow = result.get("shadow")
+        if isinstance(shadow, dict):
+            new_shadow = self._preserve_section(shadow, stored.get("shadow"))
+            if new_shadow is not shadow:
+                result = {**result, "shadow": new_shadow}
+        return result
+
+    async def _to_entity(self, model: RouterModel) -> RouterConfig:
+        entity = model.to_entity()
+        config = await self._map_config(entity.strategy_config, self._decrypt_section)
+        if config is entity.strategy_config:
+            return entity
+        return dataclasses.replace(entity, strategy_config=config)
+
+    # --- CRUD ---
 
     async def add(self, router: RouterConfig) -> RouterConfig:
         model = RouterModel(
@@ -31,7 +115,7 @@ class SQLAlchemyRouterRepository:
             candidates=_candidates_json(router),
             default_model=router.default_model,
             strategy=router.strategy,
-            strategy_config=router.strategy_config,
+            strategy_config=await self._map_config(router.strategy_config, self._encrypt_section),
             shadow_strategy=router.shadow_strategy,
             enabled=router.enabled,
         )
@@ -42,25 +126,25 @@ class SQLAlchemyRouterRepository:
             await self._session.rollback()
             raise RouterNameExists(router.name) from exc
         await self._session.refresh(model)
-        return model.to_entity()
+        return await self._to_entity(model)
 
     async def get(self, team_id: UUID, router_id: UUID) -> RouterConfig | None:
         model = await self._session.get(RouterModel, router_id)
         if model is None or model.team_id != team_id:
             return None
-        return model.to_entity()
+        return await self._to_entity(model)
 
     async def get_by_name(self, team_id: UUID, name: str) -> RouterConfig | None:
         model = await self._session.scalar(
             select(RouterModel).where(RouterModel.team_id == team_id, RouterModel.name == name)
         )
-        return model.to_entity() if model else None
+        return await self._to_entity(model) if model else None
 
     async def list_by_team(self, team_id: UUID) -> list[RouterConfig]:
         result = await self._session.scalars(
             select(RouterModel).where(RouterModel.team_id == team_id).order_by(RouterModel.name)
         )
-        return [model.to_entity() for model in result]
+        return [await self._to_entity(model) for model in result]
 
     async def update(self, router: RouterConfig) -> RouterConfig:
         model = await self._session.get(RouterModel, router.id)
@@ -70,7 +154,10 @@ class SQLAlchemyRouterRepository:
         model.candidates = _candidates_json(router)
         model.default_model = router.default_model
         model.strategy = router.strategy
-        model.strategy_config = router.strategy_config
+        model.strategy_config = await self._map_config(
+            self._preserve_masked_tokens(router.strategy_config, model.strategy_config),
+            self._encrypt_section,
+        )
         model.shadow_strategy = router.shadow_strategy
         model.enabled = router.enabled
         try:
@@ -79,7 +166,7 @@ class SQLAlchemyRouterRepository:
             await self._session.rollback()
             raise RouterNameExists(router.name) from exc
         await self._session.refresh(model)
-        return model.to_entity()
+        return await self._to_entity(model)
 
     async def delete(self, team_id: UUID, router_id: UUID) -> bool:
         # Any: the async execute() is typed Result, but at runtime it is a
