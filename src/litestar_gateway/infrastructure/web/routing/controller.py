@@ -338,8 +338,11 @@ class RouterController(Controller):
         """One JSON object per line: {text, system_prompt, chosen_model,
         strategy, score, signals, timestamp}. Only decisions that stored their
         text (judge decisions and hybrid escalations) are exported — the
-        intended path is judge → dataset → small local classifier."""
-        await team_service.ensure_team_permission(current_user, team_id, Permission.USAGE_READ)
+        intended path is judge → dataset → small local classifier.
+
+        Gated on `decisions:read` (not `usage:read`): the export carries raw
+        end-user prompts, which billing-oriented roles must never see."""
+        await team_service.ensure_team_permission(current_user, team_id, Permission.DECISIONS_READ)
         from litestar_gateway.domain.pagination import resolve_page
 
         page_limit, page_offset = resolve_page(limit, offset)

@@ -12,10 +12,10 @@ from litestar.testing import AsyncTestClient
 from litestar_gateway.app import create_app
 from litestar_gateway.config import Settings
 
-MASTER_KEY = "master-secret"
+MASTER_KEY = "master-secret"  # pragma: allowlist secret
 ADMIN_EMAIL = "admin@example.com"
-JWT_SECRET = "test-secret-key-0123456789-abcdefghij"
-SALT_KEY = "unit-test-salt-key"
+JWT_SECRET = "test-secret-key-0123456789-abcdefghij"  # pragma: allowlist secret
+SALT_KEY = "unit-test-salt-key"  # pragma: allowlist secret
 
 
 @pytest.fixture
@@ -52,12 +52,26 @@ async def _create(client: AsyncTestClient, name: str, provider: str, values: dic
 
 
 VALID = [
-    ("openai", {"api_key": "sk-x"}),
-    ("openai", {"api_key": "sk-x", "api_base": "https://proxy", "organization": "org-1"}),
-    ("anthropic", {"api_key": "sk-ant-x", "api_base": "https://proxy"}),
+    ("openai", {"api_key": "sk-x"}),  # pragma: allowlist secret
+    (
+        "openai",
+        {
+            "api_key": "sk-x",  # pragma: allowlist secret
+            "api_base": "https://proxy",
+            "organization": "org-1",
+        },  # pragma: allowlist secret
+    ),
+    (
+        "anthropic",
+        {"api_key": "sk-ant-x", "api_base": "https://proxy"},  # pragma: allowlist secret
+    ),
     (
         "azure_openai",
-        {"api_key": "az", "api_base": "https://a.openai.azure.com", "api_version": "2024-02-15"},
+        {
+            "api_key": "az",  # pragma: allowlist secret
+            "api_base": "https://a.openai.azure.com",
+            "api_version": "2024-02-15",
+        },
     ),
     # vertex_credentials is optional: the adapter falls back to ADC.
     ("vertex_ai", {"vertex_project": "p", "vertex_location": "us-central1"}),
@@ -65,7 +79,10 @@ VALID = [
         "vertex_ai",
         {"vertex_project": "p", "vertex_location": "us-central1", "vertex_credentials": "{}"},
     ),
-    ("databricks", {"api_key": "dapi-x", "api_base": "https://w.databricks.com"}),
+    (
+        "databricks",
+        {"api_key": "dapi-x", "api_base": "https://w.databricks.com"},  # pragma: allowlist secret
+    ),
     (
         "bedrock",
         {"region": "eu-west-1", "aws_access_key_id": "AKIA", "aws_secret_access_key": "s"},
@@ -93,12 +110,18 @@ INVALID = [
     ("openai", {}),  # missing api_key
     ("openai", {"api_base": "https://proxy"}),  # missing api_key
     ("openai", {"api_key": ""}),  # blank required value
-    ("openai", {"api_key": "sk-x", "api_keys": "typo"}),  # unexpected key
-    ("anthropic", {"organization": "org-1", "api_key": "x"}),  # key not valid for anthropic
-    ("azure_openai", {"api_key": "az", "api_base": "https://a"}),  # missing api_version
+    ("openai", {"api_key": "sk-x", "api_keys": "typo"}),  # pragma: allowlist secret
+    (
+        "anthropic",
+        {"organization": "org-1", "api_key": "x"},  # pragma: allowlist secret
+    ),
+    (
+        "azure_openai",
+        {"api_key": "az", "api_base": "https://a"},  # pragma: allowlist secret
+    ),
     ("vertex_ai", {"vertex_project": "p"}),  # missing vertex_location
-    ("vertex_ai", {"api_key": "sk-x"}),  # openai-shaped values on vertex
-    ("databricks", {"api_key": "dapi-x"}),  # missing api_base
+    ("vertex_ai", {"api_key": "sk-x"}),  # pragma: allowlist secret
+    ("databricks", {"api_key": "dapi-x"}),  # pragma: allowlist secret
     # missing region
     ("bedrock", {"aws_access_key_id": "AKIA", "aws_secret_access_key": "s"}),
     # litellm-style key the adapter does not read
@@ -120,7 +143,11 @@ async def test_error_names_the_offending_keys(client: AsyncTestClient) -> None:
     admin = await _admin_token(client)
     resp = await client.post(
         "/credentials",
-        json={"name": "bad", "provider": "azure_openai", "values": {"api_key": "az"}},
+        json={
+            "name": "bad",
+            "provider": "azure_openai",
+            "values": {"api_key": "az"},  # pragma: allowlist secret
+        },
         headers=_bearer(admin),
     )
     assert resp.status_code == HTTP_400_BAD_REQUEST
