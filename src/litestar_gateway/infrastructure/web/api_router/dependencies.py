@@ -68,6 +68,15 @@ def provide_completion_service(
     shadow_decision_log_factory: NamedDependency[RoutingDecisionLogFactory],
     shadow_repos_factory: NamedDependency[RoutingRepositoryFactory],
 ) -> CompletionService:
+    # One request-scoped meter, shared by the completion path and the router:
+    # judge/embeddings strategies make real, billable provider calls that must be
+    # budget-gated and billed through the same meter as a user-facing call (H22).
+    meter = UsageMeter(
+        usage=SQLAlchemyUsageRepository(db_session),
+        emit_trace=trace_dispatcher.enqueue,
+        budgets=SQLAlchemyBudgetRepository(db_session),
+        in_flight=_in_flight_spend,
+    )
     return CompletionService(
         models=SQLAlchemyModelRepository(db_session),
         credentials=SQLAlchemyCredentialRepository(db_session, keyring),
@@ -80,11 +89,7 @@ def provide_completion_service(
             credentials=SQLAlchemyCredentialRepository(db_session, keyring),
             gateway=llm_gateway,
             shadow_repos=shadow_repos_factory,
+            meter=meter,
         ),
-        meter=UsageMeter(
-            usage=SQLAlchemyUsageRepository(db_session),
-            emit_trace=trace_dispatcher.enqueue,
-            budgets=SQLAlchemyBudgetRepository(db_session),
-            in_flight=_in_flight_spend,
-        ),
+        meter=meter,
     )
