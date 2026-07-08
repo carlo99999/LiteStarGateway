@@ -181,9 +181,7 @@ async def test_vertex_chat_translation(
     assert FakeGenaiClient.last_init["project"] == "p"
     assert FakeGenaiClient.last_init["location"] == "us-central1"
     # Client built with the gateway's resilience config (timeout, as HttpOptions ms).
-    assert FakeGenaiClient.last_init["http_options"].timeout == int(
-        DEFAULT_REQUEST_TIMEOUT * 1000
-    )
+    assert FakeGenaiClient.last_init["http_options"].timeout == int(DEFAULT_REQUEST_TIMEOUT * 1000)
     # Request: system -> system_instruction, assistant role would map to "model".
     assert FakeGenaiClient.last_kwargs["model"] == "gemini-1.5-pro"
     assert FakeGenaiClient.last_kwargs["config"]["system_instruction"] == "be brief"
