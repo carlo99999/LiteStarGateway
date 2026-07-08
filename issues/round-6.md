@@ -37,7 +37,6 @@ New counts: **2 CRITICAL · 6 HIGH · 12 MEDIUM · 5 LOW**.
 re-read against the finding it claims to close; the suite re-run at 615 passed, up from 557 —
 58 new regression tests added). No fix introduced a regression. `ruff`/`pyrefly` stay clean.
 
-
 | Finding                                                           | Commit    | Verified fix                                                                                                                                                                                                                                                          |
 | ----------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C2 — decisions export leaked via `usage:read`                     | `a6c15af` | New `Permission.DECISIONS_READ`, granted only to `ADMIN`/`MODEL_MANAGER`, excluded from `AUDITOR_TEAM_PERMISSIONS`; negative tests for billing-viewer and auditor (403) in `tests/rbac/test_decisions_export_rbac.py`.                                                |
@@ -69,7 +68,6 @@ re-read against the finding it claims to close; the suite re-run at 615 passed, 
 **All 5 LOW findings from this round are now also fixed** (L30–L34, each as its own PR):
 resilience-config test coverage, money-math property tests, fake-client state reset,
 dead-code removal, and the ports-design note above.
-
 
 **Updated overall assessment: 8.5/10.** Every CRITICAL and HIGH from this round is closed
 with a targeted fix and a genuine regression test (not just a happy-path patch) — SSRF
