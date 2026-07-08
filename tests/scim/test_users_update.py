@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from litestar.status_codes import (
     HTTP_200_OK,
+    HTTP_201_CREATED,
     HTTP_204_NO_CONTENT,
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
@@ -41,6 +42,61 @@ async def test_put_replaces_username_external_id_and_active(client: AsyncTestCli
     assert body["userName"] == "alice.smith@corp.com"
     assert body["externalId"] == "aad-1b"
     assert body["active"] is False
+
+
+async def test_put_without_active_preserves_deactivated_state(client: AsyncTestClient) -> None:
+    headers = await _scim_headers(client)
+    created = await _create_user(client, headers, "gina@corp.com", external_id="aad-2")
+
+    deactivated = await client.put(
+        f"/scim/v2/Users/{created['id']}",
+        json={"schemas": [USER_URN], "userName": "gina@corp.com", "active": False},
+        headers=headers,
+    )
+    assert deactivated.json()["active"] is False
+
+    # An attribute sync that omits `active` must not reactivate the user.
+    resp = await client.put(
+        f"/scim/v2/Users/{created['id']}",
+        json={"schemas": [USER_URN], "userName": "gina.b@corp.com", "externalId": "aad-2b"},
+        headers=headers,
+    )
+    assert resp.status_code == HTTP_200_OK, resp.text
+    body = resp.json()
+    assert body["userName"] == "gina.b@corp.com"
+    assert body["active"] is False
+
+    # Explicit `active: true` still reactivates.
+    reactivated = await client.put(
+        f"/scim/v2/Users/{created['id']}",
+        json={"schemas": [USER_URN], "userName": "gina.b@corp.com", "active": True},
+        headers=headers,
+    )
+    assert reactivated.json()["active"] is True
+
+
+async def test_put_without_active_keeps_active_user_active(client: AsyncTestClient) -> None:
+    headers = await _scim_headers(client)
+    created = await _create_user(client, headers, "hank@corp.com", external_id="aad-3")
+
+    resp = await client.put(
+        f"/scim/v2/Users/{created['id']}",
+        json={"schemas": [USER_URN], "userName": "hank@corp.com", "externalId": "aad-3b"},
+        headers=headers,
+    )
+    assert resp.status_code == HTTP_200_OK, resp.text
+    assert resp.json()["active"] is True
+
+
+async def test_post_without_active_creates_active_user(client: AsyncTestClient) -> None:
+    headers = await _scim_headers(client)
+    resp = await client.post(
+        "/scim/v2/Users",
+        json={"schemas": [USER_URN], "userName": "ivy@corp.com"},
+        headers=headers,
+    )
+    assert resp.status_code == HTTP_201_CREATED, resp.text
+    assert resp.json()["active"] is True
 
 
 async def test_patch_deactivate_revokes_existing_sessions(client: AsyncTestClient) -> None:
