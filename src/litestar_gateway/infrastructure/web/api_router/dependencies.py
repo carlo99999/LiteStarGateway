@@ -13,6 +13,7 @@ from litestar_gateway.domain.ports import (
     BudgetRepository,
     LLMGateway,
     RoutingDecisionLogFactory,
+    RoutingRepositoryFactory,
     UsageRepository,
 )
 from litestar_gateway.infrastructure.keyring import Keyring
@@ -65,6 +66,7 @@ def provide_completion_service(
     llm_gateway: NamedDependency[LLMGateway],
     trace_dispatcher: NamedDependency[TraceDispatcher],
     shadow_decision_log_factory: NamedDependency[RoutingDecisionLogFactory],
+    shadow_repos_factory: NamedDependency[RoutingRepositoryFactory],
 ) -> CompletionService:
     return CompletionService(
         models=SQLAlchemyModelRepository(db_session),
@@ -77,6 +79,7 @@ def provide_completion_service(
             shadow_decisions=shadow_decision_log_factory,
             credentials=SQLAlchemyCredentialRepository(db_session, keyring),
             gateway=llm_gateway,
+            shadow_repos=shadow_repos_factory,
         ),
         meter=UsageMeter(
             usage=SQLAlchemyUsageRepository(db_session),

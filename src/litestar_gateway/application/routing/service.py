@@ -37,6 +37,7 @@ from litestar_gateway.domain.ports import (
     RouterRepository,
     RoutingDecisionLog,
     RoutingDecisionLogFactory,
+    RoutingRepositoryFactory,
 )
 from litestar_gateway.domain.routing import (
     CandidateModel,
@@ -82,6 +83,7 @@ class RouterService:
         shadow_decisions: RoutingDecisionLogFactory | None = None,
         credentials: CredentialRepository | None = None,
         gateway: LLMGateway | None = None,
+        shadow_repos: RoutingRepositoryFactory | None = None,
     ) -> None:
         self._routers = routers
         self._models = models
@@ -89,6 +91,7 @@ class RouterService:
         self._shadow_decisions = shadow_decisions
         self._credentials = credentials
         self._gateway = gateway
+        self._shadow_repos = shadow_repos
         # The persisted record id of this request's routing decision (the
         # service is request-scoped), so settlement can attach actual usage.
         self.last_decision_record_id: UUID | None = None
@@ -254,15 +257,20 @@ class RouterService:
         return decision
 
     async def _embed_texts(
-        self, team_id: UUID, model_name: str, texts: list[str]
+        self,
+        team_id: UUID,
+        model_name: str,
+        texts: list[str],
+        models: ModelRepository,
+        credentials: CredentialRepository | None,
     ) -> list[list[float]]:
         """Embed via the gateway's own port, using the team's embedding model."""
-        if self._gateway is None or self._credentials is None:
+        if self._gateway is None or credentials is None:
             raise ValueError("embeddings strategy is not wired (no gateway/credentials)")
-        model = await self._models.get_by_name(team_id, model_name)
+        model = await models.get_by_name(team_id, model_name)
         if model is None or not model.enabled or model.type is not ModelType.EMBEDDINGS:
             raise ValueError(f"'{model_name}' is not an enabled embeddings model of this team")
-        values = await self._credentials.get_values(model.credential_id)
+        values = await credentials.get_values(model.credential_id)
         if values is None:
             raise ValueError(f"credential missing for embedding model '{model_name}'")
         response = await self._gateway.aembeddings(
@@ -271,36 +279,59 @@ class RouterService:
         return [item["embedding"] for item in response["data"]]
 
     async def _judge_complete(
-        self, team_id: UUID, model_name: str, request: dict[str, Any]
+        self,
+        team_id: UUID,
+        model_name: str,
+        request: dict[str, Any],
+        models: ModelRepository,
+        credentials: CredentialRepository | None,
     ) -> dict[str, Any]:
         """One non-streamed chat call to the judge, via the gateway's own port."""
-        if self._gateway is None or self._credentials is None:
+        if self._gateway is None or credentials is None:
             raise ValueError("judge strategy is not wired (no gateway/credentials)")
-        model = await self._models.get_by_name(team_id, model_name)
+        model = await models.get_by_name(team_id, model_name)
         if model is None or not model.enabled or model.type is not ModelType.CHAT:
             raise ValueError(f"'{model_name}' is not an enabled chat model of this team")
-        values = await self._credentials.get_values(model.credential_id)
+        values = await credentials.get_values(model.credential_id)
         if values is None:
             raise ValueError(f"credential missing for judge model '{model_name}'")
         return await self._gateway.achat_completion(request, model, values)
 
-    def _build_strategy(self, router: RouterConfig, name: str, config: dict[str, Any]):
+    def _build_strategy(
+        self,
+        router: RouterConfig,
+        name: str,
+        config: dict[str, Any],
+        *,
+        models: ModelRepository | None = None,
+        credentials: CredentialRepository | None = None,
+    ):
+        models = self._models if models is None else models
+        credentials = self._credentials if credentials is None else credentials
         if name == "embeddings":
 
             async def embed(model_name: str, texts: list[str]) -> list[list[float]]:
-                return await self._embed_texts(router.team_id, model_name, texts)
+                return await self._embed_texts(
+                    router.team_id, model_name, texts, models, credentials
+                )
 
             return EmbeddingsStrategy(config, embed=embed)
         if name == "judge":
 
             async def complete(model_name: str, request: dict[str, Any]) -> dict[str, Any]:
-                return await self._judge_complete(router.team_id, model_name, request)
+                return await self._judge_complete(
+                    router.team_id, model_name, request, models, credentials
+                )
 
             return JudgeStrategy(config, complete=complete)
         if name == "hybrid":
             shell = HybridStrategy(config)  # validates margin/escalation name
             escalation = self._build_strategy(
-                router, shell.escalation_name, shell.escalation_config
+                router,
+                shell.escalation_name,
+                shell.escalation_config,
+                models=models,
+                credentials=credentials,
             )
             return HybridStrategy(config, escalation=escalation)
         return STRATEGIES[name](config)
@@ -360,10 +391,7 @@ class RouterService:
         Same time budget as an active strategy; failures logged and swallowed."""
         try:
             shadow_config = router.strategy_config.get("shadow", {})
-            budget_ms = shadow_config.get("time_budget_ms", DEFAULT_TIME_BUDGET_MS)
-            strategy = self._build_strategy(router, router.shadow_strategy, shadow_config)
-            async with asyncio.timeout(budget_ms / 1000):
-                decision = await strategy.select(ctx, capable)
+            decision = await self._shadow_select(router, ctx, capable, shadow_config)
             if self._shadow_decisions is None:  # pragma: no cover - guarded by caller
                 return
             user_text, system_prompt = self._distillation_text(decision, ctx)
@@ -394,6 +422,23 @@ class RouterService:
                 router.shadow_strategy,
                 exc_info=True,
             )
+
+    async def _shadow_select(self, router, ctx, capable, config) -> RoutingDecision:
+        """Run the shadow strategy within its time budget. Its DB lookups race
+        the request coroutine (still using the request-scoped session), so the
+        strategy gets repositories on its own session via `_shadow_repos` —
+        the same care `_shadow_decisions` takes for the decision log."""
+        budget_ms = config.get("time_budget_ms", DEFAULT_TIME_BUDGET_MS)
+        if self._shadow_repos is None:
+            strategy = self._build_strategy(router, router.shadow_strategy, config)
+            async with asyncio.timeout(budget_ms / 1000):
+                return await strategy.select(ctx, capable)
+        async with self._shadow_repos() as (models, credentials):
+            strategy = self._build_strategy(
+                router, router.shadow_strategy, config, models=models, credentials=credentials
+            )
+            async with asyncio.timeout(budget_ms / 1000):
+                return await strategy.select(ctx, capable)
 
     @staticmethod
     def _unit_costs(
