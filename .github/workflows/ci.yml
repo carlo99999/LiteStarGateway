@@ -14,7 +14,7 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -75,7 +75,7 @@ jobs:
       # "development" default so Settings doesn't also demand prod-grade secrets.
       DATABASE_URL: postgresql+asyncpg://gateway:gateway@localhost:5432/gateway # pragma: allowlist secret
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -106,7 +106,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build image
         run: docker build -t lsg-citest .
