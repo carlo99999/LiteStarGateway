@@ -12,6 +12,7 @@ import logging
 import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -89,6 +90,16 @@ def _now() -> datetime:
 
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+@dataclass(frozen=True)
+class SsoLoginResult:
+    """`upsert_sso_user` outcome: the resolved account plus what changed, so the
+    SSO callback can audit JIT creation and admin escalation (and skip no-ops)."""
+
+    user: User
+    created: bool
+    admin_granted: bool
 
 
 class UserService:
@@ -272,7 +283,7 @@ class UserService:
 
     async def upsert_sso_user(
         self, identity: ExternalIdentity, *, group_admin: bool, default_admin: bool
-    ) -> User:
+    ) -> SsoLoginResult:
         """Resolve (or JIT-provision) the local account for a verified SSO identity.
 
         Accounts are bound to the IdP subject (`sub`), which is stable across the
@@ -286,6 +297,9 @@ class UserService:
         admin. Demotion is the explicit job of the platform-admin endpoint, so a
         manual grant (or revoke) is never silently undone by the next SSO login, and
         leaving the admin group does not strip a role granted another way.
+
+        Returns the account plus `created`/`admin_granted` flags so the caller
+        can audit exactly what this login changed (R6-H20).
         """
         if not identity.email or not identity.email_verified:
             raise SSOEmailNotVerified(identity.email or "<none>")
@@ -300,11 +314,15 @@ class UserService:
                 identity, normalized, group_admin or default_admin
             )
             if created.sso_subject == identity.subject:
-                return created  # freshly JIT-created; role already set
+                # Freshly JIT-created; role already set.
+                return SsoLoginResult(created, created=True, admin_granted=created.is_admin)
             existing = created  # a password-only account to link
         # Upgrade-only re-sync: group membership can promote, re-login never demotes.
-        return await self._users.bind_sso(
+        bound = await self._users.bind_sso(
             existing.id, identity.subject, existing.is_admin or group_admin
+        )
+        return SsoLoginResult(
+            bound, created=False, admin_granted=group_admin and not existing.is_admin
         )
 
     async def _resolve_or_create_sso_user(
@@ -358,7 +376,11 @@ class UserService:
         # already dead, rather than left live against a still-active account.
         if not is_active and self._api_keys is not None:
             await self._api_keys.revoke_personal_keys_for_user(user_id, _now())
-        await self._users.set_active(user_id, is_active)
+        # Mark admin disables so SCIM cannot resurrect the account on an IdP
+        # full-sync (see ScimService.update_user); reactivation clears the mark.
+        await self._users.set_active(
+            user_id, is_active, deactivated_by=None if is_active else "admin"
+        )
         updated = await self._users.get(user_id)
         if updated is None:  # pragma: no cover - just set it
             raise UserNotFound(str(user_id))
