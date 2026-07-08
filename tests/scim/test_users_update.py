@@ -5,6 +5,7 @@ from __future__ import annotations
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_204_NO_CONTENT,
+    HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_409_CONFLICT,
@@ -135,6 +136,64 @@ async def test_patch_username_conflict_is_scim_409(client: AsyncTestClient) -> N
     )
     assert resp.status_code == HTTP_409_CONFLICT
     assert resp.json()["scimType"] == "uniqueness"
+
+
+async def test_patch_username_non_string_values_are_scim_400(client: AsyncTestClient) -> None:
+    headers = await _scim_headers(client)
+    created = await _create_user(client, headers, "grace@corp.com", external_id="aad-4")
+
+    for bad_value in (None, {"k": "v"}, "", "   "):
+        resp = await client.patch(
+            f"/scim/v2/Users/{created['id']}",
+            json={
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                "Operations": [{"op": "replace", "path": "userName", "value": bad_value}],
+            },
+            headers=headers,
+        )
+        assert resp.status_code == HTTP_400_BAD_REQUEST, resp.text
+        body = resp.json()
+        assert body["schemas"] == [ERROR_URN]
+        assert body["scimType"] == "invalidValue"
+
+    # The user's login identity is untouched.
+    fetched = await client.get(f"/scim/v2/Users/{created['id']}", headers=headers)
+    assert fetched.json()["userName"] == "grace@corp.com"
+
+
+async def test_patch_external_id_non_string_value_is_scim_400(client: AsyncTestClient) -> None:
+    headers = await _scim_headers(client)
+    created = await _create_user(client, headers, "heidi@corp.com", external_id="aad-5")
+
+    resp = await client.patch(
+        f"/scim/v2/Users/{created['id']}",
+        json={
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "externalId", "value": {"k": "v"}}],
+        },
+        headers=headers,
+    )
+    assert resp.status_code == HTTP_400_BAD_REQUEST, resp.text
+    assert resp.json()["scimType"] == "invalidValue"
+
+    fetched = await client.get(f"/scim/v2/Users/{created['id']}", headers=headers)
+    assert fetched.json()["externalId"] == "aad-5"
+
+
+async def test_patch_username_valid_string_still_works(client: AsyncTestClient) -> None:
+    headers = await _scim_headers(client)
+    created = await _create_user(client, headers, "ivan@corp.com")
+
+    resp = await client.patch(
+        f"/scim/v2/Users/{created['id']}",
+        json={
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "userName", "value": "ivan.new@corp.com"}],
+        },
+        headers=headers,
+    )
+    assert resp.status_code == HTTP_200_OK, resp.text
+    assert resp.json()["userName"] == "ivan.new@corp.com"
 
 
 async def test_delete_deactivates_instead_of_deleting(client: AsyncTestClient) -> None:
