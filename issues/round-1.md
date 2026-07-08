@@ -16,7 +16,7 @@ that were verified as **not issues / by design**.
 
 Counts: **1 CRITICAL · 5 HIGH · 13 MEDIUM · 6 LOW**.
 
-### Resolution status (updated after remediation)
+## Resolution status (updated after remediation)
 
 **Fixed & merged to `main`:**
 
