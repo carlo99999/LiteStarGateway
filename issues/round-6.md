@@ -59,11 +59,12 @@ re-read against the finding it claims to close; the suite re-run at 615 passed, 
 | M46 — Titan embeddings ran fully sequential                       | `b0bf46d` | Fanned out via `asyncio.gather` + semaphore (bound 8), order preserved, failure semantics unchanged.                                                                                                                                                                  |
 | M47 — `create_app()` 175-line god-function                        | `33d5049` | Extracted into named `_build_*` helpers; pure extraction, full suite green.                                                                                                                                                                                           |
 | M48 — `metered_stream` nesting depth 5                            | `91f1492` | Finally-block billing logic extracted into `_finalize_stream_billing`; `metered_stream` itself back to depth ≤3.                                                                                                                                                      |
+| L33 — dead `keys_match` + stale docstring in `key_generator.py`   | (this PR) | Removed the unused `keys_match` helper and corrected the module docstring to describe the actual DB-hash-lookup verification strategy.                                                                                                                                |
 | L34 — persistence/identity/lock ports have exactly one adapter    | (this PR) | Documented in `domain/ports/__init__.py`: intentional — the value here is fast in-memory test doubles, not backend swappability; `LLMGateway` (5 real adapters) is the one port that earns extensibility. No code change otherwise (not a defect).                    |
 
 **Not yet addressed (LOW, deliberately deferred — see original entries above):** L30
-(`resilience.py` has no test coverage), L31 (float money math, no property tests), L32
-(class-attribute state in test doubles), L33 (dead `keys_match` + stale docstring).
+(`resilience.py` has no test coverage), L31 (float money math — property tests planned,
+no Decimal migration per owner decision), L32 (class-attribute state in test doubles).
 
 **Updated overall assessment: 8.5/10.** Every CRITICAL and HIGH from this round is closed
 with a targeted fix and a genuine regression test (not just a happy-path patch) — SSRF

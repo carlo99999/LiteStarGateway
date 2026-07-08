@@ -1,13 +1,14 @@
 """Pure domain logic for generating and hashing keys.
 
 Keys are high-entropy random tokens, so a fast SHA-256 digest is sufficient for
-storage (no salting/bcrypt needed). Comparison uses constant-time `compare_digest`.
+storage (no salting/bcrypt needed). Verification looks up the hash by equality
+in the database rather than comparing plaintext, so no constant-time compare
+is needed here.
 """
 
 from __future__ import annotations
 
 import hashlib
-import hmac
 import secrets
 from dataclasses import dataclass
 
@@ -25,10 +26,6 @@ class NewKeyMaterial:
 
 def hash_key(plaintext: str) -> str:
     return hashlib.sha256(plaintext.encode("utf-8")).hexdigest()
-
-
-def keys_match(plaintext: str, expected_hash: str) -> bool:
-    return hmac.compare_digest(hash_key(plaintext), expected_hash)
 
 
 def generate_key() -> NewKeyMaterial:
