@@ -10,10 +10,15 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import Credential
-from litestar_gateway.domain.exceptions import CredentialMisconfigured, SaltKeyMissing
+from litestar_gateway.domain.exceptions import (
+    CredentialMisconfigured,
+    CredentialNameExists,
+    SaltKeyMissing,
+)
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.persistence.orm import CredentialModel
@@ -41,7 +46,13 @@ class SQLAlchemyCredentialRepository:
             key_id=key_id,
         )
         self._session.add(model)
-        await self._session.commit()
+        try:
+            await self._session.commit()
+        except IntegrityError as exc:
+            # Loser of a concurrent create with the same name: the service's
+            # pre-check passed for both, the unique constraint catches the race.
+            await self._session.rollback()
+            raise CredentialNameExists(credential.name) from exc
         await self._session.refresh(model)
         return model.to_entity()
 

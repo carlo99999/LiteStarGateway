@@ -7,12 +7,15 @@ that app-state keys (which AA suffixes when multiple configs exist) always match
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from advanced_alchemy.extensions.litestar import (
     EngineConfig,
     SQLAlchemyAsyncConfig,
     SQLAlchemyPlugin,
 )
+from sqlalchemy import event
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from litestar_gateway.config import Settings
 
@@ -32,6 +35,27 @@ def _engine_config(settings: Settings) -> EngineConfig:
     return EngineConfig()
 
 
+def _create_engine_with_sqlite_fk(connection_string: str, **kwargs: Any) -> AsyncEngine:
+    # Wraps the default engine factory so the FK pragma listener is attached at
+    # engine-creation time (during app startup), not when the config is built.
+    # Attaching earlier would populate `config.engine_instance` before Litestar
+    # deep-copies the route handlers, and the engine holds a non-copyable module
+    # reference. aiosqlite (dev/test) does not enforce foreign keys unless asked
+    # per connection, so without this a delete can silently orphan a child row —
+    # diverging from Postgres (prod), which always enforces them. No-op for
+    # non-SQLite dialects (Postgres ignores it entirely).
+    engine = create_async_engine(connection_string, **kwargs)
+    if engine.dialect.name == "sqlite":
+
+        @event.listens_for(engine.sync_engine, "connect")
+        def _set_sqlite_pragma(dbapi_connection: Any, _: Any) -> None:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+    return engine
+
+
 @dataclass(frozen=True)
 class Database:
     config: SQLAlchemyAsyncConfig
@@ -46,5 +70,7 @@ def create_database(settings: Settings) -> Database:
         connection_string=settings.database_url,
         create_all=not settings.is_production,
         engine_config=_engine_config(settings),
+        # Attach the SQLite FK pragma when the plugin lazily creates the engine.
+        create_engine_callable=_create_engine_with_sqlite_fk,
     )
     return Database(config=config, plugin=SQLAlchemyPlugin(config=config))

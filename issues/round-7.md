@@ -30,6 +30,15 @@ justfile recipe that re-introduces a fixed vuln).
 
 New counts: **0 CRITICAL · 3 HIGH · 10 MEDIUM · 6 LOW**.
 
+## Resolution status (in progress)
+
+Fixes land one PR per finding, each with a regression test written first (RED→GREEN) and the
+full suite + `ruff` + `pyrefly` kept clean.
+
+| Finding | Status | Fix |
+| --- | --- | --- |
+| R7-H22 — unmetered judge/embeddings provider spend | **Fixed** | Active-path judge/embeddings calls now run through `UsageMeter` (admit→settle→release) under `routing.judge`/`routing.embeddings` operation labels, so they are budget-gated and billed like any user-facing call; the shadow path stays unmetered by design (detached task + separate session — it cannot share the request-scoped meter, the C3 constraint). Tests: `tests/routing/test_strategy_call_metering.py` (judge call billed as a usage event; over-budget team does not run the judge). |
+
 ## HIGH
 
 ### R7-H22 — Judge/embeddings routing strategies make real, billable provider calls that bypass `UsageMeter` entirely

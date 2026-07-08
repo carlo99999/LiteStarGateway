@@ -207,9 +207,17 @@ class RouterModel(base.UUIDAuditBase):
 
 class RoutingDecisionModel(base.UUIDAuditBase):
     __tablename__ = "routing_decision"
+    __table_args__ = (
+        Index(
+            "ix_routing_decision_team_id_router_name_created_at",
+            "team_id",
+            "router_name",
+            "created_at",
+        ),
+    )
 
-    team_id: Mapped[UUID] = mapped_column(index=True)
-    router_name: Mapped[str] = mapped_column(index=True)
+    team_id: Mapped[UUID] = mapped_column()
+    router_name: Mapped[str] = mapped_column()
     strategy: Mapped[str] = mapped_column()
     chosen_model: Mapped[str] = mapped_column()
     tier: Mapped[str | None] = mapped_column(default=None)
@@ -472,7 +480,7 @@ class APIKeyModel(base.UUIDAuditBase):
     __tablename__ = "api_key"
 
     team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
-    created_by: Mapped[UUID] = mapped_column(ForeignKey("user_account.id"))
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("user_account.id"), index=True)
     name: Mapped[str | None] = mapped_column(default=None)
     prefix: Mapped[str] = mapped_column(index=True)
     key_hash: Mapped[str] = mapped_column(unique=True, index=True)

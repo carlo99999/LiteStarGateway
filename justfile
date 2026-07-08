@@ -90,9 +90,11 @@ migration-check:
 run:
     uv run litestar --app {{app}} run --reload
 
-# Serve like production (uvicorn, honoring proxy headers).
+# Serve like production (uvicorn, honoring proxy headers). Trusts X-Forwarded-For/-Proto
+# only from FORWARDED_ALLOW_IPS (defaults to loopback); export it to the reverse proxy's
+# IP/CIDR when deploying outside Docker (see docker-entrypoint.sh).
 serve:
-    uv run uvicorn {{app}} --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips "*"
+    uv run uvicorn {{app}} --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
 
 # ── Documentation ─────────────────────────────────────────────────────────────
 

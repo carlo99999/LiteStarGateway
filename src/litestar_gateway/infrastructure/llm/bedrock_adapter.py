@@ -29,6 +29,7 @@ from botocore.config import Config as BotoConfig
 
 from litestar_gateway.domain.entities import Model
 from litestar_gateway.domain.exceptions import CredentialMisconfigured, UnsupportedOperation
+from litestar_gateway.infrastructure.llm.feature_support import ensure_translatable_chat_request
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.llm.structured_output import parse_response_format
 
@@ -57,10 +58,28 @@ _FINISH_REASON = {
 # per LLMGatewayImpl registry: one shared pool covers every instance.
 _BEDROCK_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="bedrock")
 
+# The Titan embed fan-out (`_titan_aembeddings`) can submit up to
+# `_TITAN_EMBED_FANOUT` concurrent invoke_model calls for a single request. If
+# those shared `_BEDROCK_EXECUTOR`, one large embeddings request could occupy
+# every worker for the duration of its network round trips, leaving no worker
+# free for other teams' concurrent chat streams' `_next_event` pulls (R7-M58).
+# A small dedicated pool for the embed fan-out keeps the event-pull pool
+# uncontended; sized to the fan-out bound since the semaphore never lets more
+# than that many embed calls run at once anyway.
+_BEDROCK_EMBED_EXECUTOR = ThreadPoolExecutor(
+    max_workers=_TITAN_EMBED_FANOUT, thread_name_prefix="bedrock-embed"
+)
+
 
 async def _run[T](func: Callable[..., T], /, *args: Any) -> T:
     """Run a blocking boto3 call on the dedicated Bedrock executor."""
     return await asyncio.get_running_loop().run_in_executor(_BEDROCK_EXECUTOR, func, *args)
+
+
+async def _run_embed[T](func: Callable[..., T], /, *args: Any) -> T:
+    """Run a blocking boto3 call on the dedicated Titan embed-fanout executor
+    (see `_BEDROCK_EMBED_EXECUTOR` above for why it's kept separate)."""
+    return await asyncio.get_running_loop().run_in_executor(_BEDROCK_EMBED_EXECUTOR, func, *args)
 
 
 def _next_event(events: Iterator[dict[str, Any]]) -> dict[str, Any] | None:
@@ -81,6 +100,7 @@ def _text(content: Any) -> str:
 
 def to_converse_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
     effective = model.merge_params(request)
+    ensure_translatable_chat_request(effective, model.provider.value)
     structured = parse_response_format(effective)
 
     system_parts: list[str] = []
@@ -416,7 +436,7 @@ class BedrockAdapter:
 
         async def embed_one(text: str) -> dict[str, Any]:
             async with semaphore:
-                return await _run(_invoke, client, model_id, {"inputText": text})
+                return await _run_embed(_invoke, client, model_id, {"inputText": text})
 
         try:
             # return_exceptions so every in-flight call finishes before the

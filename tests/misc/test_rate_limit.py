@@ -17,6 +17,7 @@ from litestar_gateway.app import create_app
 from litestar_gateway.config import Settings
 from litestar_gateway.infrastructure.web.rate_limit import (
     AUTH_RATE_LIMIT,
+    SCIM_RATE_LIMIT,
     _inference_identifier,
 )
 
@@ -45,6 +46,21 @@ async def test_login_is_rate_limited_per_ip(client: AsyncTestClient) -> None:
 
     # The next one is rejected by the limiter before reaching the handler.
     blocked = await client.post("/login", json=payload)
+    assert blocked.status_code == HTTP_429_TOO_MANY_REQUESTS
+
+
+async def test_scim_is_rate_limited_per_ip(client: AsyncTestClient) -> None:
+    # M49: the IdP-facing SCIM surface authenticates by a DB-backed token-hash
+    # lookup, so an unauthenticated caller flooding garbage tokens must be
+    # throttled before reaching it — like every other pre-auth surface.
+    limit = SCIM_RATE_LIMIT[1]
+    headers = {"Authorization": "Bearer garbage-scim-token"}
+
+    for _ in range(limit):
+        resp = await client.get("/scim/v2/Users", headers=headers)
+        assert resp.status_code == HTTP_401_UNAUTHORIZED
+
+    blocked = await client.get("/scim/v2/Users", headers=headers)
     assert blocked.status_code == HTTP_429_TOO_MANY_REQUESTS
 
 
@@ -116,3 +132,4 @@ def test_rate_limit_uses_redis_store_when_configured(tmp_path: Path) -> None:
     app = create_app(settings)
     assert isinstance(app.stores.get("rate_limit_auth"), RedisStore)
     assert isinstance(app.stores.get("rate_limit_inference"), RedisStore)
+    assert isinstance(app.stores.get("rate_limit_scim"), RedisStore)
