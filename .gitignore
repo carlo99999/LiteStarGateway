@@ -13,13 +13,10 @@ __pycache__/
 .coverage.*
 htmlcov/
 
-# graphify knowledge-graph output. Track only the curated products (graph.json,
-# GRAPH_REPORT.md); ignore the regenerable cache, dated backups, machine-local
-# state (.graphify_python holds an absolute path) and junk. Regenerate the
-# tracked files with `graphify update .`.
-graphify-out/*
-!graphify-out/graph.json
-!graphify-out/GRAPH_REPORT.md
+## Excluding Graphify caches and useless files
+graphify-out/cache
+graphify-out/.graphify_root
+graphify-out/.graphify_python
 
 # Claude Code session worktrees (machine-local, never committed)
 .claude/worktrees/
