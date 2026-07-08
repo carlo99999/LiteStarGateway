@@ -23,6 +23,7 @@ from litestar_gateway.config import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
 from litestar_gateway.domain.entities import Model, ModelType, Provider
 from litestar_gateway.domain.exceptions import (
     UnsupportedOperation,
+    UpstreamAuthFailed,
     UpstreamRateLimited,
     UpstreamRequestRejected,
     UpstreamTimeout,
@@ -249,6 +250,21 @@ def test_mid_stream_errors_translate_like_non_streaming() -> None:
     assert isinstance(
         translate_upstream_error(_event_stream_error("ThrottlingException")), UpstreamRateLimited
     )
+
+
+def test_mid_stream_errors_not_yet_mapped_do_not_fall_through_to_500() -> None:
+    # R7-L35: ModelTimeoutException, ModelNotReadyException and
+    # AccessDeniedException used to be absent from `_AWS_ERROR_CODE_STATUS`, so
+    # mid-stream failures with these codes fell through to an opaque 500
+    # (`_status_code` returned None) instead of a classified domain error.
+    timeout_mapped = translate_upstream_error(_event_stream_error("ModelTimeoutException"))
+    assert isinstance(timeout_mapped, UpstreamUnavailable)
+
+    not_ready_mapped = translate_upstream_error(_event_stream_error("ModelNotReadyException"))
+    assert isinstance(not_ready_mapped, UpstreamUnavailable)
+
+    denied_mapped = translate_upstream_error(_event_stream_error("AccessDeniedException"))
+    assert isinstance(denied_mapped, UpstreamAuthFailed)
 
 
 async def test_translate_stream_maps_mid_stream_bedrock_error() -> None:

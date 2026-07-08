@@ -59,6 +59,14 @@ _AWS_ERROR_CODE_STATUS = {
     "ModelStreamErrorException": 502,
     "ServiceUnavailableException": 503,
     "ValidationException": 400,
+    # Model overloaded/not yet provisioned for on-demand throughput - same
+    # bucket as ServiceUnavailableException (>=500 -> UpstreamUnavailable).
+    "ModelNotReadyException": 503,
+    # The model took too long to respond mid-stream - a gateway timeout.
+    "ModelTimeoutException": 504,
+    # The gateway's own AWS credential lacks bedrock:InvokeModel* on this
+    # model/resource - the same ops-incident bucket as 401/403.
+    "AccessDeniedException": 403,
 }
 
 

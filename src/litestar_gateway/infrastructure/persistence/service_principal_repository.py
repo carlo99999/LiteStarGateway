@@ -35,7 +35,7 @@ class SQLAlchemyServicePrincipalRepository:
         models = await self._session.scalars(
             select(ServicePrincipalModel)
             .where(ServicePrincipalModel.team_id == team_id)
-            .order_by(ServicePrincipalModel.created_at)
+            .order_by(ServicePrincipalModel.created_at, ServicePrincipalModel.id)
             .limit(limit)
             .offset(offset)
         )

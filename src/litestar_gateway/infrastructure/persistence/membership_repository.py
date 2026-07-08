@@ -53,7 +53,7 @@ class SQLAlchemyTeamMembershipRepository:
         models = await self._session.scalars(
             select(TeamMembershipModel)
             .where(TeamMembershipModel.team_id == team_id)
-            .order_by(TeamMembershipModel.created_at)
+            .order_by(TeamMembershipModel.created_at, TeamMembershipModel.id)
             .limit(limit)
             .offset(offset)
         )
