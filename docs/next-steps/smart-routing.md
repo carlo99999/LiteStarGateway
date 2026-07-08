@@ -124,7 +124,7 @@ Validate strictly at the boundary (Pydantic); out-of-range, non-2xx, timeout, ma
 
 ### S3 — Embeddings (semantic routes)
 
-Admin defines routes: name → target model, example utterances, similarity threshold. At request time: embed the user text via a configured embedding model (through the gateway's own `LLMGateway` port — reuse existing adapters), cosine similarity against pre-computed utterance embeddings (computed lazily at first use, cached in memory), best route above threshold wins; below all thresholds → `default_model`. No external vector DB; in-memory is fine at this scale.
+Admin defines routes: name → target model, example utterances, similarity threshold. At request time: embed the user text via a configured embedding model (through the gateway's own `LLMGateway` port — reuse existing adapters), cosine similarity against pre-computed utterance embeddings (computed lazily at first use, cached in memory), best route above threshold wins; below all thresholds → `default_model`. No external vector DB; the bounded in-process cache is intentional at this scale. See `docs/routing-embeddings.md` for cache behavior, scaling limits, and the deferred vector DB decision.
 
 ### S4 — LLM as a judge
 

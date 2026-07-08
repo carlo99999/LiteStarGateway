@@ -279,7 +279,8 @@ on their own branch (linked). Order within a phase is a recommendation.
   EN+IT keywords, ported from LiteLLM's complexity router, MIT), **external
   webhook** (bring your own picker — [contract](docs/routing-webhook.md)),
   **semantic routes** (embeddings, cosine similarity against example
-  utterances), **LLM judge** (constrained structured output over the candidate
+  utterances; bounded in-process cache, vector DB deferred — [notes](docs/routing-embeddings.md)),
+  **LLM judge** (constrained structured output over the candidate
   names), **hybrid** (rule-based first, judge/webhook escalation only near
   tier boundaries), and **weighted** (percentage traffic split across
   candidates, e.g. A/B testing or gradual rollout — [design](docs/weighted-routing.md)).
