@@ -376,7 +376,11 @@ class UserService:
         # already dead, rather than left live against a still-active account.
         if not is_active and self._api_keys is not None:
             await self._api_keys.revoke_personal_keys_for_user(user_id, _now())
-        await self._users.set_active(user_id, is_active)
+        # Mark admin disables so SCIM cannot resurrect the account on an IdP
+        # full-sync (see ScimService.update_user); reactivation clears the mark.
+        await self._users.set_active(
+            user_id, is_active, deactivated_by=None if is_active else "admin"
+        )
         updated = await self._users.get(user_id)
         if updated is None:  # pragma: no cover - just set it
             raise UserNotFound(str(user_id))

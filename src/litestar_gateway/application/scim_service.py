@@ -156,6 +156,14 @@ class ScimService:
             raise PermissionDenied(
                 "SCIM cannot deactivate a platform admin; demote via the admin API first"
             )
+        # SCIM may only undo its own deactivations: an admin disabled the account
+        # for cause, and a routine IdP full-sync with active:true must not
+        # silently resurrect it (same philosophy as the admin guard above).
+        if target_active and not user.is_active and user.deactivated_by == "admin":
+            raise PermissionDenied(
+                "SCIM cannot reactivate an account disabled by an admin; "
+                "re-enable via the admin API first"
+            )
 
         new_email = _normalize_email(email) if email else user.email
         new_external_id = user.external_id if external_id is None else external_id
@@ -171,7 +179,9 @@ class ScimService:
             # riskier credential (personal keys) before flipping the account.
             if not target_active and self._api_keys is not None:
                 await self._api_keys.revoke_personal_keys_for_user(user_id, _now())
-            await self._users.set_active(user_id, target_active)
+            await self._users.set_active(
+                user_id, target_active, deactivated_by=None if target_active else "scim"
+            )
             user = await self.get_user(user_id)
         return user
 
