@@ -48,6 +48,8 @@ nav:
       - Semantic embeddings: docs/routing-embeddings.md
       - Webhook routing: docs/routing-webhook.md
       - Weighted routing: docs/weighted-routing.md
+  - Next steps:
+      - Provider-native endpoints: docs/next-steps/native-provider-endpoints.md
   - Review issues:
       - Index: issues/INDEX.md
       - Round 7: issues/round-7.md
