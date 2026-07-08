@@ -10,7 +10,8 @@ Deactivation mirrors the admin lever (`UserService.set_user_active`): existing
 sessions are revoked (token_version bump) and the user's personal API keys die
 with their access. Platform admins are the one exception — the gateway, not the
 IdP, governs admins (same philosophy as the upgrade-only SSO admin flag), so a
-SCIM deactivation of an admin account is refused.
+SCIM deactivation of an admin account is refused — as is any change to an
+admin's identity (userName/externalId).
 """
 
 from __future__ import annotations
@@ -159,6 +160,10 @@ class ScimService:
         new_email = _normalize_email(email) if email else user.email
         new_external_id = user.external_id if external_id is None else external_id
         if new_email != user.email or new_external_id != user.external_id:
+            if user.is_admin:
+                raise PermissionDenied(
+                    "SCIM cannot change a platform admin's identity; demote via the admin API first"
+                )
             user = await self._users.update_scim_identity(user_id, new_email, new_external_id)
 
         if target_active != user.is_active:

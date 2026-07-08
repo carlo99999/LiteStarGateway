@@ -14,12 +14,21 @@ care what's behind it (a heuristic, an ML model, a random pick). Contract
 Anything else — non-2xx, timeout, malformed body, out-of-range index, unknown
 name — raises, and the caller falls back to `default_model` per §4. Validation
 is strict at this boundary: a sloppy webhook must never steer silently.
+
+The URL must point at a public endpoint (SSRF guard, R6-H18): private,
+loopback, link-local, multicast, reserved and unspecified targets are rejected
+— literal IPs at config-save time, hostnames on every call after DNS
+resolution — and redirects are never followed.
 """
 
 from __future__ import annotations
 
+import asyncio
+import ipaddress
+import socket
 from time import perf_counter
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -34,13 +43,48 @@ def _client_factory(timeout_seconds: float) -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=timeout_seconds)
 
 
+async def _resolve_host_addresses(host: str) -> list[str]:
+    """Async DNS resolution (module-level for test injection)."""
+    infos = await asyncio.get_running_loop().getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    return [str(info[4][0]) for info in infos]
+
+
+def _literal_ip(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    try:
+        return ipaddress.ip_address(host)
+    except ValueError:
+        return None
+
+
+def _is_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """SSRF deny-list: anything that isn't a plain public unicast address."""
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
+
 class WebhookStrategy:
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         config = config or {}
         url = config.get("url")
         if not isinstance(url, str) or not url.startswith(("http://", "https://")):
             raise ValueError("webhook strategy requires an http(s) 'url' in strategy_config")
+        host = urlsplit(url).hostname
+        if not host:
+            raise ValueError("webhook 'url' has no host")
+        literal = _literal_ip(host)
+        if literal is not None and _is_blocked(literal):
+            raise ValueError(
+                f"webhook 'url' targets a private/loopback/link-local address ({host}); "
+                "only public endpoints are allowed"
+            )
         self._url = url
+        self._host = host
         self._bearer_token = config.get("bearer_token")
         self._timeout_seconds = config.get("timeout_ms", DEFAULT_TIMEOUT_MS) / 1000
 
@@ -56,8 +100,14 @@ class WebhookStrategy:
             "metadata": {"estimated_tokens": ctx.estimated_input_tokens},
         }
         headers = {"Authorization": f"Bearer {self._bearer_token}"} if self._bearer_token else {}
+        await self._ensure_public_target()
         async with _client_factory(self._timeout_seconds) as client:
-            response = await client.post(self._url, json=payload, headers=headers)
+            # No redirects: a webhook could otherwise bounce us to an internal
+            # target after passing the guard. raise_for_status treats 3xx as a
+            # failure, which takes the normal fallback path (§4).
+            response = await client.post(
+                self._url, json=payload, headers=headers, follow_redirects=False
+            )
         response.raise_for_status()
         chosen = self._parse_choice(response.json(), names)
         return RoutingDecision(
@@ -68,6 +118,23 @@ class WebhookStrategy:
             signals=(f"webhook chose {chosen}",),
             decision_ms=(perf_counter() - start) * 1000,
         )
+
+    async def _ensure_public_target(self) -> None:
+        """SSRF guard (R6-H18), re-checked on every call to resist DNS
+        rebinding between config-save and use: every address the host resolves
+        to must be public. A blocked target raises, which the caller treats as
+        any other strategy failure (fallback to default_model, §4)."""
+        literal = _literal_ip(self._host)
+        addresses = [literal] if literal is not None else None
+        if addresses is None:
+            resolved = await _resolve_host_addresses(self._host)
+            addresses = [ipaddress.ip_address(address) for address in resolved]
+        for address in addresses:
+            if _is_blocked(address):
+                raise ValueError(
+                    f"webhook host {self._host!r} resolves to blocked address {address}; "
+                    "only public endpoints are allowed"
+                )
 
     @staticmethod
     def _parse_choice(body: Any, names: list[str]) -> str:

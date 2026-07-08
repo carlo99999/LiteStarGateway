@@ -95,9 +95,13 @@ def _set_attr(attrs: ScimUserAttrs, path: str, value: Any) -> ScimUserAttrs:
     if attr == "active":
         return replace(attrs, active=_as_bool(value))
     if attr == "username":
-        return replace(attrs, user_name=str(value))
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("userName must be a non-empty string")
+        return replace(attrs, user_name=value)
     if attr == "externalid":
-        return replace(attrs, external_id=str(value))
+        if not isinstance(value, str):
+            raise ValueError("externalId must be a string")
+        return replace(attrs, external_id=value)
     return attrs
 
 
