@@ -36,6 +36,10 @@ class User:
     # A disabled account cannot authenticate (login JWTs are rejected). Toggled by
     # a platform admin; disabling also revokes existing sessions (token_version bump).
     is_active: bool = True
+    # Which lever disabled the account: "admin" or "scim" (None while active).
+    # SCIM may only reactivate accounts it deactivated itself — an IdP full-sync
+    # must not resurrect an account an admin disabled for cause.
+    deactivated_by: str | None = None
     # The IdP's SCIM `externalId` for this account, once provisioned/adopted via
     # SCIM. None for accounts the IdP does not manage.
     external_id: str | None = None
