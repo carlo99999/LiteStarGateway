@@ -117,10 +117,10 @@ async def test_shadow_judge_lookups_use_their_own_repositories() -> None:
         routers=SimpleNamespace(),  # type: ignore[arg-type]  # unused by route()
         models=RecordingModels("request", calls),  # type: ignore[arg-type]
         decisions=FakeDecisionLog(),  # type: ignore[arg-type]
-        shadow_decisions=shadow_decisions,
+        shadow_decisions=shadow_decisions,  # type: ignore[arg-type]
         credentials=RecordingCredentials("request", calls),  # type: ignore[arg-type]
         gateway=JudgeGateway(),  # type: ignore[arg-type]
-        shadow_repos=shadow_repos,
+        shadow_repos=shadow_repos,  # type: ignore[arg-type]
     )
     decision = await service.route(
         _router(), {"messages": [{"role": "user", "content": "Ciao, grazie!"}]}
