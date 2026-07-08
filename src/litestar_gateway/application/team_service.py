@@ -153,6 +153,18 @@ class TeamService:
             raise PermissionDenied("API key cannot manage this team")
         return team
 
+    async def principal_has_team_permission(
+        self, principal: Principal, team_id: UUID, permission: Permission
+    ) -> bool:
+        """Non-raising variant of `ensure_principal_team_permission`, for
+        endpoints that adapt their response to the caller's permissions
+        (e.g. redact fields) instead of rejecting the request outright."""
+        try:
+            await self.ensure_principal_team_permission(principal, team_id, permission)
+        except PermissionDenied:
+            return False
+        return True
+
     async def create_team(
         self, actor: User, organization_id: UUID, name: str, admin_email: str
     ) -> Team:
