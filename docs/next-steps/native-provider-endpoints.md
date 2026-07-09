@@ -163,3 +163,8 @@ Phase 1 (Anthropic `/v1/messages`) is implemented. For a copy-paste guide to
 pointing the native `anthropic` SDK at the gateway — client setup, streaming,
 and a full tool-call round-trip — see
 [Native Anthropic Messages endpoint](../native-anthropic.md).
+
+Phase 2 (Gemini `generateContent` / `:streamGenerateContent`) is implemented.
+For the equivalent copy-paste guide to pointing the native `google-genai` SDK at
+the gateway — client setup, streaming, and a full function-calling round-trip —
+see [Native Gemini generateContent endpoint](../native-gemini.md).
