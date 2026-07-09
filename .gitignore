@@ -32,3 +32,9 @@ graphify-out/manifest.json
 .ruff_cache
 .rumdl_cache
 .claude-plugin
+
+# Admin UI (ui/): dependencies, build output, and local caches.
+ui/node_modules/
+ui/dist/
+ui/*.tsbuildinfo
+ui/.vite/
