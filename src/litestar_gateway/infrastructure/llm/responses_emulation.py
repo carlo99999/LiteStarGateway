@@ -190,6 +190,14 @@ class ChatToResponsesAdapter:
             },
         }
 
+    async def anative_messages(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        # Native passthrough is provider-specific and untranslated; forward to the
+        # wrapped adapter (only Anthropic reaches here — the native surface guards
+        # provider before dispatch).
+        return await self._inner.anative_messages(request, model, credentials)
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
