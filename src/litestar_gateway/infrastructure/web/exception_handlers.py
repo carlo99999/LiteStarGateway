@@ -114,15 +114,61 @@ _STATUS: list[tuple[type[DomainError], int]] = [
 ]
 
 
-def domain_exception_handler(_: Request, exc: DomainError) -> Response:
-    status = next(
+# OpenAI error `type` per HTTP status; 4xx not listed → invalid_request_error,
+# 5xx → server_error. Kept in one place so both the shape and the status map
+# (`_STATUS`) stay the single source of truth.
+_OPENAI_ERROR_TYPE: dict[int, str] = {
+    HTTP_400_BAD_REQUEST: "invalid_request_error",
+    HTTP_401_UNAUTHORIZED: "authentication_error",
+    HTTP_402_PAYMENT_REQUIRED: "insufficient_quota",
+    HTTP_403_FORBIDDEN: "permission_error",
+    HTTP_404_NOT_FOUND: "not_found_error",
+    HTTP_429_TOO_MANY_REQUESTS: "rate_limit_error",
+}
+
+
+def _status_for(exc: DomainError) -> int:
+    return next(
         (code for cls, code in _STATUS if isinstance(exc, cls)),
         HTTP_400_BAD_REQUEST,
     )
-    detail = str(exc) or exc.__class__.__name__
-    headers: dict[str, str] = {}
+
+
+def _retry_after_headers(exc: DomainError) -> dict[str, str] | None:
     # Forward the provider's Retry-After so client SDK backoff keeps working.
     retry_after = getattr(exc, "retry_after", None)
     if isinstance(retry_after, str):
-        headers["Retry-After"] = retry_after
-    return Response({"detail": detail}, status_code=status, headers=headers or None)
+        return {"Retry-After": retry_after}
+    return None
+
+
+def domain_exception_handler(_: Request, exc: DomainError) -> Response:
+    detail = str(exc) or exc.__class__.__name__
+    return Response(
+        {"detail": detail},
+        status_code=_status_for(exc),
+        headers=_retry_after_headers(exc),
+    )
+
+
+def _openai_error_type(status: int) -> str:
+    if status in _OPENAI_ERROR_TYPE:
+        return _OPENAI_ERROR_TYPE[status]
+    return "server_error" if status >= 500 else "invalid_request_error"
+
+
+def openai_error_handler(_: Request, exc: DomainError) -> Response:
+    """OpenAI-compatible error envelope for the inference surface (`/v1/*`).
+
+    Reuses the same `_STATUS` mapping as `domain_exception_handler`, so the two
+    handlers never drift on status; only the body shape differs.
+    """
+    status = _status_for(exc)
+    body = {
+        "error": {
+            "message": str(exc) or exc.__class__.__name__,
+            "type": _openai_error_type(status),
+            "code": exc.__class__.__name__,
+        }
+    }
+    return Response(body, status_code=status, headers=_retry_after_headers(exc))
