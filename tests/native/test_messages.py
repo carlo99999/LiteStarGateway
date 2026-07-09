@@ -45,9 +45,7 @@ async def test_unknown_model_404(client: AsyncTestClient) -> None:
     key, _, _ = await _setup_team(
         client, provider="anthropic", values=ANTHROPIC_VALUES, model_type="chat"
     )
-    resp = await client.post(
-        "/v1/messages", json={**_BODY, "model": "nope"}, headers=_bearer(key)
-    )
+    resp = await client.post("/v1/messages", json={**_BODY, "model": "nope"}, headers=_bearer(key))
     assert resp.status_code == HTTP_404_NOT_FOUND
 
 
