@@ -113,6 +113,14 @@ async def test_unknown_model_404(client: AsyncTestClient) -> None:
     )
     resp = await client.post("/v1/messages", json={**_BODY, "model": "nope"}, headers=_bearer(key))
     assert resp.status_code == HTTP_404_NOT_FOUND
+    # ISSUE-007: the native surface shares `api_router`'s DomainError handler, so a
+    # domain error body stays OpenAI-shaped (`{"error": {message, type, code}}`),
+    # never Anthropic-native (`{"type": "error", "error": {...}}`). The status is
+    # what native SDKs key retry/backoff on; this pins the (documented) body shape.
+    body = resp.json()
+    assert body["error"]["type"] == "not_found_error"
+    assert body["error"]["code"] == "ModelNotFound"
+    assert "message" in body["error"]
 
 
 async def test_disabled_model_409(client: AsyncTestClient) -> None:
