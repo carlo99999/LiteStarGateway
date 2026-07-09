@@ -114,6 +114,17 @@ Every call above is metered against your team budget on the native
 `usage.input_tokens` / `usage.output_tokens` counts and shows up under
 `/teams/{id}/usage` like any other request.
 
+## Errors
+
+Domain errors (unknown model → `404`, budget exceeded → `402`, bad request →
+`400`, etc.) return the gateway's OpenAI-shaped error body —
+`{"error": {"message", "type", "code"}}` — not Anthropic's native
+`{"type": "error", "error": {...}}` envelope. The HTTP status is always
+correct, so status-based SDK error handling (retry/backoff on 429/5xx,
+`isinstance` checks on `APIStatusError` subclasses) works unchanged; only a
+client that additionally inspects the response body should key on
+`error.type` / `error.code` rather than assuming the native shape.
+
 ## Notes and limits
 
 - **Native passthrough only.** The Anthropic body flows upstream unchanged and

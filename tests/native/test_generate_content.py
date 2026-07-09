@@ -122,6 +122,23 @@ async def test_unknown_method_404(client: AsyncTestClient, monkeypatch: pytest.M
     assert resp.status_code == HTTP_404_NOT_FOUND
 
 
+async def test_unknown_model_404(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    # ISSUE-007: the native surface shares `api_router`'s DomainError handler, so a
+    # domain error body stays OpenAI-shaped (`{"error": {message, type, code}}`),
+    # never Gemini-native (`{"error": {code, message, status}}`). The status is what
+    # native SDKs key retry/backoff on; this pins the (documented) body shape.
+    _patch(monkeypatch)
+    key, _, _ = await _gemini_team(client)
+    resp = await client.post(
+        "/v1beta/models/nope:generateContent", json=_BODY, headers=_bearer(key)
+    )
+    assert resp.status_code == HTTP_404_NOT_FOUND
+    body = resp.json()
+    assert body["error"]["type"] == "not_found_error"
+    assert body["error"]["code"] == "ModelNotFound"
+    assert "message" in body["error"]
+
+
 async def test_native_passthrough_returns_verbatim_gemini_shape(
     client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
