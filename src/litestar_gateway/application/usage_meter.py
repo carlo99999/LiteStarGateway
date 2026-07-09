@@ -95,6 +95,21 @@ def _native_event_text(event: dict[str, Any]) -> str:
     return ""
 
 
+def _gemini_chunk_text(chunk: dict[str, Any]) -> str:
+    """Output text carried by one raw Gemini `GenerateContentResponse` chunk, for
+    the estimation fallback when a disconnect arrives before any authoritative
+    usage. Text lands on `candidates[].content.parts[].text`; everything else
+    contributes no output text."""
+    text = ""
+    for candidate in chunk.get("candidates") or []:
+        if not isinstance(candidate, dict):
+            continue
+        for part in (candidate.get("content") or {}).get("parts") or []:
+            if isinstance(part, dict) and isinstance(part.get("text"), str):
+                text += part["text"]
+    return text
+
+
 def _has_tokens(usage: dict[str, Any]) -> bool:
     return any(
         int(usage.get(key) or 0)
@@ -477,6 +492,61 @@ class UsageMeter:
                         usage["output_tokens"] = delta_usage.get("output_tokens") or 0
                 streamed_chars += len(_native_event_text(event))
                 yield event
+        except Exception as exc:
+            error = exc
+            raise
+        finally:
+            # Synchronous release first (survives a cancelled scope), then the
+            # shielded settlement — same ordering and guarantees as metered_stream.
+            if release is not None:
+                release()
+            with anyio.CancelScope(shield=True):
+                await self._finalize_stream_billing(
+                    team_id,
+                    api_key_id,
+                    model,
+                    operation,
+                    request,
+                    usage,
+                    streamed_chars,
+                    error,
+                    start,
+                )
+
+    async def metered_gemini_stream(
+        self,
+        team_id: UUID,
+        api_key_id: UUID,
+        model: Model,
+        operation: str,
+        stream: AsyncIterator[dict[str, Any]],
+        request: dict[str, Any],
+        release: Callable[[], None] | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Relay raw Gemini `GenerateContentResponse` chunks unchanged while
+        capturing the native `usageMetadata` they carry, then settle once at the
+        tail (or on client disconnect — the shielded finally). This is the native
+        mirror of `metered_native_stream`: identical release-once + shielded-
+        settlement machinery, but usage is read from the Gemini wire shape
+        (`usageMetadata.promptTokenCount` / `candidatesTokenCount`, reported
+        cumulatively — the final chunk carries the totals). The accumulated
+        `{input_tokens, output_tokens}` settle through the same
+        `_finalize_stream_billing` path (estimation fallback, error trace,
+        settlement timeout) as every other stream."""
+        start = perf_counter()
+        usage: dict[str, Any] = {}
+        streamed_chars = 0
+        error: Exception | None = None
+        try:
+            async for chunk in stream:
+                meta = chunk.get("usageMetadata")
+                if meta:
+                    if "promptTokenCount" in meta:
+                        usage["input_tokens"] = meta.get("promptTokenCount") or 0
+                    if "candidatesTokenCount" in meta:
+                        usage["output_tokens"] = meta.get("candidatesTokenCount") or 0
+                streamed_chars += len(_gemini_chunk_text(chunk))
+                yield chunk
         except Exception as exc:
             error = exc
             raise

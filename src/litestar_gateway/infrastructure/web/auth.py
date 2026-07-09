@@ -35,6 +35,11 @@ def _extract_key(connection: ASGIConnection) -> str | None:
     # second auth realm.
     if x_api_key := connection.headers.get("x-api-key"):
         return x_api_key
+    # The `google-genai` SDK's `api_key=...` sends `x-goog-api-key`. Accept it as
+    # the same gateway key so the native Gemini `generateContent` endpoints work
+    # with the stock client — same key/validation, still one auth realm.
+    if goog_api_key := connection.headers.get("x-goog-api-key"):
+        return goog_api_key
     return None
 
 

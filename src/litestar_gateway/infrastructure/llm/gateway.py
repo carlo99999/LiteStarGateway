@@ -137,6 +137,28 @@ class LLMGatewayImpl:
         adapter = self._resolve(model.provider, "chat.completions")
         return translate_stream(adapter.astream_native_messages(request, model, credentials))
 
+    async def agenerate_content(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        # Native Gemini passthrough: reuse the chat capability slot to resolve the
+        # adapter, then call its native method directly. arun_translated only
+        # NORMALIZES upstream SDK errors (429/5xx/timeout -> domain errors) — it does
+        # not touch the request or response body, so the native Gemini shape flows
+        # through untranslated.
+        adapter = self._resolve(model.provider, "chat.completions")
+        return await arun_translated(adapter.agenerate_content(request, model, credentials))
+
+    async def astream_generate_content(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        # Native Gemini passthrough streaming: resolve via the chat capability slot,
+        # then relay the adapter's raw chunks through translate_stream, which only
+        # NORMALIZES upstream SDK errors (open-time + mid-stream) — it does NOT
+        # translate the chunks, so the raw Gemini chunk shape flows through untouched
+        # (mirrors astream_native_messages for the Gemini wire shape).
+        adapter = self._resolve(model.provider, "chat.completions")
+        return translate_stream(adapter.astream_generate_content(request, model, credentials))
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:

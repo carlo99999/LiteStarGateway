@@ -8,9 +8,11 @@ the `client` fixture; everything else is a plain helper/class.
 
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from litestar.testing import AsyncTestClient
@@ -304,6 +306,57 @@ class _FakeGeminiModels:
         )
 
 
+# Raw Gemini REST bodies (camelCase) the native passthrough returns verbatim —
+# distinct from the SDK-typed (snake_case, model_dump()) shapes the translated
+# path echoes. `usageMetadata` carries the native token counts the meter bills on.
+GEMINI_NATIVE_RESPONSE: dict[str, Any] = {
+    "candidates": [
+        {"content": {"role": "model", "parts": [{"text": "ciao"}]}, "finishReason": "STOP"}
+    ],
+    "usageMetadata": {"promptTokenCount": 4, "candidatesTokenCount": 2, "totalTokenCount": 6},
+    "modelVersion": "gemini-1.5-pro-002",
+    "responseId": "resp-g",
+}
+GEMINI_NATIVE_STREAM: list[dict[str, Any]] = [
+    {"candidates": [{"content": {"role": "model", "parts": [{"text": "ci"}]}}]},
+    {
+        "candidates": [
+            {"content": {"role": "model", "parts": [{"text": "ao"}]}, "finishReason": "STOP"}
+        ],
+        "usageMetadata": {"promptTokenCount": 4, "candidatesTokenCount": 2, "totalTokenCount": 6},
+    },
+]
+
+
+class _FakeGeminiApiClient:
+    """Fakes the google-genai low-level request surface the native passthrough uses
+    (`client.aio._api_client.async_request` / `async_request_streamed`). Captures the
+    URL path (model-in-path resolution) and the verbatim request body; echoes the raw
+    REST JSON as a `.body` string, exactly like the real SdkHttpResponse."""
+
+    last_path: str = ""
+    last_body: dict = {}
+
+    async def async_request(
+        self, http_method: str, path: str, request_dict: dict, http_options: object = None
+    ) -> SimpleNamespace:
+        _FakeGeminiApiClient.last_path = path
+        _FakeGeminiApiClient.last_body = request_dict
+        return SimpleNamespace(headers={}, body=json.dumps(GEMINI_NATIVE_RESPONSE))
+
+    async def async_request_streamed(
+        self, http_method: str, path: str, request_dict: dict, http_options: object = None
+    ) -> AsyncIterator[SimpleNamespace]:
+        _FakeGeminiApiClient.last_path = path
+        _FakeGeminiApiClient.last_body = request_dict
+
+        async def gen() -> AsyncIterator[SimpleNamespace]:
+            for chunk in GEMINI_NATIVE_STREAM:
+                yield SimpleNamespace(headers={}, body=json.dumps(chunk))
+
+        return gen()
+
+
 class FakeGenaiClient:
     last_init: dict = {}
     last_kwargs: dict = {}
@@ -312,7 +365,9 @@ class FakeGenaiClient:
     def __init__(self, **kwargs) -> None:
         FakeGenaiClient.last_init = kwargs
         FakeGenaiClient.closed = False
-        self.aio = SimpleNamespace(models=_FakeGeminiModels(), aclose=self._aclose)
+        self.aio = SimpleNamespace(
+            models=_FakeGeminiModels(), aclose=self._aclose, _api_client=_FakeGeminiApiClient()
+        )
         self.models = _FakeGeminiModels()
 
     def close(self) -> None:  # genai.Client.close is sync
@@ -339,6 +394,8 @@ def _patch(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeGenaiClient.last_init = {}
     FakeGenaiClient.last_kwargs = {}
     FakeGenaiClient.closed = False
+    _FakeGeminiApiClient.last_path = ""
+    _FakeGeminiApiClient.last_body = {}
 
 
 @pytest.fixture
