@@ -47,6 +47,7 @@ from litestar_gateway.infrastructure.web.credentials.dependencies import (
     provide_credential_service,
 )
 from litestar_gateway.infrastructure.web.dependencies import provide_api_key_service
+from litestar_gateway.infrastructure.web.docs_site import create_docs_router
 from litestar_gateway.infrastructure.web.exception_handlers import domain_exception_handler
 from litestar_gateway.infrastructure.web.models import ModelController
 from litestar_gateway.infrastructure.web.models.dependencies import provide_model_service
@@ -91,6 +92,10 @@ def create_app(
 
     route_handlers = _build_route_handlers(database)
     dependencies = _build_dependencies(settings, database, trace_dispatcher, llm_gateway)
+
+    docs_router = create_docs_router()  # built MkDocs site at /docs, if present
+    if docs_router is not None:
+        route_handlers.append(docs_router)
 
     idp = _resolve_identity_provider(settings, identity_provider)
     if idp is not None:

@@ -35,6 +35,7 @@ nav:
       - Logging: docs/logging.md
       - Secrets rotation: docs/secrets-rotation.md
   - Gateway:
+      - API reference (interactive): docs/api-reference.md
       - OpenAI-compatible API: docs/openai-compatible.md
       - Usage and cost: docs/usage-cost.md
       - Observability: docs/observability.md
