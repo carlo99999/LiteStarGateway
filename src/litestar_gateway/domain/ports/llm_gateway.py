@@ -48,6 +48,14 @@ class LLMGateway(Protocol):
         event dicts (each carries a `type`)."""
         ...
 
+    async def anative_messages(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        """Provider-native Anthropic Messages passthrough: send the native request
+        body upstream unchanged and return the native response dict verbatim (no
+        OpenAI translation). `model` resolves the upstream model id + capability."""
+        ...
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]: ...

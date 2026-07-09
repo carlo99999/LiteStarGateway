@@ -17,12 +17,13 @@ from uuid import UUID
 
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import UsageMeter
-from litestar_gateway.domain.entities import Model, ModelType
+from litestar_gateway.domain.entities import Model, ModelType, Provider
 from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
     ModelDisabled,
     ModelNotFound,
     ModelTypeMismatch,
+    ProviderMismatch,
     UnsupportedOperation,
 )
 from litestar_gateway.domain.ports import (
@@ -187,6 +188,38 @@ class CompletionService:
         if values is None:
             raise CredentialNotFound(str(model.credential_id))
         return model, values
+
+    async def native_messages(
+        self, team_id: UUID, api_key_id: UUID, data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Anthropic-native `/v1/messages` passthrough, metered around its own
+        dispatch.
+
+        Resolves + guards the model (`prepare_native`), rejects non-Anthropic
+        models — `/v1/messages` is the Anthropic wire shape, so any other provider
+        behind it is a misconfiguration, not a translation opportunity — then runs
+        the money core: `admit` reserves the pessimistic cost from the native body
+        (it carries Anthropic's required `max_tokens`), `_dispatch` calls the
+        gateway's native method (no translation) and settles on the native `usage`
+        block (`input_tokens`/`output_tokens`, which `_parse_usage` reads
+        directly), releasing the reservation either way. The body is NOT
+        sanitized/translated — it flows to the provider verbatim."""
+        model, values = await self.prepare_native(team_id, ModelType.CHAT, data)
+        if model.provider is not Provider.ANTHROPIC:
+            raise ProviderMismatch(
+                f"Model '{model.name}' is provider '{model.provider.value}', not Anthropic; "
+                "the native Messages endpoint (/v1/messages) serves Anthropic models only"
+            )
+        reservation = await self._meter.admit(team_id, model, data)
+        return await self._dispatch(
+            team_id,
+            api_key_id,
+            model,
+            "native.messages",
+            data,
+            lambda: self._gateway.anative_messages(data, model, values),
+            reservation,
+        )
 
     async def _prepare(
         self,

@@ -202,6 +202,26 @@ class AnthropicAdapter:
         finally:
             await client.close()
 
+    async def anative_messages(
+        self, native_body: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        # Native passthrough: send the client's Anthropic Messages body upstream
+        # verbatim and return the response as-is — NO to_anthropic_request /
+        # from_anthropic_response translation. Only the `model` field is resolved
+        # from the team alias to the upstream provider id (same as every path),
+        # which is not translation. Client lifecycle mirrors achat_completion.
+        client = AsyncAnthropic(
+            api_key=require_api_key(credentials),
+            base_url=_base_url(credentials),
+            **self._resilience.client_kwargs,
+        )
+        body: dict[str, Any] = {**native_body, "model": model.provider_model_id}
+        try:
+            message: Any = await client.messages.create(**body)
+            return message.model_dump()
+        finally:
+            await client.close()
+
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:

@@ -22,7 +22,6 @@ from litestar.di import NamedDependency
 from litestar.status_codes import HTTP_200_OK
 
 from litestar_gateway.application.completion_service import CompletionService
-from litestar_gateway.domain.entities import ModelType
 from litestar_gateway.domain.exceptions import UnsupportedOperation
 
 
@@ -32,7 +31,8 @@ from litestar_gateway.domain.exceptions import UnsupportedOperation
     description=(
         "Point the native `anthropic` SDK at the gateway. The request's `model` is "
         "the team model alias, resolved and guarded exactly like "
-        "`/v1/chat/completions`. Provider dispatch is not implemented yet."
+        "`/v1/chat/completions`. The native Anthropic response is returned verbatim "
+        "(no OpenAI translation). Streaming (`stream: true`) is not implemented yet."
     ),
     status_code=HTTP_200_OK,
 )
@@ -41,11 +41,11 @@ async def native_messages(
     data: dict[str, Any],
     completion_service: NamedDependency[CompletionService],
 ) -> Response[Any]:
-    # Reuse the OpenAI path's model-resolution + enable/type/credential guards
-    # (no smart routing, no budget admission on the native surface yet). This
-    # both proves the guards are wired and keeps the two surfaces in lockstep.
-    await completion_service.prepare_native(UUID(request.user), ModelType.CHAT, data)
-    # Guards passed and nothing was billed. Native provider dispatch arrives in a
-    # later phase; until then, signal the capability gap the way the rest of the
-    # gateway does (UnsupportedOperation -> 501).
-    raise UnsupportedOperation("Native Anthropic Messages endpoint is not implemented yet")
+    if data.get("stream"):
+        # Native SSE relay is a later slice (1b); until then signal the capability
+        # gap the way the rest of the gateway does (UnsupportedOperation -> 501).
+        raise UnsupportedOperation("Streaming native Anthropic Messages is not implemented yet")
+    # Non-streaming native dispatch: resolve + guard the model, meter the call,
+    # and return the raw Anthropic Messages body untranslated.
+    body = await completion_service.native_messages(UUID(request.user), request.auth.id, data)
+    return Response(body, status_code=HTTP_200_OK)

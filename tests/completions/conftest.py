@@ -374,6 +374,8 @@ async def _setup_team(
     params: dict | None = None,
     params_enforced: dict | None = None,
     max_output_tokens: int | None = None,
+    input_cost_per_token: float | None = None,
+    output_cost_per_token: float | None = None,
 ) -> tuple[str, str, str]:
     """Configure a credential + team + model 'm' + key.
 
@@ -414,6 +416,10 @@ async def _setup_team(
         model_json["params_enforced"] = params_enforced
     if max_output_tokens is not None:
         model_json["max_output_tokens"] = max_output_tokens
+    if input_cost_per_token is not None:
+        model_json["input_cost_per_token"] = input_cost_per_token
+    if output_cost_per_token is not None:
+        model_json["output_cost_per_token"] = output_cost_per_token
     await client.post(f"/teams/{team}/models", json=model_json, headers=_bearer(admin))
     key = (
         await client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(admin))
