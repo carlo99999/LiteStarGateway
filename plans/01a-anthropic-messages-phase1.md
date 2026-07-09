@@ -10,7 +10,7 @@ Detailed, implementation-ready breakdown of **Phase 1** of
   `build_inference_rate_limit()` per-IP limiter as `/v1/chat/completions` — no fork.
 - `CompletionService.prepare_native(team_id, expected_type, request)` resolves the
   model alias and runs the shared `_ensure_usable` guards (exists / enabled / type)
-  + credential fetch. No routing, no `admit` yet.
+  - credential fetch. No routing, no `admit` yet.
 - The controller currently raises `UnsupportedOperation` → 501 after the guards.
 
 Phase 1 replaces that 501 with a real, metered native dispatch.
