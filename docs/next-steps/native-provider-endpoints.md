@@ -156,3 +156,10 @@ point at the native endpoint.
 - The OpenAI-compatible surface is unchanged; the R7-H23 501 still fires for
   OpenAI-shaped tool requests to non-OpenAI models, now pointing at the native
   endpoint.
+
+## Usage
+
+Phase 1 (Anthropic `/v1/messages`) is implemented. For a copy-paste guide to
+pointing the native `anthropic` SDK at the gateway — client setup, streaming,
+and a full tool-call round-trip — see
+[Native Anthropic Messages endpoint](../native-anthropic.md).

@@ -73,6 +73,27 @@ async def test_unauthenticated_401(client: AsyncTestClient) -> None:
     assert resp.status_code == HTTP_401_UNAUTHORIZED
 
 
+async def test_x_api_key_header_authenticates(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The native `anthropic` SDK authenticates with an `x-api-key` header (that is
+    # what `Anthropic(api_key=...)` sends), NOT `Authorization: Bearer`. The shared
+    # API-key middleware must accept it so the documented native-SDK setup works;
+    # here the same gateway key delivered via x-api-key reaches native dispatch and
+    # returns the verbatim Anthropic body (200), not a 401.
+    _patch(monkeypatch)
+    key, _, _ = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id=_MODEL_ID,
+        model_type="chat",
+    )
+    resp = await client.post("/v1/messages", json=_BODY, headers={"x-api-key": key})
+    assert resp.status_code == HTTP_200_OK
+    assert resp.json()["role"] == "assistant"
+
+
 async def test_over_rate_limit_429(client: AsyncTestClient) -> None:
     # The per-IP inference limiter runs *before* auth (same middleware the
     # OpenAI endpoints use), so unauthenticated floods are throttled: the budget

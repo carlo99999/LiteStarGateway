@@ -29,6 +29,12 @@ def _extract_key(connection: ASGIConnection) -> str | None:
         scheme, _, token = auth.partition(" ")
         if scheme.lower() == "bearer" and token:
             return token
+    # Native provider SDKs authenticate with their own header: the `anthropic`
+    # SDK's `api_key=...` sends `x-api-key`. Accept it as the same gateway key so
+    # the native `/v1/messages` endpoint works with the stock client, without a
+    # second auth realm.
+    if x_api_key := connection.headers.get("x-api-key"):
+        return x_api_key
     return None
 
 
