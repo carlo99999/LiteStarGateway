@@ -1,7 +1,10 @@
 # Plan 01a — Native Anthropic `/v1/messages`, Phase 1 (detailed)
 
 Detailed, implementation-ready breakdown of **Phase 1** of
-[Plan 01](01-native-provider-endpoints.md). Planning only — no code yet.
+[Plan 01](01-native-provider-endpoints.md).
+
+**Status: ✅ COMPLETE** — 1a (non-streaming), 1b (streaming), 1c (real `anthropic`
+SDK validation + docs + native conformance) all shipped and merged.
 
 ## What Phase 0 already gave us (merged)
 

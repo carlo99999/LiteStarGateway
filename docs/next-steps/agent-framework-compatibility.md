@@ -1,11 +1,12 @@
 # Implementation prompt: Agent framework compatibility
 
-> **Status — proposed (not started).** The gateway should be a reliable backend
-> for external agent frameworks, not a first-party agent runtime. A customer
-> should be able to point Pydantic AI, LangChain, LlamaIndex, OpenAI Agents SDK,
-> or a custom OpenAI-compatible client at the gateway and keep the same gateway
-> guarantees: API keys, team scoping, budget enforcement, usage metering, model
-> routing, audit, rate limiting, provider abstraction, and observability.
+> **Status — largely delivered.** Compatibility is achieved by conforming to the
+> standard wire protocols (see the framework-agnostic conformance suite in
+> `tests/conformance/` and the user guide **[OpenAI-compatible API](../openai-compatible.md)**),
+> not by per-framework code. A customer can point Pydantic AI, LangChain,
+> LlamaIndex, the OpenAI Agents SDK, or any OpenAI-compatible client at the gateway
+> and keep the gateway guarantees: API keys, team scoping, budget enforcement, usage
+> metering, model routing, audit, rate limiting, provider abstraction, observability.
 
 This is deliberately different from "build agents inside the gateway." The
 gateway remains the governed model backend. Agent loops, planner/executor
