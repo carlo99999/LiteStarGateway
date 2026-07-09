@@ -136,6 +136,40 @@ docs-build: docs-prepare
 docs-serve: docs-prepare
     uv run mkdocs serve
 
+# ── Admin UI (ui/) ──────────────────────────────────────────────────────────────
+# React/Vite admin console (Plan 03). Served under `/ui/`; the gateway API stays
+# at the root. Requires Node + pnpm (https://pnpm.io). All recipes run in ui/.
+
+# Install UI dependencies exactly as locked.
+ui-install:
+    cd ui && pnpm install --frozen-lockfile
+
+# Run the Vite dev server (http://localhost:5173/ui/). Proxies every non-`/ui`
+# path to the gateway — set GATEWAY_URL to point elsewhere (default :8000).
+# Start the gateway first with `just run`.
+ui-dev:
+    cd ui && pnpm dev
+
+# Production build (type-checks, then `vite build` → ui/dist).
+ui-build:
+    cd ui && pnpm build
+
+# Regenerate the typed API client from the OpenAPI schema. By default it reads
+# the checked-in ui/openapi.json; refresh that file from a running gateway with:
+#   uv run litestar --app {{app}} schema openapi --output ui/openapi.json
+# (or `curl -s localhost:8000/openapi.json -o ui/openapi.json`) before running this.
+ui-typegen:
+    cd ui && pnpm typegen
+
+# Regenerate ui/openapi.json from the app, then the typed client. No server needed.
+ui-schema:
+    uv run litestar --app {{app}} schema openapi --output ui/openapi.json
+    cd ui && pnpm typegen
+
+# Lint the UI sources (eslint).
+ui-lint:
+    cd ui && pnpm lint
+
 # ── Aggregates ─────────────────────────────────────────────────────────────────
 
 # Run the full CI gate locally: hooks (lint/format/secrets) + types + tests.

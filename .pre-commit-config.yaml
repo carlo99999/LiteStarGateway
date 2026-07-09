@@ -34,8 +34,13 @@ repos:
         # that names env vars (JWT_SECRET/MASTER_KEY) — the keyword detector
         # false-positives on them and every doc edit shifts line numbers, churning
         # the baseline, so they're excluded too. Next-step docs include
-        # copy-paste credential placeholders for gateway clients.
-        exclude: (?x)^(uv\.lock|\.secrets\.baseline|migrations/.*|graphify-out/.*|issues/.*\.md|docs/next-steps/.*\.md|README\.md)$
+        # copy-paste credential placeholders for gateway clients. ui/pnpm-lock.yaml
+        # is a dependency lockfile whose `integrity` sha512 hashes trip the
+        # Base64-high-entropy detector — same case as uv.lock, and it holds no secrets.
+        # ui/openapi.json is the generated API schema and ui/src/lib/api/schema.ts is
+        # its generated TypeScript client; the example blocks carry placeholder
+        # credentials ("sk-...", "AKIA...") that trip the keyword detector.
+        exclude: (?x)^(uv\.lock|ui/pnpm-lock\.yaml|ui/openapi\.json|ui/src/lib/api/schema\.ts|\.secrets\.baseline|migrations/.*|graphify-out/.*|issues/.*\.md|docs/next-steps/.*\.md|README\.md)$
 
   # Lint + format, reusing the project's pinned ruff (single source of truth,
   # same as CI) rather than a separately versioned mirror.

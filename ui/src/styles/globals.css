@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Terminal-tech design tokens — the single source of truth for both themes.
+ * Dark is the DEFAULT (see index.html <html class="dark"> and ThemeProvider),
+ * light is a fully supported mode. Green is an ACCENT, not body text: body copy
+ * uses `--foreground` (off-white / near-black) so all text meets WCAG AA.
+ */
+@layer base {
+  :root {
+    /* LIGHT */
+    --background: #f6f8f6;
+    --foreground: #0f1a13;
+    --card: #ffffff;
+    --card-foreground: #0f1a13;
+    --popover: #ffffff;
+    --popover-foreground: #0f1a13;
+    --primary: #16a34a;
+    --primary-foreground: #ffffff;
+    --secondary: #eef2ef;
+    --secondary-foreground: #0f1a13;
+    --muted: #eef2ef;
+    --muted-foreground: #5b6f61;
+    --accent: #7c3aed;
+    --accent-foreground: #ffffff;
+    --warning: #c2740b;
+    --warning-foreground: #ffffff;
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+    --border: #dde7e0;
+    --input: #dde7e0;
+    --ring: #16a34a;
+    --radius: 0.5rem;
+
+    /* Headline gradient (light) */
+    --gradient-from: #16a34a;
+    --gradient-via: #0891b2;
+    --gradient-to: #7c3aed;
+
+    /* Subtle background grid (light) */
+    --grid-line: rgba(22, 163, 74, 0.06);
+  }
+
+  .dark {
+    /* DARK (default) — near-black green-tinted canvas */
+    --background: #060a07;
+    --foreground: #e8f0ea;
+    --card: #0c120e;
+    --card-foreground: #e8f0ea;
+    --popover: #0c120e;
+    --popover-foreground: #e8f0ea;
+    --primary: #22c55e;
+    --primary-foreground: #060a07;
+    --secondary: #121a15;
+    --secondary-foreground: #e8f0ea;
+    --muted: #101712;
+    --muted-foreground: #6b8a76;
+    --accent: #a78bfa;
+    --accent-foreground: #060a07;
+    --warning: #f5a623;
+    --warning-foreground: #060a07;
+    --destructive: #ef4444;
+    --destructive-foreground: #060a07;
+    --border: rgba(34, 197, 94, 0.15);
+    --input: rgba(34, 197, 94, 0.15);
+    --ring: #22c55e;
+
+    /* Headline gradient (dark) */
+    --gradient-from: #22c55e;
+    --gradient-via: #2dd4bf;
+    --gradient-to: #a78bfa;
+
+    /* Subtle background grid (dark) */
+    --grid-line: rgba(34, 197, 94, 0.05);
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* Tabular, mono numbers everywhere data lives. */
+  .tabular {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Subtle grid backdrop for the app canvas + login screen. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  /* Headline gradient text utility. */
+  .text-gradient {
+    background-image: linear-gradient(
+      90deg,
+      var(--gradient-from),
+      var(--gradient-via),
+      var(--gradient-to)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
