@@ -753,3 +753,36 @@ def test_gateway_still_rejects_unregistered_providers() -> None:
     gateway._registry.pop(Provider.BEDROCK)
     with pytest.raises(UnsupportedOperation):
         gateway._resolve(Provider.BEDROCK, "chat.completions")
+
+
+async def test_gateway_native_messages_rejects_unsupported_provider_via_matrix() -> None:
+    # R8-ISSUE-006: the gateway's own capability matrix — not just the
+    # application-layer ProviderMismatch check — must gate the native
+    # passthrough methods. Bedrock has no `anative_messages`/`agenerate_content`
+    # on its adapter, so bypassing the matrix would surface an unguarded
+    # AttributeError (-> opaque 500) instead of a clean UnsupportedOperation
+    # (-> 501).
+    from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
+
+    gateway = LLMGatewayImpl()
+    model = _model("anthropic.claude-3-5-sonnet-v2:0")
+    with pytest.raises(UnsupportedOperation):
+        await gateway.anative_messages({}, model, BEDROCK_VALUES)
+    with pytest.raises(UnsupportedOperation):
+        await gateway.astream_native_messages({}, model, BEDROCK_VALUES)
+    with pytest.raises(UnsupportedOperation):
+        await gateway.agenerate_content({}, model, BEDROCK_VALUES)
+    with pytest.raises(UnsupportedOperation):
+        await gateway.astream_generate_content({}, model, BEDROCK_VALUES)
+
+
+async def test_gateway_native_capability_slots_still_resolve_for_supported_providers() -> None:
+    # Anthropic/Vertex must keep working through the matrix now that native
+    # passthrough is a real, gated capability rather than an implicit bypass.
+    from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
+
+    gateway = LLMGatewayImpl()
+    anthropic_adapter = gateway._resolve(Provider.ANTHROPIC, "native.messages")
+    assert hasattr(anthropic_adapter, "anative_messages")
+    vertex_adapter = gateway._resolve(Provider.VERTEX_AI, "native.generate_content")
+    assert hasattr(vertex_adapter, "agenerate_content")
