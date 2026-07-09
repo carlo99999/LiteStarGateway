@@ -42,6 +42,9 @@ proven once and reused.
 
 ## Phase 1 — Anthropic `POST /v1/messages`
 
+> Detailed, implementation-ready breakdown (design decisions resolved, task list,
+> TDD tests, file touchpoints): [`01a-anthropic-messages-phase1.md`](01a-anthropic-messages-phase1.md).
+
 ### 1a. Non-streaming
 
 - Accept the native Anthropic Messages request shape; resolve the model; fetch
