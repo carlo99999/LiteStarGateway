@@ -5,13 +5,51 @@ docs_dir: .mkdocs-docs
 site_dir: .mkdocs-site
 
 theme:
-  name: readthedocs
-  highlightjs: true
+  name: material
+  # No Google Fonts: this gateway is meant to run self-hosted / air-gapped, so
+  # the theme must not fetch anything at page load. Material bundles all other
+  # assets locally; `font: false` makes it use the system font stack too.
+  font: false
+  icon:
+    logo: material/lightning-bolt
+  palette:
+    # Light mode.
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    # Dark mode.
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - navigation.tracking
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
 
 markdown_extensions:
   - admonition
-  - fenced_code
   - tables
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - toc:
       permalink: true
 

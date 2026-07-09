@@ -30,4 +30,6 @@ accounting in both cases.
 | Scalar | Clean API reference browsing | [Open Scalar](/scalar) |
 | Stoplight Elements | Contract review and navigation | [Open Elements](/elements) |
 | OpenAPI JSON | SDK generation, tests, and tooling | [Download schema](/openapi.json) |
+
+For guides, deployment, and configuration, see the [narrative documentation](/docs/).
 """.strip()
