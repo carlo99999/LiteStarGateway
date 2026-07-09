@@ -150,6 +150,44 @@ class CompletionService:
         if isinstance(prompt, int) and isinstance(completion, int):
             await self._router_service.record_usage(prompt, completion)
 
+    @staticmethod
+    def _ensure_usable(model: Model | None, alias: object, expected_type: ModelType) -> Model:
+        """The model must exist, be enabled, and match the operation's type.
+
+        The three guards every resolution path shares (OpenAI-compatible and
+        native alike), factored out so neither surface drifts from the other."""
+        if model is None:
+            raise ModelNotFound(str(alias))
+        if not model.enabled:
+            raise ModelDisabled(model.name)
+        if model.type != expected_type:
+            raise ModelTypeMismatch(
+                f"Model '{model.name}' is type '{model.type}', not '{expected_type}'"
+            )
+        return model
+
+    async def prepare_native(
+        self, team_id: UUID, expected_type: ModelType, request: dict[str, Any]
+    ) -> tuple[Model, dict[str, str]]:
+        """Resolve a provider-native request's `model` alias to a usable team
+        `Model` plus its decrypted credentials.
+
+        Runs the *same* enable/type/credential guards as `_prepare`, minus smart
+        routing (native endpoints resolve one concrete same-protocol model) and
+        budget admission (the native surface meters natively around its own
+        dispatch). The upstream `base_url` still comes only from the credential
+        (`get_values`), never from the client."""
+        alias = request.get("model")
+        model = self._ensure_usable(
+            await self._models.get_by_name(team_id, alias) if alias else None,
+            alias,
+            expected_type,
+        )
+        values = await self._credentials.get_values(model.credential_id)
+        if values is None:
+            raise CredentialNotFound(str(model.credential_id))
+        return model, values
+
     async def _prepare(
         self,
         team_id: UUID,
@@ -173,14 +211,7 @@ class CompletionService:
             if router is not None:
                 decision = await self._router_service.route(router, request, api_key_id=api_key_id)
                 model = await self._models.get_by_name(team_id, decision.model_name)
-        if model is None:
-            raise ModelNotFound(str(alias))
-        if not model.enabled:
-            raise ModelDisabled(model.name)
-        if model.type != expected_type:
-            raise ModelTypeMismatch(
-                f"Model '{model.name}' is type '{model.type}', not '{expected_type}'"
-            )
+        model = self._ensure_usable(model, alias, expected_type)
         _reject_unsupported_n(operation, model, request)
         # Per-model output ceiling: clamp/inject now that the model is known, and
         # reserve from the clamped request so admission and the provider call agree.
