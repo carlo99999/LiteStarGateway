@@ -125,6 +125,18 @@ class LLMGatewayImpl:
         adapter = self._resolve(model.provider, "chat.completions")
         return await arun_translated(adapter.anative_messages(request, model, credentials))
 
+    async def astream_native_messages(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        # Native Anthropic passthrough streaming: resolve via the chat capability
+        # slot, then relay the adapter's raw events through translate_stream, which
+        # only NORMALIZES upstream SDK errors (open-time + mid-stream) to domain
+        # errors — it does NOT translate the events, so the raw Anthropic event
+        # shape flows through untouched (mirrors astream_chat_completion minus the
+        # anthropic_event_to_delta re-encoding done inside the adapter there).
+        adapter = self._resolve(model.provider, "chat.completions")
+        return translate_stream(adapter.astream_native_messages(request, model, credentials))
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
