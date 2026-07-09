@@ -44,6 +44,7 @@ from litestar.testing import AsyncTestClient
 from litestar_gateway.application.completion_service import CompletionService
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.entities import Model, ModelType, Provider, TraceRecord, UsageEvent
+from litestar_gateway.domain.request_policy import MAX_TOKENS
 from litestar_gateway.infrastructure.llm import anthropic_adapter
 from litestar_gateway.infrastructure.web.rate_limit import INFERENCE_RATE_LIMIT
 
@@ -310,6 +311,81 @@ async def test_upstream_error_maps_to_http_status_and_bills_nothing(
     resp = await client.post("/v1/messages", json=_BODY, headers=_bearer(key))
     assert resp.status_code == HTTP_502_BAD_GATEWAY
     assert await _team_usage(client, team, admin) == []
+
+
+# --- Native governance: reserved-kwarg rejection + output-token clamp -----------
+
+
+@pytest.mark.parametrize(
+    "bad_field", ["extra_headers", "extra_query", "extra_body", "timeout", "_x"]
+)
+async def test_native_rejects_sdk_control_kwargs_before_dispatch(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch, bad_field: str
+) -> None:
+    # ISSUE-001: the native body is splatted into `messages.create(**body)`, so a
+    # reserved SDK control kwarg (extra_headers/extra_query/extra_body/timeout) — or
+    # any leading-underscore key — would let a tenant override the vaulted
+    # credential / inject outbound headers. They are rejected (400) centrally BEFORE
+    # dispatch, so they never reach the SDK and nothing is billed.
+    _patch(monkeypatch)
+    key, team, admin = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id=_MODEL_ID,
+        model_type="chat",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.01,
+    )
+    resp = await client.post(
+        "/v1/messages", json={**_BODY, bad_field: {"X-Api-Key": "attacker"}}, headers=_bearer(key)
+    )
+    assert resp.status_code == HTTP_400_BAD_REQUEST
+    # Never dispatched: the fake SDK's create() was not called (kwargs stay empty).
+    assert FakeAnthropic.last_kwargs == {}
+    assert await _team_usage(client, team, admin) == []
+
+
+async def test_native_output_ceiling_clamped_to_model_max(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # ISSUE-003: the native surface must enforce the per-model output ceiling (H15)
+    # like the OpenAI surface. With max_output_tokens=10, a body asking for 5000 is
+    # clamped to 10 before dispatch.
+    _patch(monkeypatch)
+    key, _, _ = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id=_MODEL_ID,
+        model_type="chat",
+        max_output_tokens=10,
+    )
+    resp = await client.post(
+        "/v1/messages", json={**_BODY, "max_tokens": 5000}, headers=_bearer(key)
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeAnthropic.last_kwargs["max_tokens"] == 10
+
+
+async def test_native_output_ceiling_global_bound(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # ISSUE-003: with no per-model ceiling, the global MAX_TOKENS still bounds the
+    # native body's output field.
+    _patch(monkeypatch)
+    key, _, _ = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id=_MODEL_ID,
+        model_type="chat",
+    )
+    resp = await client.post(
+        "/v1/messages", json={**_BODY, "max_tokens": 99_999}, headers=_bearer(key)
+    )
+    assert resp.status_code == HTTP_200_OK
+    assert FakeAnthropic.last_kwargs["max_tokens"] == MAX_TOKENS
 
 
 # --- Native streaming settlement unit tests -------------------------------------
