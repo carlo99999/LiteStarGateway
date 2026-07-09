@@ -206,6 +206,22 @@ class ChatToResponsesAdapter:
         # the inner async iterator directly, no translation).
         return self._inner.astream_native_messages(request, model, credentials)
 
+    async def agenerate_content(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        # Native Gemini passthrough is provider-specific and untranslated; forward
+        # to the wrapped adapter (only Vertex reaches here — the native surface
+        # guards provider before dispatch).
+        return await self._inner.agenerate_content(request, model, credentials)
+
+    def astream_generate_content(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        # Native Gemini streaming passthrough: forward the raw chunk stream from the
+        # wrapped adapter unchanged (mirrors astream_chat_completion — returns the
+        # inner async iterator directly, no translation).
+        return self._inner.astream_generate_content(request, model, credentials)
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:

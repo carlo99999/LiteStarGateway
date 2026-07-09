@@ -65,6 +65,24 @@ class LLMGateway(Protocol):
         domain errors; the events themselves flow through untouched."""
         ...
 
+    async def agenerate_content(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        """Provider-native Gemini `generateContent` passthrough: send the native
+        request body upstream unchanged and return the native REST response dict
+        verbatim (no OpenAI translation). `model` resolves the upstream model id +
+        capability; the alias lives in the URL path, not the body."""
+        ...
+
+    async def astream_generate_content(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Provider-native Gemini `streamGenerateContent` passthrough: resolve
+        eagerly and relay the raw Gemini `GenerateContentResponse` chunks verbatim,
+        with NO OpenAI translation. Only open-time/iteration errors are normalized
+        to domain errors; the chunks themselves flow through untouched."""
+        ...
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]: ...

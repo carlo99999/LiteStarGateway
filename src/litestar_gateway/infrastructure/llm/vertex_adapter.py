@@ -284,6 +284,43 @@ class VertexAdapter:
         finally:
             await client.aio.aclose()
 
+    async def agenerate_content(
+        self, native_body: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        # Native passthrough: POST the client's Gemini `GenerateContentRequest` body
+        # upstream verbatim and return the raw REST response as-is — NO
+        # to_gemini_request / from_gemini_response translation. The model alias is
+        # resolved to the provider id in the URL PATH (Gemini carries the model in
+        # the path, not the body), which is not translation. The credential-side
+        # config (project/location/base_url) stays server-side in the client.
+        client = self._client(credentials)
+        path = f"{model.provider_model_id}:generateContent"
+        try:
+            response = await client.aio._api_client.async_request("post", path, dict(native_body))
+            return json.loads(response.body) if response.body else {}
+        finally:
+            await client.aio.aclose()
+
+    async def astream_generate_content(
+        self, native_body: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        # Native passthrough streaming: relay the upstream Gemini
+        # `GenerateContentResponse` chunks verbatim (parsed from the raw REST SSE)
+        # — NO gemini_chunk_to_delta, NO OpenAI chunk shape. Only the model alias is
+        # resolved to the provider id in the URL PATH (not translation). Client
+        # lifecycle mirrors astream_chat_completion minus the translation.
+        client = self._client(credentials)
+        path = f"{model.provider_model_id}:streamGenerateContent"
+        try:
+            stream = await client.aio._api_client.async_request_streamed(
+                "post", path, dict(native_body)
+            )
+            async for chunk in stream:
+                if chunk.body:
+                    yield json.loads(chunk.body)
+        finally:
+            await client.aio.aclose()
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
