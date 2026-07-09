@@ -1,78 +1,99 @@
-# Plan 02 — Agent-framework compatibility
+# Plan 02 — Framework-agnostic wire-contract conformance
 
 **Design doc:** [`docs/next-steps/agent-framework-compatibility.md`](../docs/next-steps/agent-framework-compatibility.md)
-**Depends on:** Plan 01 (native endpoints) for the highest compatibility level;
-the OpenAI-compatible surface + R7-H23 already cover the baseline.
-**Theme:** make tool-calling agent frameworks work against the gateway, and prove
-it with an automated conformance suite instead of prose promises.
+**Depends on:** nothing for the OpenAI-surface contract (available today); the
+native Anthropic/Gemini contracts depend on Plan 01.
+**Theme:** guarantee the gateway works with **any** agent framework — by
+conforming to the standard **wire protocols**, validated by contract, not by
+chasing individual frameworks.
 
-## Two compatibility levels
+## Principle: agnostic by contract, not by framework
 
-1. **OpenAI-compatible surface** (`/v1/chat/completions`): works today for
-   text/tools where the target provider is OpenAI/Azure/Databricks. After H23,
-   providers that can't translate tools/vision **reject cleanly (501)** instead of
-   silently degrading — so frameworks fail loudly, not wrongly.
-2. **Native endpoints** (Plan 01): full-fidelity tool calling for Anthropic/Gemini
-   via their own SDKs. This is where Anthropic/Gemini tool-calling agents belong.
+A framework is compatible iff it speaks a wire protocol the gateway implements
+faithfully. So the gateway needs **zero per-framework code**: it implements the
+OpenAI Chat Completions protocol today, and the native Anthropic Messages / Gemini
+`generateContent` protocols after Plan 01. Get the contracts right and every
+compliant client — Pydantic AI, LangChain, the OpenAI Agents SDK, or anything
+built next year — works for free.
 
-The plan's job: make the routing between these two explicit, tested, and documented.
+- ❌ **Framework-coupled** (rejected): "test that Pydantic AI works, test that
+  LangChain works" — an endless matrix that couples us to each framework's quirks.
+- ✅ **Contract-based** (this plan): assert the gateway's request/response/streaming/
+  error shapes match the protocol spec. Use the **official provider SDKs** as
+  end-to-end canaries (proof the contract holds in practice), never as the
+  definition of done. If a specific framework breaks, fix the **contract** (only
+  when the defect is legitimate against the spec) — never add a per-framework branch.
 
-## Phase 1 — Conformance suite (the core deliverable)
+## Two contract surfaces
 
-A provider- and framework-parametrized test suite asserting each framework's
-happy-path and tool-calling flow against the gateway.
+1. **OpenAI Chat Completions** (`/v1/chat/completions`) — available now. After
+   R7-H23, providers that cannot translate tools/vision **reject cleanly (501)**
+   instead of silently degrading, so clients fail loudly, not wrongly.
+2. **Native Anthropic Messages / Gemini `generateContent`** — after Plan 01. This
+   is the agnostic path for the Anthropic/Gemini ecosystems: any client speaking
+   those native protocols (their own SDKs, or frameworks built on them) works.
 
-- **Framework matrix** (start with the two highest-value, add the rest):
-  - Pydantic AI (OpenAI-compatible provider pointing at the gateway).
-  - OpenAI Python client / OpenAI Agents SDK style.
-  - LangChain `ChatOpenAI`.
-- **Per framework, assert:**
-  - plain completion returns and is billed once;
-  - a single tool call round-trips (request → tool_use → tool_result → final);
-  - an unsupported combination (e.g. tools on a non-translating provider via the
-    OpenAI surface) returns **501**, and the framework surfaces it as an error
-    rather than hanging or fabricating.
-- **Mechanism:** drive real framework clients against an in-process gateway with a
-  faked upstream provider (reuse the existing `Fake*` client patterns in
-  `tests/completions/`), so the suite is deterministic and needs no live API keys.
-- **Done when:** the matrix is green in CI and a regression in request/response
-  shape breaks a named framework test, not just a low-level unit test.
+## Phase 1 — OpenAI Chat Completions contract conformance (existing surface)
 
-## Phase 2 — OpenAI-shaped requirements
+The core deliverable, buildable now against what already ships.
 
-Close the specific OpenAI-surface gaps agent frameworks depend on (from the design
-doc's "OpenAI-shaped requirements"): tool/tool_choice echoing, `finish_reason`
-values, streamed tool-call deltas, and error-shape parity. Each gap = one test in
-the conformance suite first (RED), then the fix.
+- **Contract assertions** (the shapes any compliant client depends on):
+  - response envelope: `choices`, `message`, `finish_reason` values, `usage`;
+  - tool calling: `tool_calls` request echo + response shape, `tool_choice`,
+    `finish_reason == "tool_calls"`, and a tool-result round-trip;
+  - streaming: chunk/delta shape, incremental tool-call deltas, terminal chunk;
+  - errors: OpenAI-shaped error envelope + correct HTTP status (incl. the H23
+    501 for untranslatable tools/vision on non-OpenAI providers).
+- **Canary, not matrix:** drive the assertions with the **official `openai`
+  Python SDK** pointed at an in-process gateway with a **faked upstream provider**
+  (reuse the `Fake*` client patterns in `tests/completions/`) — deterministic, no
+  live keys. One real client proves the wire works; the contract tests define done.
+- **Done when:** `tests/conformance/` is green in CI and a change to the
+  request/response/stream/error shape breaks a **contract** test (not just a
+  low-level unit test), for OpenAI/Azure/Databricks-backed models.
 
-## Phase 3 — Documentation deliverables
+## Phase 2 — Close OpenAI-shape contract gaps
 
-Copy-paste setup snippets, one per framework, in the docs:
+Whatever Phase 1 surfaces (from the design doc's "OpenAI-shaped requirements":
+tool/tool_choice echo, `finish_reason` values, streamed tool-call deltas, error-
+shape parity). Each gap = a failing contract test first (RED), then the fix in the
+adapter/emulation layer — never a per-framework special case.
 
-- Pydantic AI / OpenAI-compatible provider.
-- LangChain `ChatOpenAI`.
-- OpenAI client / OpenAI Agents SDK.
-- A decision note: **when to use the OpenAI surface vs a native endpoint** (Plan 01)
-  — native for Anthropic/Gemini tool-calling agents, OpenAI surface for
-  provider-agnostic or OpenAI-target agents.
+## Phase 3 — Documentation (protocol-based)
+
+- "Point any OpenAI-compatible client at the gateway" — one snippet with the stock
+  `openai` SDK; note that any framework layering on it (Pydantic AI, LangChain,
+  OpenAI Agents SDK) inherits this for free.
+- The surface-selection note: OpenAI surface for OpenAI-target/provider-agnostic
+  clients; **native endpoints (Plan 01)** for Anthropic/Gemini tool-calling.
+
+## After Plan 01 — extend conformance to the native contracts
+
+Add native-protocol contract suites (Anthropic Messages, Gemini `generateContent`)
+using the official `anthropic` / `google-genai` SDKs as canaries. Same principle:
+assert the native wire contract, no per-framework code. This is also Plan 01's
+acceptance layer — build the native contract tests as the RED that Plan 01 turns
+GREEN.
 
 ## File touchpoints
 
-- New: `tests/conformance/` (parametrized framework × flow suite).
+- New: `tests/conformance/` (contract-assertion suites; SDK-canary fixtures).
 - Extended as gaps surface: `infrastructure/llm/openai_adapter.py`,
-  `responses_emulation.py`, `feature_support.py`, `errors.py`.
-- Docs: `docs/` framework guides + the surface-selection note.
-- CI: the conformance suite runs in the existing test job (add the framework deps to
-  the test extras).
+  `responses_emulation.py`, `feature_support.py`, `errors.py`; later the native
+  adapters.
+- Docs: protocol-based client guides + the surface-selection note.
+- CI: the conformance suite runs in the existing test job (add SDK test extras).
 
 ## Risks & mitigations
 
-- **Framework dep weight / flakiness** → fake the upstream provider; pin framework
-  versions; keep the suite offline and deterministic.
-- **Chasing every framework** → matrix is explicitly incremental; land Pydantic AI +
-  OpenAI client first, expand only on demand.
+- **A framework depends on an undocumented quirk** → fix the contract only if the
+  quirk is legitimate against the spec; otherwise it is the framework's bug, not
+  ours. Never branch on framework identity.
+- **SDK dep weight / flakiness** → fake the upstream provider; pin SDK versions;
+  keep the suite offline and deterministic.
 
 ## Execution
 
-Phase 1 is one focused slice per framework (parallelizable across worktrees once the
-`tests/conformance/` harness exists). Phases 2–3 follow from what phase 1 surfaces.
+Phase 1 is one focused slice (contract suite + `openai` SDK canary). Phases 2–3
+follow from what it surfaces. The native-contract extension runs after Plan 01,
+reusing the same harness.

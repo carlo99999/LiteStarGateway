@@ -25,12 +25,19 @@ It is deliberately separate from `docs/next-steps/`:
 | # | Plan | Depends on | Theme |
 |---|------|-----------|-------|
 | 01 | [Native provider endpoints](01-native-provider-endpoints.md) | H23 (done) | Product differentiator — native SDKs point at the gateway |
-| 02 | [Agent-framework compatibility](02-agent-frameworks.md) | 01 | Tool-calling agents (Pydantic AI, LangChain, OpenAI Agents) work end-to-end |
+| 02 | [Framework-agnostic wire-contract conformance](02-agent-frameworks.md) | none for the OpenAI surface; native contracts need 01 | Any client speaking the wire spec works — validated by contract, not per-framework |
 | 03 | [Admin UI](03-admin-ui.md) | backend only | Non-dev operability (teams, budgets, keys, usage) |
 
-**Recommended order:** 01 phase 1 (Anthropic `/v1/messages`) → validate with the
-native SDK → 01 phase 2 (Gemini) → 02. Plan 03 (UI) is backend-independent and can
-run in parallel whenever capacity allows.
+**Recommended order:** 02 phase 1 (OpenAI Chat Completions **contract conformance**
+on the existing surface) first — it ships value now, locks current behavior, and
+becomes the acceptance layer for 01. Then 01 phase 1 (Anthropic `/v1/messages`) →
+validate with the native SDK → 01 phase 2 (Gemini), extending the same conformance
+harness to the native contracts as its acceptance. Plan 03 (UI) is
+backend-independent and can run in parallel whenever capacity allows.
+
+Compatibility is **framework-agnostic by construction**: the gateway implements
+standard wire protocols, so conformance is asserted against the protocol contract
+(with official SDKs as canaries), never per framework.
 
 ## Execution conventions (proven this project)
 
