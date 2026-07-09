@@ -50,6 +50,7 @@ from litestar_gateway.infrastructure.web.dependencies import provide_api_key_ser
 from litestar_gateway.infrastructure.web.exception_handlers import domain_exception_handler
 from litestar_gateway.infrastructure.web.models import ModelController
 from litestar_gateway.infrastructure.web.models.dependencies import provide_model_service
+from litestar_gateway.infrastructure.web.openapi import OPENAPI_DESCRIPTION
 from litestar_gateway.infrastructure.web.organizations import OrganizationController
 from litestar_gateway.infrastructure.web.organizations.dependencies import (
     provide_organization_service,
@@ -276,15 +277,7 @@ def _build_openapi_config(settings: Settings) -> OpenAPIConfig | None:
     return OpenAPIConfig(
         title="Litestar Gateway API",
         version="1.0.0",
-        description=(
-            "A gateway for LLM inference, model deployments, and API key "
-            "management.\n\n"
-            "**Docs viewers:**\n\n"
-            "- [Swagger UI](/)\n"
-            "- [Scalar](/scalar)\n"
-            "- [Stoplight Elements](/elements)\n"
-            "- [OpenAPI schema](/openapi.json)\n"
-        ),
+        description=OPENAPI_DESCRIPTION,
         path="/",
         render_plugins=[
             SwaggerRenderPlugin(version="5.18.2", path="/"),
