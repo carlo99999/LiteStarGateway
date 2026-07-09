@@ -39,8 +39,17 @@ from litestar.status_codes import (
 from litestar.testing import AsyncTestClient
 
 from litestar_gateway.application.completion_service import CompletionService
-from litestar_gateway.application.usage_meter import UsageMeter
-from litestar_gateway.domain.entities import Model, ModelType, Provider, TraceRecord, UsageEvent
+from litestar_gateway.application.usage_meter import InFlightSpend, UsageMeter
+from litestar_gateway.domain.entities import (
+    Budget,
+    Model,
+    ModelType,
+    Provider,
+    TraceRecord,
+    UsageEvent,
+)
+from litestar_gateway.domain.entities.enums import BudgetWindow
+from litestar_gateway.domain.exceptions import BudgetExceeded
 from litestar_gateway.infrastructure.llm import vertex_adapter
 
 _MODEL_ID = "gemini-1.5-pro-002"
@@ -159,6 +168,22 @@ async def test_native_call_bills_one_event_with_native_token_counts(
     assert row["prompt_tokens"] == 4  # native promptTokenCount
     assert row["completion_tokens"] == 2  # native candidatesTokenCount
     assert row["cost"] == pytest.approx(0.06)  # (4 + 2) * 0.01
+
+
+async def test_native_output_ceiling_clamped_gemini(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # ISSUE-003: the native Gemini surface must enforce the per-model output ceiling
+    # (H15). With max_output_tokens=10, a body asking for 5000 in the nested
+    # generationConfig.maxOutputTokens is clamped to 10 before dispatch.
+    _patch(monkeypatch)
+    key, _, _ = await _gemini_team(client, max_output_tokens=10)
+    body = {**_BODY, "generationConfig": {"maxOutputTokens": 5000}}
+    resp = await client.post(_GEN_PATH, json=body, headers=_bearer(key))
+    assert resp.status_code == HTTP_200_OK
+    from completions.conftest import _FakeGeminiApiClient
+
+    assert _FakeGeminiApiClient.last_body["generationConfig"]["maxOutputTokens"] == 10
 
 
 async def test_non_vertex_model_rejected_400(
@@ -411,3 +436,132 @@ async def test_native_stream_cancellation_mid_stream_still_settles() -> None:
     assert usage.events[0].prompt_tokens == 4
     assert usage.events[0].completion_tokens == 2
     assert [t.status for t in traces] == ["ok"]
+
+
+# --- Native governance: Gemini reservation (ISSUE-002) + H14 estimate (ISSUE-004) ---
+
+
+def _priced_vertex_model() -> Model:
+    return Model(
+        id=uuid4(),
+        team_id=_TEAM_ID,
+        name="m",
+        provider=Provider.VERTEX_AI,
+        credential_id=uuid4(),
+        type=ModelType.CHAT,
+        provider_model_id=_MODEL_ID,
+        params={},
+        api_version=None,
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.01,
+        enabled=True,
+        created_at=datetime.now(UTC),
+    )
+
+
+class _FakeBudgets:
+    def __init__(self, limit: float) -> None:
+        self._limit = limit
+
+    async def get(self, team_id: UUID) -> Budget:
+        return Budget(
+            id=uuid4(),
+            team_id=team_id,
+            limit_cost=self._limit,
+            window=BudgetWindow.MONTHLY,
+            created_at=datetime.now(UTC),
+        )
+
+
+class _SpendUsage(_FakeUsage):
+    async def spend_since(self, team_id: UUID, since: datetime) -> float:
+        return 0.0
+
+
+class _NoUsageGateway:
+    """Returns a raw Gemini body that omits usageMetadata (blocked/safety response
+    or an upstream shape change) — the case ISSUE-004 must estimate rather than
+    silently bill $0."""
+
+    async def agenerate_content(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        return {"candidates": [{"content": {"parts": [{"text": "ciao"}]}}]}
+
+
+class _BlockingGeminiGateway:
+    """agenerate_content parks until released, so the first request keeps its budget
+    reservation in-flight while a concurrent second request is admitted."""
+
+    def __init__(self, entered: anyio.Event, release: anyio.Event) -> None:
+        self._entered = entered
+        self._release = release
+
+    async def agenerate_content(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> dict[str, Any]:
+        self._entered.set()
+        await self._release.wait()
+        return {
+            "candidates": [{"content": {"parts": [{"text": "ciao"}]}, "finishReason": "STOP"}],
+            "usageMetadata": {"promptTokenCount": 4, "candidatesTokenCount": 2},
+        }
+
+
+async def test_generate_content_bills_estimate_when_usage_absent() -> None:
+    # ISSUE-004: a Gemini response without usageMetadata must not bill a silent $0.
+    # Routing generate_content through _dispatch (with request context) makes the
+    # H14 estimate fallback fire — prompt is estimated from the request text.
+    traces: list[TraceRecord] = []
+    usage = _FakeUsage()
+    service = CompletionService(
+        models=_FakeModels(_priced_vertex_model()),  # type: ignore[arg-type]
+        credentials=_FakeCredentials(),  # type: ignore[arg-type]
+        gateway=_NoUsageGateway(),  # type: ignore[arg-type]
+        meter=UsageMeter(usage=usage, emit_trace=traces.append),  # type: ignore[arg-type]
+    )
+
+    response = await service.generate_content(_TEAM_ID, _KEY_ID, "m", dict(_BODY))
+
+    assert "candidates" in response  # raw body still returned verbatim
+    assert len(usage.events) == 1
+    assert usage.events[0].prompt_tokens > 0  # estimated, not a silent 0
+    assert usage.events[0].cost > 0
+    assert [t.status for t in traces] == ["ok"]
+
+
+async def test_gemini_reservation_nonzero_gates_concurrent_burst() -> None:
+    # ISSUE-002: the native Gemini reservation must read the native body shape
+    # (contents / generationConfig.maxOutputTokens), not the OpenAI keys, so a
+    # concurrent burst near the budget cannot slip through with a $0 reservation.
+    traces: list[TraceRecord] = []
+    usage = _SpendUsage()
+    in_flight = InFlightSpend()
+    meter = UsageMeter(
+        usage=usage,  # type: ignore[arg-type]
+        emit_trace=traces.append,
+        budgets=_FakeBudgets(limit=1.0),  # type: ignore[arg-type]
+        in_flight=in_flight,
+    )
+    entered = anyio.Event()
+    release = anyio.Event()
+    service = CompletionService(
+        models=_FakeModels(_priced_vertex_model()),  # type: ignore[arg-type]
+        credentials=_FakeCredentials(),  # type: ignore[arg-type]
+        gateway=_BlockingGeminiGateway(entered, release),  # type: ignore[arg-type]
+        meter=meter,
+    )
+    # maxOutputTokens=1000 @ 0.01/token => ~10 USD reserved, far over the 1.0 cap.
+    body = {**_BODY, "generationConfig": {"maxOutputTokens": 1000}}
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(service.generate_content, _TEAM_ID, _KEY_ID, "m", dict(body))
+        await entered.wait()
+        # First request admitted and holding a non-zero reservation (was $0 pre-fix).
+        assert in_flight.total(_TEAM_ID) > 0
+        with pytest.raises(BudgetExceeded):
+            await service.generate_content(_TEAM_ID, _KEY_ID, "m", dict(body))
+        release.set()
+
+    # Only the first request billed; the gated burst never dispatched.
+    assert len(usage.events) == 1

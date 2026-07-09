@@ -137,6 +137,14 @@ class UnsupportedOperation(DomainError):
     """This provider does not support the requested operation (e.g. /responses)."""
 
 
+class UnsupportedNativeField(DomainError):
+    """The native passthrough body carries a field the gateway refuses to forward
+    to the provider SDK — a reserved SDK control kwarg (extra_headers/extra_query/
+    extra_body/timeout) or a leading-underscore key. Splatting these into the SDK
+    call would let a tenant override the vaulted credential or inject outbound
+    transport options, so the request is rejected as a bad request (400)."""
+
+
 class ModelTypeMismatch(DomainError):
     """The model's type does not match the requested operation (e.g. chat vs embeddings)."""
 

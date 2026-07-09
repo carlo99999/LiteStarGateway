@@ -31,7 +31,13 @@ from litestar_gateway.domain.ports import (
     LLMGateway,
     ModelRepository,
 )
-from litestar_gateway.domain.request_policy import clamp_output_tokens, sanitize_request
+from litestar_gateway.domain.request_policy import (
+    clamp_native_output_tokens,
+    clamp_output_tokens,
+    native_reservation_view,
+    reject_native_control_kwargs,
+    sanitize_request,
+)
 
 
 def _reject_unsupported_n(operation: str, model: Model, request: dict[str, Any]) -> None:
@@ -131,12 +137,16 @@ class CompletionService:
         request: dict[str, Any],
         call: Callable[[], Awaitable[dict[str, Any]]],
         reservation: float = 0.0,
+        settle_view: Callable[[dict[str, Any]], dict[str, Any]] = lambda response: response,
     ) -> dict[str, Any]:
         """Run one gateway call, observing success (usage + trace) and failure
         (error trace) before the exception propagates to the HTTP layer. The
         budget reservation taken at admission is released either way. The request
         is passed to settlement so usage can be estimated if the provider
-        reported none (H14)."""
+        reported none (H14). `settle_view` maps the raw response to the usage-only
+        shape settlement reads (identity for OpenAI-shaped responses; the native
+        Gemini path passes `_gemini_usage`), so the raw body is still returned to
+        the caller verbatim while billing sees the native token counts."""
         start = perf_counter()
         try:
             try:
@@ -148,7 +158,7 @@ class CompletionService:
                 raise
             latency_ms = (perf_counter() - start) * 1000
             await self._meter.settle_ok(
-                team_id, api_key_id, model, operation, response, latency_ms, request
+                team_id, api_key_id, model, operation, settle_view(response), latency_ms, request
             )
             await self._attach_routing_usage(response)
             return response
@@ -184,18 +194,24 @@ class CompletionService:
         return model
 
     async def prepare_native(
-        self, team_id: UUID, expected_type: ModelType, alias: str | None
-    ) -> tuple[Model, dict[str, str]]:
+        self, team_id: UUID, expected_type: ModelType, alias: str | None, data: dict[str, Any]
+    ) -> tuple[Model, dict[str, str], dict[str, Any]]:
         """Resolve a provider-native request's model `alias` to a usable team
-        `Model` plus its decrypted credentials.
+        `Model` plus its decrypted credentials, and return the *governed* body.
 
         The alias is passed explicitly because the native protocols disagree on
         where it lives: Anthropic Messages carries it in the request body, Gemini
         carries it in the URL path. Runs the *same* enable/type/credential guards
         as `_prepare`, minus smart routing (native endpoints resolve one concrete
-        same-protocol model) and budget admission (the native surface meters
-        natively around its own dispatch). The upstream `base_url` still comes only
-        from the credential (`get_values`), never from the client."""
+        same-protocol model). Budget admission stays with the caller (the native
+        surface meters natively around its own dispatch), but the two governance
+        guards the OpenAI surface applies are reapplied centrally here so every
+        native method — streaming and non-streaming, both providers — gets them:
+        reserved SDK control kwargs are rejected (credential-override vector,
+        ISSUE-001) and the output-token field is clamped to the per-model/global
+        ceiling (ISSUE-003). Everything else in the body stays verbatim. The
+        upstream `base_url` still comes only from the credential (`get_values`),
+        never from the client."""
         model = self._ensure_usable(
             await self._models.get_by_name(team_id, alias) if alias else None,
             alias,
@@ -204,7 +220,9 @@ class CompletionService:
         values = await self._credentials.get_values(model.credential_id)
         if values is None:
             raise CredentialNotFound(str(model.credential_id))
-        return model, values
+        reject_native_control_kwargs(data)
+        governed = clamp_native_output_tokens(model.provider, data, model.max_output_tokens)
+        return model, values, governed
 
     async def native_messages(
         self, team_id: UUID, api_key_id: UUID, data: dict[str, Any]
@@ -219,22 +237,26 @@ class CompletionService:
         (it carries Anthropic's required `max_tokens`), `_dispatch` calls the
         gateway's native method (no translation) and settles on the native `usage`
         block (`input_tokens`/`output_tokens`, which `_parse_usage` reads
-        directly), releasing the reservation either way. The body is NOT
-        sanitized/translated — it flows to the provider verbatim."""
-        model, values = await self.prepare_native(team_id, ModelType.CHAT, data.get("model"))
+        directly), releasing the reservation either way. Only the governance
+        fields are touched (reserved-kwarg rejection + output-token clamp in
+        `prepare_native`); the rest of the body flows to the provider verbatim."""
+        model, values, governed = await self.prepare_native(
+            team_id, ModelType.CHAT, data.get("model"), data
+        )
         if model.provider is not Provider.ANTHROPIC:
             raise ProviderMismatch(
                 f"Model '{model.name}' is provider '{model.provider.value}', not Anthropic; "
                 "the native Messages endpoint (/v1/messages) serves Anthropic models only"
             )
-        reservation = await self._meter.admit(team_id, model, data)
+        view = native_reservation_view(model.provider, governed)
+        reservation = await self._meter.admit(team_id, model, view)
         return await self._dispatch(
             team_id,
             api_key_id,
             model,
             "native.messages",
-            data,
-            lambda: self._gateway.anative_messages(data, model, values),
+            view,
+            lambda: self._gateway.anative_messages(governed, model, values),
             reservation,
         )
 
@@ -252,19 +274,22 @@ class CompletionService:
         status BEFORE the SSE 200 commits (H24). The events flow through
         untranslated; usage is accumulated from the raw events and settled at the
         tail (or on disconnect — `_rechain`'s aclose propagation)."""
-        model, values = await self.prepare_native(team_id, ModelType.CHAT, data.get("model"))
+        model, values, governed = await self.prepare_native(
+            team_id, ModelType.CHAT, data.get("model"), data
+        )
         if model.provider is not Provider.ANTHROPIC:
             raise ProviderMismatch(
                 f"Model '{model.name}' is provider '{model.provider.value}', not Anthropic; "
                 "the native Messages endpoint (/v1/messages) serves Anthropic models only"
             )
-        reservation = await self._meter.admit(team_id, model, data)
+        view = native_reservation_view(model.provider, governed)
+        reservation = await self._meter.admit(team_id, model, view)
         try:
-            stream = await self._gateway.astream_native_messages(data, model, values)
+            stream = await self._gateway.astream_native_messages(governed, model, values)
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        gen = self._metered_native(team_id, api_key_id, model, stream, data, reservation)
+        gen = self._metered_native(team_id, api_key_id, model, stream, view, reservation)
         return await _prime(gen)
 
     def _metered_native(
@@ -308,44 +333,33 @@ class CompletionService:
         translation) and settles on the native `usageMetadata`
         (`promptTokenCount`/`candidatesTokenCount`, mapped to the
         `input_tokens`/`output_tokens` `_parse_usage` reads), releasing the
-        reservation either way. The body flows to the provider verbatim; the raw
-        Gemini response is returned untranslated."""
-        model, values = await self.prepare_native(team_id, ModelType.CHAT, model_alias)
+        reservation either way. Only the governance fields are touched
+        (`prepare_native`); the rest of the body flows to the provider verbatim and
+        the raw Gemini response is returned untranslated. Routed through `_dispatch`
+        (with `settle_view=_gemini_usage`) rather than a hand-rolled copy, so the
+        H14 estimate-when-usage-absent fallback fires here too (ISSUE-004): the
+        OpenAI-shaped reservation view is passed as the settlement request, so a
+        response missing `usageMetadata` is estimated instead of billed as $0."""
+        model, values, governed = await self.prepare_native(
+            team_id, ModelType.CHAT, model_alias, data
+        )
         if model.provider is not Provider.VERTEX_AI:
             raise ProviderMismatch(
                 f"Model '{model.name}' is provider '{model.provider.value}', not Vertex/Gemini; "
                 "the native Gemini endpoint (generateContent) serves Vertex models only"
             )
-        reservation = await self._meter.admit(team_id, model, data)
-        start = perf_counter()
-        try:
-            try:
-                response = await self._gateway.agenerate_content(data, model, values)
-            except Exception as exc:
-                self._meter.trace_error(
-                    team_id,
-                    api_key_id,
-                    model,
-                    "native.generate_content",
-                    (perf_counter() - start) * 1000,
-                    exc,
-                )
-                raise
-            latency_ms = (perf_counter() - start) * 1000
-            # Return the raw Gemini body verbatim, but settle on a usage-only view
-            # mapped from its native usageMetadata (the body has no `usage` key that
-            # settle_ok/_parse_usage would recognize).
-            await self._meter.settle_ok(
-                team_id,
-                api_key_id,
-                model,
-                "native.generate_content",
-                _gemini_usage(response),
-                latency_ms,
-            )
-            return response
-        finally:
-            self._meter.release(team_id, reservation)
+        view = native_reservation_view(model.provider, governed)
+        reservation = await self._meter.admit(team_id, model, view)
+        return await self._dispatch(
+            team_id,
+            api_key_id,
+            model,
+            "native.generate_content",
+            view,
+            lambda: self._gateway.agenerate_content(governed, model, values),
+            reservation,
+            settle_view=_gemini_usage,
+        )
 
     async def open_generate_content_stream(
         self, team_id: UUID, api_key_id: UUID, model_alias: str, data: dict[str, Any]
@@ -360,19 +374,22 @@ class CompletionService:
         status BEFORE the SSE 200 commits (H24). The chunks flow through
         untranslated; usage is accumulated from the raw `usageMetadata` and settled
         at the tail (or on disconnect — `_rechain`'s aclose propagation)."""
-        model, values = await self.prepare_native(team_id, ModelType.CHAT, model_alias)
+        model, values, governed = await self.prepare_native(
+            team_id, ModelType.CHAT, model_alias, data
+        )
         if model.provider is not Provider.VERTEX_AI:
             raise ProviderMismatch(
                 f"Model '{model.name}' is provider '{model.provider.value}', not Vertex/Gemini; "
                 "the native Gemini endpoint (streamGenerateContent) serves Vertex models only"
             )
-        reservation = await self._meter.admit(team_id, model, data)
+        view = native_reservation_view(model.provider, governed)
+        reservation = await self._meter.admit(team_id, model, view)
         try:
-            stream = await self._gateway.astream_generate_content(data, model, values)
+            stream = await self._gateway.astream_generate_content(governed, model, values)
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        gen = self._metered_gemini(team_id, api_key_id, model, stream, data, reservation)
+        gen = self._metered_gemini(team_id, api_key_id, model, stream, view, reservation)
         return await _prime(gen)
 
     def _metered_gemini(
