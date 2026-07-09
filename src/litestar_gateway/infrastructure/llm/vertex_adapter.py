@@ -178,6 +178,31 @@ def from_imagen_response(response: dict[str, Any]) -> dict[str, Any]:
     return {"created": int(time.time()), "data": data}
 
 
+async def _raw_request(
+    client: genai.Client, http_method: str, path: str, body: dict[str, Any]
+) -> Any:
+    """Single call-site for the private `google-genai` raw-request surface.
+
+    The native passthrough (`agenerate_content`) needs to send a
+    `GenerateContentRequest` body upstream verbatim, but `google-genai` has no
+    public raw-request API — only the private `client.aio._api_client.async_request`
+    (see ISSUE-005). Routing both native passthrough call sites through this one
+    helper keeps the private-API surface to a single, documented spot, and
+    `tests/native/test_genai_private_api_contract.py` pins the assumed shape
+    against the *installed* SDK so a `google-genai` upgrade that renames/re-signs
+    this method fails in CI instead of 500ing in production.
+    """
+    return await client.aio._api_client.async_request(http_method, path, body)
+
+
+async def _raw_request_streamed(
+    client: genai.Client, http_method: str, path: str, body: dict[str, Any]
+) -> Any:
+    """Streaming counterpart of `_raw_request` — see its docstring for why this
+    wraps a private `google-genai` method behind a single, tested call-site."""
+    return await client.aio._api_client.async_request_streamed(http_method, path, body)
+
+
 def _build_client(credentials: dict[str, str], timeout_ms: int) -> genai.Client:
     creds = None
     if raw := credentials.get("vertex_credentials"):
@@ -296,7 +321,7 @@ class VertexAdapter:
         client = self._client(credentials)
         path = f"{model.provider_model_id}:generateContent"
         try:
-            response = await client.aio._api_client.async_request("post", path, dict(native_body))
+            response = await _raw_request(client, "post", path, dict(native_body))
             return json.loads(response.body) if response.body else {}
         finally:
             await client.aio.aclose()
@@ -312,9 +337,7 @@ class VertexAdapter:
         client = self._client(credentials)
         path = f"{model.provider_model_id}:streamGenerateContent"
         try:
-            stream = await client.aio._api_client.async_request_streamed(
-                "post", path, dict(native_body)
-            )
+            stream = await _raw_request_streamed(client, "post", path, dict(native_body))
             async for chunk in stream:
                 if chunk.body:
                     yield json.loads(chunk.body)
