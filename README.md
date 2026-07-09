@@ -18,7 +18,7 @@ Built on a few deliberate principles:
   a clean multi-tenant model, by design rather than as an afterthought.
 - **Auditable** — a small, hexagonal codebase a team can read in an afternoon.
 
-**Status: `v1.0.0`** — the production-ready core is complete (CI, container +
+**Status: `v1.1.0`** — the production-ready core is complete (CI, container +
 Postgres + migrations, provider resilience, request allowlist, structured
 logging, secrets/key rotation, usage accounting, and MLflow observability). See
 the [Roadmap](#roadmap) for what's next.
@@ -188,7 +188,7 @@ Notes:
 
 ## Roadmap
 
-**v1.0.0 is released** — everything under "v1 (shipped)" below is done. The
+**v1.1.0 is released** — everything under "v1 (shipped)" below is done. The
 **Enterprise** and **v2** phases are next; items with a design doc have it parked
 on their own branch (linked). Order within a phase is a recommendation.
 
