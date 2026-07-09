@@ -1,0 +1,60 @@
+name: Publish image
+
+# Build and push the container image to GHCR. The image BUILD is validated on
+# every CI run (see the `docker` job in ci.yml); this workflow adds the registry
+# push. A version tag push (`v1.2.3`) publishes that semver tag plus `latest`;
+# a push to main publishes a moving `edge` tag for the current mainline.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ghcr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/carlo99999/litestargateway
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # tags: `latest` + the semver only on tag pushes; `edge` only on main.
+      - name: Derive image tags
+        id: tags
+        run: |
+          tags=""
+          case "${GITHUB_REF}" in
+            refs/tags/v*)
+              version="${GITHUB_REF#refs/tags/}"
+              tags="${IMAGE}:${version}
+          ${IMAGE}:latest"
+              ;;
+            refs/heads/main)
+              tags="${IMAGE}:edge"
+              ;;
+          esac
+          {
+            echo "tags<<EOF"
+            echo "${tags}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}

@@ -16,6 +16,29 @@ RUN uv sync --frozen --no-install-project --no-dev
 COPY . .
 RUN uv sync --frozen --no-dev
 
+# ---- Docs: build the MkDocs site the app serves at /docs ----
+FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS docs
+
+ENV UV_LINK_MODE=copy
+
+WORKDIR /app
+
+# The dev group holds mkdocs; the project itself isn't needed to build the docs.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project
+
+# Reproduce `just docs-prepare` (the source projection mkdocs.yml's docs_dir
+# points at) then build the site to /app/.mkdocs-site (mkdocs.yml site_dir).
+COPY . .
+RUN mkdir -p .mkdocs-docs \
+    && ln -sfn ../README.md .mkdocs-docs/index.md \
+    && ln -sfn ../EXAMPLES.md .mkdocs-docs/EXAMPLES.md \
+    && ln -sfn ../CONTRIBUTING.md .mkdocs-docs/CONTRIBUTING.md \
+    && ln -sfn ../SECURITY.md .mkdocs-docs/SECURITY.md \
+    && ln -sfn ../docs .mkdocs-docs/docs \
+    && ln -sfn ../issues .mkdocs-docs/issues \
+    && uv run mkdocs build --strict
+
 # ---- Runtime: slim image with just the venv + source ----
 FROM python:3.14-slim-bookworm AS runtime
 
@@ -27,6 +50,10 @@ RUN useradd --create-home --uid 1000 app \
 
 WORKDIR /app
 COPY --from=builder --chown=app:app /app /app
+
+# The built narrative docs, served by the app as static files at /docs (see
+# infrastructure/web/docs_site.py). Absent when running from source; present here.
+COPY --from=docs --chown=app:app /app/.mkdocs-site /app/.mkdocs-site
 
 # No DATABASE_URL default on purpose: production requires PostgreSQL, and the
 # app fails fast at startup unless DATABASE_URL points at postgresql+asyncpg://

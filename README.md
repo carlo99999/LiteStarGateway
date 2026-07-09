@@ -122,6 +122,20 @@ uv run pre-commit install
 The app ships as a container (multi-stage `Dockerfile`, non-root, served by
 uvicorn with `--proxy-headers`). Provide the secrets via the environment.
 
+Pull the published image from GHCR (built and pushed by CI on each release tag):
+
+```bash
+docker pull ghcr.io/carlo99999/litestargateway:latest
+docker run -p 8000:8000 \
+  -e ENVIRONMENT=production \
+  -e MASTER_KEY=… -e JWT_SECRET=… -e SALT_KEY=… \
+  ghcr.io/carlo99999/litestargateway:latest
+```
+
+On a running instance: the interactive **Swagger UI** is served at `/` (with
+Scalar at `/scalar`, Stoplight at `/elements`, and the schema at `/openapi.json`),
+and the narrative **docs** are served at `/docs`.
+
 ```bash
 # Local prod-like run (app + Postgres) via compose:
 MASTER_KEY=… JWT_SECRET=… SALT_KEY=… POSTGRES_PASSWORD=… docker compose up --build
