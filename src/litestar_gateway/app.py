@@ -281,7 +281,7 @@ def _build_openapi_config(settings: Settings) -> OpenAPIConfig | None:
         return None
     return OpenAPIConfig(
         title="Litestar Gateway API",
-        version="1.0.0",
+        version="1.1.0",
         description=OPENAPI_DESCRIPTION,
         path="/",
         render_plugins=[
