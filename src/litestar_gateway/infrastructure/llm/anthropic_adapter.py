@@ -222,6 +222,28 @@ class AnthropicAdapter:
         finally:
             await client.close()
 
+    async def astream_native_messages(
+        self, native_body: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        # Native passthrough streaming: relay the upstream Anthropic events verbatim
+        # (event.model_dump()) — NO anthropic_event_to_delta, NO OpenAI chunk shape.
+        # Only the client's `model` alias is resolved to the provider id (same as
+        # every path), which is not translation. Client lifecycle mirrors
+        # astream_chat_completion minus the translation + synthetic usage chunk.
+        client = AsyncAnthropic(
+            api_key=require_api_key(credentials),
+            base_url=_base_url(credentials),
+            **self._resilience.client_kwargs,
+        )
+        body: dict[str, Any] = {**native_body, "model": model.provider_model_id, "stream": True}
+        # Keep the client open for the whole stream; close on completion/disconnect.
+        try:
+            stream: Any = await client.messages.create(**body)
+            async for event in stream:
+                yield event.model_dump()
+        finally:
+            await client.close()
+
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:

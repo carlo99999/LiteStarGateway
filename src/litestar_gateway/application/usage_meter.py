@@ -80,6 +80,21 @@ def _chunk_output_text(chunk: dict[str, Any]) -> str:
     return text
 
 
+def _native_event_text(event: dict[str, Any]) -> str:
+    """Output text carried by one raw Anthropic stream event, for the estimation
+    fallback when a disconnect arrives before any authoritative usage. Native
+    text lands on `content_block_delta` events as `text_delta`/`input_json_delta`;
+    everything else contributes no output text."""
+    if event.get("type") != "content_block_delta":
+        return ""
+    delta = event.get("delta") or {}
+    for key in ("text", "partial_json"):
+        value = delta.get(key)
+        if isinstance(value, str):
+            return value
+    return ""
+
+
 def _has_tokens(usage: dict[str, Any]) -> bool:
     return any(
         int(usage.get(key) or 0)
@@ -410,6 +425,66 @@ class UsageMeter:
             # Shielded: on a client disconnect this frame is already cancelled,
             # and the settlement's first checkpoint (the DB commit) would
             # re-raise CancelledError — no ledger row, no outbox, no trace.
+            with anyio.CancelScope(shield=True):
+                await self._finalize_stream_billing(
+                    team_id,
+                    api_key_id,
+                    model,
+                    operation,
+                    request,
+                    usage,
+                    streamed_chars,
+                    error,
+                    start,
+                )
+
+    async def metered_native_stream(
+        self,
+        team_id: UUID,
+        api_key_id: UUID,
+        model: Model,
+        operation: str,
+        stream: AsyncIterator[dict[str, Any]],
+        request: dict[str, Any],
+        release: Callable[[], None] | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Relay raw Anthropic Messages stream events unchanged while capturing the
+        native usage they carry, then settle once at the tail (or on client
+        disconnect — the shielded finally). This is the native mirror of
+        `metered_stream`: identical release-once + shielded-settlement machinery,
+        but usage is read from the Anthropic event shape rather than the OpenAI/
+        Responses shapes. `message_start` reports `message.usage.input_tokens`;
+        `message_delta` reports the running top-level `usage.output_tokens`. The
+        accumulated `{input_tokens, output_tokens}` settle through the same
+        `_finalize_stream_billing` path (estimation fallback, error trace,
+        settlement timeout) as every other stream."""
+        start = perf_counter()
+        usage: dict[str, Any] = {}
+        streamed_chars = 0
+        error: Exception | None = None
+        try:
+            async for event in stream:
+                etype = event.get("type")
+                if etype == "message_start":
+                    start_usage = (event.get("message") or {}).get("usage") or {}
+                    if "input_tokens" in start_usage:
+                        usage["input_tokens"] = start_usage.get("input_tokens") or 0
+                    if "output_tokens" in start_usage:
+                        usage["output_tokens"] = start_usage.get("output_tokens") or 0
+                elif etype == "message_delta":
+                    delta_usage = event.get("usage") or {}
+                    if "output_tokens" in delta_usage:
+                        usage["output_tokens"] = delta_usage.get("output_tokens") or 0
+                streamed_chars += len(_native_event_text(event))
+                yield event
+        except Exception as exc:
+            error = exc
+            raise
+        finally:
+            # Synchronous release first (survives a cancelled scope), then the
+            # shielded settlement — same ordering and guarantees as metered_stream.
+            if release is not None:
+                release()
             with anyio.CancelScope(shield=True):
                 await self._finalize_stream_billing(
                     team_id,

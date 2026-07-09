@@ -56,6 +56,15 @@ class LLMGateway(Protocol):
         OpenAI translation). `model` resolves the upstream model id + capability."""
         ...
 
+    async def astream_native_messages(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Provider-native Anthropic Messages streaming passthrough: resolve eagerly
+        and relay the raw Anthropic stream events verbatim (each carries a `type`),
+        with NO OpenAI translation. Only open-time/iteration errors are normalized to
+        domain errors; the events themselves flow through untouched."""
+        ...
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]: ...

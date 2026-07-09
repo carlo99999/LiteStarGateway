@@ -198,6 +198,14 @@ class ChatToResponsesAdapter:
         # provider before dispatch).
         return await self._inner.anative_messages(request, model, credentials)
 
+    def astream_native_messages(
+        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[dict[str, Any]]:
+        # Native streaming passthrough: forward the raw Anthropic event stream from
+        # the wrapped adapter unchanged (mirrors astream_chat_completion — returns
+        # the inner async iterator directly, no translation).
+        return self._inner.astream_native_messages(request, model, credentials)
+
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:

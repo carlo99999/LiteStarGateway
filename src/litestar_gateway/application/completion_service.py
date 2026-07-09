@@ -221,6 +221,62 @@ class CompletionService:
             reservation,
         )
 
+    async def open_native_messages_stream(
+        self, team_id: UUID, api_key_id: UUID, data: dict[str, Any]
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Anthropic-native `/v1/messages` streaming passthrough, metered natively.
+
+        Mirrors `open_chat_stream` on top of `native_messages`' guards: resolve +
+        guard the model (`prepare_native` → Anthropic-only via `ProviderMismatch`),
+        `admit` the pessimistic cost from the native body (it carries Anthropic's
+        required `max_tokens`), open the RAW Anthropic event stream (releasing the
+        reservation on an open error), wrap it in the native metered generator, and
+        prime the first event so an open-time provider error surfaces as an HTTP
+        status BEFORE the SSE 200 commits (H24). The events flow through
+        untranslated; usage is accumulated from the raw events and settled at the
+        tail (or on disconnect — `_rechain`'s aclose propagation)."""
+        model, values = await self.prepare_native(team_id, ModelType.CHAT, data)
+        if model.provider is not Provider.ANTHROPIC:
+            raise ProviderMismatch(
+                f"Model '{model.name}' is provider '{model.provider.value}', not Anthropic; "
+                "the native Messages endpoint (/v1/messages) serves Anthropic models only"
+            )
+        reservation = await self._meter.admit(team_id, model, data)
+        try:
+            stream = await self._gateway.astream_native_messages(data, model, values)
+        except BaseException:
+            self._meter.release(team_id, reservation)
+            raise
+        gen = self._metered_native(team_id, api_key_id, model, stream, data, reservation)
+        return await _prime(gen)
+
+    def _metered_native(
+        self,
+        team_id: UUID,
+        api_key_id: UUID,
+        model: Model,
+        stream: AsyncIterator[dict[str, Any]],
+        request: dict[str, Any],
+        reservation: float,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Native mirror of `_metered`: wrap the raw Anthropic stream in the native
+        metered generator (usage accumulated from the raw events) and release the
+        budget reservation exactly once — the generator's finally when iterated, a
+        `weakref.finalize` for the never-iterated (drop-before-first-byte) case."""
+        released = False
+
+        def release() -> None:
+            nonlocal released
+            if not released:
+                released = True
+                self._meter.release(team_id, reservation)
+
+        gen = self._meter.metered_native_stream(
+            team_id, api_key_id, model, "native.messages", stream, request, release
+        )
+        weakref.finalize(gen, release)
+        return gen
+
     async def _prepare(
         self,
         team_id: UUID,
