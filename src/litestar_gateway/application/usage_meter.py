@@ -40,6 +40,17 @@ def _request_text(request: dict[str, Any]) -> str:
     parts: list[str] = []
     if isinstance(request.get("instructions"), str):
         parts.append(request["instructions"])
+    # Anthropic-native bodies carry the system prompt in a top-level `system`
+    # field (string or list of content blocks), outside `messages` (R8-ISSUE-008).
+    system = request.get("system")
+    if isinstance(system, str):
+        parts.append(system)
+    elif isinstance(system, list):
+        parts.extend(
+            block.get("text", "")
+            for block in system
+            if isinstance(block, dict) and isinstance(block.get("text"), str)
+        )
     value = request.get("input")
     if isinstance(value, str):
         parts.append(value)
