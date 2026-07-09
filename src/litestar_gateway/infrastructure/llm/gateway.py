@@ -29,6 +29,8 @@ _CHAT = "chat.completions"
 _RESPONSES = "responses"
 _EMBEDDINGS = "embeddings"
 _IMAGES = "image_generation"
+_NATIVE_MESSAGES = "native.messages"
+_NATIVE_GENERATE_CONTENT = "native.generate_content"
 
 
 class LLMGatewayImpl:
@@ -50,15 +52,17 @@ class LLMGatewayImpl:
                 ChatToResponsesAdapter(openai_adapter),
                 frozenset({_CHAT, _RESPONSES, _EMBEDDINGS}),
             ),
-            # Anthropic: chat + emulated Responses. No embeddings API.
+            # Anthropic: chat + emulated Responses + native Messages passthrough.
+            # No embeddings API.
             Provider.ANTHROPIC: (
                 ChatToResponsesAdapter(AnthropicAdapter(resilience)),
-                frozenset({_CHAT, _RESPONSES}),
+                frozenset({_CHAT, _RESPONSES, _NATIVE_MESSAGES}),
             ),
-            # Vertex/Gemini: chat + emulated Responses + embeddings + images (Imagen).
+            # Vertex/Gemini: chat + emulated Responses + native generateContent
+            # passthrough + embeddings + images (Imagen).
             Provider.VERTEX_AI: (
                 ChatToResponsesAdapter(VertexAdapter(resilience)),
-                frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES}),
+                frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES, _NATIVE_GENERATE_CONTENT}),
             ),
             # Bedrock: Converse chat + emulated Responses + invoke_model
             # embeddings (Titan/Cohere) and images (Titan Image Generator).
@@ -117,46 +121,50 @@ class LLMGatewayImpl:
     async def anative_messages(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        # Native Anthropic passthrough: reuse the chat capability slot to resolve
-        # the adapter, then call its native method directly. arun_translated only
-        # NORMALIZES upstream SDK errors (429/5xx/timeout -> domain errors) — it
-        # does not touch the request or response body, so the native Anthropic
-        # shape flows through untranslated.
-        adapter = self._resolve(model.provider, "chat.completions")
+        # Native Anthropic passthrough: resolve via the dedicated native.messages
+        # capability slot (only Anthropic advertises it), then call the adapter's
+        # native method directly. arun_translated only NORMALIZES upstream SDK
+        # errors (429/5xx/timeout -> domain errors) — it does not touch the
+        # request or response body, so the native Anthropic shape flows through
+        # untranslated.
+        adapter = self._resolve(model.provider, _NATIVE_MESSAGES)
         return await arun_translated(adapter.anative_messages(request, model, credentials))
 
     async def astream_native_messages(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        # Native Anthropic passthrough streaming: resolve via the chat capability
-        # slot, then relay the adapter's raw events through translate_stream, which
-        # only NORMALIZES upstream SDK errors (open-time + mid-stream) to domain
-        # errors — it does NOT translate the events, so the raw Anthropic event
-        # shape flows through untouched (mirrors astream_chat_completion minus the
-        # anthropic_event_to_delta re-encoding done inside the adapter there).
-        adapter = self._resolve(model.provider, "chat.completions")
+        # Native Anthropic passthrough streaming: resolve via the dedicated
+        # native.messages capability slot, then relay the adapter's raw events
+        # through translate_stream, which only NORMALIZES upstream SDK errors
+        # (open-time + mid-stream) to domain errors — it does NOT translate the
+        # events, so the raw Anthropic event shape flows through untouched
+        # (mirrors astream_chat_completion minus the anthropic_event_to_delta
+        # re-encoding done inside the adapter there).
+        adapter = self._resolve(model.provider, _NATIVE_MESSAGES)
         return translate_stream(adapter.astream_native_messages(request, model, credentials))
 
     async def agenerate_content(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        # Native Gemini passthrough: reuse the chat capability slot to resolve the
-        # adapter, then call its native method directly. arun_translated only
+        # Native Gemini passthrough: resolve via the dedicated
+        # native.generate_content capability slot (only Vertex advertises it),
+        # then call the adapter's native method directly. arun_translated only
         # NORMALIZES upstream SDK errors (429/5xx/timeout -> domain errors) — it does
         # not touch the request or response body, so the native Gemini shape flows
         # through untranslated.
-        adapter = self._resolve(model.provider, "chat.completions")
+        adapter = self._resolve(model.provider, _NATIVE_GENERATE_CONTENT)
         return await arun_translated(adapter.agenerate_content(request, model, credentials))
 
     async def astream_generate_content(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        # Native Gemini passthrough streaming: resolve via the chat capability slot,
-        # then relay the adapter's raw chunks through translate_stream, which only
-        # NORMALIZES upstream SDK errors (open-time + mid-stream) — it does NOT
-        # translate the chunks, so the raw Gemini chunk shape flows through untouched
-        # (mirrors astream_native_messages for the Gemini wire shape).
-        adapter = self._resolve(model.provider, "chat.completions")
+        # Native Gemini passthrough streaming: resolve via the dedicated
+        # native.generate_content capability slot, then relay the adapter's raw
+        # chunks through translate_stream, which only NORMALIZES upstream SDK
+        # errors (open-time + mid-stream) — it does NOT translate the chunks, so
+        # the raw Gemini chunk shape flows through untouched (mirrors
+        # astream_native_messages for the Gemini wire shape).
+        adapter = self._resolve(model.provider, _NATIVE_GENERATE_CONTENT)
         return translate_stream(adapter.astream_generate_content(request, model, credentials))
 
     def embeddings(
