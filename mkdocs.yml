@@ -41,6 +41,7 @@ nav:
       - Provider resilience: docs/provider-resilience.md
       - Bedrock: docs/bedrock.md
       - Native Anthropic endpoint: docs/native-anthropic.md
+      - Native Gemini endpoint: docs/native-gemini.md
   - Identity and access:
       - Enterprise SSO: docs/enterprise-sso.md
       - Account recovery: docs/account-recovery.md
