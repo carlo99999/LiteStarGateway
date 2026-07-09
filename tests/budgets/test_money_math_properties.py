@@ -16,7 +16,12 @@ from uuid import uuid4
 from hypothesis import given
 from hypothesis import strategies as st
 
-from litestar_gateway.application.usage_meter import InFlightSpend, _parse_usage, _reservation_cost
+from litestar_gateway.application.usage_meter import (
+    InFlightSpend,
+    _parse_usage,
+    _request_text,
+    _reservation_cost,
+)
 from litestar_gateway.domain.entities import Model, ModelType, Provider
 
 TEAM_ID = uuid4()
@@ -174,3 +179,18 @@ def test_reservation_cost_is_never_negative(
     assert reservation_with_ceiling >= 0.0
     # A higher output ceiling (same prompt) reserves at least as much.
     assert reservation_with_ceiling >= reservation
+
+
+def test_request_text_includes_anthropic_system_field() -> None:
+    # R8-ISSUE-008: the Anthropic-native top-level `system` prompt (string or
+    # content-block list) must be counted by the reservation/estimate, not only
+    # `messages` — otherwise a large system prompt is invisible to admission.
+    assert "big system" in _request_text({"system": "big system", "messages": []})
+    assert "block sys" in _request_text(
+        {"system": [{"type": "text", "text": "block sys"}], "messages": []}
+    )
+    # Regression guard: system text actually raises the estimated prompt cost.
+    model = _model(input_cost=1.0, output_cost=1.0)
+    with_system = _reservation_cost(model, {"system": "x" * 400, "messages": []})
+    without_system = _reservation_cost(model, {"messages": []})
+    assert with_system > without_system

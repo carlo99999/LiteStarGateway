@@ -62,6 +62,40 @@ Counts: **1 CRITICAL · 3 HIGH · 3 MEDIUM · 3 LOW.**
 | ISSUE-009 | Triplicazione dello scheletro di stream-metering (`_metered`/`_metered_native`/`_metered_gemini`, `metered_*_stream`) — debito DRY | low | `application/completion_service.py:270-295,378-404,515-543`; `application/usage_meter.py:392-569` | open |
 | ISSUE-010 | Asimmetria di copertura test: nessun test di budget/concorrenza sulla superficie Gemini nativa | low | `tests/native/test_generate_content.py` | open |
 
+## Resolution status — REMEDIATED
+
+Tutti i finding risolti e mergiati, tranne un LOW già coperto e uno deferito con
+motivazione. `main` è rimasta verde per tutta la remediation (740 test passati,
+`ruff`/`pyrefly`/`pre-commit` puliti).
+
+| ID | Priorità | Stato | PR |
+|----|----------|-------|----|
+| ISSUE-001 | critical | **Fixed** | #221 |
+| ISSUE-002 | high | **Fixed** | #221 |
+| ISSUE-003 | high | **Fixed** | #221 |
+| ISSUE-004 | high | **Fixed** | #221 |
+| ISSUE-005 | medium | **Fixed** | #222 |
+| ISSUE-006 | medium | **Fixed** | #224 |
+| ISSUE-007 | medium | **Fixed** | #223 |
+| ISSUE-008 | low | **Fixed** | (chiusura Round 8) |
+| ISSUE-009 | low | **Deferred** | — |
+| ISSUE-010 | low | **Covered** | #221 |
+
+Note:
+
+- **001+002+003+004** sono atterrate come un'unica modifica coesa (#221): reject dei
+  control-kwargs SDK, clamp del ceiling di output, reservation per-provider centralizzati
+  in `prepare_native` + `domain/request_policy.py`, e `generate_content` reinstradato su
+  `_dispatch` (con `settle_view`). Il body **clampato** è quello realmente inviato upstream.
+- **ISSUE-010** (test budget/concorrenza Gemini) è coperto da
+  `tests/native/test_generate_content.py::test_gemini_reservation_nonzero_gates_concurrent_burst`
+  aggiunto in #221.
+- **ISSUE-009** (refactor DRY dello scheletro stream-metering) è **deferito**: le parti
+  correttezza-critiche (release-once, settlement shielded) sono già fattorizzate in
+  `_finalize_stream_billing`; rifattorizzare il residuo relay-loop su codice money-critical
+  di streaming è un rischio/beneficio sfavorevole (simplicity-first) — segnalato, non
+  schedulato.
+
 ## Issues
 
 ### ISSUE-001 — Native Anthropic passthrough: client override della credenziale del gateway via `extra_headers` (kwargs injection / open relay)
