@@ -7,6 +7,11 @@ native Anthropic/Gemini contracts depend on Plan 01.
 conforming to the standard **wire protocols**, validated by contract, not by
 chasing individual frameworks.
 
+**Status:** ✅ Phase 1 (OpenAI Chat Completions contract, `openai` SDK canary) and
+Phase 2 (error-envelope parity) shipped. Native Anthropic + Gemini conformance
+contracts added (via Plan 01 slices 1c/2b). ⏳ Phase 3 (protocol-based client docs +
+surface-selection note) in progress.
+
 ## Principle: agnostic by contract, not by framework
 
 A framework is compatible iff it speaks a wire protocol the gateway implements

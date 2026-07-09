@@ -7,6 +7,14 @@
 differentiator: native tool-calling and provider-specific features work without the
 lossy OpenAI translation layer.
 
+**Status: ✅ COMPLETE.** Phase 1 (Anthropic `/v1/messages` — 1a non-streaming, 1b
+streaming, 1c real-SDK validation + docs) and Phase 2 (Gemini `generateContent` /
+`streamGenerateContent` — dispatch + real-SDK validation + docs) are shipped:
+verbatim passthrough, native metering, provider guards, real-SDK-validated,
+documented, and locked by native conformance contracts. Auth was extended to accept
+`x-api-key` (Anthropic) and `x-goog-api-key` (Gemini). Deferred: smart routing on the
+native endpoints (backlog), Anthropic cache-token billing.
+
 ## Guardrails (from the design doc — non-negotiable)
 
 1. **Reuse every existing guard — do not fork the middleware.** Auth

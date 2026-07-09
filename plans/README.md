@@ -19,14 +19,18 @@ It is deliberately separate from `docs/next-steps/`:
   (`alembic upgrade head` + persistence subset), plus a Docker build + `/health`
   smoke test; Dependabot watches `uv` + `github-actions` weekly.
 - Migration chain validated end-to-end against Postgres; schema drift reconciled.
+- **Plan 01 shipped:** native Anthropic `/v1/messages` and Gemini `generateContent`
+  endpoints (non-streaming + streaming), real-SDK-validated, documented, conformance-
+  locked. **Plan 02 Phase 1–2 shipped** (OpenAI contract + error-envelope parity);
+  Phase 3 (client docs + surface-selection note) is the current work.
 
 ## The roadmap
 
-| # | Plan | Depends on | Theme |
-|---|------|-----------|-------|
-| 01 | [Native provider endpoints](01-native-provider-endpoints.md) | H23 (done) | Product differentiator — native SDKs point at the gateway |
-| 02 | [Framework-agnostic wire-contract conformance](02-agent-frameworks.md) | none for the OpenAI surface; native contracts need 01 | Any client speaking the wire spec works — validated by contract, not per-framework |
-| 03 | [Admin UI](03-admin-ui.md) | backend only | Non-dev operability (teams, budgets, keys, usage) |
+| # | Plan | Status | Theme |
+|---|------|--------|-------|
+| 01 | [Native provider endpoints](01-native-provider-endpoints.md) | ✅ **complete** (Anthropic + Gemini) | Product differentiator — native SDKs point at the gateway |
+| 02 | [Framework-agnostic wire-contract conformance](02-agent-frameworks.md) | ✅ Phase 1–2 + native contracts; ⏳ Phase 3 docs | Any client speaking the wire spec works — validated by contract, not per-framework |
+| 03 | [Admin UI](03-admin-ui.md) | ⏳ not started (`ui/` empty) | Non-dev operability (teams, budgets, keys, usage) |
 
 **Recommended order:** 02 phase 1 (OpenAI Chat Completions **contract conformance**
 on the existing surface) first — it ships value now, locks current behavior, and
