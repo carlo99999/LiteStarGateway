@@ -115,16 +115,6 @@ async def test_h23_vision_on_anthropic_surfaces_501(
     assert exc.value.status_code == 501
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Phase 2 (error-shape parity): the gateway's shared exception handler "
-        "returns {'detail': ...}, not the OpenAI error envelope {'error': "
-        "{'message', 'type', ...}}. Making /v1/* emit the OpenAI envelope without "
-        "changing the management API's error shape is a scoped adapter change for "
-        "Plan 02 Phase 2, not a contract weakening here."
-    ),
-    strict=True,
-)
 async def test_error_body_is_openai_envelope(
     client: AsyncTestClient,
     sdk: Callable[[str], AsyncOpenAI],

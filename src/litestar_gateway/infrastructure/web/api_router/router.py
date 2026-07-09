@@ -13,6 +13,7 @@ from advanced_alchemy.extensions.litestar import SQLAlchemyAsyncConfig
 from litestar.middleware.base import DefineMiddleware
 from litestar.router import Router
 
+from litestar_gateway.domain.exceptions import DomainError
 from litestar_gateway.infrastructure.web.api_router.completions import (
     chat_completions,
     embeddings,
@@ -21,6 +22,7 @@ from litestar_gateway.infrastructure.web.api_router.completions import (
 )
 from litestar_gateway.infrastructure.web.api_router.wo_am_i import whoami
 from litestar_gateway.infrastructure.web.auth import APIKeyAuthMiddleware
+from litestar_gateway.infrastructure.web.exception_handlers import openai_error_handler
 from litestar_gateway.infrastructure.web.native.controller import native_messages
 from litestar_gateway.infrastructure.web.rate_limit import build_inference_rate_limit
 
@@ -36,5 +38,9 @@ def create_api_router(config: SQLAlchemyAsyncConfig) -> Router:
             build_inference_rate_limit().middleware,
             DefineMiddleware(APIKeyAuthMiddleware, config=config),
         ],
+        # Router-level handler overrides the app-level {"detail": ...} one for
+        # these routes only, so /v1/* emits the OpenAI error envelope while the
+        # management API keeps its {"detail": ...} shape.
+        exception_handlers={DomainError: openai_error_handler},
         tags=["api-endpoint"],
     )

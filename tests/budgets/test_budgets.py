@@ -208,7 +208,7 @@ async def test_budget_enforced_end_to_end(client: AsyncTestClient) -> None:
     assert (await _chat(client, key)).status_code == HTTP_200_OK
     blocked = await _chat(client, key)
     assert blocked.status_code == HTTP_402_PAYMENT_REQUIRED
-    assert "budget" in blocked.json()["detail"].lower()
+    assert "budget" in blocked.json()["error"]["message"].lower()
 
     # The budget view reflects the spend; remaining never goes negative.
     resp = await client.get(f"/teams/{team}/budget", headers=_bearer(admin))
