@@ -8,5 +8,9 @@
 .env
 .pytest_cache/
 .ruff_cache/
-docs/
 tests/
+# Locally generated MkDocs artifacts: the image builds its own in the docs stage,
+# so never copy a stale local one into the build context. (docs/ source is kept:
+# the docs stage needs it to build the site served at /docs.)
+.mkdocs-docs/
+.mkdocs-site/
