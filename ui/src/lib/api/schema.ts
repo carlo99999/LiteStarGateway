@@ -1044,6 +1044,8 @@ export interface components {
         /** CreateOrganizationRequest */
         CreateOrganizationRequest: {
             name: string;
+            description?: string | null;
+            tags?: string[];
         };
         /** CreateServicePrincipalRequest */
         CreateServicePrincipalRequest: {
@@ -1188,6 +1190,8 @@ export interface components {
             name: string;
             /** Format: date-time */
             created_at: string;
+            description: string | null;
+            tags: string[];
         };
         /** OrganizationSpendResponse */
         OrganizationSpendResponse: {
@@ -1365,6 +1369,8 @@ export interface components {
         /** UpdateOrganizationRequest */
         UpdateOrganizationRequest: {
             name: string;
+            description?: string | null;
+            tags?: string[];
         };
         /** UsageResponse */
         UsageResponse: {

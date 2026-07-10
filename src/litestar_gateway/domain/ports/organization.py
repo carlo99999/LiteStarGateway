@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol
 from uuid import UUID
 
@@ -20,9 +21,11 @@ class OrganizationRepository(Protocol):
         self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
     ) -> list[Organization]: ...
 
-    async def update(self, organization_id: UUID, name: str) -> Organization | None:
-        """Rename the organization; return the updated entity, or None if no
-        organization has that id."""
+    async def update(
+        self, organization_id: UUID, name: str, description: str | None, tags: Sequence[str]
+    ) -> Organization | None:
+        """Replace the organization's editable metadata (name, description, tags);
+        return the updated entity, or None if no organization has that id."""
         ...
 
     async def delete(self, organization_id: UUID) -> bool:

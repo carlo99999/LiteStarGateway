@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import select
@@ -17,7 +18,12 @@ class SQLAlchemyOrganizationRepository:
         self._session = session
 
     async def add(self, organization: Organization) -> Organization:
-        model = OrganizationModel(id=organization.id, name=organization.name)
+        model = OrganizationModel(
+            id=organization.id,
+            name=organization.name,
+            description=organization.description,
+            tags=list(organization.tags),
+        )
         self._session.add(model)
         await self._session.commit()
         await self._session.refresh(model)
@@ -36,11 +42,15 @@ class SQLAlchemyOrganizationRepository:
         )
         return [m.to_entity() for m in models]
 
-    async def update(self, organization_id: UUID, name: str) -> Organization | None:
+    async def update(
+        self, organization_id: UUID, name: str, description: str | None, tags: Sequence[str]
+    ) -> Organization | None:
         model = await self._session.get(OrganizationModel, organization_id)
         if model is None:
             return None
         model.name = name
+        model.description = description
+        model.tags = list(tags)
         await self._session.commit()
         await self._session.refresh(model)
         return model.to_entity()

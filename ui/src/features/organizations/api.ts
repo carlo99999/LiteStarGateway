@@ -4,6 +4,13 @@ import type { components } from "@/lib/api/schema";
 export type Organization = components["schemas"]["OrganizationResponse"];
 export type OrganizationSpend = components["schemas"]["OrganizationSpendResponse"];
 
+/** Editable organization fields sent on create/update. */
+export interface OrganizationInput {
+  name: string;
+  description: string | null;
+  tags: string[];
+}
+
 /** Pull a human message out of the gateway's OpenAI-shaped error envelope. */
 function errorMessage(error: unknown, fallback: string): string {
   if (error && typeof error === "object") {
@@ -50,22 +57,25 @@ export async function getOrganizationSpend(
 }
 
 /** POST /organizations — create a tenant (platform-admin). */
-export async function createOrganization(name: string): Promise<Organization> {
-  const { data, error } = await api.POST("/organizations", { body: { name } });
+export async function createOrganization(input: OrganizationInput): Promise<Organization> {
+  const { data, error } = await api.POST("/organizations", { body: input });
   if (error || !data) {
     throw new Error(errorMessage(error, "Failed to create organization"));
   }
   return data;
 }
 
-/** PATCH /organizations/{id} — rename a tenant (platform-admin). */
-export async function updateOrganization(id: string, name: string): Promise<Organization> {
+/** PATCH /organizations/{id} — update a tenant's name/description/tags (platform-admin). */
+export async function updateOrganization(
+  id: string,
+  input: OrganizationInput,
+): Promise<Organization> {
   const { data, error } = await api.PATCH("/organizations/{organization_id}", {
     params: { path: { organization_id: id } },
-    body: { name },
+    body: input,
   });
   if (error || !data) {
-    throw new Error(errorMessage(error, "Failed to rename organization"));
+    throw new Error(errorMessage(error, "Failed to update organization"));
   }
   return data;
 }

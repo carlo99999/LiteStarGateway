@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -57,9 +58,24 @@ class OrganizationService:
         self._teams = teams
         self._usage = usage
 
-    async def create(self, actor: User, name: str) -> Organization:
+    async def create(
+        self,
+        actor: User,
+        name: str,
+        *,
+        description: str | None = None,
+        tags: Sequence[str] | None = None,
+    ) -> Organization:
         _require_platform_admin(actor)
-        return await self._orgs.add(Organization(id=uuid4(), name=name, created_at=_now()))
+        return await self._orgs.add(
+            Organization(
+                id=uuid4(),
+                name=name,
+                created_at=_now(),
+                description=description,
+                tags=list(tags or []),
+            )
+        )
 
     async def get(self, actor: User, organization_id: UUID) -> Organization:
         _require_platform_admin(actor)
@@ -108,9 +124,17 @@ class OrganizationService:
         _require_platform_admin(actor)
         return await self._orgs.list(limit=limit, offset=offset)
 
-    async def rename(self, actor: User, organization_id: UUID, name: str) -> Organization:
+    async def update(
+        self,
+        actor: User,
+        organization_id: UUID,
+        name: str,
+        *,
+        description: str | None = None,
+        tags: Sequence[str] | None = None,
+    ) -> Organization:
         _require_platform_admin(actor)
-        org = await self._orgs.update(organization_id, name)
+        org = await self._orgs.update(organization_id, name, description, list(tags or []))
         if org is None:
             raise OrganizationNotFound(str(organization_id))
         return org

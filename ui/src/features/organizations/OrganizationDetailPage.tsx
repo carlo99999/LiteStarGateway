@@ -3,6 +3,7 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { DataTable, type Column } from "@/components/common/DataTable";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   getOrganization,
@@ -69,6 +70,19 @@ export function OrganizationDetailPage() {
           </Button>
         }
       />
+
+      {org.data?.description ? (
+        <p className="mb-3 max-w-2xl text-sm text-muted-foreground">{org.data.description}</p>
+      ) : null}
+      {org.data?.tags.length ? (
+        <div className="mb-6 flex flex-wrap gap-1">
+          {org.data.tags.map((tag) => (
+            <Badge key={tag} variant="muted">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-border bg-card p-4">
