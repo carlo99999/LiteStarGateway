@@ -10,6 +10,8 @@ import { LoginPage } from "@/features/auth/LoginPage";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { OrganizationDetailPage } from "@/features/organizations/OrganizationDetailPage";
 import { OrganizationsPage } from "@/features/organizations/OrganizationsPage";
+import { TeamDetailPage } from "@/features/teams/TeamDetailPage";
+import { TeamsPage } from "@/features/teams/TeamsPage";
 
 const rootRoute = createRootRoute({ component: Outlet });
 
@@ -48,6 +50,18 @@ const organizationDetailRoute = createRoute({
   component: OrganizationDetailPage,
 });
 
+const teamsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/teams",
+  component: TeamsPage,
+});
+
+const teamDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/teams/$teamId",
+  component: TeamDetailPage,
+});
+
 // Scaffolded-but-not-implemented feature areas (Phase 1 lands their views),
 // grouped in the sidebar under gateway / governance / observability.
 const planned: { path: string; command: string; title: string }[] = [
@@ -57,7 +71,6 @@ const planned: { path: string; command: string; title: string }[] = [
   { path: "/credentials", command: "credentials list", title: "Credentials" },
   { path: "/api-keys", command: "api-keys list", title: "API Keys" },
   // governance
-  { path: "/teams", command: "teams list", title: "Teams" },
   { path: "/users", command: "users list", title: "Users" },
   {
     path: "/service-principals",
@@ -84,6 +97,8 @@ const routeTree = rootRoute.addChildren([
     indexRoute,
     organizationsRoute,
     organizationDetailRoute,
+    teamsRoute,
+    teamDetailRoute,
     ...plannedRoutes,
   ]),
 ]);

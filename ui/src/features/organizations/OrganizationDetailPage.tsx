@@ -28,7 +28,15 @@ const teamColumns: Column<TeamSpend>[] = [
   {
     key: "name",
     header: "team",
-    cell: (t) => <span className="font-medium text-foreground">{t.name}</span>,
+    cell: (t) => (
+      <Link
+        to="/teams/$teamId"
+        params={{ teamId: t.team_id }}
+        className="font-medium text-foreground hover:text-primary hover:underline"
+      >
+        {t.name}
+      </Link>
+    ),
   },
   {
     key: "team_id",

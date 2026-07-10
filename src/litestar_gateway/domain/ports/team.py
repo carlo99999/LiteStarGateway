@@ -20,6 +20,10 @@ class TeamRepository(Protocol):
         self, organization_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
     ) -> list[Team]: ...
 
+    async def list(self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0) -> list[Team]:
+        """Every team across all organizations, stable order (platform-admin use)."""
+        ...
+
 
 class TeamMembershipRepository(Protocol):
     """Persistence port for team memberships."""

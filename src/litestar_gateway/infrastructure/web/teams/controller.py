@@ -37,6 +37,7 @@ from litestar_gateway.infrastructure.web.teams.schemas import (
     MembershipResponse,
     SetBudgetRequest,
     SetRoleRequest,
+    TeamResponse,
     UsageResponse,
 )
 
@@ -63,6 +64,32 @@ class TeamController(Controller):
     tags = ["teams"]
     # Any authenticated user; per-team authorization happens in the service.
     dependencies = {"current_user": Provide(provide_current_user)}
+
+    @get("")
+    async def list_teams(
+        self,
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
+    ) -> list[TeamResponse]:
+        """Every team across all organizations (platform-admin only)."""
+        page_limit, page_offset = resolve_page(limit, offset)
+        teams = await team_service.list_all_teams(
+            current_user, limit=page_limit, offset=page_offset
+        )
+        return [TeamResponse.from_entity(t) for t in teams]
+
+    @get("/{team_id:uuid}")
+    async def get_team(
+        self,
+        team_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+    ) -> TeamResponse:
+        """One team by id (platform admin, auditor, or a team member with read)."""
+        team = await team_service.get_team(current_user, team_id)
+        return TeamResponse.from_entity(team)
 
     @get("/{team_id:uuid}/members")
     async def list_members(

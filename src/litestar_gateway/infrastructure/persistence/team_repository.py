@@ -39,3 +39,9 @@ class SQLAlchemyTeamRepository:
             .offset(offset)
         )
         return [m.to_entity() for m in models]
+
+    async def list(self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0) -> list[Team]:
+        models = await self._session.scalars(
+            select(TeamModel).order_by(TeamModel.created_at).limit(limit).offset(offset)
+        )
+        return [m.to_entity() for m in models]

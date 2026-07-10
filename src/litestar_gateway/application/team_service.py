@@ -203,6 +203,20 @@ class TeamService:
                 await self._memberships.add(self._admin_membership(team.id, lead.id))
         return team
 
+    async def list_all_teams(
+        self, actor: User, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[Team]:
+        """Every team across all organizations — platform-admin only (the admin
+        console's global teams view)."""
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        return await self._teams.list(limit=limit, offset=offset)
+
+    async def get_team(self, actor: User, team_id: UUID) -> Team:
+        """One team by id, authorized like reading its members (platform admin,
+        platform auditor, or a team member with read)."""
+        return await self.ensure_team_permission(actor, team_id, Permission.MEMBERS_READ)
+
     async def list_members(
         self, actor: User, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
     ) -> list[TeamMembership]:

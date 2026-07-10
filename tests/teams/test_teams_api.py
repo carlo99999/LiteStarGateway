@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from litestar.status_codes import (
@@ -209,3 +210,47 @@ async def test_list_organizations_pagination(client: AsyncTestClient) -> None:
     assert [o["name"] for o in first.json()] == ["A", "B"]
     second = await client.get("/organizations?limit=2&offset=2", headers=_bearer(admin))
     assert [o["name"] for o in second.json()] == ["C"]
+
+
+async def test_list_all_teams_platform_admin(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    core = await _team(client, admin, org_id, ADMIN_EMAIL)
+    ops = (
+        await client.post(
+            f"/organizations/{org_id}/teams",
+            json={"name": "Ops", "admin_email": ADMIN_EMAIL},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+
+    resp = await client.get("/teams", headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+    ids = {t["id"] for t in resp.json()}
+    assert {core, ops} <= ids
+
+
+async def test_list_all_teams_forbidden_for_non_admin(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    await _register(client, admin, "bob@b.com")
+    bob = await _login(client, "bob@b.com", "Passw0rd!")
+    assert (await client.get("/teams", headers=_bearer(bob))).status_code == HTTP_403_FORBIDDEN
+
+
+async def test_get_team_detail(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, ADMIN_EMAIL)
+
+    resp = await client.get(f"/teams/{team_id}", headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+    body = resp.json()
+    assert body["id"] == team_id
+    assert body["organization_id"] == org_id
+    assert body["name"] == "Core"
+
+
+async def test_get_team_missing_is_404(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    resp = await client.get(f"/teams/{uuid4()}", headers=_bearer(admin))
+    assert resp.status_code == HTTP_404_NOT_FOUND, resp.text
