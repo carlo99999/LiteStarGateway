@@ -16,6 +16,9 @@ from litestar_gateway.infrastructure.persistence.organization_repository import 
 from litestar_gateway.infrastructure.persistence.team_repository import (
     SQLAlchemyTeamRepository,
 )
+from litestar_gateway.infrastructure.persistence.usage_repository import (
+    SQLAlchemyUsageRepository,
+)
 from litestar_gateway.infrastructure.persistence.user_repository import (
     SQLAlchemyUserRepository,
 )
@@ -27,6 +30,7 @@ def provide_organization_service(
     return OrganizationService(
         SQLAlchemyOrganizationRepository(db_session),
         SQLAlchemyTeamRepository(db_session),
+        SQLAlchemyUsageRepository(db_session),
     )
 
 

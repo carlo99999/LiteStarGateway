@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -36,7 +37,15 @@ export function OrganizationsPage() {
     {
       key: "name",
       header: "name",
-      cell: (org) => <span className="font-medium text-foreground">{org.name}</span>,
+      cell: (org) => (
+        <Link
+          to="/organizations/$organizationId"
+          params={{ organizationId: org.id }}
+          className="font-medium text-foreground hover:text-primary hover:underline"
+        >
+          {org.name}
+        </Link>
+      ),
     },
     {
       key: "id",

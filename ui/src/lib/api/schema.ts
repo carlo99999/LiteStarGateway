@@ -407,7 +407,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** GetOrganization */
+        get: operations["OrganizationsOrganizationIdGetOrganization"];
         put?: never;
         post?: never;
         /** DeleteOrganization */
@@ -416,6 +417,23 @@ export interface paths {
         head?: never;
         /** UpdateOrganization */
         patch: operations["OrganizationsOrganizationIdUpdateOrganization"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/spend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OrganizationSpend */
+        get: operations["OrganizationsOrganizationIdSpendOrganizationSpend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/teams/{team_id}/members": {
@@ -1171,6 +1189,15 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        /** OrganizationSpendResponse */
+        OrganizationSpendResponse: {
+            /** Format: uuid */
+            organization_id: string;
+            /** Format: date-time */
+            since: string;
+            total_cost: number;
+            teams: components["schemas"]["TeamSpendResponse"][];
+        };
         /** PasswordResetCreateRequest */
         PasswordResetCreateRequest: {
             email: string;
@@ -1307,6 +1334,13 @@ export interface components {
          * @enum {string}
          */
         TeamRole: "admin" | "member" | "model-manager" | "key-issuer" | "billing-viewer";
+        /** TeamSpendResponse */
+        TeamSpendResponse: {
+            /** Format: uuid */
+            team_id: string;
+            name: string;
+            cost: number;
+        };
         /** TokenResponse */
         TokenResponse: {
             access_token: string;
@@ -2161,6 +2195,43 @@ export interface operations {
             };
         };
     };
+    OrganizationsOrganizationIdGetOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
     OrganizationsOrganizationIdDeleteOrganization: {
         parameters: {
             query?: never;
@@ -2218,6 +2289,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganizationResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    OrganizationsOrganizationIdSpendOrganizationSpend: {
+        parameters: {
+            query?: {
+                days?: number | null;
+            };
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationSpendResponse"];
                 };
             };
             /** @description Bad request syntax or unsupported method */
