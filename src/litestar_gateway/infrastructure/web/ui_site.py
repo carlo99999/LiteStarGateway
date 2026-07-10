@@ -77,7 +77,10 @@ def create_ui_router(dist_dir: Path | None = None) -> Router | None:
         return None
 
     def _shell() -> File:
-        return File(index_html, media_type="text/html")
+        # content_disposition_type="inline": Litestar's File defaults to
+        # "attachment", which makes the browser DOWNLOAD index.html instead of
+        # rendering the app. Serve it (and every asset) inline.
+        return File(index_html, media_type="text/html", content_disposition_type="inline")
 
     # Two handlers, not one with both paths: Litestar only binds `file_path` when
     # the path parameter is the handler's sole route, so `/ui/` gets its own
@@ -94,7 +97,7 @@ def create_ui_router(dist_dir: Path | None = None) -> Router | None:
             # asset would be served as octet-stream — which the browser refuses
             # to run as a module script. Set it from the suffix explicitly.
             media_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
-            return File(target, media_type=media_type)
+            return File(target, media_type=media_type, content_disposition_type="inline")
         # A missing hashed asset is a genuine 404 (a broken reference), not a
         # client-side route — don't mask it as the app shell.
         if file_path.strip("/").startswith("assets/"):

@@ -65,6 +65,9 @@ async def test_serves_shell_when_build_exists(
         assert resp.status_code == HTTP_200_OK
         assert "admin console" in resp.text
         assert resp.headers["content-type"].startswith("text/html")
+        # Must be inline, not "attachment" — otherwise the browser downloads
+        # index.html instead of rendering the app.
+        assert "attachment" not in resp.headers.get("content-disposition", "")
 
 
 async def test_bare_ui_redirects_to_trailing_slash(
