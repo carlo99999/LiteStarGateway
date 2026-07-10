@@ -2,7 +2,7 @@
     "info": {
         "title": "Litestar Gateway API",
         "version": "1.1.0",
-        "description": "# Litestar Gateway\n\n**One governed entry point for LLM traffic.**\n\nLitestar Gateway centralizes OpenAI-compatible inference, model deployments,\nrouter aliases, provider credentials, budget enforcement, usage metering, audit,\nand observability.\n\nUse a real team model name or a router alias in the `model` field. The gateway\napplies the same authentication, rate limits, budget checks, and usage\naccounting in both cases.\n\n## Supported surfaces\n\n- Chat completions and streamed chat completions\n- Responses API, including emulated provider support where available\n- Embeddings and image generation\n- Structured outputs / JSON schema\n- Smart routing, shadow routing, and weighted routing\n- Team-scoped models, credentials, API keys, budgets, usage, and audit logs\n\n## Documentation viewers\n\n| Viewer | Best for | Link |\n| --- | --- | --- |\n| Swagger UI | Quick endpoint exploration and request testing | [Open Swagger UI](/) |\n| Scalar | Clean API reference browsing | [Open Scalar](/scalar) |\n| Stoplight Elements | Contract review and navigation | [Open Elements](/elements) |\n| OpenAPI JSON | SDK generation, tests, and tooling | [Download schema](/openapi.json) |\n\nFor guides, deployment, and configuration, see the [narrative documentation](/docs/)."
+        "description": "# Litestar Gateway\n\n**One governed entry point for LLM traffic.**\n\nLitestar Gateway centralizes OpenAI-compatible inference, model deployments,\nrouter aliases, provider credentials, budget enforcement, usage metering, audit,\nand observability.\n\nUse a real team model name or a router alias in the `model` field. The gateway\napplies the same authentication, rate limits, budget checks, and usage\naccounting in both cases.\n\n## Supported surfaces\n\n- Chat completions and streamed chat completions\n- Responses API, including emulated provider support where available\n- Embeddings and image generation\n- Structured outputs / JSON schema\n- Smart routing, shadow routing, and weighted routing\n- Team-scoped models, credentials, API keys, budgets, usage, and audit logs\n\n## Admin console\n\nManage teams, models, provider credentials, API keys, budgets, and usage from\nthe **[admin console](/ui/)** — a web UI served by this same gateway.\n\n## Documentation viewers\n\n| Viewer | Best for | Link |\n| --- | --- | --- |\n| Admin console | Managing teams, models, credentials, and budgets | [Open console](/ui/) |\n| Swagger UI | Quick endpoint exploration and request testing | [Open Swagger UI](/) |\n| Scalar | Clean API reference browsing | [Open Scalar](/scalar) |\n| Stoplight Elements | Contract review and navigation | [Open Elements](/elements) |\n| OpenAPI JSON | SDK generation, tests, and tooling | [Download schema](/openapi.json) |\n\nFor guides, deployment, and configuration, see the [narrative documentation](/docs/)."
     },
     "openapi": "3.1.0",
     "servers": [
@@ -1380,6 +1380,153 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/TeamResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/organizations/{organization_id}": {
+            "delete": {
+                "tags": [
+                    "organizations"
+                ],
+                "summary": "DeleteOrganization",
+                "operationId": "OrganizationsOrganizationIdDeleteOrganization",
+                "parameters": [
+                    {
+                        "name": "organization_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Request fulfilled, nothing follows",
+                        "headers": {}
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "patch": {
+                "tags": [
+                    "organizations"
+                ],
+                "summary": "UpdateOrganization",
+                "operationId": "OrganizationsOrganizationIdUpdateOrganization",
+                "parameters": [
+                    {
+                        "name": "organization_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateOrganizationRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrganizationResponse"
                                 }
                             }
                         }
@@ -6548,6 +6695,18 @@
                 "type": "object",
                 "required": [],
                 "title": "UpdateModelRequest"
+            },
+            "UpdateOrganizationRequest": {
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "title": "UpdateOrganizationRequest"
             },
             "UsageResponse": {
                 "properties": {
