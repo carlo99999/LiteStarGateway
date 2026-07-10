@@ -14,3 +14,8 @@ tests/
 # the docs stage needs it to build the site served at /docs.)
 .mkdocs-docs/
 .mkdocs-site/
+# Admin UI build artifacts: the image builds its own dist in the ui stage, so
+# never ship a stale local build or the local node_modules. (ui/ source is kept:
+# the ui stage needs it to build the SPA served at /ui.)
+ui/node_modules/
+ui/dist/

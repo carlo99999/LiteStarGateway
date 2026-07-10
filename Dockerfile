@@ -39,6 +39,28 @@ RUN mkdir -p .mkdocs-docs \
     && ln -sfn ../issues .mkdocs-docs/issues \
     && uv run mkdocs build --strict
 
+# ---- UI: build the admin console (SPA) the app serves at /ui ----
+FROM node:22-bookworm-slim AS ui
+
+WORKDIR /app/ui
+
+# Pin pnpm to the version the lockfile was written with; npm ships with node.
+RUN npm install --global pnpm@11.6.0
+
+# Install deps first (this layer is cached while the lockfile is unchanged).
+# strict-dep-builds=false: in a clean, non-interactive environment pnpm 10.16+
+# otherwise fails (ERR_PNPM_IGNORED_BUILDS) on esbuild's skipped build script.
+# We don't need that script — esbuild's platform binary ships via an optional
+# dependency — so the vite build works regardless; this just keeps install green.
+COPY ui/package.json ui/pnpm-lock.yaml ui/pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --config.strict-dep-builds=false
+
+# Then build the SPA to /app/ui/dist (vite `base: '/ui/'`). Local node_modules
+# and dist are .dockerignored, so this copies only source and won't clobber the
+# freshly installed node_modules above.
+COPY ui/ ./
+RUN pnpm run build
+
 # ---- Runtime: slim image with just the venv + source ----
 FROM python:3.14-slim-bookworm AS runtime
 
@@ -54,6 +76,10 @@ COPY --from=builder --chown=app:app /app /app
 # The built narrative docs, served by the app as static files at /docs (see
 # infrastructure/web/docs_site.py). Absent when running from source; present here.
 COPY --from=docs --chown=app:app /app/.mkdocs-site /app/.mkdocs-site
+
+# The built admin console, served by the app as static files at /ui (see
+# infrastructure/web/ui_site.py). Absent when running from source; present here.
+COPY --from=ui --chown=app:app /app/ui/dist /app/ui/dist
 
 # No DATABASE_URL default on purpose: production requires PostgreSQL, and the
 # app fails fast at startup unless DATABASE_URL points at postgresql+asyncpg://
