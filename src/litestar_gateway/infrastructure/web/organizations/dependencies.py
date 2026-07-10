@@ -10,8 +10,14 @@ from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.infrastructure.persistence.membership_repository import (
     SQLAlchemyTeamMembershipRepository,
 )
+from litestar_gateway.infrastructure.persistence.model_repository import (
+    SQLAlchemyModelRepository,
+)
 from litestar_gateway.infrastructure.persistence.organization_repository import (
     SQLAlchemyOrganizationRepository,
+)
+from litestar_gateway.infrastructure.persistence.repository import (
+    SQLAlchemyAPIKeyRepository,
 )
 from litestar_gateway.infrastructure.persistence.team_repository import (
     SQLAlchemyTeamRepository,
@@ -43,4 +49,6 @@ def provide_team_service(db_session: NamedDependency[AsyncSession]) -> TeamServi
         memberships=SQLAlchemyTeamMembershipRepository(db_session),
         users=SQLAlchemyUserRepository(db_session),
         transaction=db_session,
+        models=SQLAlchemyModelRepository(db_session),
+        api_keys=SQLAlchemyAPIKeyRepository(db_session),
     )

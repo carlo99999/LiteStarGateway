@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
+    HTTP_204_NO_CONTENT,
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
+    HTTP_409_CONFLICT,
 )
 from litestar.testing import AsyncTestClient
 
@@ -209,3 +212,112 @@ async def test_list_organizations_pagination(client: AsyncTestClient) -> None:
     assert [o["name"] for o in first.json()] == ["A", "B"]
     second = await client.get("/organizations?limit=2&offset=2", headers=_bearer(admin))
     assert [o["name"] for o in second.json()] == ["C"]
+
+
+async def test_list_all_teams_platform_admin(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    core = await _team(client, admin, org_id, ADMIN_EMAIL)
+    ops = (
+        await client.post(
+            f"/organizations/{org_id}/teams",
+            json={"name": "Ops", "admin_email": ADMIN_EMAIL},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+
+    resp = await client.get("/teams", headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+    ids = {t["id"] for t in resp.json()}
+    assert {core, ops} <= ids
+
+
+async def test_list_all_teams_forbidden_for_non_admin(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    await _register(client, admin, "bob@b.com")
+    bob = await _login(client, "bob@b.com", "Passw0rd!")
+    assert (await client.get("/teams", headers=_bearer(bob))).status_code == HTTP_403_FORBIDDEN
+
+
+async def test_get_team_detail(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, ADMIN_EMAIL)
+
+    resp = await client.get(f"/teams/{team_id}", headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+    body = resp.json()
+    assert body["id"] == team_id
+    assert body["organization_id"] == org_id
+    assert body["name"] == "Core"
+
+
+async def test_get_team_missing_is_404(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    resp = await client.get(f"/teams/{uuid4()}", headers=_bearer(admin))
+    assert resp.status_code == HTTP_404_NOT_FOUND, resp.text
+
+
+async def test_rename_team(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, ADMIN_EMAIL)
+
+    resp = await client.patch(f"/teams/{team_id}", json={"name": "Renamed"}, headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+    assert resp.json()["name"] == "Renamed"
+    got = await client.get(f"/teams/{team_id}", headers=_bearer(admin))
+    assert got.json()["name"] == "Renamed"
+
+
+async def test_rename_team_missing_is_404(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    resp = await client.patch(f"/teams/{uuid4()}", json={"name": "X"}, headers=_bearer(admin))
+    assert resp.status_code == HTTP_404_NOT_FOUND, resp.text
+
+
+async def test_delete_empty_team(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, ADMIN_EMAIL)
+
+    resp = await client.delete(f"/teams/{team_id}", headers=_bearer(admin))
+    assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
+    # Gone, along with its membership.
+    assert (
+        await client.get(f"/teams/{team_id}", headers=_bearer(admin))
+    ).status_code == HTTP_404_NOT_FOUND
+
+
+async def test_delete_team_blocked_by_api_key(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, ADMIN_EMAIL)
+    key = await client.post(
+        f"/teams/{team_id}/keys",
+        json={"name": "k", "scope": "inference"},
+        headers=_bearer(admin),
+    )
+    assert key.status_code in (HTTP_200_OK, HTTP_201_CREATED), key.text
+
+    resp = await client.delete(f"/teams/{team_id}", headers=_bearer(admin))
+    assert resp.status_code == HTTP_409_CONFLICT, resp.text
+    # Still there.
+    assert (
+        await client.get(f"/teams/{team_id}", headers=_bearer(admin))
+    ).status_code == HTTP_200_OK
+
+
+async def test_team_rename_and_delete_forbidden_for_non_admin(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, ADMIN_EMAIL)
+    await _register(client, admin, "bob@b.com")
+    bob = await _login(client, "bob@b.com", "Passw0rd!")
+
+    assert (
+        await client.patch(f"/teams/{team_id}", json={"name": "X"}, headers=_bearer(bob))
+    ).status_code == HTTP_403_FORBIDDEN
+    assert (
+        await client.delete(f"/teams/{team_id}", headers=_bearer(bob))
+    ).status_code == HTTP_403_FORBIDDEN

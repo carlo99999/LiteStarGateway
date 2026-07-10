@@ -52,7 +52,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "governance",
     items: [
       { to: "/organizations", label: "organizations", icon: Building2, ready: true },
-      { to: "/teams", label: "teams", icon: Users },
+      { to: "/teams", label: "teams", icon: Users, ready: true },
       { to: "/users", label: "users", icon: UserRound },
       { to: "/service-principals", label: "service-principals", icon: Bot },
     ],
