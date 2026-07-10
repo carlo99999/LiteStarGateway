@@ -3,7 +3,6 @@ import {
   createRoute,
   createRouter,
   Outlet,
-  redirect,
 } from "@tanstack/react-router";
 import { AppShell } from "@/app/layout/AppShell";
 import { PlannedPage } from "@/app/PlannedPage";
@@ -33,9 +32,7 @@ const appRoute = createRoute({
 const indexRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/",
-  beforeLoad: () => {
-    throw redirect({ to: "/organizations" });
-  },
+  component: () => <PlannedPage command="dashboard" title="Dashboard" />,
 });
 
 const organizationsRoute = createRoute({
@@ -44,15 +41,26 @@ const organizationsRoute = createRoute({
   component: OrganizationsPage,
 });
 
-// Scaffolded-but-not-implemented feature areas (Phase 1 lands their views).
+// Scaffolded-but-not-implemented feature areas (Phase 1 lands their views),
+// grouped in the sidebar under gateway / governance / observability.
 const planned: { path: string; command: string; title: string }[] = [
-  { path: "/teams", command: "teams list", title: "Teams" },
+  // gateway
   { path: "/models", command: "models list", title: "Models" },
+  { path: "/routing", command: "routing inspect", title: "Routing" },
   { path: "/credentials", command: "credentials list", title: "Credentials" },
   { path: "/api-keys", command: "api-keys list", title: "API Keys" },
-  { path: "/budgets", command: "budgets list", title: "Budgets" },
+  // governance
+  { path: "/teams", command: "teams list", title: "Teams" },
+  { path: "/users", command: "users list", title: "Users" },
+  {
+    path: "/service-principals",
+    command: "service-principals list",
+    title: "Service Principals",
+  },
+  // observability
   { path: "/usage", command: "usage report", title: "Usage & Cost" },
-  { path: "/routing", command: "routing inspect", title: "Routing" },
+  { path: "/budgets", command: "budgets list", title: "Budgets" },
+  { path: "/audit", command: "audit log", title: "Audit Log" },
 ];
 
 const plannedRoutes = planned.map((p) =>
