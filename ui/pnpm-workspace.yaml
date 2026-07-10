@@ -1,5 +1,6 @@
 verifyDepsBeforeRun: false
+# esbuild's platform binary ships via an optional dependency, so the build works
+# whether or not its (skipped) build script runs; listing it here records an
+# explicit decision so `pnpm install` never blocks on an undecided build script.
 onlyBuiltDependencies:
   - esbuild
-allowBuilds:
-  esbuild: set this to true or false
