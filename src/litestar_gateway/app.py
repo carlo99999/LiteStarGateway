@@ -75,6 +75,7 @@ from litestar_gateway.infrastructure.web.service_principals.dependencies import 
 from litestar_gateway.infrastructure.web.session import create_session_router
 from litestar_gateway.infrastructure.web.session.sso import create_sso_router
 from litestar_gateway.infrastructure.web.teams import TeamController
+from litestar_gateway.infrastructure.web.ui_site import create_ui_router
 from litestar_gateway.infrastructure.web.users import create_users_router
 from litestar_gateway.infrastructure.web.users.dependencies import provide_user_service
 
@@ -97,6 +98,10 @@ def create_app(
     docs_router = create_docs_router()  # built MkDocs site at /docs, if present
     if docs_router is not None:
         route_handlers.append(docs_router)
+
+    ui_router = create_ui_router()  # built admin UI (SPA) at /ui, if present
+    if ui_router is not None:
+        route_handlers.append(ui_router)
 
     idp = _resolve_identity_provider(settings, identity_provider)
     if idp is not None:

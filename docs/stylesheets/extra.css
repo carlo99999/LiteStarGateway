@@ -1,0 +1,168 @@
+/*
+ * Terminal-tech theme for the docs — matches the admin UI (ui/src/styles/globals.css).
+ * Same palette, same typography: Space Grotesk (headings), Inter (body), JetBrains
+ * Mono (code). Fonts are self-hosted (woff2 in ./fonts) so the docs fetch nothing
+ * at page load, consistent with `font: false` and the air-gapped deployment goal.
+ * Colors are mapped onto mkdocs-material's custom properties for both schemes:
+ * `default` = light, `slate` = dark.
+ */
+
+/* ── Self-hosted fonts (latin subset) ─────────────────────────────────────── */
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/space-grotesk-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/inter-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/inter-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2");
+}
+
+/* ── Typography ────────────────────────────────────────────────────────────── */
+:root {
+  --md-text-font: "Inter";
+  --md-code-font: "JetBrains Mono";
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4 {
+  font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Gradient page title, like the UI headline. */
+.md-typeset h1 {
+  background-image: linear-gradient(
+    90deg,
+    var(--lg-gradient-from),
+    var(--lg-gradient-via),
+    var(--lg-gradient-to)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Light scheme (default) ───────────────────────────────────────────────── */
+[data-md-color-scheme="default"] {
+  --lg-gradient-from: #16a34a;
+  --lg-gradient-via: #0891b2;
+  --lg-gradient-to: #7c3aed;
+
+  --md-primary-fg-color: #16a34a;
+  --md-primary-fg-color--light: #22c55e;
+  --md-primary-fg-color--dark: #15803d;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #f6f8f6;
+  --md-accent-fg-color: #7c3aed;
+
+  --md-default-bg-color: #f6f8f6;
+  --md-default-fg-color: #0f1a13;
+  --md-default-fg-color--light: #3a4a40;
+  --md-default-fg-color--lighter: #5b6f61;
+  --md-default-fg-color--lightest: #dde7e0;
+
+  --md-typeset-a-color: #16a34a;
+  --md-code-bg-color: #eef2ef;
+  --md-code-fg-color: #0f1a13;
+}
+
+/* ── Dark scheme (slate) ──────────────────────────────────────────────────── */
+[data-md-color-scheme="slate"] {
+  --lg-gradient-from: #22c55e;
+  --lg-gradient-via: #2dd4bf;
+  --lg-gradient-to: #a78bfa;
+
+  --md-primary-fg-color: #22c55e;
+  --md-primary-fg-color--light: #4ade80;
+  --md-primary-fg-color--dark: #16a34a;
+  --md-primary-bg-color: #060a07;
+  --md-primary-bg-color--light: #0c120e;
+  --md-accent-fg-color: #a78bfa;
+
+  --md-default-bg-color: #060a07;
+  --md-default-fg-color: #e8f0ea;
+  --md-default-fg-color--light: #b8c8bd;
+  --md-default-fg-color--lighter: #6b8a76;
+  --md-default-fg-color--lightest: rgba(34, 197, 94, 0.15);
+
+  --md-typeset-a-color: #22c55e;
+  --md-code-bg-color: #0c120e;
+  --md-code-fg-color: #e8f0ea;
+
+  /* Cards / surfaces the theme derives from the bg. */
+  --md-footer-bg-color: #0c120e;
+  --md-footer-bg-color--dark: #060a07;
+}
+
+/* Link hover picks up the accent (purple), matching the UI. */
+.md-typeset a:hover {
+  color: var(--md-accent-fg-color);
+}
+
+/* ── Terminal-flavored code + surfaces ────────────────────────────────────── */
+.md-typeset code,
+.md-typeset pre {
+  font-feature-settings: "liga" 0;
+}
+
+[data-md-color-scheme="slate"] .md-typeset pre > code,
+[data-md-color-scheme="slate"] .highlight {
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  border-radius: 0.5rem;
+}
+
+/* Inline code reads like a bracketed terminal token. */
+.md-typeset code {
+  border-radius: 0.35rem;
+}
+
+/* Subtle grid backdrop on the content canvas, like the app + login screens. */
+[data-md-color-scheme="slate"] .md-main {
+  background-image:
+    linear-gradient(to right, rgba(34, 197, 94, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34, 197, 94, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+[data-md-color-scheme="default"] .md-main {
+  background-image:
+    linear-gradient(to right, rgba(22, 163, 74, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(22, 163, 74, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
