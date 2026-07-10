@@ -24,6 +24,17 @@ class TeamRepository(Protocol):
         """Every team across all organizations, stable order (platform-admin use)."""
         ...
 
+    async def update(self, team_id: UUID, name: str) -> Team | None:
+        """Rename the team; return the updated entity, or None if none has that id."""
+        ...
+
+    async def delete(self, team_id: UUID) -> None:
+        """Delete the team and its intrinsic children (memberships, budget,
+        routers, service principals, and usage history). The caller is
+        responsible for refusing when models or API keys still exist — those are
+        NOT removed here."""
+        ...
+
 
 class TeamMembershipRepository(Protocol):
     """Persistence port for team memberships."""

@@ -41,11 +41,14 @@ from litestar_gateway.domain.exceptions import (
     MembershipNotFound,
     OrganizationNotFound,
     PermissionDenied,
+    TeamNotEmpty,
     TeamNotFound,
     UserNotFound,
 )
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.domain.ports import (
+    APIKeyRepository,
+    ModelRepository,
     OrganizationRepository,
     TeamMembershipRepository,
     TeamRepository,
@@ -80,12 +83,16 @@ class TeamService:
         memberships: TeamMembershipRepository,
         users: UserRepository,
         transaction: Transaction,
+        models: ModelRepository,
+        api_keys: APIKeyRepository,
     ) -> None:
         self._orgs = organizations
         self._teams = teams
         self._memberships = memberships
         self._users = users
         self._transaction = transaction
+        self._models = models
+        self._api_keys = api_keys
 
     @asynccontextmanager
     async def _unit_of_work(self) -> AsyncGenerator[None]:
@@ -216,6 +223,34 @@ class TeamService:
         """One team by id, authorized like reading its members (platform admin,
         platform auditor, or a team member with read)."""
         return await self.ensure_team_permission(actor, team_id, Permission.MEMBERS_READ)
+
+    async def rename_team(self, actor: User, team_id: UUID, name: str) -> Team:
+        """Rename a team — platform-admin only (a structural op, like create)."""
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        async with self._unit_of_work():
+            team = await self._teams.update(team_id, name)
+        if team is None:
+            raise TeamNotFound(str(team_id))
+        return team
+
+    async def delete_team(self, actor: User, team_id: UUID) -> Team:
+        """Delete a team — platform-admin only. Refuses (TeamNotEmpty → 409) if it
+        still has models or API keys; otherwise removes the team with its intrinsic
+        children (members, budget, routers, service principals, usage history).
+        Returns the deleted team for the audit trail."""
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        team = await self._teams.get(team_id)
+        if team is None:
+            raise TeamNotFound(str(team_id))
+        if await self._models.list_by_team(team_id, limit=1, offset=0):
+            raise TeamNotEmpty(str(team_id))
+        if await self._api_keys.list_by_team(team_id, limit=1, offset=0):
+            raise TeamNotEmpty(str(team_id))
+        async with self._unit_of_work():
+            await self._teams.delete(team_id)
+        return team
 
     async def list_members(
         self, actor: User, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0

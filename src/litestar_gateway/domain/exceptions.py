@@ -89,6 +89,13 @@ class TeamNotFound(DomainError):
     """No team exists for the given id."""
 
 
+class TeamNotEmpty(DomainError):
+    """The team still has models or API keys and cannot be deleted — doing so
+    would orphan real provider config or leave live keys dangling. Remove those
+    first (→ 409). Members, budget, routers, service principals, and usage
+    history are removed with the team."""
+
+
 class AlreadyMember(DomainError):
     """The user is already a member of the team."""
 

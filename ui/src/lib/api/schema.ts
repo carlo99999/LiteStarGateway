@@ -502,10 +502,12 @@ export interface paths {
         get: operations["TeamsTeamIdGetTeam"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** DeleteTeam */
+        delete: operations["TeamsTeamIdDeleteTeam"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** RenameTeam */
+        patch: operations["TeamsTeamIdRenameTeam"];
         trace?: never;
     };
     "/teams/{team_id}/keys/spending": {
@@ -1405,6 +1407,10 @@ export interface components {
             name: string;
             description?: string | null;
             tags?: string[];
+        };
+        /** UpdateTeamRequest */
+        UpdateTeamRequest: {
+            name: string;
         };
         /** UsageResponse */
         UsageResponse: {
@@ -2672,6 +2678,82 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdDeleteTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, nothing follows */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdRenameTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTeamRequest"];
+            };
+        };
         responses: {
             /** @description Request fulfilled, document follows */
             200: {

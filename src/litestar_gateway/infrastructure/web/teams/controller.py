@@ -38,6 +38,7 @@ from litestar_gateway.infrastructure.web.teams.schemas import (
     SetBudgetRequest,
     SetRoleRequest,
     TeamResponse,
+    UpdateTeamRequest,
     UsageResponse,
 )
 
@@ -90,6 +91,50 @@ class TeamController(Controller):
         """One team by id (platform admin, auditor, or a team member with read)."""
         team = await team_service.get_team(current_user, team_id)
         return TeamResponse.from_entity(team)
+
+    @patch("/{team_id:uuid}", dependencies={"current_admin": Provide(provide_current_admin)})
+    async def rename_team(
+        self,
+        request: Request,
+        team_id: FromPath[UUID],
+        data: UpdateTeamRequest,
+        current_admin: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        audit_log: NamedDependency[AuditLog],
+    ) -> TeamResponse:
+        team = await team_service.rename_team(current_admin, team_id, data.name)
+        await record_audit(
+            audit_log,
+            request,
+            current_admin,
+            "team.update",
+            target_type="team",
+            target_id=team.id,
+            detail=data.name,
+        )
+        return TeamResponse.from_entity(team)
+
+    @delete("/{team_id:uuid}", dependencies={"current_admin": Provide(provide_current_admin)})
+    async def delete_team(
+        self,
+        request: Request,
+        team_id: FromPath[UUID],
+        current_admin: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        audit_log: NamedDependency[AuditLog],
+    ) -> None:
+        # Refuses with 409 (TeamNotEmpty) if the team still has models or API
+        # keys; otherwise removes the team and its intrinsic children.
+        team = await team_service.delete_team(current_admin, team_id)
+        await record_audit(
+            audit_log,
+            request,
+            current_admin,
+            "team.delete",
+            target_type="team",
+            target_id=team.id,
+            detail=team.name,
+        )
 
     @get("/{team_id:uuid}/members")
     async def list_members(

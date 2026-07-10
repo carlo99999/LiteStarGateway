@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -16,6 +17,7 @@ from litestar_gateway.app import create_app
 from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.entities import Organization, Team, TeamMembership, User
+from litestar_gateway.domain.ports import APIKeyRepository, ModelRepository
 
 MASTER_KEY = "master-secret"
 ADMIN_EMAIL = "admin@example.com"
@@ -125,6 +127,18 @@ class FakeUserRepo:
         return None
 
 
+class FakeModelRepo:
+    """Only `list_by_team` is exercised (the team-delete guard)."""
+
+    async def list_by_team(self, team_id: UUID, *, limit: int = 100, offset: int = 0) -> list:
+        return []
+
+
+class FakeApiKeyRepo:
+    async def list_by_team(self, team_id: UUID, *, limit: int = 100, offset: int = 0) -> list:
+        return []
+
+
 class FakeTransaction:
     """No-op unit-of-work boundary; the in-memory fakes persist on write."""
 
@@ -143,7 +157,17 @@ def repos() -> tuple[FakeOrgRepo, FakeTeamRepo, FakeMembershipRepo, FakeUserRepo
 @pytest.fixture
 def service(repos) -> TeamService:  # noqa: ANN001
     orgs, teams, memberships, users = repos
-    return TeamService(orgs, teams, memberships, users, FakeTransaction())
+    # The fakes intentionally implement only what these unit tests exercise; cast
+    # to the ports so the type checker accepts the partial test doubles.
+    return TeamService(
+        orgs,
+        teams,
+        memberships,
+        users,
+        FakeTransaction(),
+        cast(ModelRepository, FakeModelRepo()),
+        cast(APIKeyRepository, FakeApiKeyRepo()),
+    )
 
 
 # ── Integration fixtures (API-level tests: service principals, keys, teams) ──

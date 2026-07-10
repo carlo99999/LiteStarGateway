@@ -74,6 +74,11 @@ class CreateTeamRequest:
 
 
 @dataclass(frozen=True)
+class UpdateTeamRequest:
+    name: str
+
+
+@dataclass(frozen=True)
 class TeamResponse:
     id: UUID
     organization_id: UUID

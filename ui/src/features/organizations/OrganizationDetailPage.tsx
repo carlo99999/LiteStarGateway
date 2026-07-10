@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
+import { useState } from "react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import {
   getOrganizationSpend,
   type OrganizationSpend,
 } from "@/features/organizations/api";
+import { CreateTeamDialog } from "@/features/teams/CreateTeamDialog";
 
 // The route lives under the pathless "app" layout route, so its id is prefixed
 // with /app (the URL stays /organizations/$organizationId).
@@ -63,6 +65,8 @@ export function OrganizationDetailPage() {
     queryFn: () => getOrganizationSpend(organizationId, SPEND_WINDOW_DAYS),
   });
 
+  const [createOpen, setCreateOpen] = useState(false);
+
   return (
     <>
       <PageHeader
@@ -111,6 +115,15 @@ export function OrganizationDetailPage() {
         </div>
       </div>
 
+      <div className="mb-2 flex items-center justify-between">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          // teams
+        </p>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <Plus className="h-4 w-4" />
+          New team
+        </Button>
+      </div>
       <DataTable
         columns={teamColumns}
         rows={spend.data?.teams}
@@ -119,6 +132,12 @@ export function OrganizationDetailPage() {
         error={spend.error as Error | null}
         emptyTitle="no teams"
         emptyDescription="This organization has no teams yet."
+      />
+
+      <CreateTeamDialog
+        organizationId={organizationId}
+        open={createOpen}
+        onOpenChange={setCreateOpen}
       />
     </>
   );

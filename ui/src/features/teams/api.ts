@@ -57,3 +57,37 @@ export async function listTeamUsage(id: string): Promise<TeamUsage[]> {
   if (error || !data) throw fail(error, "Failed to load usage");
   return data;
 }
+
+/** POST /organizations/{orgId}/teams — create a team (platform-admin). The
+ * admin_email must be an existing user, who becomes the team's first admin. */
+export async function createTeam(
+  organizationId: string,
+  name: string,
+  adminEmail: string,
+): Promise<Team> {
+  const { data, error } = await api.POST("/organizations/{organization_id}/teams", {
+    params: { path: { organization_id: organizationId } },
+    body: { name, admin_email: adminEmail },
+  });
+  if (error || !data) throw fail(error, "Failed to create team");
+  return data;
+}
+
+/** PATCH /teams/{id} — rename a team (platform-admin). */
+export async function updateTeam(id: string, name: string): Promise<Team> {
+  const { data, error } = await api.PATCH("/teams/{team_id}", {
+    params: { path: { team_id: id } },
+    body: { name },
+  });
+  if (error || !data) throw fail(error, "Failed to rename team");
+  return data;
+}
+
+/** DELETE /teams/{id} — remove a team (platform-admin). Refused (409) if the
+ * team still has models or API keys. */
+export async function deleteTeam(id: string): Promise<void> {
+  const { error } = await api.DELETE("/teams/{team_id}", {
+    params: { path: { team_id: id } },
+  });
+  if (error) throw fail(error, "Failed to delete team");
+}

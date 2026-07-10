@@ -4,12 +4,20 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import Team
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_gateway.infrastructure.persistence.orm import TeamModel
+from litestar_gateway.infrastructure.persistence.orm import (
+    PendingUsageEventModel,
+    RouterModel,
+    ServicePrincipalModel,
+    TeamBudgetModel,
+    TeamMembershipModel,
+    TeamModel,
+    UsageEventModel,
+)
 
 
 class SQLAlchemyTeamRepository:
@@ -45,3 +53,31 @@ class SQLAlchemyTeamRepository:
             select(TeamModel).order_by(TeamModel.created_at).limit(limit).offset(offset)
         )
         return [m.to_entity() for m in models]
+
+    async def update(self, team_id: UUID, name: str) -> Team | None:
+        # Stage only (flush); the service owns the commit (unit of work).
+        model = await self._session.get(TeamModel, team_id)
+        if model is None:
+            return None
+        model.name = name
+        await self._session.flush()
+        await self._session.refresh(model)
+        return model.to_entity()
+
+    async def delete(self, team_id: UUID) -> None:
+        # Remove the intrinsic children first (all FK team.id with RESTRICT, so
+        # the team row can't drop while they exist), then the team. Models and
+        # API keys are intentionally NOT touched — the caller refuses the delete
+        # when any remain. pending_usage_event has no FK but is team-scoped, so
+        # it's cleared for hygiene. Staged only; the service commits.
+        for child in (
+            UsageEventModel,
+            PendingUsageEventModel,
+            RouterModel,
+            ServicePrincipalModel,
+            TeamMembershipModel,
+            TeamBudgetModel,
+        ):
+            await self._session.execute(delete(child).where(child.team_id == team_id))
+        await self._session.execute(delete(TeamModel).where(TeamModel.id == team_id))
+        await self._session.flush()

@@ -2410,6 +2410,151 @@
                     }
                 },
                 "deprecated": false
+            },
+            "delete": {
+                "tags": [
+                    "teams"
+                ],
+                "summary": "DeleteTeam",
+                "operationId": "TeamsTeamIdDeleteTeam",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Request fulfilled, nothing follows",
+                        "headers": {}
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "patch": {
+                "tags": [
+                    "teams"
+                ],
+                "summary": "RenameTeam",
+                "operationId": "TeamsTeamIdRenameTeam",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateTeamRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TeamResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
             }
         },
         "/teams/{team_id}/keys/spending": {
@@ -7144,6 +7289,18 @@
                     "name"
                 ],
                 "title": "UpdateOrganizationRequest"
+            },
+            "UpdateTeamRequest": {
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "title": "UpdateTeamRequest"
             },
             "UsageResponse": {
                 "properties": {
