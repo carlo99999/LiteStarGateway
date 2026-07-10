@@ -2479,8 +2479,8 @@
                 "tags": [
                     "teams"
                 ],
-                "summary": "RenameTeam",
-                "operationId": "TeamsTeamIdRenameTeam",
+                "summary": "UpdateTeam",
+                "operationId": "TeamsTeamIdUpdateTeam",
                 "parameters": [
                     {
                         "name": "team_id",
@@ -6147,6 +6147,22 @@
                     },
                     "admin_email": {
                         "type": "string"
+                    },
+                    "description": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "tags": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
                     }
                 },
                 "type": "object",
@@ -7108,14 +7124,32 @@
                     "created_at": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "description": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "tags": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
                     }
                 },
                 "type": "object",
                 "required": [
                     "created_at",
+                    "description",
                     "id",
                     "name",
-                    "organization_id"
+                    "organization_id",
+                    "tags"
                 ],
                 "title": "TeamResponse"
             },
@@ -7294,6 +7328,22 @@
                 "properties": {
                     "name": {
                         "type": "string"
+                    },
+                    "description": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "tags": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
                     }
                 },
                 "type": "object",

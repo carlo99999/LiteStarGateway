@@ -284,6 +284,8 @@ class TeamModel(base.UUIDAuditBase):
 
     organization_id: Mapped[UUID] = mapped_column(ForeignKey("organization.id"), index=True)
     name: Mapped[str] = mapped_column(index=True)
+    description: Mapped[str | None] = mapped_column(default=None)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     def to_entity(self) -> Team:
         return Team(
@@ -291,6 +293,8 @@ class TeamModel(base.UUIDAuditBase):
             organization_id=self.organization_id,
             name=self.name,
             created_at=self.created_at,
+            description=self.description,
+            tags=list(self.tags or []),
         )
 
 

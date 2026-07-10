@@ -93,7 +93,7 @@ class TeamController(Controller):
         return TeamResponse.from_entity(team)
 
     @patch("/{team_id:uuid}", dependencies={"current_admin": Provide(provide_current_admin)})
-    async def rename_team(
+    async def update_team(
         self,
         request: Request,
         team_id: FromPath[UUID],
@@ -102,7 +102,13 @@ class TeamController(Controller):
         team_service: NamedDependency[TeamService],
         audit_log: NamedDependency[AuditLog],
     ) -> TeamResponse:
-        team = await team_service.rename_team(current_admin, team_id, data.name)
+        team = await team_service.update_team(
+            current_admin,
+            team_id,
+            data.name,
+            description=data.description,
+            tags=data.tags,
+        )
         await record_audit(
             audit_log,
             request,

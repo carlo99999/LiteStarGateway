@@ -321,3 +321,47 @@ async def test_team_rename_and_delete_forbidden_for_non_admin(client: AsyncTestC
     assert (
         await client.delete(f"/teams/{team_id}", headers=_bearer(bob))
     ).status_code == HTTP_403_FORBIDDEN
+
+
+async def test_create_team_with_metadata(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    resp = await client.post(
+        f"/organizations/{org_id}/teams",
+        json={
+            "name": "Meta",
+            "admin_email": ADMIN_EMAIL,
+            "description": "the meta team",
+            "tags": ["core", "eu"],
+        },
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_201_CREATED, resp.text
+    body = resp.json()
+    assert body["description"] == "the meta team"
+    assert body["tags"] == ["core", "eu"]
+
+
+async def test_create_team_defaults_empty_metadata(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, ADMIN_EMAIL)
+    got = (await client.get(f"/teams/{team_id}", headers=_bearer(admin))).json()
+    assert got["description"] is None
+    assert got["tags"] == []
+
+
+async def test_update_team_metadata(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, ADMIN_EMAIL)
+    resp = await client.patch(
+        f"/teams/{team_id}",
+        json={"name": "Core", "description": "d2", "tags": ["x"]},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_200_OK, resp.text
+    assert resp.json()["description"] == "d2"
+    assert resp.json()["tags"] == ["x"]
+    got = await client.get(f"/teams/{team_id}", headers=_bearer(admin))
+    assert got.json()["tags"] == ["x"]

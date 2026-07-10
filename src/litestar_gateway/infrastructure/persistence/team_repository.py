@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import delete, select
@@ -26,7 +27,13 @@ class SQLAlchemyTeamRepository:
 
     async def add(self, team: Team) -> Team:
         # Stage only (flush, no commit); the service owns the transaction boundary.
-        model = TeamModel(id=team.id, organization_id=team.organization_id, name=team.name)
+        model = TeamModel(
+            id=team.id,
+            organization_id=team.organization_id,
+            name=team.name,
+            description=team.description,
+            tags=list(team.tags),
+        )
         self._session.add(model)
         await self._session.flush()
         await self._session.refresh(model)
@@ -54,12 +61,16 @@ class SQLAlchemyTeamRepository:
         )
         return [m.to_entity() for m in models]
 
-    async def update(self, team_id: UUID, name: str) -> Team | None:
+    async def update(
+        self, team_id: UUID, name: str, description: str | None, tags: Sequence[str]
+    ) -> Team | None:
         # Stage only (flush); the service owns the commit (unit of work).
         model = await self._session.get(TeamModel, team_id)
         if model is None:
             return None
         model.name = name
+        model.description = description
+        model.tags = list(tags)
         await self._session.flush()
         await self._session.refresh(model)
         return model.to_entity()

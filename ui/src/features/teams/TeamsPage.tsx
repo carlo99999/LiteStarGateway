@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { listOrganizations } from "@/features/organizations/api";
 import { CreateTeamDialog } from "@/features/teams/CreateTeamDialog";
 import { DeleteTeamDialog } from "@/features/teams/DeleteTeamDialog";
-import { TeamRenameDialog } from "@/features/teams/TeamRenameDialog";
+import { TeamEditDialog } from "@/features/teams/TeamEditDialog";
 import { listTeams, type Team } from "@/features/teams/api";
 
 function formatDate(iso: string): string {
@@ -23,7 +23,7 @@ export function TeamsPage() {
   const orgs = useQuery({ queryKey: ["organizations"], queryFn: listOrganizations });
   const orgName = new Map((orgs.data ?? []).map((o) => [o.id, o.name]));
 
-  const [renaming, setRenaming] = useState<Team | null>(null);
+  const [editing, setEditing] = useState<Team | null>(null);
   const [deleting, setDeleting] = useState<Team | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -33,13 +33,20 @@ export function TeamsPage() {
       key: "name",
       header: "name",
       cell: (t) => (
-        <Link
-          to="/teams/$teamId"
-          params={{ teamId: t.id }}
-          className="font-medium text-foreground hover:text-primary hover:underline"
-        >
-          {t.name}
-        </Link>
+        <span className="flex flex-col">
+          <Link
+            to="/teams/$teamId"
+            params={{ teamId: t.id }}
+            className="font-medium text-foreground hover:text-primary hover:underline"
+          >
+            {t.name}
+          </Link>
+          {t.description ? (
+            <span className="max-w-xs truncate text-xs text-muted-foreground">
+              {t.description}
+            </span>
+          ) : null}
+        </span>
       ),
     },
     {
@@ -63,6 +70,22 @@ export function TeamsPage() {
       ),
     },
     {
+      key: "tags",
+      header: "tags",
+      cell: (t) =>
+        t.tags.length ? (
+          <span className="flex flex-wrap gap-1">
+            {t.tags.map((tag) => (
+              <Badge key={tag} variant="muted">
+                {tag}
+              </Badge>
+            ))}
+          </span>
+        ) : (
+          <span className="text-muted-foreground/40">—</span>
+        ),
+    },
+    {
       key: "actions",
       header: "",
       className: "w-20",
@@ -73,8 +96,8 @@ export function TeamsPage() {
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            aria-label={`Rename ${t.name}`}
-            onClick={() => setRenaming(t)}
+            aria-label={`Edit ${t.name}`}
+            onClick={() => setEditing(t)}
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
@@ -119,10 +142,10 @@ export function TeamsPage() {
       />
 
       <CreateTeamDialog open={createOpen} onOpenChange={setCreateOpen} />
-      <TeamRenameDialog
-        team={renaming}
+      <TeamEditDialog
+        team={editing}
         onOpenChange={(open) => {
-          if (!open) setRenaming(null);
+          if (!open) setEditing(null);
         }}
       />
       <DeleteTeamDialog

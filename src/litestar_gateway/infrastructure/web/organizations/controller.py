@@ -172,6 +172,8 @@ class OrganizationController(Controller):
             organization_id=organization_id,
             name=data.name,
             admin_email=data.admin_email,
+            description=data.description,
+            tags=data.tags,
         )
         await record_audit(
             audit_log,
