@@ -132,6 +132,64 @@ async def test_delete_missing_org_is_404(client: AsyncTestClient) -> None:
     assert resp.status_code == HTTP_404_NOT_FOUND, resp.text
 
 
+async def test_get_organization_by_id(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    org_id = await _create_org(client, admin, "Detail")
+
+    resp = await client.get(f"/organizations/{org_id}", headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+    body = resp.json()
+    assert body["id"] == org_id
+    assert body["name"] == "Detail"
+
+
+async def test_get_missing_org_is_404(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    resp = await client.get(f"/organizations/{uuid4()}", headers=_bearer(admin))
+    assert resp.status_code == HTTP_404_NOT_FOUND, resp.text
+
+
+async def test_spend_rollup_lists_every_team(client: AsyncTestClient) -> None:
+    # With no recorded usage the totals are zero, but every team must appear so
+    # the detail page shows the full breakdown.
+    admin = await _admin(client)
+    org_id = await _create_org(client, admin, "Spendy")
+    for name in ("Alpha", "Beta"):
+        created = await client.post(
+            f"/organizations/{org_id}/teams",
+            json={"name": name, "admin_email": ADMIN_EMAIL},
+            headers=_bearer(admin),
+        )
+        assert created.status_code == HTTP_201_CREATED, created.text
+
+    resp = await client.get(f"/organizations/{org_id}/spend", headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+    body = resp.json()
+    assert body["organization_id"] == org_id
+    assert body["total_cost"] == 0
+    assert {t["name"] for t in body["teams"]} == {"Alpha", "Beta"}
+    assert all(t["cost"] == 0 for t in body["teams"])
+
+
+async def test_spend_rollup_missing_org_is_404(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    resp = await client.get(f"/organizations/{uuid4()}/spend", headers=_bearer(admin))
+    assert resp.status_code == HTTP_404_NOT_FOUND, resp.text
+
+
+async def test_non_admin_cannot_read_detail_or_spend(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    org_id = await _create_org(client, admin, "Private")
+    member = await _member(client, admin, "reader@example.com")
+
+    assert (
+        await client.get(f"/organizations/{org_id}", headers=_bearer(member))
+    ).status_code == HTTP_403_FORBIDDEN
+    assert (
+        await client.get(f"/organizations/{org_id}/spend", headers=_bearer(member))
+    ).status_code == HTTP_403_FORBIDDEN
+
+
 async def test_non_admin_cannot_mutate(client: AsyncTestClient) -> None:
     admin = await _admin(client)
     org_id = await _create_org(client, admin, "Guarded")

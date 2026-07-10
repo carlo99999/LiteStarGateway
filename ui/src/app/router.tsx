@@ -8,6 +8,7 @@ import { AppShell } from "@/app/layout/AppShell";
 import { PlannedPage } from "@/app/PlannedPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RequireAuth } from "@/features/auth/RequireAuth";
+import { OrganizationDetailPage } from "@/features/organizations/OrganizationDetailPage";
 import { OrganizationsPage } from "@/features/organizations/OrganizationsPage";
 
 const rootRoute = createRootRoute({ component: Outlet });
@@ -39,6 +40,12 @@ const organizationsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/organizations",
   component: OrganizationsPage,
+});
+
+const organizationDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/organizations/$organizationId",
+  component: OrganizationDetailPage,
 });
 
 // Scaffolded-but-not-implemented feature areas (Phase 1 lands their views),
@@ -73,7 +80,12 @@ const plannedRoutes = planned.map((p) =>
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  appRoute.addChildren([indexRoute, organizationsRoute, ...plannedRoutes]),
+  appRoute.addChildren([
+    indexRoute,
+    organizationsRoute,
+    organizationDetailRoute,
+    ...plannedRoutes,
+  ]),
 ]);
 
 export const router = createRouter({ routeTree, basepath: "/ui" });

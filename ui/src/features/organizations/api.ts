@@ -2,6 +2,7 @@ import { api } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 
 export type Organization = components["schemas"]["OrganizationResponse"];
+export type OrganizationSpend = components["schemas"]["OrganizationSpendResponse"];
 
 /** Pull a human message out of the gateway's OpenAI-shaped error envelope. */
 function errorMessage(error: unknown, fallback: string): string {
@@ -18,6 +19,32 @@ export async function listOrganizations(): Promise<Organization[]> {
   const { data, error } = await api.GET("/organizations");
   if (error || !data) {
     throw new Error(errorMessage(error, "Failed to load organizations"));
+  }
+  return data;
+}
+
+/** GET /organizations/{id} — one tenant (platform-admin). */
+export async function getOrganization(id: string): Promise<Organization> {
+  const { data, error } = await api.GET("/organizations/{organization_id}", {
+    params: { path: { organization_id: id } },
+  });
+  if (error || !data) {
+    throw new Error(errorMessage(error, "Failed to load organization"));
+  }
+  return data;
+}
+
+/** GET /organizations/{id}/spend — cost over the last `days`, summed across the
+ * org's teams with a per-team breakdown (platform-admin). */
+export async function getOrganizationSpend(
+  id: string,
+  days = 30,
+): Promise<OrganizationSpend> {
+  const { data, error } = await api.GET("/organizations/{organization_id}/spend", {
+    params: { path: { organization_id: id }, query: { days } },
+  });
+  if (error || !data) {
+    throw new Error(errorMessage(error, "Failed to load organization spend"));
   }
   return data;
 }

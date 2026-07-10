@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from litestar import Controller, Request, delete, get, patch, post
@@ -17,10 +18,17 @@ from litestar_gateway.infrastructure.web.audit.recorder import record_audit
 from litestar_gateway.infrastructure.web.organizations.schemas import (
     CreateOrganizationRequest,
     OrganizationResponse,
+    OrganizationSpendResponse,
+    TeamSpendResponse,
     UpdateOrganizationRequest,
 )
 from litestar_gateway.infrastructure.web.session.dependencies import provide_current_admin
 from litestar_gateway.infrastructure.web.teams.schemas import CreateTeamRequest, TeamResponse
+
+# Spend rollup window: default 30 days, clamped to a sane range so a stray query
+# value can't ask for an unbounded or negative window.
+_DEFAULT_SPEND_DAYS = 30
+_MAX_SPEND_DAYS = 365
 
 
 class OrganizationController(Controller):
@@ -61,6 +69,41 @@ class OrganizationController(Controller):
         page_limit, page_offset = resolve_page(limit, offset)
         orgs = await organization_service.list(current_admin, limit=page_limit, offset=page_offset)
         return [OrganizationResponse.from_entity(o) for o in orgs]
+
+    @get("/{organization_id:uuid}")
+    async def get_organization(
+        self,
+        organization_id: FromPath[UUID],
+        current_admin: NamedDependency[User],
+        organization_service: NamedDependency[OrganizationService],
+    ) -> OrganizationResponse:
+        org = await organization_service.get(current_admin, organization_id)
+        return OrganizationResponse.from_entity(org)
+
+    @get("/{organization_id:uuid}/spend")
+    async def organization_spend(
+        self,
+        organization_id: FromPath[UUID],
+        current_admin: NamedDependency[User],
+        organization_service: NamedDependency[OrganizationService],
+        days: FromQuery[int | None] = None,
+    ) -> OrganizationSpendResponse:
+        """Recorded cost over the last `days` (default 30, clamped to 1..365),
+        summed across the org's teams with a per-team breakdown. Read-only."""
+        window = max(1, min(days or _DEFAULT_SPEND_DAYS, _MAX_SPEND_DAYS))
+        since = datetime.now(UTC) - timedelta(days=window)
+        rollup = await organization_service.spend_rollup(
+            current_admin, organization_id, since=since
+        )
+        return OrganizationSpendResponse(
+            organization_id=organization_id,
+            since=rollup.since,
+            total_cost=rollup.total_cost,
+            teams=[
+                TeamSpendResponse(team_id=ts.team.id, name=ts.team.name, cost=ts.cost)
+                for ts in rollup.teams
+            ],
+        )
 
     @patch("/{organization_id:uuid}")
     async def update_organization(
