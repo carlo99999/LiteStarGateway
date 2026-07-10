@@ -22,10 +22,16 @@ accounting in both cases.
 - Smart routing, shadow routing, and weighted routing
 - Team-scoped models, credentials, API keys, budgets, usage, and audit logs
 
+## Admin console
+
+Manage teams, models, provider credentials, API keys, budgets, and usage from
+the **[admin console](/ui/)** — a web UI served by this same gateway.
+
 ## Documentation viewers
 
 | Viewer | Best for | Link |
 | --- | --- | --- |
+| Admin console | Managing teams, models, credentials, and budgets | [Open console](/ui/) |
 | Swagger UI | Quick endpoint exploration and request testing | [Open Swagger UI](/) |
 | Scalar | Clean API reference browsing | [Open Scalar](/scalar) |
 | Stoplight Elements | Contract review and navigation | [Open Elements](/elements) |
