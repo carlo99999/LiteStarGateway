@@ -19,3 +19,13 @@ class OrganizationRepository(Protocol):
     async def list(
         self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
     ) -> list[Organization]: ...
+
+    async def update(self, organization_id: UUID, name: str) -> Organization | None:
+        """Rename the organization; return the updated entity, or None if no
+        organization has that id."""
+        ...
+
+    async def delete(self, organization_id: UUID) -> bool:
+        """Delete the organization; return True if a row was removed, False if no
+        organization has that id."""
+        ...

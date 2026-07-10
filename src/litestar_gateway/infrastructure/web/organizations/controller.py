@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from litestar import Controller, Request, get, post
+from litestar import Controller, Request, delete, get, patch, post
 from litestar.di import NamedDependency, Provide
 from litestar.params import FromPath, FromQuery
 
@@ -17,6 +17,7 @@ from litestar_gateway.infrastructure.web.audit.recorder import record_audit
 from litestar_gateway.infrastructure.web.organizations.schemas import (
     CreateOrganizationRequest,
     OrganizationResponse,
+    UpdateOrganizationRequest,
 )
 from litestar_gateway.infrastructure.web.session.dependencies import provide_current_admin
 from litestar_gateway.infrastructure.web.teams.schemas import CreateTeamRequest, TeamResponse
@@ -60,6 +61,50 @@ class OrganizationController(Controller):
         page_limit, page_offset = resolve_page(limit, offset)
         orgs = await organization_service.list(current_admin, limit=page_limit, offset=page_offset)
         return [OrganizationResponse.from_entity(o) for o in orgs]
+
+    @patch("/{organization_id:uuid}")
+    async def update_organization(
+        self,
+        request: Request,
+        organization_id: FromPath[UUID],
+        data: UpdateOrganizationRequest,
+        current_admin: NamedDependency[User],
+        organization_service: NamedDependency[OrganizationService],
+        audit_log: NamedDependency[AuditLog],
+    ) -> OrganizationResponse:
+        org = await organization_service.rename(current_admin, organization_id, data.name)
+        await record_audit(
+            audit_log,
+            request,
+            current_admin,
+            "organization.update",
+            target_type="organization",
+            target_id=org.id,
+            detail=data.name,
+        )
+        return OrganizationResponse.from_entity(org)
+
+    @delete("/{organization_id:uuid}")
+    async def delete_organization(
+        self,
+        request: Request,
+        organization_id: FromPath[UUID],
+        current_admin: NamedDependency[User],
+        organization_service: NamedDependency[OrganizationService],
+        audit_log: NamedDependency[AuditLog],
+    ) -> None:
+        # Refuses with 409 (OrganizationNotEmpty) if the org still has teams —
+        # no cascade. Returns the deleted entity so we can audit its name.
+        org = await organization_service.delete(current_admin, organization_id)
+        await record_audit(
+            audit_log,
+            request,
+            current_admin,
+            "organization.delete",
+            target_type="organization",
+            target_id=org.id,
+            detail=org.name,
+        )
 
     @post("/{organization_id:uuid}/teams")
     async def create_team(

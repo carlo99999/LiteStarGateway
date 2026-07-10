@@ -24,7 +24,10 @@ from litestar_gateway.infrastructure.persistence.user_repository import (
 def provide_organization_service(
     db_session: NamedDependency[AsyncSession],
 ) -> OrganizationService:
-    return OrganizationService(SQLAlchemyOrganizationRepository(db_session))
+    return OrganizationService(
+        SQLAlchemyOrganizationRepository(db_session),
+        SQLAlchemyTeamRepository(db_session),
+    )
 
 
 def provide_team_service(db_session: NamedDependency[AsyncSession]) -> TeamService:

@@ -15,6 +15,11 @@ class CreateOrganizationRequest:
 
 
 @dataclass(frozen=True)
+class UpdateOrganizationRequest:
+    name: str
+
+
+@dataclass(frozen=True)
 class OrganizationResponse:
     id: UUID
     name: str

@@ -35,3 +35,20 @@ class SQLAlchemyOrganizationRepository:
             .offset(offset)
         )
         return [m.to_entity() for m in models]
+
+    async def update(self, organization_id: UUID, name: str) -> Organization | None:
+        model = await self._session.get(OrganizationModel, organization_id)
+        if model is None:
+            return None
+        model.name = name
+        await self._session.commit()
+        await self._session.refresh(model)
+        return model.to_entity()
+
+    async def delete(self, organization_id: UUID) -> bool:
+        model = await self._session.get(OrganizationModel, organization_id)
+        if model is None:
+            return False
+        await self._session.delete(model)
+        await self._session.commit()
+        return True

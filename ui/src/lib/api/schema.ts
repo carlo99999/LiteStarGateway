@@ -400,6 +400,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/{organization_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** DeleteOrganization */
+        delete: operations["OrganizationsOrganizationIdDeleteOrganization"];
+        options?: never;
+        head?: never;
+        /** UpdateOrganization */
+        patch: operations["OrganizationsOrganizationIdUpdateOrganization"];
+        trace?: never;
+    };
     "/teams/{team_id}/members": {
         parameters: {
             query?: never;
@@ -1310,6 +1328,10 @@ export interface components {
             output_cost_per_token?: number | null;
             enabled?: boolean | null;
         };
+        /** UpdateOrganizationRequest */
+        UpdateOrganizationRequest: {
+            name: string;
+        };
         /** UsageResponse */
         UsageResponse: {
             model: string;
@@ -2120,6 +2142,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TeamResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    OrganizationsOrganizationIdDeleteOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, nothing follows */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    OrganizationsOrganizationIdUpdateOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationResponse"];
                 };
             };
             /** @description Bad request syntax or unsupported method */

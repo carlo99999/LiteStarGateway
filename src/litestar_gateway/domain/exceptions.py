@@ -79,6 +79,12 @@ class OrganizationNotFound(DomainError):
     """No organization exists for the given id."""
 
 
+class OrganizationNotEmpty(DomainError):
+    """The organization still has teams and cannot be deleted — doing so would
+    orphan those teams (and everything scoped under them). Remove the teams
+    first (→ 409)."""
+
+
 class TeamNotFound(DomainError):
     """No team exists for the given id."""
 
