@@ -5784,6 +5784,22 @@
                 "properties": {
                     "name": {
                         "type": "string"
+                    },
+                    "description": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "tags": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
                     }
                 },
                 "type": "object",
@@ -6339,13 +6355,31 @@
                     "created_at": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "description": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "tags": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
                     }
                 },
                 "type": "object",
                 "required": [
                     "created_at",
+                    "description",
                     "id",
-                    "name"
+                    "name",
+                    "tags"
                 ],
                 "title": "OrganizationResponse"
             },
@@ -6912,6 +6946,22 @@
                 "properties": {
                     "name": {
                         "type": "string"
+                    },
+                    "description": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "tags": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
                     }
                 },
                 "type": "object",

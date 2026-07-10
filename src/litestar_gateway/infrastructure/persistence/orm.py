@@ -266,9 +266,17 @@ class OrganizationModel(base.UUIDAuditBase):
     __tablename__ = "organization"
 
     name: Mapped[str] = mapped_column(index=True)
+    description: Mapped[str | None] = mapped_column(default=None)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     def to_entity(self) -> Organization:
-        return Organization(id=self.id, name=self.name, created_at=self.created_at)
+        return Organization(
+            id=self.id,
+            name=self.name,
+            created_at=self.created_at,
+            description=self.description,
+            tags=list(self.tags or []),
+        )
 
 
 class TeamModel(base.UUIDAuditBase):

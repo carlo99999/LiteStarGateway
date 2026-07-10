@@ -88,6 +88,43 @@ async def test_rename_updates_the_name(client: AsyncTestClient) -> None:
     assert {o["id"]: o["name"] for o in listed}[org_id] == "Acme Corp"
 
 
+async def test_create_with_description_and_tags(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    resp = await client.post(
+        "/organizations",
+        json={"name": "Meta", "description": "an org", "tags": ["eu", "prod"]},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_201_CREATED, resp.text
+    body = resp.json()
+    assert body["description"] == "an org"
+    assert body["tags"] == ["eu", "prod"]
+
+
+async def test_create_defaults_empty_metadata(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    org_id = await _create_org(client, admin, "Bare")
+    got = (await client.get(f"/organizations/{org_id}", headers=_bearer(admin))).json()
+    assert got["description"] is None
+    assert got["tags"] == []
+
+
+async def test_update_replaces_description_and_tags(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    org_id = await _create_org(client, admin, "Meta2")
+    resp = await client.patch(
+        f"/organizations/{org_id}",
+        json={"name": "Meta2", "description": "d2", "tags": ["x"]},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_200_OK, resp.text
+    assert resp.json()["description"] == "d2"
+    assert resp.json()["tags"] == ["x"]
+    # Persisted, and re-fetch confirms it.
+    got = (await client.get(f"/organizations/{org_id}", headers=_bearer(admin))).json()
+    assert got["tags"] == ["x"]
+
+
 async def test_delete_empty_org(client: AsyncTestClient) -> None:
     admin = await _admin(client)
     org_id = await _create_org(client, admin, "Temp")

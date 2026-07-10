@@ -46,7 +46,9 @@ class OrganizationController(Controller):
         organization_service: NamedDependency[OrganizationService],
         audit_log: NamedDependency[AuditLog],
     ) -> OrganizationResponse:
-        org = await organization_service.create(current_admin, data.name)
+        org = await organization_service.create(
+            current_admin, data.name, description=data.description, tags=data.tags
+        )
         await record_audit(
             audit_log,
             request,
@@ -115,7 +117,13 @@ class OrganizationController(Controller):
         organization_service: NamedDependency[OrganizationService],
         audit_log: NamedDependency[AuditLog],
     ) -> OrganizationResponse:
-        org = await organization_service.rename(current_admin, organization_id, data.name)
+        org = await organization_service.update(
+            current_admin,
+            organization_id,
+            data.name,
+            description=data.description,
+            tags=data.tags,
+        )
         await record_audit(
             audit_log,
             request,

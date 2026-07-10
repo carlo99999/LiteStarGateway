@@ -38,13 +38,20 @@ export function OrganizationsPage() {
       key: "name",
       header: "name",
       cell: (org) => (
-        <Link
-          to="/organizations/$organizationId"
-          params={{ organizationId: org.id }}
-          className="font-medium text-foreground hover:text-primary hover:underline"
-        >
-          {org.name}
-        </Link>
+        <span className="flex flex-col">
+          <Link
+            to="/organizations/$organizationId"
+            params={{ organizationId: org.id }}
+            className="font-medium text-foreground hover:text-primary hover:underline"
+          >
+            {org.name}
+          </Link>
+          {org.description ? (
+            <span className="max-w-xs truncate text-xs text-muted-foreground">
+              {org.description}
+            </span>
+          ) : null}
+        </span>
       ),
     },
     {
@@ -58,6 +65,22 @@ export function OrganizationsPage() {
       cell: (org) => (
         <span className="text-xs text-muted-foreground">{formatDate(org.created_at)}</span>
       ),
+    },
+    {
+      key: "tags",
+      header: "tags",
+      cell: (org) =>
+        org.tags.length ? (
+          <span className="flex flex-wrap gap-1">
+            {org.tags.map((tag) => (
+              <Badge key={tag} variant="muted">
+                {tag}
+              </Badge>
+            ))}
+          </span>
+        ) : (
+          <span className="text-muted-foreground/40">—</span>
+        ),
     },
     {
       key: "actions",

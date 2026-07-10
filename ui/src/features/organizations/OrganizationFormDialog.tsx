@@ -15,17 +15,32 @@ import {
   createOrganization,
   updateOrganization,
   type Organization,
+  type OrganizationInput,
 } from "@/features/organizations/api";
 
 interface OrganizationFormDialogProps {
   mode: "create" | "edit";
-  /** The organization being renamed, when mode is "edit". */
+  /** The organization being edited, when mode is "edit". */
   organization?: Organization;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-/** Create a new organization or rename an existing one. */
+/** Parse the comma-separated tags field into a trimmed, de-duplicated list. */
+function parseTags(text: string): string[] {
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  for (const raw of text.split(",")) {
+    const tag = raw.trim();
+    if (tag && !seen.has(tag)) {
+      seen.add(tag);
+      tags.push(tag);
+    }
+  }
+  return tags;
+}
+
+/** Create a new organization or edit an existing one (name, description, tags). */
 export function OrganizationFormDialog({
   mode,
   organization,
@@ -34,41 +49,58 @@ export function OrganizationFormDialog({
 }: OrganizationFormDialogProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [tagsText, setTagsText] = useState("");
 
-  // Seed the field each time the dialog opens (blank for create, current name
-  // for rename) so a previous edit never leaks into the next open.
+  // Seed the fields each time the dialog opens so a previous edit never leaks in.
   useEffect(() => {
-    if (open) setName(mode === "edit" ? (organization?.name ?? "") : "");
+    if (!open) return;
+    if (mode === "edit" && organization) {
+      setName(organization.name);
+      setDescription(organization.description ?? "");
+      setTagsText(organization.tags.join(", "));
+    } else {
+      setName("");
+      setDescription("");
+      setTagsText("");
+    }
   }, [open, mode, organization]);
 
   const mutation = useMutation({
-    mutationFn: (value: string) =>
+    mutationFn: (input: OrganizationInput) =>
       mode === "edit" && organization
-        ? updateOrganization(organization.id, value)
-        : createOrganization(value),
-    onSuccess: async () => {
+        ? updateOrganization(organization.id, input)
+        : createOrganization(input),
+    onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      // Refresh the detail view too, when editing from there.
+      if (mode === "edit") {
+        await queryClient.invalidateQueries({ queryKey: ["organizations", saved.id] });
+      }
       onOpenChange(false);
     },
   });
 
-  const trimmed = name.trim();
-  const unchanged = mode === "edit" && trimmed === organization?.name;
-  const canSubmit = trimmed.length > 0 && !unchanged && !mutation.isPending;
+  const canSubmit = name.trim().length > 0 && !mutation.isPending;
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (canSubmit) mutation.mutate(trimmed);
+    if (!canSubmit) return;
+    mutation.mutate({
+      name: name.trim(),
+      description: description.trim() || null,
+      tags: parseTags(tagsText),
+    });
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{mode === "edit" ? "Rename organization" : "New organization"}</DialogTitle>
+          <DialogTitle>{mode === "edit" ? "Edit organization" : "New organization"}</DialogTitle>
           <DialogDescription>
             {mode === "edit"
-              ? "Change the display name. The id and members are unaffected."
+              ? "Update the name, description, and tags. Members and teams are unaffected."
               : "Create a platform-scoped tenant. You can add teams to it afterwards."}
           </DialogDescription>
         </DialogHeader>
@@ -81,6 +113,26 @@ export function OrganizationFormDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="Acme Corp"
               autoFocus
+              autoComplete="off"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="org-description">description</Label>
+            <Input
+              id="org-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="optional"
+              autoComplete="off"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="org-tags">tags</Label>
+            <Input
+              id="org-tags"
+              value={tagsText}
+              onChange={(e) => setTagsText(e.target.value)}
+              placeholder="comma, separated, labels"
               autoComplete="off"
             />
           </div>
@@ -97,11 +149,7 @@ export function OrganizationFormDialog({
               cancel
             </Button>
             <Button type="submit" disabled={!canSubmit}>
-              {mutation.isPending
-                ? "saving…"
-                : mode === "edit"
-                  ? "save"
-                  : "create"}
+              {mutation.isPending ? "saving…" : mode === "edit" ? "save" : "create"}
             </Button>
           </DialogFooter>
         </form>
