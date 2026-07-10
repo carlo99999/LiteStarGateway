@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatusDot } from "@/components/common/StatusDot";
@@ -8,6 +8,7 @@ import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { listOrganizations } from "@/features/organizations/api";
+import { CreateTeamDialog } from "@/features/teams/CreateTeamDialog";
 import { DeleteTeamDialog } from "@/features/teams/DeleteTeamDialog";
 import { TeamRenameDialog } from "@/features/teams/TeamRenameDialog";
 import { listTeams, type Team } from "@/features/teams/api";
@@ -24,6 +25,7 @@ export function TeamsPage() {
 
   const [renaming, setRenaming] = useState<Team | null>(null);
   const [deleting, setDeleting] = useState<Team | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const columns: Column<Team>[] = [
     { key: "status", header: "", className: "w-8", cell: () => <StatusDot tone="green" /> },
@@ -96,7 +98,15 @@ export function TeamsPage() {
         command="teams list"
         title="Teams"
         description="Every team across all organizations. Members, budget, and usage live on each team."
-        actions={<Badge variant="muted">{teams.data ? `${teams.data.length} total` : "…"}</Badge>}
+        actions={
+          <span className="flex items-center gap-3">
+            <Badge variant="muted">{teams.data ? `${teams.data.length} total` : "…"}</Badge>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4" />
+              New team
+            </Button>
+          </span>
+        }
       />
       <DataTable
         columns={columns}
@@ -108,6 +118,7 @@ export function TeamsPage() {
         emptyDescription="Create a team from an organization's detail page."
       />
 
+      <CreateTeamDialog open={createOpen} onOpenChange={setCreateOpen} />
       <TeamRenameDialog
         team={renaming}
         onOpenChange={(open) => {
