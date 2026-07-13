@@ -55,6 +55,7 @@ class APIKeyService:
         name: str | None = None,
         scope: KeyScope = KeyScope.INFERENCE,
         service_principal_id: UUID | None = None,
+        rate_limit_rpm: int | None = None,
     ) -> IssuedKey:
         # Management/all scope is reserved for service-principal keys: a personal
         # key (no SP) can only ever do inference. A human manages via their JWT.
@@ -75,6 +76,7 @@ class APIKeyService:
             last_used_at=None,
             scope=scope,
             service_principal_id=service_principal_id,
+            rate_limit_rpm=rate_limit_rpm,
         )
         stored = await self._repo.add(key)
         return IssuedKey(key=stored, plaintext=material.plaintext)

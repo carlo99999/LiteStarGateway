@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 from litestar.status_codes import (
     HTTP_200_OK,
+    HTTP_201_CREATED,
     HTTP_429_TOO_MANY_REQUESTS,
 )
 from litestar.testing import AsyncTestClient
@@ -53,3 +54,25 @@ async def test_no_limit_is_unlimited(
     for _ in range(5):
         resp = await client.post("/v1/chat/completions", json=_CHAT, headers=_bearer(key))
         assert resp.status_code == HTTP_200_OK, resp.text
+
+
+async def test_key_rpm_limit_blocks_after_limit(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A per-key limit throttles that key independently of the team limit.
+    _patch(monkeypatch)
+    _key, team_id, admin = await _setup_team(client)
+    issued = await client.post(
+        f"/teams/{team_id}/keys",
+        json={"name": "capped", "scope": "inference", "rate_limit_rpm": 1},
+        headers=_bearer(admin),
+    )
+    assert issued.status_code in (HTTP_200_OK, HTTP_201_CREATED), issued.text
+    assert issued.json()["rate_limit_rpm"] == 1
+    limited = issued.json()["plaintext"]
+
+    first = await client.post("/v1/chat/completions", json=_CHAT, headers=_bearer(limited))
+    assert first.status_code == HTTP_200_OK, first.text
+    second = await client.post("/v1/chat/completions", json=_CHAT, headers=_bearer(limited))
+    assert second.status_code == HTTP_429_TOO_MANY_REQUESTS, second.text
+    assert "retry-after" in {k.lower() for k in second.headers}

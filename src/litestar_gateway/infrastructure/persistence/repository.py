@@ -31,6 +31,7 @@ class SQLAlchemyAPIKeyRepository:
             last_used_at=key.last_used_at,
             scope=key.scope.value,
             service_principal_id=key.service_principal_id,
+            rate_limit_rpm=key.rate_limit_rpm,
         )
         self._session.add(model)
         await self._session.commit()

@@ -242,7 +242,11 @@ class TeamController(Controller):
             valid = ", ".join(s.value for s in KeyScope)
             raise InvalidKeyScope(f"scope must be one of: {valid}") from None
         issued = await api_key_service.issue(
-            team_id=team_id, created_by=current_user.id, name=data.name, scope=scope
+            team_id=team_id,
+            created_by=current_user.id,
+            name=data.name,
+            scope=scope,
+            rate_limit_rpm=data.rate_limit_rpm,
         )
         await record_audit(
             audit_log,
