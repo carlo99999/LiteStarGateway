@@ -30,6 +30,9 @@ from litestar_gateway.infrastructure.persistence.credential_repository import (
 from litestar_gateway.infrastructure.persistence.model_repository import (
     SQLAlchemyModelRepository,
 )
+from litestar_gateway.infrastructure.persistence.repository import (
+    SQLAlchemyAPIKeyRepository,
+)
 from litestar_gateway.infrastructure.persistence.router_repository import (
     SQLAlchemyRouterRepository,
     SQLAlchemyRoutingDecisionLog,
@@ -83,6 +86,7 @@ def provide_completion_service(
         in_flight=_in_flight_spend,
         rate_limiter=rate_limiter,
         teams=SQLAlchemyTeamRepository(db_session),
+        api_keys=SQLAlchemyAPIKeyRepository(db_session),
     )
     return CompletionService(
         models=SQLAlchemyModelRepository(db_session),

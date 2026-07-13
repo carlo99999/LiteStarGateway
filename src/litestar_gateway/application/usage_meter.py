@@ -23,6 +23,7 @@ from litestar_gateway.domain.budget import window_start
 from litestar_gateway.domain.entities import Model, TraceRecord, UsageEvent
 from litestar_gateway.domain.exceptions import BudgetExceeded, RateLimited
 from litestar_gateway.domain.ports import (
+    APIKeyRepository,
     BudgetRepository,
     RateLimiter,
     TeamRepository,
@@ -218,14 +219,16 @@ class UsageMeter:
         settlement_timeout: float = 30.0,
         rate_limiter: RateLimiter | None = None,
         teams: TeamRepository | None = None,
+        api_keys: APIKeyRepository | None = None,
     ) -> None:
         self._usage = usage
         self._emit_trace = emit_trace
         self._budgets = budgets
-        # Rate limiting is opt-in: without both a limiter and a team repo (library
-        # use), admit skips the RPM gate entirely.
+        # Rate limiting is opt-in: without a limiter admit skips the RPM gates.
+        # The team gate needs the team repo; the key gate needs the api-key repo.
         self._rate_limiter = rate_limiter
         self._teams = teams
+        self._api_keys = api_keys
         # Library use may omit it; the web wiring passes one shared instance so
         # request-scoped meters see each other's reservations.
         self._in_flight = in_flight if in_flight is not None else InFlightSpend()
@@ -233,7 +236,14 @@ class UsageMeter:
         # leave an unbounded pile of orphan cleanup coroutines (M29).
         self._settlement_timeout = settlement_timeout
 
-    async def admit(self, team_id: UUID, model: Model, request: dict[str, Any]) -> float:
+    async def admit(
+        self,
+        team_id: UUID,
+        model: Model,
+        request: dict[str, Any],
+        *,
+        api_key_id: UUID | None = None,
+    ) -> float:
         """Pre-call spend gate: reject once committed spend plus the estimated
         cost already reserved by in-flight requests reaches the budget limit.
         An admitted request immediately reserves its own pessimistic cost
@@ -243,6 +253,7 @@ class UsageMeter:
         the gate before the first one settles (streams widen that blind spot
         to minutes)."""
         await self._enforce_team_rate_limit(team_id)
+        await self._enforce_key_rate_limit(api_key_id)
         if self._budgets is None:
             return 0.0
         budget = await self._budgets.get(team_id)
@@ -277,6 +288,21 @@ class UsageMeter:
         if not decision.allowed:
             raise RateLimited(
                 f"Team rate limit exceeded: {team.rate_limit_rpm} requests/min",
+                retry_after=decision.retry_after,
+            )
+
+    async def _enforce_key_rate_limit(self, api_key_id: UUID | None) -> None:
+        """Per-key requests/minute gate. No-op for internal calls with no user key
+        (e.g. router judge/embeddings strategies) or when unwired / no limit set."""
+        if self._rate_limiter is None or self._api_keys is None or api_key_id is None:
+            return
+        key = await self._api_keys.get(api_key_id)
+        if key is None or key.rate_limit_rpm is None:
+            return
+        decision = await self._rate_limiter.hit(f"key:{api_key_id}", key.rate_limit_rpm)
+        if not decision.allowed:
+            raise RateLimited(
+                f"API key rate limit exceeded: {key.rate_limit_rpm} requests/min",
                 retry_after=decision.retry_after,
             )
 

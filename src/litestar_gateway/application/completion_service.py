@@ -249,7 +249,7 @@ class CompletionService:
                 "the native Messages endpoint (/v1/messages) serves Anthropic models only"
             )
         view = native_reservation_view(model.provider, governed)
-        reservation = await self._meter.admit(team_id, model, view)
+        reservation = await self._meter.admit(team_id, model, view, api_key_id=api_key_id)
         return await self._dispatch(
             team_id,
             api_key_id,
@@ -283,7 +283,7 @@ class CompletionService:
                 "the native Messages endpoint (/v1/messages) serves Anthropic models only"
             )
         view = native_reservation_view(model.provider, governed)
-        reservation = await self._meter.admit(team_id, model, view)
+        reservation = await self._meter.admit(team_id, model, view, api_key_id=api_key_id)
         try:
             stream = await self._gateway.astream_native_messages(governed, model, values)
         except BaseException:
@@ -349,7 +349,7 @@ class CompletionService:
                 "the native Gemini endpoint (generateContent) serves Vertex models only"
             )
         view = native_reservation_view(model.provider, governed)
-        reservation = await self._meter.admit(team_id, model, view)
+        reservation = await self._meter.admit(team_id, model, view, api_key_id=api_key_id)
         return await self._dispatch(
             team_id,
             api_key_id,
@@ -383,7 +383,7 @@ class CompletionService:
                 "the native Gemini endpoint (streamGenerateContent) serves Vertex models only"
             )
         view = native_reservation_view(model.provider, governed)
-        reservation = await self._meter.admit(team_id, model, view)
+        reservation = await self._meter.admit(team_id, model, view, api_key_id=api_key_id)
         try:
             stream = await self._gateway.astream_generate_content(governed, model, values)
         except BaseException:
@@ -448,7 +448,7 @@ class CompletionService:
         # Per-model output ceiling: clamp/inject now that the model is known, and
         # reserve from the clamped request so admission and the provider call agree.
         clean = clamp_output_tokens(operation, request, model.max_output_tokens)
-        reservation = await self._meter.admit(team_id, model, clean)
+        reservation = await self._meter.admit(team_id, model, clean, api_key_id=api_key_id)
         try:
             values = await self._credentials.get_values(model.credential_id)
             if values is None:

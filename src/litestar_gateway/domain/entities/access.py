@@ -59,6 +59,8 @@ class APIKey:
     last_used_at: datetime | None
     scope: KeyScope = KeyScope.INFERENCE
     service_principal_id: UUID | None = None
+    # Requests/minute cap for this key; None = unlimited.
+    rate_limit_rpm: int | None = None
 
     @property
     def is_service_principal(self) -> bool:
