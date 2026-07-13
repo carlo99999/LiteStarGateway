@@ -106,6 +106,16 @@ migration-check:
 
 # ── Run ──────────────────────────────────────────────────────────────────────
 
+# Run the complete Docker development stack. The first invocation creates a
+# gitignored .env.docker-dev with random secrets. Python reload and Vite HMR are
+# enabled; dependency/lockfile changes require a rebuild.
+dev:
+    ./scripts/dev-compose.sh
+
+# Stop the development stack while preserving database and dependency volumes.
+dev-down:
+    ./scripts/dev-compose.sh down
+
 # Run the dev server with auto-reload.
 run:
     uv run litestar --app {{app}} run --reload

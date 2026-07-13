@@ -142,6 +142,30 @@ MASTER_KEY=… JWT_SECRET=… SALT_KEY=… POSTGRES_PASSWORD=… docker compose 
 # → http://localhost:8000  (GET /health liveness, GET /health/ready readiness)
 ```
 
+For a different local host port, set `APP_PORT` (for example
+`APP_PORT=18000 docker compose up --build`). The app, database, Redis, and the
+non-root MLflow service remain connected on their fixed internal ports.
+
+For full-stack local development with live reload, run:
+
+```bash
+just dev
+```
+
+The first run creates `.env.docker-dev` with random, gitignored local secrets and
+starts Postgres, Redis, MLflow, the Litestar backend, and the Vite frontend. Open
+the admin UI at `http://127.0.0.1:5173/ui/`; API requests are proxied to the
+backend at `http://127.0.0.1:8000`. Python changes trigger Litestar reload, while
+React, TypeScript, and CSS changes use Vite HMR. Stop the stack with `just
+dev-down`; volumes are preserved. Changes to dependency manifests or lockfiles
+require rebuilding the images.
+
+If filesystem events are not propagated by the Docker host, set
+`WATCHFILES_FORCE_POLLING=true` and/or `CHOKIDAR_USEPOLLING=true` before running
+`just dev`. Host ports can also be changed when a default is already occupied,
+for example `BACKEND_PORT=18000 FRONTEND_PORT=15173 just dev`; the container
+network and frontend API proxy continue to use their fixed internal ports.
+
 Or build and run the image directly:
 
 ```bash
