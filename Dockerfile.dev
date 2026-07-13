@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
+
+# Development-only images. Dependencies are baked into the image while source
+# directories are bind-mounted by docker-compose.dev.yml for live reload.
+
+FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim@sha256:7cf77f594be8042dab6daa9fe326f90962252268b4f120a7f5dccce4d947e6c1 AS backend
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+# Keep dependency installation cached until the lockfile changes.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project --no-dev
+
+RUN useradd --create-home --uid 1000 app \
+    && chown app:app /app
+
+COPY --chown=app:app README.md LICENSE alembic.ini ./
+COPY --chown=app:app src/ ./src/
+COPY --chown=app:app migrations/ ./migrations/
+RUN uv sync --frozen --no-dev
+
+USER app
+EXPOSE 8000
+
+
+FROM node:22-bookworm-slim@sha256:53ada149d435c38b14476cb57e4a7da73c15595aba79bd6971b547ceb6d018bf AS frontend
+
+RUN npm install --global pnpm@11.6.0 \
+    && mkdir -p /app/ui \
+    && chown -R node:node /app
+
+WORKDIR /app/ui
+USER node
+
+# The named node_modules volume keeps dependencies inside Linux while the UI
+# source is bind-mounted from the host for Vite HMR.
+COPY --chown=node:node ui/package.json ui/pnpm-lock.yaml ui/pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --config.strict-dep-builds=false
+
+COPY --chown=node:node ui/ ./
+
+EXPOSE 5173
+
+
+FROM ghcr.io/mlflow/mlflow:v3.14.0@sha256:967de3ca34b6a5751718e380a0a383eb0ce1a6f5b484f363bd0da7559117a5f8 AS mlflow
+
+RUN useradd --create-home --uid 10001 mlflow \
+    && mkdir -p /mlflow \
+    && chown -R mlflow:mlflow /mlflow
+
+WORKDIR /mlflow
+USER mlflow
+EXPOSE 5000

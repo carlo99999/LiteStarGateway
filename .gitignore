@@ -1,4 +1,5 @@
 .env
+.env.docker-dev
 *.db
 .venv/
 __pycache__/
