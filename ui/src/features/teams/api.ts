@@ -58,28 +58,48 @@ export async function listTeamUsage(id: string): Promise<TeamUsage[]> {
   return data;
 }
 
+export interface TeamMetadata {
+  name: string;
+  description: string | null;
+  tags: string[];
+}
+
+/** Parse a comma-separated tags field into a trimmed, de-duplicated list. */
+export function parseTags(text: string): string[] {
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  for (const raw of text.split(",")) {
+    const tag = raw.trim();
+    if (tag && !seen.has(tag)) {
+      seen.add(tag);
+      tags.push(tag);
+    }
+  }
+  return tags;
+}
+
 /** POST /organizations/{orgId}/teams — create a team (platform-admin). The
  * admin_email must be an existing user, who becomes the team's first admin. */
 export async function createTeam(
   organizationId: string,
-  name: string,
   adminEmail: string,
+  meta: TeamMetadata,
 ): Promise<Team> {
   const { data, error } = await api.POST("/organizations/{organization_id}/teams", {
     params: { path: { organization_id: organizationId } },
-    body: { name, admin_email: adminEmail },
+    body: { admin_email: adminEmail, ...meta },
   });
   if (error || !data) throw fail(error, "Failed to create team");
   return data;
 }
 
-/** PATCH /teams/{id} — rename a team (platform-admin). */
-export async function updateTeam(id: string, name: string): Promise<Team> {
+/** PATCH /teams/{id} — update a team's name/description/tags (platform-admin). */
+export async function updateTeam(id: string, meta: TeamMetadata): Promise<Team> {
   const { data, error } = await api.PATCH("/teams/{team_id}", {
     params: { path: { team_id: id } },
-    body: { name },
+    body: meta,
   });
-  if (error || !data) throw fail(error, "Failed to rename team");
+  if (error || !data) throw fail(error, "Failed to update team");
   return data;
 }
 

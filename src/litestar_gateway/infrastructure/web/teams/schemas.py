@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
@@ -71,11 +71,15 @@ class UsageResponse:
 class CreateTeamRequest:
     name: str
     admin_email: str  # first team-admin (must be an existing user)
+    description: str | None = None
+    tags: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class UpdateTeamRequest:
     name: str
+    description: str | None = None
+    tags: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -84,6 +88,8 @@ class TeamResponse:
     organization_id: UUID
     name: str
     created_at: datetime
+    description: str | None
+    tags: list[str]
 
     @classmethod
     def from_entity(cls, team: Team) -> TeamResponse:
@@ -92,6 +98,8 @@ class TeamResponse:
             organization_id=team.organization_id,
             name=team.name,
             created_at=team.created_at,
+            description=team.description,
+            tags=list(team.tags),
         )
 
 

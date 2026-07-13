@@ -506,8 +506,8 @@ export interface paths {
         delete: operations["TeamsTeamIdDeleteTeam"];
         options?: never;
         head?: never;
-        /** RenameTeam */
-        patch: operations["TeamsTeamIdRenameTeam"];
+        /** UpdateTeam */
+        patch: operations["TeamsTeamIdUpdateTeam"];
         trace?: never;
     };
     "/teams/{team_id}/keys/spending": {
@@ -1091,6 +1091,8 @@ export interface components {
         CreateTeamRequest: {
             name: string;
             admin_email: string;
+            description?: string | null;
+            tags?: string[];
         };
         /** CreatedKeyResponse */
         CreatedKeyResponse: {
@@ -1364,6 +1366,8 @@ export interface components {
             name: string;
             /** Format: date-time */
             created_at: string;
+            description: string | null;
+            tags: string[];
         };
         /**
          * TeamRole
@@ -1411,6 +1415,8 @@ export interface components {
         /** UpdateTeamRequest */
         UpdateTeamRequest: {
             name: string;
+            description?: string | null;
+            tags?: string[];
         };
         /** UsageResponse */
         UsageResponse: {
@@ -2740,7 +2746,7 @@ export interface operations {
             };
         };
     };
-    TeamsTeamIdRenameTeam: {
+    TeamsTeamIdUpdateTeam: {
         parameters: {
             query?: never;
             header?: never;

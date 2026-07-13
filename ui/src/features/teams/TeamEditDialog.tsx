@@ -11,25 +11,36 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { updateTeam, type Team } from "@/features/teams/api";
+import { parseTags, updateTeam, type Team } from "@/features/teams/api";
 
-interface TeamRenameDialogProps {
-  /** The team being renamed, or null when the dialog is closed. */
+interface TeamEditDialogProps {
+  /** The team being edited, or null when the dialog is closed. */
   team: Team | null;
   onOpenChange: (open: boolean) => void;
 }
 
-/** Rename a team. */
-export function TeamRenameDialog({ team, onOpenChange }: TeamRenameDialogProps) {
+/** Edit a team's name, description, and tags. */
+export function TeamEditDialog({ team, onOpenChange }: TeamEditDialogProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [tagsText, setTagsText] = useState("");
 
   useEffect(() => {
-    if (team) setName(team.name);
+    if (team) {
+      setName(team.name);
+      setDescription(team.description ?? "");
+      setTagsText(team.tags.join(", "));
+    }
   }, [team]);
 
   const mutation = useMutation({
-    mutationFn: (value: string) => updateTeam(team!.id, value),
+    mutationFn: () =>
+      updateTeam(team!.id, {
+        name: name.trim(),
+        description: description.trim() || null,
+        tags: parseTags(tagsText),
+      }),
     onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: ["teams"] });
       await queryClient.invalidateQueries({ queryKey: ["teams", saved.id] });
@@ -37,12 +48,11 @@ export function TeamRenameDialog({ team, onOpenChange }: TeamRenameDialogProps) 
     },
   });
 
-  const trimmed = name.trim();
-  const canSubmit = trimmed.length > 0 && trimmed !== team?.name && !mutation.isPending;
+  const canSubmit = name.trim().length > 0 && !mutation.isPending;
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (canSubmit) mutation.mutate(trimmed);
+    if (canSubmit) mutation.mutate();
   }
 
   return (
@@ -57,17 +67,39 @@ export function TeamRenameDialog({ team, onOpenChange }: TeamRenameDialogProps) 
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Rename team</DialogTitle>
-          <DialogDescription>Change the team&apos;s display name.</DialogDescription>
+          <DialogTitle>Edit team</DialogTitle>
+          <DialogDescription>
+            Update the name, description, and tags. Members are unaffected.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="team-rename">name</Label>
+            <Label htmlFor="team-edit-name">name</Label>
             <Input
-              id="team-rename"
+              id="team-edit-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
+              autoComplete="off"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="team-edit-description">description</Label>
+            <Input
+              id="team-edit-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="optional"
+              autoComplete="off"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="team-edit-tags">tags</Label>
+            <Input
+              id="team-edit-tags"
+              value={tagsText}
+              onChange={(e) => setTagsText(e.target.value)}
+              placeholder="comma, separated, labels"
               autoComplete="off"
             />
           </div>

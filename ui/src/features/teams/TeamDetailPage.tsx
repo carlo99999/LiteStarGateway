@@ -91,6 +91,19 @@ export function TeamDetailPage() {
         </p>
       ) : null}
 
+      {team.data?.description ? (
+        <p className="mb-3 max-w-2xl text-sm text-muted-foreground">{team.data.description}</p>
+      ) : null}
+      {team.data?.tags.length ? (
+        <div className="mb-6 flex flex-wrap gap-1">
+          {team.data.tags.map((tag) => (
+            <Badge key={tag} variant="muted">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Stat label="members" value={members.isLoading ? "…" : (members.data?.length ?? "—")} />
         <Stat

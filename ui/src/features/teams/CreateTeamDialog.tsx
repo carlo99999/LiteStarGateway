@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listOrganizations } from "@/features/organizations/api";
-import { createTeam } from "@/features/teams/api";
+import { createTeam, parseTags } from "@/features/teams/api";
 
 interface CreateTeamDialogProps {
   /** Fixed organization (from the org detail page). Omit to show an org picker
@@ -34,6 +34,8 @@ export function CreateTeamDialog({ organizationId, open, onOpenChange }: CreateT
   const [name, setName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [orgId, setOrgId] = useState("");
+  const [description, setDescription] = useState("");
+  const [tagsText, setTagsText] = useState("");
 
   // Only need the org list when no organization is fixed.
   const orgs = useQuery({
@@ -47,13 +49,20 @@ export function CreateTeamDialog({ organizationId, open, onOpenChange }: CreateT
       setName("");
       setAdminEmail("");
       setOrgId("");
+      setDescription("");
+      setTagsText("");
     }
   }, [open]);
 
   const effectiveOrgId = organizationId ?? orgId;
 
   const mutation = useMutation({
-    mutationFn: () => createTeam(effectiveOrgId, name.trim(), adminEmail.trim()),
+    mutationFn: () =>
+      createTeam(effectiveOrgId, adminEmail.trim(), {
+        name: name.trim(),
+        description: description.trim() || null,
+        tags: parseTags(tagsText),
+      }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["organizations", effectiveOrgId] });
       await queryClient.invalidateQueries({ queryKey: ["teams"] });
@@ -122,6 +131,26 @@ export function CreateTeamDialog({ organizationId, open, onOpenChange }: CreateT
               value={adminEmail}
               onChange={(e) => setAdminEmail(e.target.value)}
               placeholder="lead@example.com"
+              autoComplete="off"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="team-description">description</Label>
+            <Input
+              id="team-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="optional"
+              autoComplete="off"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="team-tags">tags</Label>
+            <Input
+              id="team-tags"
+              value={tagsText}
+              onChange={(e) => setTagsText(e.target.value)}
+              placeholder="comma, separated, labels"
               autoComplete="off"
             />
           </div>

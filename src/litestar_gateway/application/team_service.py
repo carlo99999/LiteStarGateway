@@ -23,7 +23,7 @@ port, so multi-step operations (e.g. team + memberships) persist atomically.
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Literal
@@ -184,7 +184,14 @@ class TeamService:
         return True
 
     async def create_team(
-        self, actor: User, organization_id: UUID, name: str, admin_email: str
+        self,
+        actor: User,
+        organization_id: UUID,
+        name: str,
+        admin_email: str,
+        *,
+        description: str | None = None,
+        tags: Sequence[str] | None = None,
     ) -> Team:
         if not actor.is_admin:
             raise PermissionDenied("Platform admin privileges required")
@@ -201,6 +208,8 @@ class TeamService:
                     organization_id=organization_id,
                     name=name,
                     created_at=_now(),
+                    description=description,
+                    tags=list(tags or []),
                 )
             )
             # The platform admin is always the team's first admin.
@@ -224,12 +233,21 @@ class TeamService:
         platform auditor, or a team member with read)."""
         return await self.ensure_team_permission(actor, team_id, Permission.MEMBERS_READ)
 
-    async def rename_team(self, actor: User, team_id: UUID, name: str) -> Team:
-        """Rename a team — platform-admin only (a structural op, like create)."""
+    async def update_team(
+        self,
+        actor: User,
+        team_id: UUID,
+        name: str,
+        *,
+        description: str | None = None,
+        tags: Sequence[str] | None = None,
+    ) -> Team:
+        """Update a team's name/description/tags — platform-admin only (a
+        structural op, like create)."""
         if not actor.is_admin:
             raise PermissionDenied("Platform admin privileges required")
         async with self._unit_of_work():
-            team = await self._teams.update(team_id, name)
+            team = await self._teams.update(team_id, name, description, list(tags or []))
         if team is None:
             raise TeamNotFound(str(team_id))
         return team
