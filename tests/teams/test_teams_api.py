@@ -365,3 +365,25 @@ async def test_update_team_metadata(client: AsyncTestClient) -> None:
     assert resp.json()["tags"] == ["x"]
     got = await client.get(f"/teams/{team_id}", headers=_bearer(admin))
     assert got.json()["tags"] == ["x"]
+
+
+async def test_create_and_update_rate_limit_rpm(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    created = await client.post(
+        f"/organizations/{org_id}/teams",
+        json={"name": "Capped", "admin_email": ADMIN_EMAIL, "rate_limit_rpm": 100},
+        headers=_bearer(admin),
+    )
+    assert created.status_code == HTTP_201_CREATED, created.text
+    team_id = created.json()["id"]
+    assert created.json()["rate_limit_rpm"] == 100
+
+    # Update clears it (null = unlimited).
+    updated = await client.patch(
+        f"/teams/{team_id}",
+        json={"name": "Capped", "rate_limit_rpm": None},
+        headers=_bearer(admin),
+    )
+    assert updated.status_code == HTTP_200_OK, updated.text
+    assert updated.json()["rate_limit_rpm"] is None

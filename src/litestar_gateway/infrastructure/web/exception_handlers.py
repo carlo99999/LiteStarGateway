@@ -47,6 +47,7 @@ from litestar_gateway.domain.exceptions import (
     OrganizationNotFound,
     PermissionDenied,
     ProviderMismatch,
+    RateLimited,
     RouterNameExists,
     RouterNotFound,
     SaltKeyMissing,
@@ -80,6 +81,7 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     (ServicePrincipalNotFound, HTTP_404_NOT_FOUND),
     (ScimTokenNotFound, HTTP_404_NOT_FOUND),
     (BudgetExceeded, HTTP_402_PAYMENT_REQUIRED),
+    (RateLimited, HTTP_429_TOO_MANY_REQUESTS),
     (CredentialNotFound, HTTP_404_NOT_FOUND),
     (ModelNotFound, HTTP_404_NOT_FOUND),
     (RouterNotFound, HTTP_404_NOT_FOUND),
@@ -145,6 +147,9 @@ def _retry_after_headers(exc: DomainError) -> dict[str, str] | None:
     retry_after = getattr(exc, "retry_after", None)
     if isinstance(retry_after, str):
         return {"Retry-After": retry_after}
+    # Our own RPM gate carries an int (seconds until the window resets).
+    if isinstance(retry_after, int):
+        return {"Retry-After": str(retry_after)}
     return None
 
 

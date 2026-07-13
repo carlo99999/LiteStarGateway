@@ -73,6 +73,7 @@ class CreateTeamRequest:
     admin_email: str  # first team-admin (must be an existing user)
     description: str | None = None
     tags: list[str] = field(default_factory=list)
+    rate_limit_rpm: int | None = None  # requests/min for the team; None = unlimited
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,7 @@ class UpdateTeamRequest:
     name: str
     description: str | None = None
     tags: list[str] = field(default_factory=list)
+    rate_limit_rpm: int | None = None
 
 
 @dataclass(frozen=True)
@@ -90,6 +92,7 @@ class TeamResponse:
     created_at: datetime
     description: str | None
     tags: list[str]
+    rate_limit_rpm: int | None
 
     @classmethod
     def from_entity(cls, team: Team) -> TeamResponse:
@@ -100,6 +103,7 @@ class TeamResponse:
             created_at=team.created_at,
             description=team.description,
             tags=list(team.tags),
+            rate_limit_rpm=team.rate_limit_rpm,
         )
 
 

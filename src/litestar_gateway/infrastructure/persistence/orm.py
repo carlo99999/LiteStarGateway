@@ -286,6 +286,7 @@ class TeamModel(base.UUIDAuditBase):
     name: Mapped[str] = mapped_column(index=True)
     description: Mapped[str | None] = mapped_column(default=None)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    rate_limit_rpm: Mapped[int | None] = mapped_column(default=None)
 
     def to_entity(self) -> Team:
         return Team(
@@ -295,6 +296,7 @@ class TeamModel(base.UUIDAuditBase):
             created_at=self.created_at,
             description=self.description,
             tags=list(self.tags or []),
+            rate_limit_rpm=self.rate_limit_rpm,
         )
 
 

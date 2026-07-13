@@ -33,6 +33,7 @@ class SQLAlchemyTeamRepository:
             name=team.name,
             description=team.description,
             tags=list(team.tags),
+            rate_limit_rpm=team.rate_limit_rpm,
         )
         self._session.add(model)
         await self._session.flush()
@@ -62,7 +63,12 @@ class SQLAlchemyTeamRepository:
         return [m.to_entity() for m in models]
 
     async def update(
-        self, team_id: UUID, name: str, description: str | None, tags: Sequence[str]
+        self,
+        team_id: UUID,
+        name: str,
+        description: str | None,
+        tags: Sequence[str],
+        rate_limit_rpm: int | None,
     ) -> Team | None:
         # Stage only (flush); the service owns the commit (unit of work).
         model = await self._session.get(TeamModel, team_id)
@@ -71,6 +77,7 @@ class SQLAlchemyTeamRepository:
         model.name = name
         model.description = description
         model.tags = list(tags)
+        model.rate_limit_rpm = rate_limit_rpm
         await self._session.flush()
         await self._session.refresh(model)
         return model.to_entity()

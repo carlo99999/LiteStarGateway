@@ -21,8 +21,13 @@ import anyio
 
 from litestar_gateway.domain.budget import window_start
 from litestar_gateway.domain.entities import Model, TraceRecord, UsageEvent
-from litestar_gateway.domain.exceptions import BudgetExceeded
-from litestar_gateway.domain.ports import BudgetRepository, UsageRepository
+from litestar_gateway.domain.exceptions import BudgetExceeded, RateLimited
+from litestar_gateway.domain.ports import (
+    BudgetRepository,
+    RateLimiter,
+    TeamRepository,
+    UsageRepository,
+)
 
 logger = logging.getLogger("litestar_gateway.usage")
 
@@ -211,10 +216,16 @@ class UsageMeter:
         budgets: BudgetRepository | None = None,
         in_flight: InFlightSpend | None = None,
         settlement_timeout: float = 30.0,
+        rate_limiter: RateLimiter | None = None,
+        teams: TeamRepository | None = None,
     ) -> None:
         self._usage = usage
         self._emit_trace = emit_trace
         self._budgets = budgets
+        # Rate limiting is opt-in: without both a limiter and a team repo (library
+        # use), admit skips the RPM gate entirely.
+        self._rate_limiter = rate_limiter
+        self._teams = teams
         # Library use may omit it; the web wiring passes one shared instance so
         # request-scoped meters see each other's reservations.
         self._in_flight = in_flight if in_flight is not None else InFlightSpend()
@@ -231,6 +242,7 @@ class UsageMeter:
         without the reservation, any number of concurrent requests could pass
         the gate before the first one settles (streams widen that blind spot
         to minutes)."""
+        await self._enforce_team_rate_limit(team_id)
         if self._budgets is None:
             return 0.0
         budget = await self._budgets.get(team_id)
@@ -251,6 +263,22 @@ class UsageMeter:
         reservation = _reservation_cost(model, request)
         self._in_flight.add(team_id, reservation)
         return reservation
+
+    async def _enforce_team_rate_limit(self, team_id: UUID) -> None:
+        """Per-team requests/minute gate, checked before the budget reservation so
+        a throttled request never reserves spend. No-op unless a rate limiter and
+        team repo are wired and the team has a limit set (RateLimited → 429)."""
+        if self._rate_limiter is None or self._teams is None:
+            return
+        team = await self._teams.get(team_id)
+        if team is None or team.rate_limit_rpm is None:
+            return
+        decision = await self._rate_limiter.hit(f"team:{team_id}", team.rate_limit_rpm)
+        if not decision.allowed:
+            raise RateLimited(
+                f"Team rate limit exceeded: {team.rate_limit_rpm} requests/min",
+                retry_after=decision.retry_after,
+            )
 
     def release(self, team_id: UUID, reservation: float) -> None:
         """Give back a reservation taken at admission (settlement or failure)."""

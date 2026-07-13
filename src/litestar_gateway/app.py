@@ -30,6 +30,7 @@ from litestar_gateway.infrastructure.persistence.database import Database, creat
 from litestar_gateway.infrastructure.persistence.secret_key_repository import (
     SQLAlchemySecretKeyRepository,
 )
+from litestar_gateway.infrastructure.rate_limiter import build_rate_limiter
 from litestar_gateway.infrastructure.rotation import make_rotation_scheduler
 from litestar_gateway.infrastructure.sso.oidc import OIDCIdentityProvider
 from litestar_gateway.infrastructure.usage_reconciler import make_usage_reconciler
@@ -223,6 +224,9 @@ def _build_dependencies(
 ) -> dict[str, Provide]:
     session_maker_key = database.config.session_maker_app_state_key
     keyring_provider = _make_keyring_provider(settings)
+    # One shared rate limiter (Redis-backed with REDIS_URL, else in-memory) so the
+    # per-team RPM counter is consistent across request-scoped meters.
+    rate_limiter = build_rate_limiter(settings)
     return {
         "api_key_service": Provide(provide_api_key_service, sync_to_thread=False),
         "user_service": Provide(provide_user_service, sync_to_thread=False),
@@ -249,6 +253,7 @@ def _build_dependencies(
         "audit_log": Provide(provide_audit_log, sync_to_thread=False),
         "trace_dispatcher": Provide(lambda: trace_dispatcher, sync_to_thread=False),
         "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
+        "rate_limiter": Provide(lambda: rate_limiter, sync_to_thread=False),
         "keyring": Provide(keyring_provider, sync_to_thread=False),
     }
 

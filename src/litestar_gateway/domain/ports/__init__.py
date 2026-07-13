@@ -19,6 +19,7 @@ from litestar_gateway.domain.ports.llm_gateway import LLMGateway
 from litestar_gateway.domain.ports.lock import DistributedLock
 from litestar_gateway.domain.ports.model import ModelRepository
 from litestar_gateway.domain.ports.organization import OrganizationRepository
+from litestar_gateway.domain.ports.rate_limiter import RateLimitDecision, RateLimiter
 from litestar_gateway.domain.ports.routing import (
     RouterRepository,
     RoutingDecisionLog,
@@ -45,6 +46,8 @@ __all__ = [
     "LLMGateway",
     "ModelRepository",
     "OrganizationRepository",
+    "RateLimitDecision",
+    "RateLimiter",
     "PasswordResetRepository",
     "RouterRepository",
     "RoutingDecisionLog",
