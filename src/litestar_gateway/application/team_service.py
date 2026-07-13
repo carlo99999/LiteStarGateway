@@ -192,6 +192,7 @@ class TeamService:
         *,
         description: str | None = None,
         tags: Sequence[str] | None = None,
+        rate_limit_rpm: int | None = None,
     ) -> Team:
         if not actor.is_admin:
             raise PermissionDenied("Platform admin privileges required")
@@ -210,6 +211,7 @@ class TeamService:
                     created_at=_now(),
                     description=description,
                     tags=list(tags or []),
+                    rate_limit_rpm=rate_limit_rpm,
                 )
             )
             # The platform admin is always the team's first admin.
@@ -241,13 +243,16 @@ class TeamService:
         *,
         description: str | None = None,
         tags: Sequence[str] | None = None,
+        rate_limit_rpm: int | None = None,
     ) -> Team:
-        """Update a team's name/description/tags — platform-admin only (a
-        structural op, like create)."""
+        """Update a team's name/description/tags/rate limit — platform-admin only
+        (a structural op, like create)."""
         if not actor.is_admin:
             raise PermissionDenied("Platform admin privileges required")
         async with self._unit_of_work():
-            team = await self._teams.update(team_id, name, description, list(tags or []))
+            team = await self._teams.update(
+                team_id, name, description, list(tags or []), rate_limit_rpm
+            )
         if team is None:
             raise TeamNotFound(str(team_id))
         return team

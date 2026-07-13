@@ -174,6 +174,7 @@ class OrganizationController(Controller):
             admin_email=data.admin_email,
             description=data.description,
             tags=data.tags,
+            rate_limit_rpm=data.rate_limit_rpm,
         )
         await record_audit(
             audit_log,

@@ -12,6 +12,7 @@ from litestar_gateway.config import Settings
 from litestar_gateway.domain.ports import (
     BudgetRepository,
     LLMGateway,
+    RateLimiter,
     RoutingDecisionLogFactory,
     RoutingRepositoryFactory,
     UsageRepository,
@@ -32,6 +33,9 @@ from litestar_gateway.infrastructure.persistence.model_repository import (
 from litestar_gateway.infrastructure.persistence.router_repository import (
     SQLAlchemyRouterRepository,
     SQLAlchemyRoutingDecisionLog,
+)
+from litestar_gateway.infrastructure.persistence.team_repository import (
+    SQLAlchemyTeamRepository,
 )
 from litestar_gateway.infrastructure.persistence.usage_repository import (
     SQLAlchemyUsageRepository,
@@ -67,6 +71,7 @@ def provide_completion_service(
     trace_dispatcher: NamedDependency[TraceDispatcher],
     shadow_decision_log_factory: NamedDependency[RoutingDecisionLogFactory],
     shadow_repos_factory: NamedDependency[RoutingRepositoryFactory],
+    rate_limiter: NamedDependency[RateLimiter],
 ) -> CompletionService:
     # One request-scoped meter, shared by the completion path and the router:
     # judge/embeddings strategies make real, billable provider calls that must be
@@ -76,6 +81,8 @@ def provide_completion_service(
         emit_trace=trace_dispatcher.enqueue,
         budgets=SQLAlchemyBudgetRepository(db_session),
         in_flight=_in_flight_spend,
+        rate_limiter=rate_limiter,
+        teams=SQLAlchemyTeamRepository(db_session),
     )
     return CompletionService(
         models=SQLAlchemyModelRepository(db_session),

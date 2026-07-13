@@ -200,6 +200,15 @@ class BudgetExceeded(DomainError):
     """The team's spend cap for the current window is exhausted (→ 402)."""
 
 
+class RateLimited(DomainError):
+    """A per-team or per-key request-rate limit (RPM) was exceeded (→ 429).
+    `retry_after` carries seconds until the limiting window resets."""
+
+    def __init__(self, message: str, retry_after: int | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
 class BudgetNotFound(DomainError):
     """The team has no budget configured."""
 

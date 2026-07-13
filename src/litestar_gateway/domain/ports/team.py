@@ -26,10 +26,15 @@ class TeamRepository(Protocol):
         ...
 
     async def update(
-        self, team_id: UUID, name: str, description: str | None, tags: Sequence[str]
+        self,
+        team_id: UUID,
+        name: str,
+        description: str | None,
+        tags: Sequence[str],
+        rate_limit_rpm: int | None,
     ) -> Team | None:
-        """Replace the team's editable metadata (name, description, tags); return
-        the updated entity, or None if none has that id."""
+        """Replace the team's editable metadata (name, description, tags,
+        rate_limit_rpm); return the updated entity, or None if none has that id."""
         ...
 
     async def delete(self, team_id: UUID) -> None:

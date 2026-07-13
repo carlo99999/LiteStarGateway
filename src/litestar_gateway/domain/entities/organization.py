@@ -30,6 +30,8 @@ class Team:
     created_at: datetime
     description: str | None = None
     tags: list[str] = field(default_factory=list)
+    # Requests/minute cap for the whole team (all keys); None = unlimited.
+    rate_limit_rpm: int | None = None
 
 
 @dataclass(frozen=True)
