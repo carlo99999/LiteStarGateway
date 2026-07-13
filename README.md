@@ -142,6 +142,10 @@ MASTER_KEY=… JWT_SECRET=… SALT_KEY=… POSTGRES_PASSWORD=… docker compose 
 # → http://localhost:8000  (GET /health liveness, GET /health/ready readiness)
 ```
 
+For a different local host port, set `APP_PORT` (for example
+`APP_PORT=18000 docker compose up --build`). The app, database, Redis, and the
+non-root MLflow service remain connected on their fixed internal ports.
+
 For full-stack local development with live reload, run:
 
 ```bash

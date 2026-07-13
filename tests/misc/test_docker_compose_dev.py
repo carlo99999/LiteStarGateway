@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -14,9 +15,14 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILE = ROOT / "docker-compose.dev.yml"
 DEV_DOCKERFILE = ROOT / "Dockerfile.dev"
+PROD_COMPOSE_FILE = ROOT / "docker-compose.yml"
+PROD_DOCKERFILE = ROOT / "Dockerfile"
 
 
-def _compose_config() -> dict[str, Any]:
+def _compose_config(
+    compose_file: Path = COMPOSE_FILE,
+    extra_environment: dict[str, str] | None = None,
+) -> dict[str, Any]:
     if shutil.which("docker") is None:
         pytest.skip("Docker CLI is not installed")
 
@@ -31,17 +37,18 @@ def _compose_config() -> dict[str, Any]:
 
     environment = {
         **os.environ,
-        "POSTGRES_PASSWORD": "compose-test-password",
-        "MASTER_KEY": "compose-test-master-key",
-        "JWT_SECRET": "compose-test-jwt-secret",
-        "SALT_KEY": "compose-test-salt-key",
+        "POSTGRES_PASSWORD": "compose-test-password",  # pragma: allowlist secret
+        "MASTER_KEY": "compose-test-master-key",  # pragma: allowlist secret
+        "JWT_SECRET": "compose-test-jwt-secret",  # pragma: allowlist secret
+        "SALT_KEY": "compose-test-salt-key",  # pragma: allowlist secret
+        **(extra_environment or {}),
     }
     result = subprocess.run(
         [
             "docker",
             "compose",
             "-f",
-            str(COMPOSE_FILE),
+            str(compose_file),
             "config",
             "--format",
             "json",
@@ -133,6 +140,65 @@ def test_dev_compose_provides_live_backend_frontend_and_dependencies() -> None:
     assert "/ui/" in " ".join(frontend["healthcheck"]["test"])
 
 
+def test_prod_compose_starts_hardened_observability_before_the_app() -> None:
+    config = _compose_config(PROD_COMPOSE_FILE)
+    dev_config = _compose_config()
+    services = config["services"]
+
+    postgres_image = services["db"]["image"]
+    redis_image = services["redis"]["image"]
+    assert re.fullmatch(r"postgres:17@sha256:[0-9a-f]{64}", postgres_image)
+    assert re.fullmatch(r"redis:7-alpine@sha256:[0-9a-f]{64}", redis_image)
+    assert postgres_image == dev_config["services"]["db"]["image"]
+    assert redis_image == dev_config["services"]["redis"]["image"]
+
+    mlflow_init = services["mlflow-init"]
+    assert re.fullmatch(
+        r"ghcr\.io/mlflow/mlflow:v3\.14\.0@sha256:[0-9a-f]{64}",
+        mlflow_init["image"],
+    )
+    assert mlflow_init["user"] == "0:0"
+    assert "chown -R 10001:10001 /mlflow" in " ".join(mlflow_init["command"])
+    assert _volume_for(mlflow_init, "/mlflow")["source"] == "mlflow-data"
+
+    mlflow = services["mlflow"]
+    assert mlflow["build"]["dockerfile"] == PROD_DOCKERFILE.name
+    assert mlflow["build"]["target"] == "mlflow"
+    assert "--allowed-hosts mlflow:5000,localhost,127.0.0.1" in " ".join(mlflow["command"])
+    assert "/health" in " ".join(mlflow["healthcheck"]["test"])
+    assert "ports" not in mlflow
+    assert mlflow["depends_on"]["mlflow-init"]["condition"] == "service_completed_successfully"
+
+    app = services["app"]
+    assert app["build"]["target"] == "runtime"
+    assert app["depends_on"]["mlflow"]["condition"] == "service_healthy"
+    assert "/health/ready" in " ".join(app["healthcheck"]["test"])
+    assert app["ports"] == [
+        {
+            "host_ip": "127.0.0.1",
+            "mode": "ingress",
+            "protocol": "tcp",
+            "published": "8000",
+            "target": 8000,
+        }
+    ]
+
+    dockerfile_source = PROD_DOCKERFILE.read_text(encoding="utf-8")
+    assert "AS mlflow" in dockerfile_source
+    assert "USER mlflow" in dockerfile_source
+
+    custom_port_config = _compose_config(PROD_COMPOSE_FILE, {"APP_PORT": "18080"})
+    assert custom_port_config["services"]["app"]["ports"] == [
+        {
+            "host_ip": "127.0.0.1",
+            "mode": "ingress",
+            "protocol": "tcp",
+            "published": "18080",
+            "target": 8000,
+        }
+    ]
+
+
 def test_dev_compose_requires_secrets_instead_of_storing_them() -> None:
     compose_source = COMPOSE_FILE.read_text(encoding="utf-8")
 
@@ -182,10 +248,10 @@ printf '%s\\n' "${POSTGRES_PASSWORD-unset}" "${MASTER_KEY-unset}" \
         **os.environ,
         "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
         "DEV_ENV_FILE": str(env_file),
-        "POSTGRES_PASSWORD": "bad@override",
-        "MASTER_KEY": "short",
-        "JWT_SECRET": "short",
-        "SALT_KEY": "short",
+        "POSTGRES_PASSWORD": "bad@override",  # pragma: allowlist secret
+        "MASTER_KEY": "short",  # pragma: allowlist secret
+        "JWT_SECRET": "short",  # pragma: allowlist secret
+        "SALT_KEY": "short",  # pragma: allowlist secret
     }
     result = subprocess.run(
         [str(ROOT / "scripts" / "dev-compose.sh"), "config"],
