@@ -47,13 +47,13 @@ Counts: **1 CRITICAL · 4 HIGH · 6 MEDIUM · 2 LOW**.
 | ISSUE-006 | Qualsiasi invite persistito rende il team non cancellabile | medium | `persistence/team_repository.py:85-101`; `orm.py:112-130` | **Fixed** ([#253](https://github.com/carlo99999/LiteStarGateway/pull/253)) |
 | ISSUE-007 | Creare un invite per un team inesistente restituisce 500 | medium | `application/user_service.py:160-177`; `persistence/invite_repository.py:20-32` | **Fixed** ([#253](https://github.com/carlo99999/LiteStarGateway/pull/253)) |
 | ISSUE-008 | L'invite token nella query string finisce in log e history | medium | `ui/src/features/users/InviteUserDialog.tsx:56-59`; `SignupPage.tsx:11-17` | **Fixed** ([#254](https://github.com/carlo99999/LiteStarGateway/pull/254)) |
-| ISSUE-009 | L'admin UI mostra solo i primi 100 record di ogni collezione | medium | `ui/src/features/*/api.ts` | open |
+| ISSUE-009 | L'admin UI mostra solo i primi 100 record di ogni collezione | medium | `ui/src/features/*/api.ts` | **Fixed** ([#259](https://github.com/carlo99999/LiteStarGateway/pull/259)) |
 | ISSUE-010 | Il JWT admin persistito in `localStorage` è leggibile da script same-origin | medium | `ui/src/features/auth/AuthProvider.tsx:12-23` | **Fixed** ([#255](https://github.com/carlo99999/LiteStarGateway/pull/255)) |
 | ISSUE-011 | La rotazione non è atomica e può lasciare una replacement key orfana | medium | `application/service.py:128-140`; `persistence/repository.py:22-39,75-83` | **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250)) |
 | ISSUE-012 | Il rate limiter in-memory non elimina mai i bucket inattivi | low | `infrastructure/rate_limiter.py:27-42` | **Fixed** ([#258](https://github.com/carlo99999/LiteStarGateway/pull/258)) |
 | ISSUE-013 | La UI trasforma qualsiasi errore budget in “nessun budget” | low | `ui/src/features/teams/api.ts:43-49` | **Fixed** ([#257](https://github.com/carlo99999/LiteStarGateway/pull/257)) |
 
-## Resolution status — IN PROGRESS
+## Resolution status — FULLY REMEDIATED
 
 La remediation è iniziata dal finding critical. **ISSUE-001** è risolta dalla
 [#249](https://github.com/carlo99999/LiteStarGateway/pull/249): il rotate risolve prima
@@ -94,6 +94,14 @@ del router. Il token resta in memoria per i retry, viene cancellato dopo il sign
 e la SPA imposta `Referrer-Policy: no-referrer`; i link query legacy sono redatti ma
 non più accettati.
 
+**ISSUE-009** è risolta dalla
+[#259](https://github.com/carlo99999/LiteStarGateway/pull/259): le tabelle usano
+pagine server-side con sentinella e ordine DB deterministico; picker e totale usage
+esauriscono sequenzialmente collezioni bounded, cancellabili e senza risultati
+parziali. La vista globale delle key seleziona un team e pagina una sola lista,
+eliminando il fan-out team × key, mentre gli errori restano visibili e le cache dati
+vengono svuotate ai cambi di sessione.
+
 **ISSUE-010** è risolta dalla
 [#255](https://github.com/carlo99999/LiteStarGateway/pull/255): la console usa una
 sessione cookie host-only `HttpOnly; SameSite=Strict` con CSRF legato al JWT e
@@ -125,6 +133,7 @@ policy diverse.
 | ISSUE-006 | medium | **Fixed** | [#253](https://github.com/carlo99999/LiteStarGateway/pull/253) |
 | ISSUE-007 | medium | **Fixed** | [#253](https://github.com/carlo99999/LiteStarGateway/pull/253) |
 | ISSUE-008 | medium | **Fixed** | [#254](https://github.com/carlo99999/LiteStarGateway/pull/254) |
+| ISSUE-009 | medium | **Fixed** | [#259](https://github.com/carlo99999/LiteStarGateway/pull/259) |
 | ISSUE-010 | medium | **Fixed** | [#255](https://github.com/carlo99999/LiteStarGateway/pull/255) |
 | ISSUE-011 | medium | **Fixed** | [#250](https://github.com/carlo99999/LiteStarGateway/pull/250) |
 | ISSUE-012 | low | **Fixed** | [#258](https://github.com/carlo99999/LiteStarGateway/pull/258) |
@@ -333,7 +342,7 @@ altra attività; impostare una `Referrer-Policy` restrittiva.
 ### ISSUE-009 — L'admin UI mostra solo i primi 100 record di ogni collezione
 
 **Priorità:** medium
-**Stato:** open
+**Stato:** **Fixed** ([#259](https://github.com/carlo99999/LiteStarGateway/pull/259))
 **File coinvolti:** `ui/src/features/organizations/api.ts:24-31`, `ui/src/features/teams/api.ts:18-23,34-40,52-58`, `ui/src/features/users/api.ts:17-22`, `ui/src/features/api-keys/api.ts:18-25`
 
 **Problema**
