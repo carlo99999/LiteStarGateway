@@ -20,7 +20,7 @@ export interface NavItem {
   /** Mono label, shown prefixed with `/`. */
   label: string;
   icon: LucideIcon;
-  /** Implemented in Phase 0? Others render a "planned" placeholder. */
+  /** Implemented? Others render a "planned" placeholder and show a "soon" tag. */
   ready?: boolean;
 }
 
@@ -45,7 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: "/models", label: "models", icon: Boxes },
       { to: "/routing", label: "routing", icon: Route },
       { to: "/credentials", label: "credentials", icon: ShieldCheck },
-      { to: "/api-keys", label: "api-keys", icon: KeyRound },
+      { to: "/api-keys", label: "api-keys", icon: KeyRound, ready: true },
     ],
   },
   {

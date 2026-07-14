@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { AppShell } from "@/app/layout/AppShell";
 import { PlannedPage } from "@/app/PlannedPage";
+import { ApiKeysPage } from "@/features/api-keys/ApiKeysPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { OrganizationDetailPage } from "@/features/organizations/OrganizationDetailPage";
@@ -62,6 +63,12 @@ const teamDetailRoute = createRoute({
   component: TeamDetailPage,
 });
 
+const apiKeysRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/api-keys",
+  component: ApiKeysPage,
+});
+
 // Scaffolded-but-not-implemented feature areas (Phase 1 lands their views),
 // grouped in the sidebar under gateway / governance / observability.
 const planned: { path: string; command: string; title: string }[] = [
@@ -69,7 +76,6 @@ const planned: { path: string; command: string; title: string }[] = [
   { path: "/models", command: "models list", title: "Models" },
   { path: "/routing", command: "routing inspect", title: "Routing" },
   { path: "/credentials", command: "credentials list", title: "Credentials" },
-  { path: "/api-keys", command: "api-keys list", title: "API Keys" },
   // governance
   { path: "/users", command: "users list", title: "Users" },
   {
@@ -99,6 +105,7 @@ const routeTree = rootRoute.addChildren([
     organizationDetailRoute,
     teamsRoute,
     teamDetailRoute,
+    apiKeysRoute,
     ...plannedRoutes,
   ]),
 ]);

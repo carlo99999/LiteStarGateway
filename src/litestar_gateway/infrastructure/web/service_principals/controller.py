@@ -158,6 +158,7 @@ class ServicePrincipalController(Controller):
             created_by=current_user.id,
             name=data.name,
             scope=scope,
+            rate_limit_rpm=data.rate_limit_rpm,
         )
         await record_audit(
             audit_log,

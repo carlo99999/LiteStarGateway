@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TeamKeys } from "@/features/api-keys/TeamKeys";
 import {
   getTeam,
   getTeamBudget,
@@ -141,6 +142,10 @@ export function TeamDetailPage() {
         emptyTitle="no members"
         emptyDescription="This team has no members."
       />
+
+      <div className="mt-8">
+        <TeamKeys teamId={teamId} />
+      </div>
     </>
   );
 }

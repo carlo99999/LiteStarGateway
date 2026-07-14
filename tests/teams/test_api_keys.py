@@ -129,3 +129,34 @@ async def test_key_creation_requires_team_admin(client: AsyncTestClient) -> None
         f"/teams/{team_id}/keys", json={"name": "x"}, headers=_bearer(outsider)
     )
     assert resp.status_code == HTTP_403_FORBIDDEN
+
+
+async def test_personal_key_carries_rate_limit(client: AsyncTestClient) -> None:
+    token, team_id = await _setup_team(client)
+    resp = await client.post(
+        f"/teams/{team_id}/keys",
+        json={"name": "k", "rate_limit_rpm": 30},
+        headers=_bearer(token),
+    )
+    assert resp.status_code in (200, 201), resp.text
+    assert resp.json()["rate_limit_rpm"] == 30
+    listed = (await client.get(f"/teams/{team_id}/keys", headers=_bearer(token))).json()
+    assert any(k["rate_limit_rpm"] == 30 for k in listed)
+
+
+async def test_service_principal_key_carries_rate_limit(client: AsyncTestClient) -> None:
+    token, team_id = await _setup_team(client)
+    sp = await client.post(
+        f"/teams/{team_id}/service-principals",
+        json={"name": "bot"},
+        headers=_bearer(token),
+    )
+    assert sp.status_code in (200, 201), sp.text
+    sp_id = sp.json()["id"]
+    resp = await client.post(
+        f"/teams/{team_id}/service-principals/{sp_id}/keys",
+        json={"name": "botkey", "scope": "management", "rate_limit_rpm": 50},
+        headers=_bearer(token),
+    )
+    assert resp.status_code in (200, 201), resp.text
+    assert resp.json()["rate_limit_rpm"] == 50
