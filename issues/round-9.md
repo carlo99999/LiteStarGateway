@@ -50,7 +50,7 @@ Counts: **1 CRITICAL · 4 HIGH · 6 MEDIUM · 2 LOW**.
 | ISSUE-009 | L'admin UI mostra solo i primi 100 record di ogni collezione | medium | `ui/src/features/*/api.ts` | open |
 | ISSUE-010 | Il JWT admin persistito in `localStorage` è leggibile da script same-origin | medium | `ui/src/features/auth/AuthProvider.tsx:12-23` | **Fixed** ([#255](https://github.com/carlo99999/LiteStarGateway/pull/255)) |
 | ISSUE-011 | La rotazione non è atomica e può lasciare una replacement key orfana | medium | `application/service.py:128-140`; `persistence/repository.py:22-39,75-83` | **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250)) |
-| ISSUE-012 | Il rate limiter in-memory non elimina mai i bucket inattivi | low | `infrastructure/rate_limiter.py:27-42` | open |
+| ISSUE-012 | Il rate limiter in-memory non elimina mai i bucket inattivi | low | `infrastructure/rate_limiter.py:27-42` | **Fixed** ([#258](https://github.com/carlo99999/LiteStarGateway/pull/258)) |
 | ISSUE-013 | La UI trasforma qualsiasi errore budget in “nessun budget” | low | `ui/src/features/teams/api.ts:43-49` | **Fixed** ([#257](https://github.com/carlo99999/LiteStarGateway/pull/257)) |
 
 ## Resolution status — IN PROGRESS
@@ -108,6 +108,13 @@ solo eliminato da `localStorage` durante il bootstrap.
 restano errori con messaggi utili. La pagina team distingue ora `unavailable` da
 `none` e rende il dettaglio in un alert accessibile.
 
+**ISSUE-012** è risolta dalla
+[#258](https://github.com/carlo99999/LiteStarGateway/pull/258): il limiter in-memory
+elimina lazy i counter scaduti al traffico successivo, preservando finestre ancora
+attive e la serializzazione concorrente sotto lo stesso lock. Il namespace Redis
+include anche la durata della finestra, impedendo collisioni di count e TTL tra
+policy diverse.
+
 | ID | Priorità | Stato | PR |
 |---|---|---|---|
 | ISSUE-001 | critical | **Fixed** | [#249](https://github.com/carlo99999/LiteStarGateway/pull/249) |
@@ -120,6 +127,7 @@ restano errori con messaggi utili. La pagina team distingue ora `unavailable` da
 | ISSUE-008 | medium | **Fixed** | [#254](https://github.com/carlo99999/LiteStarGateway/pull/254) |
 | ISSUE-010 | medium | **Fixed** | [#255](https://github.com/carlo99999/LiteStarGateway/pull/255) |
 | ISSUE-011 | medium | **Fixed** | [#250](https://github.com/carlo99999/LiteStarGateway/pull/250) |
+| ISSUE-012 | low | **Fixed** | [#258](https://github.com/carlo99999/LiteStarGateway/pull/258) |
 | ISSUE-013 | low | **Fixed** | [#257](https://github.com/carlo99999/LiteStarGateway/pull/257) |
 
 ## Issues
@@ -395,7 +403,7 @@ il plaintext va restituito solo dopo il commit riuscito.
 ### ISSUE-012 — Il rate limiter in-memory non elimina mai i bucket inattivi
 
 **Priorità:** low
-**Stato:** open
+**Stato:** **Fixed** ([#258](https://github.com/carlo99999/LiteStarGateway/pull/258))
 **File coinvolti:** `src/litestar_gateway/infrastructure/rate_limiter.py:27-42`
 
 **Problema**
