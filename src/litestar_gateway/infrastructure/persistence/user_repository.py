@@ -57,7 +57,7 @@ class SQLAlchemyUserRepository:
         await self._session.execute(
             update(UserModel).where(UserModel.id == user_id).values(**values)
         )
-        await self._session.commit()
+        await self._session.flush()
 
     async def set_auditor(self, user_id: UUID, is_auditor: bool) -> None:
         # Like set_admin: read live per request, effective on the next call.
@@ -133,6 +133,12 @@ class SQLAlchemyUserRepository:
 
     async def get(self, user_id: UUID) -> User | None:
         model = await self._session.get(UserModel, user_id)
+        return model.to_entity() if model else None
+
+    async def get_for_update(self, user_id: UUID) -> User | None:
+        model = await self._session.scalar(
+            select(UserModel).where(UserModel.id == user_id).with_for_update()
+        )
         return model.to_entity() if model else None
 
     async def get_by_email(self, email: str) -> User | None:

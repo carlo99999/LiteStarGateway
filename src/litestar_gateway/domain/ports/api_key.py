@@ -13,9 +13,15 @@ from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 class APIKeyRepository(Protocol):
     """Persistence port for API keys."""
 
-    async def add(self, key: APIKey) -> APIKey: ...
+    async def add(self, key: APIKey) -> APIKey:
+        """Stage a key insert; the application service owns the commit."""
+        ...
 
     async def get(self, key_id: UUID) -> APIKey | None: ...
+
+    async def get_for_update(self, key_id: UUID) -> APIKey | None:
+        """Load and lock a key for a transactional state change."""
+        ...
 
     async def get_by_hash(self, key_hash: str) -> APIKey | None: ...
 
@@ -32,13 +38,30 @@ class APIKeyRepository(Protocol):
 
     async def update(self, key: APIKey) -> APIKey: ...
 
+    async def touch_last_used(self, key_id: UUID, last_used_at: datetime) -> bool:
+        """Update only ``last_used_at`` while the key is still active."""
+        ...
+
+    async def is_authenticatable(self, key_id: UUID) -> bool:
+        """Validate key and owning principal state in one current DB statement."""
+        ...
+
+    async def schedule_revocation(
+        self,
+        key_id: UUID,
+        expected_revoked_at: datetime | None,
+        revoked_at: datetime,
+    ) -> bool:
+        """Stage a compare-and-set of ``revoked_at`` for atomic rotation."""
+        ...
+
     async def revoke_personal_keys_for_user(self, user_id: UUID, revoked_at: datetime) -> None:
         """Revoke all active *personal* keys (no service principal) created by
-        the user — called when the account is deactivated."""
+        the user — called when the account is deactivated. Staged only."""
         ...
 
     async def revoke_for_service_principal(
         self, service_principal_id: UUID, revoked_at: datetime
     ) -> None:
-        """Revoke all of a service principal's active keys (on SP deletion)."""
+        """Stage immediate revocation and detach keys from a deleted principal."""
         ...

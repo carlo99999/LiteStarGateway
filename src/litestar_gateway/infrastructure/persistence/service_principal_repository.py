@@ -29,6 +29,12 @@ class SQLAlchemyServicePrincipalRepository:
         model = await self._session.get(ServicePrincipalModel, sp_id)
         return model.to_entity() if model else None
 
+    async def get_for_update(self, sp_id: UUID) -> ServicePrincipal | None:
+        model = await self._session.scalar(
+            select(ServicePrincipalModel).where(ServicePrincipalModel.id == sp_id).with_for_update()
+        )
+        return model.to_entity() if model else None
+
     async def list_by_team(
         self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
     ) -> list[ServicePrincipal]:
@@ -54,4 +60,4 @@ class SQLAlchemyServicePrincipalRepository:
         await self._session.execute(
             delete(ServicePrincipalModel).where(ServicePrincipalModel.id == sp_id)
         )
-        await self._session.commit()
+        await self._session.flush()

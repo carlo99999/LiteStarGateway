@@ -21,7 +21,7 @@ from litestar_gateway.domain.entities import Budget, BudgetWindow, KeyScope, Pri
 from litestar_gateway.domain.exceptions import BudgetNotFound, InvalidBudget, InvalidKeyScope
 from litestar_gateway.domain.pagination import resolve_page
 from litestar_gateway.domain.ports import AuditLog, BudgetRepository, UsageRepository
-from litestar_gateway.infrastructure.web.audit.recorder import record_audit
+from litestar_gateway.infrastructure.web.audit.recorder import make_audit_event, record_audit
 from litestar_gateway.infrastructure.web.principal import provide_principal
 from litestar_gateway.infrastructure.web.session.dependencies import (
     provide_current_admin,
@@ -341,7 +341,6 @@ class TeamController(Controller):
         current_user: NamedDependency[User],
         team_service: NamedDependency[TeamService],
         api_key_service: NamedDependency[APIKeyService],
-        audit_log: NamedDependency[AuditLog],
     ) -> CreatedKeyResponse:
         """Issue a replacement key (same scope/rate-limit/owner) and give the old
         one a grace window before it stops working. Returns the new plaintext once."""
@@ -351,16 +350,15 @@ class TeamController(Controller):
             await team_service.ensure_team_permission(
                 current_user, team_id, Permission.SERVICE_PRINCIPALS_MANAGE
             )
-        issued = await api_key_service.rotate_for_team(team_id, key_id, current_user.id)
-        await record_audit(
-            audit_log,
+        audit_event = make_audit_event(
             request,
             current_user,
             "api_key.rotate",
             target_type="api_key",
             target_id=key_id,
-            detail=f"team {team_id} -> new key {issued.key.id}",
+            detail=f"team {team_id}",
         )
+        issued = await api_key_service.rotate_for_team(team_id, key_id, audit_event=audit_event)
         return CreatedKeyResponse.from_issued(issued)
 
     @get("/{team_id:uuid}/budget", dependencies={"principal": Provide(provide_principal)})

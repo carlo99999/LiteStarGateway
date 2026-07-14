@@ -17,6 +17,8 @@ admin's identity (userName/externalId).
 from __future__ import annotations
 
 import secrets
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -32,6 +34,7 @@ from litestar_gateway.domain.password import ahash_password
 from litestar_gateway.domain.ports import (
     APIKeyRepository,
     ScimTokenRepository,
+    Transaction,
     UserRepository,
 )
 
@@ -52,11 +55,22 @@ class ScimService:
         self,
         users: UserRepository,
         tokens: ScimTokenRepository,
+        transaction: Transaction,
         api_keys: APIKeyRepository | None = None,
     ) -> None:
         self._users = users
         self._tokens = tokens
+        self._transaction = transaction
         self._api_keys = api_keys
+
+    @asynccontextmanager
+    async def _unit_of_work(self) -> AsyncGenerator[None]:
+        try:
+            yield
+            await self._transaction.commit()
+        except Exception:
+            await self._transaction.rollback()
+            raise
 
     # ── Provisioning tokens (platform-admin surface) ─────────────────────────
 
@@ -175,13 +189,31 @@ class ScimService:
             user = await self._users.update_scim_identity(user_id, new_email, new_external_id)
 
         if target_active != user.is_active:
-            # Same ordering rationale as UserService.set_user_active: kill the
-            # riskier credential (personal keys) before flipping the account.
-            if not target_active and self._api_keys is not None:
-                await self._api_keys.revoke_personal_keys_for_user(user_id, _now())
-            await self._users.set_active(
-                user_id, target_active, deactivated_by=None if target_active else "scim"
-            )
+            async with self._unit_of_work():
+                # Serialize with personal key issuance/rotation, then re-check
+                # the security-sensitive state from the locked row.
+                locked = await self._users.get_for_update(user_id)
+                if locked is None:
+                    raise UserNotFound(str(user_id))
+                if locked.is_admin and not target_active:
+                    raise PermissionDenied(
+                        "SCIM cannot deactivate a platform admin; demote via the admin API first"
+                    )
+                if target_active and not locked.is_active and locked.deactivated_by == "admin":
+                    raise PermissionDenied(
+                        "SCIM cannot reactivate an account disabled by an admin; "
+                        "re-enable via the admin API first"
+                    )
+                # Another actor may have completed the same transition while
+                # SCIM waited for the lock. Preserve that actor's provenance.
+                if locked.is_active != target_active:
+                    if not target_active and self._api_keys is not None:
+                        await self._api_keys.revoke_personal_keys_for_user(user_id, _now())
+                    await self._users.set_active(
+                        user_id,
+                        target_active,
+                        deactivated_by=None if target_active else "scim",
+                    )
             user = await self.get_user(user_id)
         return user
 

@@ -22,6 +22,9 @@ from litestar_gateway.infrastructure.persistence.repository import (
 from litestar_gateway.infrastructure.persistence.service_principal_repository import (
     SQLAlchemyServicePrincipalRepository,
 )
+from litestar_gateway.infrastructure.persistence.user_repository import (
+    SQLAlchemyUserRepository,
+)
 
 
 def _extract_key(connection: ASGIConnection) -> str | None:
@@ -57,7 +60,9 @@ class APIKeyAuthMiddleware(AbstractAuthenticationMiddleware):
         async with session_maker() as session:
             service = APIKeyService(
                 SQLAlchemyAPIKeyRepository(session),
-                SQLAlchemyServicePrincipalRepository(session),
+                transaction=session,
+                users=SQLAlchemyUserRepository(session),
+                service_principals=SQLAlchemyServicePrincipalRepository(session),
             )
             try:
                 key = await service.authenticate(plaintext)

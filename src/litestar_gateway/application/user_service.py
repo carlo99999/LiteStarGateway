@@ -420,22 +420,20 @@ class UserService:
             raise PermissionDenied("Platform admin privileges required")
         if actor.id == user_id:
             raise PermissionDenied("Cannot change your own active status")
-        if await self._users.get(user_id) is None:
-            raise UserNotFound(str(user_id))
-        # Disabling revokes the user's personal keys too: like their JWT
-        # sessions, credentials that represent the person must not outlive their
-        # access. Service-principal keys are untouched (a machine identity
-        # doesn't belong to this user). Revoke the keys BEFORE flipping the
-        # account (the two are separate commits): should the process die between
-        # them, the higher-risk credential — the leaked/forgotten key — is
-        # already dead, rather than left live against a still-active account.
-        if not is_active and self._api_keys is not None:
-            await self._api_keys.revoke_personal_keys_for_user(user_id, _now())
-        # Mark admin disables so SCIM cannot resurrect the account on an IdP
-        # full-sync (see ScimService.update_user); reactivation clears the mark.
-        await self._users.set_active(
-            user_id, is_active, deactivated_by=None if is_active else "admin"
-        )
+        async with self._unit_of_work():
+            # Personal key issuance and rotation take this same lock before
+            # touching a credential, so offboarding cannot race a new live key.
+            if await self._users.get_for_update(user_id) is None:
+                raise UserNotFound(str(user_id))
+            # Account state, session invalidation and every personal credential
+            # are one transaction. Grace-window keys are shortened to now too.
+            if not is_active and self._api_keys is not None:
+                await self._api_keys.revoke_personal_keys_for_user(user_id, _now())
+            # Mark admin disables so SCIM cannot resurrect the account on an IdP
+            # full-sync (see ScimService.update_user); reactivation clears it.
+            await self._users.set_active(
+                user_id, is_active, deactivated_by=None if is_active else "admin"
+            )
         updated = await self._users.get(user_id)
         if updated is None:  # pragma: no cover - just set it
             raise UserNotFound(str(user_id))

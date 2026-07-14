@@ -178,6 +178,60 @@ async def test_rotate_issues_new_key_and_keeps_old_during_grace(client: AsyncTes
     # During the grace window both the old and the new key work.
     assert (await client.get("/whoami", headers=_bearer(old_plain))).status_code == 200
     assert (await client.get("/whoami", headers=_bearer(new_plain))).status_code == 200
+    audit = (await client.get("/audit", headers=_bearer(token))).json()
+    rotation = next(event for event in audit if event["action"] == "api_key.rotate")
+    assert new_plain not in (rotation["detail"] or "")
+    assert rot.json()["id"] in (rotation["detail"] or "")
+
+
+async def test_key_cannot_be_rotated_twice_during_grace(client: AsyncTestClient) -> None:
+    token, team_id = await _setup_team(client)
+    created = await _create_key(client, token, team_id)
+
+    first = await client.post(
+        f"/teams/{team_id}/keys/{created['id']}/rotate", headers=_bearer(token)
+    )
+    assert first.status_code == HTTP_201_CREATED, first.text
+
+    second = await client.post(
+        f"/teams/{team_id}/keys/{created['id']}/rotate", headers=_bearer(token)
+    )
+    assert second.status_code == 404, second.text
+
+
+@pytest.mark.parametrize("failure_point", ["grace", "audit"])
+async def test_rotate_failure_rolls_back_replacement_and_grace(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_point: str,
+) -> None:
+    token, team_id = await _setup_team(client)
+    created = await _create_key(client, token, team_id)
+
+    async def boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("injected rotation failure")
+
+    if failure_point == "grace":
+        from litestar_gateway.infrastructure.persistence import repository
+
+        monkeypatch.setattr(repository.SQLAlchemyAPIKeyRepository, "schedule_revocation", boom)
+    else:
+        from litestar_gateway.infrastructure.persistence import audit_repository
+
+        monkeypatch.setattr(audit_repository.SQLAlchemyAuditLog, "stage", boom)
+
+    failed = await client.post(
+        f"/teams/{team_id}/keys/{created['id']}/rotate", headers=_bearer(token)
+    )
+    assert failed.status_code == 500
+    monkeypatch.undo()
+
+    keys = (await client.get(f"/teams/{team_id}/keys", headers=_bearer(token))).json()
+    assert [key["id"] for key in keys] == [created["id"]]
+    assert keys[0]["is_active"] is True
+    assert (
+        await client.get("/whoami", headers=_bearer(created["plaintext"]))
+    ).status_code == HTTP_200_OK
 
 
 async def test_rotate_revoked_key_is_404(client: AsyncTestClient) -> None:
