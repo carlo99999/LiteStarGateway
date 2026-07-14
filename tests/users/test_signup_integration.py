@@ -16,6 +16,7 @@ from litestar.status_codes import (
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
     HTTP_409_CONFLICT,
 )
 from litestar.testing import AsyncTestClient
@@ -142,6 +143,18 @@ async def test_invite_creation_with_admin_token(client: AsyncTestClient) -> None
     assert resp.json()["team_id"] == team_id
 
 
+async def test_invite_creation_for_missing_team_is_404(client: AsyncTestClient) -> None:
+    token = await _admin_token(client)
+
+    resp = await client.post(
+        "/invites",
+        json={"team_id": str(uuid4()), "role": "member"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert resp.status_code == HTTP_404_NOT_FOUND
+
+
 async def test_signup_requires_valid_invite(client: AsyncTestClient) -> None:
     resp = await client.post(
         "/signup",
@@ -195,6 +208,11 @@ async def test_signup_duplicate_email_is_non_revealing(client: AsyncTestClient) 
     # 400 as other client errors, and the email is never echoed back.
     assert dup.status_code == HTTP_400_BAD_REQUEST
     assert "dup@b.com" not in dup.text
+    reused = await client.post(
+        "/signup",
+        json={"invite_token": token2, "email": "new@b.com", "password": "Passw0rd!"},
+    )
+    assert reused.status_code == HTTP_400_BAD_REQUEST
 
 
 async def test_signup_normalizes_email(client: AsyncTestClient) -> None:

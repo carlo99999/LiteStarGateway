@@ -35,6 +35,7 @@ from litestar_gateway.domain.exceptions import (
     PermissionDenied,
     SSOEmailNotVerified,
     SSOIdentityConflict,
+    TeamNotFound,
     UserHasReferences,
     UserNotFound,
     WeakPassword,
@@ -46,6 +47,7 @@ from litestar_gateway.domain.ports import (
     APIKeyRepository,
     InviteRepository,
     PasswordResetRepository,
+    TeamLifecycleRepository,
     TeamMembershipRepository,
     Transaction,
     UserRepository,
@@ -114,6 +116,7 @@ class UserService:
         invites: InviteRepository,
         password_resets: PasswordResetRepository,
         transaction: Transaction,
+        teams: TeamLifecycleRepository,
         api_keys: APIKeyRepository | None = None,
         memberships: TeamMembershipRepository | None = None,
     ) -> None:
@@ -121,6 +124,7 @@ class UserService:
         self._invites = invites
         self._password_resets = password_resets
         self._transaction = transaction
+        self._teams = teams
         self._api_keys = api_keys
         self._memberships = memberships
 
@@ -170,18 +174,21 @@ class UserService:
     ) -> IssuedInvite:
         """Create a single-use invite that, on signup, adds the new user to
         `team_id` with `role`."""
-        token = secrets.token_urlsafe(_INVITE_TOKEN_BYTES)
-        now = _now()
-        invite = Invite(
-            id=uuid4(),
-            token_hash=hash_key(token),
-            created_at=now,
-            expires_at=now + _INVITE_TTL,
-            used_at=None,
-            team_id=team_id,
-            role=role.value,
-        )
-        stored = await self._invites.add(invite)
+        async with self._unit_of_work():
+            if await self._teams.lock_for_lifecycle(team_id) is None:
+                raise TeamNotFound(str(team_id))
+            token = secrets.token_urlsafe(_INVITE_TOKEN_BYTES)
+            now = _now()
+            invite = Invite(
+                id=uuid4(),
+                token_hash=hash_key(token),
+                created_at=now,
+                expires_at=now + _INVITE_TTL,
+                used_at=None,
+                team_id=team_id,
+                role=role.value,
+            )
+            stored = await self._invites.add(invite)
         return IssuedInvite(invite=stored, token=token)
 
     async def list_users(
@@ -241,42 +248,53 @@ class UserService:
         except ValueError as e:
             raise WeakPassword(str(e)) from e
 
-        # Consume the invite atomically *before* the email check, so two
-        # concurrent signups can never reuse one invite AND so probing whether an
-        # email exists costs a single-use, admin-issued invite per attempt
-        # (account-enumeration is bounded by invite scarcity). Deliberately NOT
-        # a unit of work with the user insert: rolling the consumption back on
-        # failure would make that probing free.
-        if not await self._invites.mark_used(invite.id, _now()):
-            raise InvalidInvite("Invite token is invalid or already used")
-
         email = _normalize_email(email)
-        if await self._users.get_by_email(email) is not None:
-            raise EmailAlreadyRegistered(email)
-
-        user = await self._users.add(
-            User(
-                id=uuid4(),
-                email=email,
-                password_hash=await ahash_password(password),
-                is_admin=False,
-                created_at=_now(),
-            )
-        )
-        # New invites carry the team the user joins; add the membership (a second
-        # commit — user.add already committed, so this can't be one unit of work).
-        if invite.team_id is not None and self._memberships is not None:
-            role = TeamRole(invite.role) if invite.role else TeamRole.MEMBER
-            await self._memberships.add(
-                TeamMembership(
-                    id=uuid4(),
-                    team_id=invite.team_id,
-                    user_id=user.id,
-                    role=role,
-                    created_at=_now(),
+        duplicate_email = False
+        user: User | None = None
+        async with self._unit_of_work():
+            if invite.team_id is not None:
+                if await self._teams.lock_for_lifecycle(invite.team_id) is None:
+                    raise InvalidInvite("Invite token is invalid or its team no longer exists")
+            # Consume before checking the email so account enumeration still costs
+            # one scarce admin-issued token. The team lock remains held through the
+            # user+membership writes, preventing delete-vs-redemption orphans.
+            if not await self._invites.mark_used(invite.id, _now()):
+                raise InvalidInvite("Invite token is invalid or already used")
+            if await self._users.get_by_email(email) is not None:
+                duplicate_email = True
+            else:
+                # Hash only after this request wins the single-use UPDATE. This
+                # prevents one valid token from amplifying concurrent Argon2 work.
+                password_hash = await ahash_password(password)
+                try:
+                    user = await self._users.add_staged(
+                        User(
+                            id=uuid4(),
+                            email=email,
+                            password_hash=password_hash,
+                            is_admin=False,
+                            created_at=_now(),
+                        )
+                    )
+                except EmailAlreadyRegistered:
+                    # The savepoint in add_staged keeps the surrounding invite
+                    # consumption committable when a concurrent insert wins.
+                    duplicate_email = True
+            if user is not None and invite.team_id is not None and self._memberships is not None:
+                role = TeamRole(invite.role) if invite.role else TeamRole.MEMBER
+                await self._memberships.add(
+                    TeamMembership(
+                        id=uuid4(),
+                        team_id=invite.team_id,
+                        user_id=user.id,
+                        role=role,
+                        created_at=_now(),
+                    )
                 )
-            )
-            await self._transaction.commit()
+        if duplicate_email:
+            raise EmailAlreadyRegistered(email)
+        if user is None:  # pragma: no cover - every non-duplicate branch assigns it
+            raise RuntimeError("Registration completed without a user")
         return user
 
     async def authenticate(self, email: str, password: str) -> User:

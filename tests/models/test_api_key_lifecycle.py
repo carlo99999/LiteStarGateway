@@ -29,6 +29,9 @@ from litestar_gateway.infrastructure.persistence.repository import (
 from litestar_gateway.infrastructure.persistence.service_principal_repository import (
     SQLAlchemyServicePrincipalRepository,
 )
+from litestar_gateway.infrastructure.persistence.team_repository import (
+    SQLAlchemyTeamRepository,
+)
 from litestar_gateway.infrastructure.persistence.user_repository import (
     SQLAlchemyUserRepository,
 )
@@ -126,6 +129,7 @@ def _user_service(session: AsyncSession) -> UserService:
         invites=SQLAlchemyInviteRepository(session),
         password_resets=SQLAlchemyPasswordResetRepository(session),
         transaction=session,
+        teams=SQLAlchemyTeamRepository(session),
         api_keys=SQLAlchemyAPIKeyRepository(session),
     )
 

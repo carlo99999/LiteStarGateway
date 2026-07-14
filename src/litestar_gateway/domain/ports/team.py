@@ -10,7 +10,19 @@ from litestar_gateway.domain.entities import Team, TeamMembership
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 
 
-class TeamRepository(Protocol):
+class TeamLifecycleRepository(Protocol):
+    """Narrow port for operations serialized against team deletion."""
+
+    async def lock_for_lifecycle(self, team_id: UUID) -> Team | None:
+        """Serialize invite creation and team deletion for this team.
+
+        Return the current team, or None if it no longer exists. The lock is
+        held until the surrounding transaction completes.
+        """
+        ...
+
+
+class TeamRepository(TeamLifecycleRepository, Protocol):
     """Persistence port for teams."""
 
     async def add(self, team: Team) -> Team: ...
@@ -39,7 +51,7 @@ class TeamRepository(Protocol):
 
     async def delete(self, team_id: UUID) -> None:
         """Delete the team and its intrinsic children (memberships, budget,
-        routers, service principals, and usage history). The caller is
+        routers, service principals, invites, and usage history). The caller is
         responsible for refusing when models or API keys still exist — those are
         NOT removed here."""
         ...

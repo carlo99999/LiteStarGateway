@@ -21,6 +21,7 @@ from .conftest import (
     FakeInviteRepository,
     FakePasswordResetRepository,
     FakeTeamMembershipRepository,
+    FakeTeamRepository,
     FakeTransaction,
     FakeUserRepository,
     _account,
@@ -39,6 +40,7 @@ def _service(
         users=users,
         invites=FakeInviteRepository(),
         password_resets=FakePasswordResetRepository(),
+        teams=FakeTeamRepository(),
         # Minimal fakes: they implement only the lookups the delete guard needs.
         api_keys=api_keys or FakeAPIKeyRepository(),  # type: ignore[bad-argument-type]
         memberships=memberships or FakeTeamMembershipRepository(),  # type: ignore[bad-argument-type]

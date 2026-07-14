@@ -12,11 +12,18 @@ from litestar_gateway.domain.entities import Invite, PasswordReset
 class InviteRepository(Protocol):
     """Persistence port for invites."""
 
-    async def add(self, invite: Invite) -> Invite: ...
+    async def add(self, invite: Invite) -> Invite:
+        """Stage an invite insert; the surrounding unit of work owns the commit.
+
+        Raise TeamNotFound if the invite's team disappeared before the insert.
+        """
+        ...
 
     async def get_by_token_hash(self, token_hash: str) -> Invite | None: ...
 
-    async def mark_used(self, invite_id: UUID, used_at: datetime) -> bool: ...
+    async def mark_used(self, invite_id: UUID, used_at: datetime) -> bool:
+        """Stage single-use consumption; the surrounding unit of work commits."""
+        ...
 
 
 class PasswordResetRepository(Protocol):

@@ -264,14 +264,14 @@ class TeamService:
         Returns the deleted team for the audit trail."""
         if not actor.is_admin:
             raise PermissionDenied("Platform admin privileges required")
-        team = await self._teams.get(team_id)
-        if team is None:
-            raise TeamNotFound(str(team_id))
-        if await self._models.list_by_team(team_id, limit=1, offset=0):
-            raise TeamNotEmpty(str(team_id))
-        if await self._api_keys.list_by_team(team_id, limit=1, offset=0):
-            raise TeamNotEmpty(str(team_id))
         async with self._unit_of_work():
+            team = await self._teams.lock_for_lifecycle(team_id)
+            if team is None:
+                raise TeamNotFound(str(team_id))
+            if await self._models.list_by_team(team_id, limit=1, offset=0):
+                raise TeamNotEmpty(str(team_id))
+            if await self._api_keys.list_by_team(team_id, limit=1, offset=0):
+                raise TeamNotEmpty(str(team_id))
             await self._teams.delete(team_id)
         return team
 

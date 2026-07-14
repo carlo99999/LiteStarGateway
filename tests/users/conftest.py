@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from litestar_gateway.application.user_service import UserService
-from litestar_gateway.domain.entities import Invite, PasswordReset, User
+from litestar_gateway.domain.entities import Invite, PasswordReset, Team, User
 
 
 class FakeTransaction:
@@ -33,6 +33,9 @@ class FakeUserRepository:
     async def add(self, user: User) -> User:
         self._by_email[user.email] = user
         return user
+
+    async def add_staged(self, user: User) -> User:
+        return await self.add(user)
 
     async def get_by_email(self, email: str) -> User | None:
         return self._by_email.get(email)
@@ -150,6 +153,24 @@ class FakeUserRepository:
                 del self._by_email[email]
 
 
+class FakeTeamRepository:
+    """Invite-test fake; legacy tests may opt into accepting any team id."""
+
+    def __init__(self, *, allow_all: bool = True) -> None:
+        self.allow_all = allow_all
+        self.ids: set[UUID] = set()
+
+    async def lock_for_lifecycle(self, team_id: UUID) -> Team | None:
+        if not self.allow_all and team_id not in self.ids:
+            return None
+        return Team(
+            id=team_id,
+            organization_id=uuid4(),
+            name="Invite Team",
+            created_at=datetime.now(UTC),
+        )
+
+
 class FakeInviteRepository:
     def __init__(self) -> None:
         self._by_id: dict[UUID, Invite] = {}
@@ -162,10 +183,9 @@ class FakeInviteRepository:
         return next((i for i in self._by_id.values() if i.token_hash == token_hash), None)
 
     async def mark_used(self, invite_id: UUID, used_at: datetime) -> bool:
-        # Mirror the real repo's conditional UPDATE (consume only if not yet used);
-        # expiry is enforced in the service before mark_used is called.
+        # Mirror the real repo's atomic used/expiry predicate.
         invite = self._by_id.get(invite_id)
-        if invite is None or invite.used_at is not None:
+        if invite is None or invite.used_at is not None or invite.expires_at <= used_at:
             return False
         self._by_id[invite_id] = dataclasses.replace(invite, used_at=used_at)
         return True
@@ -223,6 +243,7 @@ def service() -> UserService:
         users=FakeUserRepository(),
         invites=FakeInviteRepository(),
         password_resets=FakePasswordResetRepository(),
+        teams=FakeTeamRepository(),
     )
 
 

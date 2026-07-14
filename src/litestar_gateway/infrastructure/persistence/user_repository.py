@@ -19,6 +19,15 @@ class SQLAlchemyUserRepository:
         self._session = session
 
     async def add(self, user: User) -> User:
+        try:
+            stored = await self.add_staged(user)
+            await self._session.commit()
+        except EmailAlreadyRegistered:
+            await self._session.rollback()
+            raise
+        return stored
+
+    async def add_staged(self, user: User) -> User:
         model = UserModel(
             id=user.id,
             email=user.email,
@@ -30,13 +39,15 @@ class SQLAlchemyUserRepository:
             external_id=user.external_id,
             is_auditor=user.is_auditor,
         )
-        self._session.add(model)
         try:
-            await self._session.commit()
+            # Isolate uniqueness arbitration from the outer registration UoW:
+            # a loser can still commit the already-staged invite consumption.
+            async with self._session.begin_nested():
+                self._session.add(model)
+                await self._session.flush()
         except IntegrityError as exc:
             # A unique constraint (email or sso_subject) already holds — surface a
             # domain error so callers can handle the conflict / concurrent insert.
-            await self._session.rollback()
             raise EmailAlreadyRegistered(user.email) from exc
         await self._session.refresh(model)
         return model.to_entity()
