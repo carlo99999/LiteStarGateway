@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED
+from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_429_TOO_MANY_REQUESTS
 from litestar.testing import AsyncTestClient
 
 from litestar_gateway.app import create_app
@@ -26,6 +26,8 @@ class JudgeAwareClient:
     """Fake AsyncOpenAI: a judge request (json_schema response_format) gets a
     valid `{"choice": ...}`; everything else echoes the model with usage."""
 
+    call_count = 0
+
     def __init__(self, **kwargs) -> None:
         self.chat = SimpleNamespace(completions=self)
 
@@ -33,6 +35,7 @@ class JudgeAwareClient:
         return None
 
     async def create(self, **kwargs):
+        JudgeAwareClient.call_count += 1
         is_judge = (kwargs.get("response_format") or {}).get("type") == "json_schema"
         content = json.dumps({"choice": "cheap-model"}) if is_judge else "ok"
         data = {
@@ -199,3 +202,30 @@ async def test_over_budget_team_does_not_run_the_judge(
         .fetchall()
     )
     assert rows == [], f"judge ran despite an exhausted budget: {rows}"
+
+
+async def test_key_rpm_rejects_before_billable_router_call(
+    client: AsyncTestClient,
+) -> None:
+    _key, team, admin = await _setup_judge_router(client)
+    issued = await client.post(
+        f"/teams/{team}/keys",
+        json={"name": "capped", "scope": "inference", "rate_limit_rpm": 1},
+        headers=_bearer(admin),
+    )
+    assert issued.status_code == HTTP_201_CREATED, issued.text
+    limited = issued.json()["plaintext"]
+    payload = {
+        "model": "auto",
+        "messages": [{"role": "user", "content": "route me"}],
+    }
+    JudgeAwareClient.call_count = 0
+
+    first = await client.post("/v1/chat/completions", json=payload, headers=_bearer(limited))
+    assert first.status_code == HTTP_200_OK, first.text
+    calls_after_first = JudgeAwareClient.call_count
+    assert calls_after_first == 2  # judge + routed answer
+
+    second = await client.post("/v1/chat/completions", json=payload, headers=_bearer(limited))
+    assert second.status_code == HTTP_429_TOO_MANY_REQUESTS, second.text
+    assert JudgeAwareClient.call_count == calls_after_first
