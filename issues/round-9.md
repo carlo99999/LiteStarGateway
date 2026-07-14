@@ -40,8 +40,8 @@ Counts: **1 CRITICAL · 4 HIGH · 6 MEDIUM · 2 LOW**.
 | ID | Titolo | Priorità | File coinvolti | Stato |
 |---|---|---|---|---|
 | ISSUE-001 | `key-issuer` può ruotare una key di service principal e ottenere scope management | critical | `infrastructure/web/teams/controller.py:335-359`; `application/service.py:117-140` | **Fixed** ([#249](https://github.com/carlo99999/LiteStarGateway/pull/249)) |
-| ISSUE-002 | La rotazione trasferisce la proprietà della personal key all'operatore | high | `application/service.py:117-140`; `infrastructure/web/teams/controller.py:335-359` | open |
-| ISSUE-003 | La disattivazione utente non revoca subito la vecchia key in grace | high | `application/service.py:139`; `persistence/repository.py:85-95` | open |
+| ISSUE-002 | La rotazione trasferisce la proprietà della personal key all'operatore | high | `application/service.py:117-140`; `infrastructure/web/teams/controller.py:335-359` | **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250)) |
+| ISSUE-003 | La disattivazione utente non revoca subito la vecchia key in grace | high | `application/service.py:139`; `persistence/repository.py:85-95` | **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250)) |
 | ISSUE-004 | Il rate limit per API key è bypassabile su embeddings e images | high | `application/completion_service.py:423-451,562-594` | open |
 | ISSUE-005 | L'admin può cancellare se stesso e lasciare la piattaforma senza admin | high | `application/user_service.py:186-204` | open |
 | ISSUE-006 | Qualsiasi invite persistito rende il team non cancellabile | medium | `persistence/team_repository.py:85-101`; `orm.py:112-130` | open |
@@ -49,7 +49,7 @@ Counts: **1 CRITICAL · 4 HIGH · 6 MEDIUM · 2 LOW**.
 | ISSUE-008 | L'invite token nella query string finisce in log e history | medium | `ui/src/features/users/InviteUserDialog.tsx:56-59`; `SignupPage.tsx:11-17` | open |
 | ISSUE-009 | L'admin UI mostra solo i primi 100 record di ogni collezione | medium | `ui/src/features/*/api.ts` | open |
 | ISSUE-010 | Il JWT admin persistito in `localStorage` è leggibile da script same-origin | medium | `ui/src/features/auth/AuthProvider.tsx:12-23` | open |
-| ISSUE-011 | La rotazione non è atomica e può lasciare una replacement key orfana | medium | `application/service.py:128-140`; `persistence/repository.py:22-39,75-83` | open |
+| ISSUE-011 | La rotazione non è atomica e può lasciare una replacement key orfana | medium | `application/service.py:128-140`; `persistence/repository.py:22-39,75-83` | **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250)) |
 | ISSUE-012 | Il rate limiter in-memory non elimina mai i bucket inattivi | low | `infrastructure/rate_limiter.py:27-42` | open |
 | ISSUE-013 | La UI trasforma qualsiasi errore budget in “nessun budget” | low | `ui/src/features/teams/api.ts:43-49` | open |
 
@@ -62,9 +62,20 @@ anche `SERVICE_PRINCIPALS_MANAGE` prima di emettere la replacement. I test RBAC 
 gli scope `inference`, `management` e `all`, verificano che il diniego non modifichi la
 key e che la replacement autorizzata resti soggetta al kill switch dello SP.
 
+**ISSUE-002**, **ISSUE-003** e **ISSUE-011** sono risolte insieme dalla
+[#250](https://github.com/carlo99999/LiteStarGateway/pull/250): la rotazione conserva
+l'owner originale e committa replacement, grace e audit in una sola unit of work;
+la disattivazione serializza su owner e anticipa anche le revoche future. Una
+validazione DB finale impedisce inoltre alle race di autenticazione e telemetria di
+accettare credenziali revocate. I test PostgreSQL coprono rotate/deactivate,
+rotazioni concorrenti, fast path throttled contro revoke e delete degli SP.
+
 | ID | Priorità | Stato | PR |
 |---|---|---|---|
 | ISSUE-001 | critical | **Fixed** | [#249](https://github.com/carlo99999/LiteStarGateway/pull/249) |
+| ISSUE-002 | high | **Fixed** | [#250](https://github.com/carlo99999/LiteStarGateway/pull/250) |
+| ISSUE-003 | high | **Fixed** | [#250](https://github.com/carlo99999/LiteStarGateway/pull/250) |
+| ISSUE-011 | medium | **Fixed** | [#250](https://github.com/carlo99999/LiteStarGateway/pull/250) |
 
 ## Issues
 
@@ -101,7 +112,7 @@ key inference-only. Aggiungere un test RBAC negativo con un attore `key-issuer`.
 ### ISSUE-002 — La rotazione trasferisce la proprietà della personal key all'operatore
 
 **Priorità:** high
-**Stato:** open
+**Stato:** **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250))
 **File coinvolti:** `src/litestar_gateway/application/service.py:117-140`, `src/litestar_gateway/infrastructure/web/teams/controller.py:335-359`
 
 **Problema**
@@ -127,7 +138,7 @@ caso “Alice emette, admin ruota, Alice viene disattivata”.
 ### ISSUE-003 — La disattivazione utente non revoca subito la vecchia key in grace
 
 **Priorità:** high
-**Stato:** open
+**Stato:** **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250))
 **File coinvolti:** `src/litestar_gateway/application/service.py:139`, `src/litestar_gateway/infrastructure/persistence/repository.py:85-95`
 
 **Problema**
@@ -317,7 +328,7 @@ intermedia, memoria/sessionStorage + CSP stretta riducono persistenza e superfic
 ### ISSUE-011 — La rotazione non è atomica e può lasciare una replacement key orfana
 
 **Priorità:** medium
-**Stato:** open
+**Stato:** **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250))
 **File coinvolti:** `src/litestar_gateway/application/service.py:128-140`, `src/litestar_gateway/infrastructure/persistence/repository.py:22-39,75-83`
 
 **Problema**
@@ -401,6 +412,6 @@ React Query mostri lo stato di errore.
 | Test / CI | **8.5/10** | 807 test verdi e gate forti; mancano test di interazione RBAC/rotation/FK che avrebbero catturato i finding principali. |
 
 **Overall: 6.8/10.** La base resta buona e verificata. ISSUE-001 è stata chiusa dalla
-[#249](https://github.com/carlo99999/LiteStarGateway/pull/249); ISSUE-002..005 sono il
-blocco successivo perché riguardano controlli di revoca e governance, non semplici
-rifiniture UI.
+[#249](https://github.com/carlo99999/LiteStarGateway/pull/249); ISSUE-002, ISSUE-003 e
+ISSUE-011 dalla [#250](https://github.com/carlo99999/LiteStarGateway/pull/250). I due
+finding high successivi sono ora rate-limit coverage e governance dell'ultimo admin.
