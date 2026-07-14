@@ -62,8 +62,8 @@ async def test_concurrent_admin_changes_preserve_one_active_admin(
     settings = Settings(
         database_url=database_url,
         admin_email="admin-a@example.com",
-        master_key="master-secret",
-        jwt_secret="test-secret-key-0123456789-abcdefghij",
+        master_key="master-secret",  # pragma: allowlist secret
+        jwt_secret="test-secret-key-0123456789-abcdefghij",  # pragma: allowlist secret
         salt_key="test-salt-key",
     )
     async with AsyncTestClient(app=create_app(settings)):
@@ -78,7 +78,7 @@ async def test_concurrent_admin_changes_preserve_one_active_admin(
                     User(
                         id=uuid4(),
                         email="admin-b@example.com",
-                        password_hash="unused",
+                        password_hash="unused",  # pragma: allowlist secret
                         is_admin=True,
                         created_at=datetime.now(UTC),
                     )
