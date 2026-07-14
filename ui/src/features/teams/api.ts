@@ -62,6 +62,16 @@ export interface TeamMetadata {
   name: string;
   description: string | null;
   tags: string[];
+  rate_limit_rpm: number | null;
+}
+
+/** Parse a requests/minute field: blank → null (unlimited); otherwise a positive
+ * integer, or null when the input isn't one. */
+export function parseRpm(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 
 /** Parse a comma-separated tags field into a trimmed, de-duplicated list. */

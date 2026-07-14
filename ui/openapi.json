@@ -6013,6 +6013,16 @@
                     "scope": {
                         "type": "string",
                         "default": "inference"
+                    },
+                    "rate_limit_rpm": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",
@@ -6163,6 +6173,16 @@
                             "type": "string"
                         },
                         "type": "array"
+                    },
+                    "rate_limit_rpm": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",
@@ -6204,6 +6224,16 @@
                     "created_at": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "rate_limit_rpm": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",
@@ -6213,6 +6243,7 @@
                     "name",
                     "plaintext",
                     "prefix",
+                    "rate_limit_rpm",
                     "scope",
                     "team_id"
                 ],
@@ -6413,6 +6444,16 @@
                                 "type": "null"
                             }
                         ]
+                    },
+                    "rate_limit_rpm": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",
@@ -6424,6 +6465,7 @@
                     "last_used_at",
                     "name",
                     "prefix",
+                    "rate_limit_rpm",
                     "revoked_at",
                     "scope",
                     "team_id"
@@ -7140,6 +7182,16 @@
                             "type": "string"
                         },
                         "type": "array"
+                    },
+                    "rate_limit_rpm": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",
@@ -7149,6 +7201,7 @@
                     "id",
                     "name",
                     "organization_id",
+                    "rate_limit_rpm",
                     "tags"
                 ],
                 "title": "TeamResponse"
@@ -7344,6 +7397,16 @@
                             "type": "string"
                         },
                         "type": "array"
+                    },
+                    "rate_limit_rpm": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",

@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listOrganizations } from "@/features/organizations/api";
-import { createTeam, parseTags } from "@/features/teams/api";
+import { createTeam, parseRpm, parseTags } from "@/features/teams/api";
 
 interface CreateTeamDialogProps {
   /** Fixed organization (from the org detail page). Omit to show an org picker
@@ -36,6 +36,7 @@ export function CreateTeamDialog({ organizationId, open, onOpenChange }: CreateT
   const [orgId, setOrgId] = useState("");
   const [description, setDescription] = useState("");
   const [tagsText, setTagsText] = useState("");
+  const [rpmText, setRpmText] = useState("");
 
   // Only need the org list when no organization is fixed.
   const orgs = useQuery({
@@ -51,6 +52,7 @@ export function CreateTeamDialog({ organizationId, open, onOpenChange }: CreateT
       setOrgId("");
       setDescription("");
       setTagsText("");
+      setRpmText("");
     }
   }, [open]);
 
@@ -62,6 +64,7 @@ export function CreateTeamDialog({ organizationId, open, onOpenChange }: CreateT
         name: name.trim(),
         description: description.trim() || null,
         tags: parseTags(tagsText),
+        rate_limit_rpm: parseRpm(rpmText),
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["organizations", effectiveOrgId] });
@@ -151,6 +154,18 @@ export function CreateTeamDialog({ organizationId, open, onOpenChange }: CreateT
               value={tagsText}
               onChange={(e) => setTagsText(e.target.value)}
               placeholder="comma, separated, labels"
+              autoComplete="off"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="team-rpm">rate limit (req/min)</Label>
+            <Input
+              id="team-rpm"
+              type="number"
+              min="1"
+              value={rpmText}
+              onChange={(e) => setRpmText(e.target.value)}
+              placeholder="unlimited"
               autoComplete="off"
             />
           </div>

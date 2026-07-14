@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { parseTags, updateTeam, type Team } from "@/features/teams/api";
+import { parseRpm, parseTags, updateTeam, type Team } from "@/features/teams/api";
 
 interface TeamEditDialogProps {
   /** The team being edited, or null when the dialog is closed. */
@@ -25,12 +25,14 @@ export function TeamEditDialog({ team, onOpenChange }: TeamEditDialogProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [tagsText, setTagsText] = useState("");
+  const [rpmText, setRpmText] = useState("");
 
   useEffect(() => {
     if (team) {
       setName(team.name);
       setDescription(team.description ?? "");
       setTagsText(team.tags.join(", "));
+      setRpmText(team.rate_limit_rpm?.toString() ?? "");
     }
   }, [team]);
 
@@ -40,6 +42,7 @@ export function TeamEditDialog({ team, onOpenChange }: TeamEditDialogProps) {
         name: name.trim(),
         description: description.trim() || null,
         tags: parseTags(tagsText),
+        rate_limit_rpm: parseRpm(rpmText),
       }),
     onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: ["teams"] });
@@ -100,6 +103,18 @@ export function TeamEditDialog({ team, onOpenChange }: TeamEditDialogProps) {
               value={tagsText}
               onChange={(e) => setTagsText(e.target.value)}
               placeholder="comma, separated, labels"
+              autoComplete="off"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="team-edit-rpm">rate limit (req/min)</Label>
+            <Input
+              id="team-edit-rpm"
+              type="number"
+              min="1"
+              value={rpmText}
+              onChange={(e) => setRpmText(e.target.value)}
+              placeholder="unlimited"
               autoComplete="off"
             />
           </div>
