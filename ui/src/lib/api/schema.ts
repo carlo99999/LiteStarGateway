@@ -579,6 +579,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/keys/{key_id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RotateKey */
+        post: operations["TeamsTeamIdKeysKeyIdRotateRotateKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams/{team_id}/usage": {
         parameters: {
             query?: never;
@@ -2967,6 +2984,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdKeysKeyIdRotateRotateKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document created, URL follows */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedKeyResponse"];
+                };
             };
             /** @description Bad request syntax or unsupported method */
             400: {

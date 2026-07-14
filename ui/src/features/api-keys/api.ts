@@ -47,6 +47,17 @@ export async function revokeTeamKey(teamId: string, keyId: string): Promise<void
   if (error) throw fail(error, "Failed to revoke API key");
 }
 
+/** POST /teams/{id}/keys/{keyId}/rotate — issue a replacement key (same
+ * scope/rate-limit/owner) and start the old key's grace window. Returns the new
+ * plaintext once. */
+export async function rotateTeamKey(teamId: string, keyId: string): Promise<IssuedKey> {
+  const { data, error } = await api.POST("/teams/{team_id}/keys/{key_id}/rotate", {
+    params: { path: { team_id: teamId, key_id: keyId } },
+  });
+  if (error || !data) throw fail(error, "Failed to rotate API key");
+  return data;
+}
+
 /** GET /teams/{id}/service-principals — the team's service principals. */
 export async function listServicePrincipals(teamId: string): Promise<ServicePrincipal[]> {
   const { data, error } = await api.GET("/teams/{team_id}/service-principals", {

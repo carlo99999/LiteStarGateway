@@ -7,6 +7,7 @@ import { IssueKeyDialog } from "@/features/api-keys/IssueKeyDialog";
 import { KeyStatusToggle, type KeyStatus } from "@/features/api-keys/KeyStatusToggle";
 import { KeysTable, type KeyRow } from "@/features/api-keys/KeysTable";
 import { RevokeKeyDialog } from "@/features/api-keys/RevokeKeyDialog";
+import { RotateKeyDialog } from "@/features/api-keys/RotateKeyDialog";
 import { listTeamKeys, type ApiKey } from "@/features/api-keys/api";
 import { useAuth } from "@/features/auth/use-auth";
 import { listTeams } from "@/features/teams/api";
@@ -34,6 +35,7 @@ export function ApiKeysPage() {
 
   const [issueOpen, setIssueOpen] = useState(false);
   const [revoking, setRevoking] = useState<ApiKey | null>(null);
+  const [rotating, setRotating] = useState<ApiKey | null>(null);
   const [status, setStatus] = useState<KeyStatus>("active");
 
   const active = rows.filter((k) => k.is_active);
@@ -67,6 +69,7 @@ export function ApiKeysPage() {
         error={error}
         showTeam
         currentUserId={user?.id}
+        onRotate={setRotating}
         onRevoke={setRevoking}
         emptyDescription={
           status === "active" ? "Issue a key with the button above." : "No revoked keys."
@@ -74,6 +77,12 @@ export function ApiKeysPage() {
       />
 
       <IssueKeyDialog open={issueOpen} onOpenChange={setIssueOpen} />
+      <RotateKeyDialog
+        apiKey={rotating}
+        onOpenChange={(open) => {
+          if (!open) setRotating(null);
+        }}
+      />
       <RevokeKeyDialog
         apiKey={revoking}
         onOpenChange={(open) => {

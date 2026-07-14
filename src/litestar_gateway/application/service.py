@@ -23,6 +23,11 @@ from litestar_gateway.domain.ports import APIKeyRepository, ServicePrincipalRepo
 # Only persist last_used_at this often, to avoid a DB write on every request.
 _LAST_USED_THROTTLE = timedelta(minutes=1)
 
+# Rotation grace: after a rotate, the old key keeps working this long so callers
+# can migrate without downtime, then stops on its own (no background job — the
+# auth check honours the future revoked_at).
+ROTATION_GRACE = timedelta(hours=1)
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -108,6 +113,31 @@ class APIKeyService:
             raise APIKeyNotFound(str(key_id))
         if key.is_active:
             await self._repo.update(dataclasses.replace(key, revoked_at=_now()))
+
+    async def rotate_for_team(
+        self,
+        team_id: UUID,
+        key_id: UUID,
+        created_by: UUID,
+        *,
+        grace: timedelta = ROTATION_GRACE,
+    ) -> IssuedKey:
+        """Issue a replacement key (same scope, rate limit, and owner) and schedule
+        the old one to stop working after `grace`, so clients can migrate without
+        downtime. For an immediate cut-over (e.g. a leaked key), revoke instead."""
+        key = await self._repo.get(key_id)
+        if key is None or key.team_id != team_id or not key.is_active:
+            raise APIKeyNotFound(str(key_id))
+        issued = await self.issue(
+            team_id=team_id,
+            created_by=created_by,
+            name=key.name,
+            scope=key.scope,
+            service_principal_id=key.service_principal_id,
+            rate_limit_rpm=key.rate_limit_rpm,
+        )
+        await self._repo.update(dataclasses.replace(key, revoked_at=_now() + grace))
+        return issued
 
     async def list_for_team(
         self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0

@@ -6,6 +6,7 @@ import { IssueKeyDialog } from "@/features/api-keys/IssueKeyDialog";
 import { KeyStatusToggle, type KeyStatus } from "@/features/api-keys/KeyStatusToggle";
 import { KeysTable } from "@/features/api-keys/KeysTable";
 import { RevokeKeyDialog } from "@/features/api-keys/RevokeKeyDialog";
+import { RotateKeyDialog } from "@/features/api-keys/RotateKeyDialog";
 import { listTeamKeys, type ApiKey } from "@/features/api-keys/api";
 import { useAuth } from "@/features/auth/use-auth";
 
@@ -19,6 +20,7 @@ export function TeamKeys({ teamId }: TeamKeysProps) {
   const keys = useQuery({ queryKey: ["team-keys", teamId], queryFn: () => listTeamKeys(teamId) });
   const [issueOpen, setIssueOpen] = useState(false);
   const [revoking, setRevoking] = useState<ApiKey | null>(null);
+  const [rotating, setRotating] = useState<ApiKey | null>(null);
   const [status, setStatus] = useState<KeyStatus>("active");
 
   const all = keys.data ?? [];
@@ -51,6 +53,7 @@ export function TeamKeys({ teamId }: TeamKeysProps) {
         error={keys.error as Error | null}
         showTeam={false}
         currentUserId={user?.id}
+        onRotate={setRotating}
         onRevoke={setRevoking}
         emptyDescription={
           status === "active"
@@ -60,6 +63,12 @@ export function TeamKeys({ teamId }: TeamKeysProps) {
       />
 
       <IssueKeyDialog teamId={teamId} open={issueOpen} onOpenChange={setIssueOpen} />
+      <RotateKeyDialog
+        apiKey={rotating}
+        onOpenChange={(open) => {
+          if (!open) setRotating(null);
+        }}
+      />
       <RevokeKeyDialog
         apiKey={revoking}
         onOpenChange={(open) => {

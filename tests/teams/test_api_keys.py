@@ -160,3 +160,50 @@ async def test_service_principal_key_carries_rate_limit(client: AsyncTestClient)
     )
     assert resp.status_code in (200, 201), resp.text
     assert resp.json()["rate_limit_rpm"] == 50
+
+
+async def test_rotate_issues_new_key_and_keeps_old_during_grace(client: AsyncTestClient) -> None:
+    token, team_id = await _setup_team(client)
+    created = await _create_key(client, token, team_id)
+    old_plain, key_id = created["plaintext"], created["id"]
+    assert (await client.get("/whoami", headers=_bearer(old_plain))).status_code == 200
+
+    rot = await client.post(f"/teams/{team_id}/keys/{key_id}/rotate", headers=_bearer(token))
+    assert rot.status_code in (200, 201), rot.text
+    new_plain = rot.json()["plaintext"]
+    assert new_plain != old_plain
+    assert rot.json()["scope"] == created["scope"]
+
+    # During the grace window both the old and the new key work.
+    assert (await client.get("/whoami", headers=_bearer(old_plain))).status_code == 200
+    assert (await client.get("/whoami", headers=_bearer(new_plain))).status_code == 200
+
+
+async def test_rotate_revoked_key_is_404(client: AsyncTestClient) -> None:
+    token, team_id = await _setup_team(client)
+    created = await _create_key(client, token, team_id)
+    key_id = created["id"]
+    await client.delete(f"/teams/{team_id}/keys/{key_id}", headers=_bearer(token))
+    rot = await client.post(f"/teams/{team_id}/keys/{key_id}/rotate", headers=_bearer(token))
+    assert rot.status_code == 404, rot.text
+
+
+def test_apikey_is_active_honours_grace_window() -> None:
+    from datetime import UTC, datetime, timedelta
+    from uuid import uuid4
+
+    from litestar_gateway.domain.entities import APIKey
+
+    base = {
+        "id": uuid4(),
+        "team_id": uuid4(),
+        "created_by": uuid4(),
+        "name": None,
+        "prefix": "x",
+        "key_hash": "h",
+        "created_at": datetime.now(UTC),
+        "last_used_at": None,
+    }
+    assert APIKey(**base, revoked_at=None).is_active
+    assert APIKey(**base, revoked_at=datetime.now(UTC) + timedelta(hours=1)).is_active
+    assert not APIKey(**base, revoked_at=datetime.now(UTC) - timedelta(seconds=1)).is_active
