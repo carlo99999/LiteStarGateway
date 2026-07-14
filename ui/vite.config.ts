@@ -22,7 +22,9 @@ export default defineConfig({
     proxy: {
       "^/(?!ui/|@|src/|node_modules/).*": {
         target: GATEWAY_URL,
-        changeOrigin: true,
+        // Cookie-session CSRF compares Origin to the public Host. Preserve the
+        // browser-facing Vite host instead of rewriting it to the backend target.
+        changeOrigin: false,
       },
     },
   },

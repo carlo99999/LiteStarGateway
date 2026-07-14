@@ -28,16 +28,22 @@ async def provide_principal(
     user_service: NamedDependency[UserService],
     api_key_service: NamedDependency[APIKeyService],
     service_principal_service: NamedDependency[ServicePrincipalService],
+    browser_session_cookie_secure: NamedDependency[bool],
 ) -> Principal:
     auth = request.headers.get("Authorization")
     if not auth:
-        raise NotAuthorizedException("Missing bearer token")
+        user = await provide_current_user(
+            request, keyring, user_service, browser_session_cookie_secure
+        )
+        return Principal(user=user)
     scheme, _, token = auth.partition(" ")
     if scheme.lower() != "bearer" or not token:
         raise NotAuthorizedException("Invalid Authorization header")
 
     if token.count(".") == 2:  # a JWT — reuse the session path (all its checks)
-        user = await provide_current_user(request, keyring, user_service)
+        user = await provide_current_user(
+            request, keyring, user_service, browser_session_cookie_secure
+        )
         return Principal(user=user)
 
     try:

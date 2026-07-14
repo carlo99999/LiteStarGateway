@@ -1,27 +1,30 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import { config } from "@/lib/config";
 import type { paths } from "@/lib/api/schema";
+import { csrfHeaderValue } from "@/lib/api/csrf";
 
 /**
  * Typed API client generated from the gateway's OpenAPI schema.
  *
- * A single mutable token holder lets the auth layer swap the bearer token
- * (login / logout / restore-from-storage) without recreating the client.
+ * The browser session JWT remains in an HttpOnly same-origin cookie. Only the
+ * non-secret CSRF value is held in memory and attached to unsafe requests.
  */
-let bearerToken: string | null = null;
+let csrfToken: string | null = null;
 
-export function setBearerToken(token: string | null): void {
-  bearerToken = token;
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
 }
 
 const authMiddleware: Middleware = {
   async onRequest({ request }) {
-    if (bearerToken) {
-      request.headers.set("Authorization", `Bearer ${bearerToken}`);
-    }
+    const value = csrfHeaderValue(request.method, csrfToken);
+    if (value) request.headers.set("X-CSRF-Token", value);
     return request;
   },
 };
 
-export const api = createClient<paths>({ baseUrl: config.apiBaseUrl });
+export const api = createClient<paths>({
+  baseUrl: config.apiBaseUrl,
+  credentials: "same-origin",
+});
 api.use(authMiddleware);

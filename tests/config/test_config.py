@@ -30,6 +30,7 @@ _BASE = Settings(
     jwt_secret=STRONG_SECRET,
     salt_key="a-strong-random-salt-key-0123456789",
     environment="development",
+    session_cookie_secure=True,
 )
 
 
@@ -68,6 +69,11 @@ def test_staging_still_allows_sqlite() -> None:
     # environments keep SQLite available (secrets are still validated there).
     settings = dataclasses.replace(_BASE, environment="staging")
     assert settings.is_postgres is False
+
+
+def test_non_local_env_rejects_insecure_session_cookies() -> None:
+    with pytest.raises(InsecureConfigurationError, match="SESSION_COOKIE_SECURE"):
+        dataclasses.replace(_BASE, environment="staging", session_cookie_secure=False)
 
 
 def test_development_allows_default_jwt_secret() -> None:

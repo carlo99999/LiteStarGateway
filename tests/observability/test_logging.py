@@ -17,6 +17,7 @@ def _settings(environment: str) -> Settings:
         jwt_secret="x" * 40,
         salt_key="s" * 32,
         environment=environment,
+        session_cookie_secure=True,
     )
 
 

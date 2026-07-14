@@ -1,71 +1,50 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { setBearerToken } from "@/lib/api/client";
+import { setCsrfToken } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { AuthContext, type AuthStatus } from "@/features/auth/auth-context";
 import {
-  fetchCurrentUser,
+  fetchBrowserSession,
   login as loginRequest,
   logout as logoutRequest,
   type CurrentUser,
 } from "@/features/auth/api";
 
-function readStoredToken(): string | null {
-  return window.localStorage.getItem(config.tokenStorageKey);
-}
-
-function storeToken(token: string | null): void {
-  if (token) {
-    window.localStorage.setItem(config.tokenStorageKey, token);
-  } else {
-    window.localStorage.removeItem(config.tokenStorageKey);
-  }
-  setBearerToken(token);
-}
-
 /**
- * Owns the bearer token + current user. On mount it restores a stored token and
- * validates it via GET /me; an invalid/expired token is cleared so the app
- * falls back to the login screen.
+ * Owns the current browser session. The JWT is never exposed to JavaScript: the
+ * browser sends its HttpOnly cookie, while only the CSRF value lives in memory.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
-    const token = readStoredToken();
-    if (!token) {
-      setStatus("unauthenticated");
-      return;
-    }
-    setBearerToken(token);
-    fetchCurrentUser()
-      .then((current) => {
-        setUser(current);
+    // One-way cleanup for sessions created before HttpOnly cookies shipped.
+    window.localStorage.removeItem(config.legacyTokenStorageKey);
+    fetchBrowserSession()
+      .then((session) => {
+        setCsrfToken(session.csrf_token);
+        setUser(session.user);
         setStatus("authenticated");
       })
       .catch(() => {
-        storeToken(null);
+        setCsrfToken(null);
         setUser(null);
         setStatus("unauthenticated");
       });
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { access_token } = await loginRequest(email, password);
-    storeToken(access_token);
-    const current = await fetchCurrentUser();
-    setUser(current);
+    const session = await loginRequest(email, password);
+    setCsrfToken(session.csrf_token);
+    setUser(session.user);
     setStatus("authenticated");
   }, []);
 
   const logout = useCallback(async () => {
-    try {
-      await logoutRequest();
-    } finally {
-      storeToken(null);
-      setUser(null);
-      setStatus("unauthenticated");
-    }
+    await logoutRequest();
+    setCsrfToken(null);
+    setUser(null);
+    setStatus("unauthenticated");
   }, []);
 
   const value = useMemo(
