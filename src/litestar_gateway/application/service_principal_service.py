@@ -80,6 +80,7 @@ class ServicePrincipalService:
         created_by: UUID,
         name: str | None,
         scope: KeyScope,
+        rate_limit_rpm: int | None = None,
     ) -> IssuedKey:
         await self._get_in_team(team_id, sp_id)
         return await self._keys.issue(
@@ -88,4 +89,5 @@ class ServicePrincipalService:
             name=name,
             scope=scope,
             service_principal_id=sp_id,
+            rate_limit_rpm=rate_limit_rpm,
         )
