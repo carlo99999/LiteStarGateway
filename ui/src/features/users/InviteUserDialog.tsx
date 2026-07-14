@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { buildInviteSignupLink } from "@/features/auth/inviteToken";
 import { listTeams } from "@/features/teams/api";
 import { inviteUser, type Invite, type TeamRole } from "@/features/users/api";
 
@@ -53,10 +54,8 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
 
   const canSubmit = !mutation.isPending && teamId.length > 0;
 
-  // The signup page lives under the `/ui` basepath and reads `?token=`.
-  const signupLink = invite
-    ? `${window.location.origin}/ui/signup?token=${encodeURIComponent(invite.token)}`
-    : "";
+  // Fragments stay client-side: the bearer never reaches HTTP access logs.
+  const signupLink = invite ? buildInviteSignupLink(window.location.origin, invite.token) : "";
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();

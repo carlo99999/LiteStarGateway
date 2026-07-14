@@ -3,24 +3,17 @@ import { Terminal } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { signup } from "@/features/auth/api";
 import { CodeRain } from "@/features/auth/CodeRain";
+import { inviteTokenStore } from "@/features/auth/inviteToken";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-/** The invite token, carried in the `?token=` query param of the signup link
- * the admin hands out. Read from the URL directly so the page works whether or
- * not the router validated the search. */
-function tokenFromUrl(): string {
-  if (typeof window === "undefined") return "";
-  return new URLSearchParams(window.location.search).get("token") ?? "";
-}
-
 /** Public page where an invited user redeems their invite token to set their
  * own password. Reached via the link from the "Invite user" dialog. */
 export function SignupPage() {
   const navigate = useNavigate();
-  const [token] = useState(tokenFromUrl);
+  const [token, setToken] = useState(() => inviteTokenStore.get());
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +26,8 @@ export function SignupPage() {
     setSubmitting(true);
     try {
       await signup(token, email, password);
+      inviteTokenStore.clear();
+      setToken("");
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
