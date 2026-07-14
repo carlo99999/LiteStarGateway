@@ -134,6 +134,14 @@ class UserService:
             await self._transaction.rollback()
             raise
 
+    async def _lock_and_require_live_admin(self, actor: User) -> list[User]:
+        """Serialize admin-capability changes and reject a stale actor."""
+        admins = await self._users.lock_platform_admins()
+        live_actor = next((admin for admin in admins if admin.id == actor.id), None)
+        if live_actor is None or not live_actor.is_active:
+            raise PermissionDenied("Platform admin privileges required")
+        return admins
+
     async def ensure_admin(self, admin_email: str, master_key: str | None) -> None:
         """Bootstrap the first user. Raises if the table is empty and no key is set."""
         if await self._users.count() > 0:
@@ -186,21 +194,27 @@ class UserService:
     async def delete_user(self, actor: User, user_id: UUID) -> User:
         """Hard-delete a user — platform-admin only. Refused (UserHasReferences →
         409) if they still have team memberships or API keys they created, so
-        nothing is orphaned; their pending password resets are cleared first."""
+        nothing is orphaned; their pending password resets are cleared first.
+        Self-deletion is forbidden, and the actor is revalidated while the live
+        admin set is locked so concurrent cross-deletes cannot remove every admin."""
         if not actor.is_admin:
             raise PermissionDenied("Platform admin privileges required")
-        user = await self._users.get(user_id)
-        if user is None:
-            raise UserNotFound(str(user_id))
-        if self._memberships is not None and await self._memberships.list_by_user(
-            user_id, limit=1, offset=0
-        ):
-            raise UserHasReferences(str(user_id))
-        if self._api_keys is not None and await self._api_keys.list_by_creator(
-            user_id, limit=1, offset=0
-        ):
-            raise UserHasReferences(str(user_id))
-        await self._users.delete(user_id)
+        if actor.id == user_id:
+            raise PermissionDenied("Cannot delete your own account")
+        async with self._unit_of_work():
+            await self._lock_and_require_live_admin(actor)
+            user = await self._users.get_for_update(user_id)
+            if user is None:
+                raise UserNotFound(str(user_id))
+            if self._memberships is not None and await self._memberships.list_by_user(
+                user_id, limit=1, offset=0
+            ):
+                raise UserHasReferences(str(user_id))
+            if self._api_keys is not None and await self._api_keys.list_by_creator(
+                user_id, limit=1, offset=0
+            ):
+                raise UserHasReferences(str(user_id))
+            await self._users.delete(user_id)
         return user
 
     def _check_password_complexity(self, password: str) -> None:
@@ -421,6 +435,7 @@ class UserService:
         if actor.id == user_id:
             raise PermissionDenied("Cannot change your own active status")
         async with self._unit_of_work():
+            await self._lock_and_require_live_admin(actor)
             # Personal key issuance and rotation take this same lock before
             # touching a credential, so offboarding cannot race a new live key.
             if await self._users.get_for_update(user_id) is None:
@@ -462,9 +477,11 @@ class UserService:
             raise PermissionDenied("Platform admin privileges required")
         if actor.id == user_id:
             raise PermissionDenied("Cannot change your own admin role")
-        if await self._users.get(user_id) is None:
-            raise UserNotFound(str(user_id))
-        await self._users.set_admin(user_id, is_admin)
+        async with self._unit_of_work():
+            await self._lock_and_require_live_admin(actor)
+            if await self._users.get_for_update(user_id) is None:
+                raise UserNotFound(str(user_id))
+            await self._users.set_admin(user_id, is_admin)
         updated = await self._users.get(user_id)
         if updated is None:  # pragma: no cover - just set it
             raise UserNotFound(str(user_id))

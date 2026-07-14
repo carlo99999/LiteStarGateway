@@ -1,9 +1,9 @@
 """Admin endpoint to hard-delete a user (admin JWT).
 
-Refused with 409 (UserHasReferences) if the account still has team memberships
-or API keys it created — deactivate instead in that case. A clean account (no
-memberships, no created keys) is removed outright, along with its pending
-password resets.
+Self-deletion is refused with 403. Deleting another account is refused with 409
+(UserHasReferences) if it still has team memberships or API keys it created —
+deactivate instead in that case. A clean account is removed outright, along
+with its pending password resets.
 """
 
 from __future__ import annotations

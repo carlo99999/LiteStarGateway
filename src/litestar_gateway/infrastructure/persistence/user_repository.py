@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -73,7 +73,7 @@ class SQLAlchemyUserRepository:
         await self._session.execute(
             update(UserModel).where(UserModel.id == user_id).values(is_admin=is_admin)
         )
-        await self._session.commit()
+        await self._session.flush()
 
     async def increment_token_version(self, user_id: UUID) -> None:
         await self._session.execute(
@@ -140,6 +140,21 @@ class SQLAlchemyUserRepository:
             select(UserModel).where(UserModel.id == user_id).with_for_update()
         )
         return model.to_entity() if model else None
+
+    async def lock_platform_admins(self) -> list[User]:
+        # A no-op UPDATE is a cross-database transaction mutex for admin lifecycle
+        # changes: PostgreSQL row-locks the current admin set, while SQLite takes
+        # its write lock before we inspect it. A plain SELECT FOR UPDATE would be
+        # ignored by SQLite and would permit two admins to delete each other.
+        # SQL text deliberately bypasses SQLAlchemy's automatic `updated_at`
+        # on-update default: acquiring this mutex must not rewrite user audit data.
+        await self._session.execute(
+            text("UPDATE user_account SET is_admin = is_admin WHERE is_admin = true")
+        )
+        models = await self._session.scalars(
+            select(UserModel).where(UserModel.is_admin.is_(True)).order_by(UserModel.id)
+        )
+        return [model.to_entity() for model in models]
 
     async def get_by_email(self, email: str) -> User | None:
         model = await self._session.scalar(select(UserModel).where(UserModel.email == email))
@@ -208,4 +223,4 @@ class SQLAlchemyUserRepository:
             delete(PasswordResetModel).where(PasswordResetModel.user_id == user_id)
         )
         await self._session.execute(delete(UserModel).where(UserModel.id == user_id))
-        await self._session.commit()
+        await self._session.flush()

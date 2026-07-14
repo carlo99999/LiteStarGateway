@@ -94,6 +94,9 @@ class FakeUserRepository:
     async def get_for_update(self, user_id: UUID) -> User | None:
         return await self.get(user_id)
 
+    async def lock_platform_admins(self) -> list[User]:
+        return [user for user in self._by_email.values() if user.is_admin]
+
     async def register_failed_login(self, user_id: UUID) -> int:
         for email, user in self._by_email.items():
             if user.id == user_id:
