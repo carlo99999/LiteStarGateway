@@ -1055,6 +1055,7 @@ export interface components {
             name?: string | null;
             /** @default inference */
             scope: string;
+            rate_limit_rpm?: number | null;
         };
         /** CreateModelRequest */
         CreateModelRequest: {
@@ -1093,6 +1094,7 @@ export interface components {
             admin_email: string;
             description?: string | null;
             tags?: string[];
+            rate_limit_rpm?: number | null;
         };
         /** CreatedKeyResponse */
         CreatedKeyResponse: {
@@ -1106,6 +1108,7 @@ export interface components {
             scope: string;
             /** Format: date-time */
             created_at: string;
+            rate_limit_rpm: number | null;
         };
         /** CredentialResponse */
         CredentialResponse: {
@@ -1157,6 +1160,7 @@ export interface components {
             created_at: string;
             last_used_at: string | null;
             revoked_at: string | null;
+            rate_limit_rpm: number | null;
         };
         /** KeySpendingResponse */
         KeySpendingResponse: {
@@ -1368,6 +1372,7 @@ export interface components {
             created_at: string;
             description: string | null;
             tags: string[];
+            rate_limit_rpm: number | null;
         };
         /**
          * TeamRole
@@ -1417,6 +1422,7 @@ export interface components {
             name: string;
             description?: string | null;
             tags?: string[];
+            rate_limit_rpm?: number | null;
         };
         /** UsageResponse */
         UsageResponse: {

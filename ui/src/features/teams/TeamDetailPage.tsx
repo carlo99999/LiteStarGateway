@@ -104,8 +104,18 @@ export function TeamDetailPage() {
         </div>
       ) : null}
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="members" value={members.isLoading ? "…" : (members.data?.length ?? "—")} />
+        <Stat
+          label="rate limit"
+          value={
+            team.isLoading
+              ? "…"
+              : team.data?.rate_limit_rpm
+                ? `${team.data.rate_limit_rpm}/min`
+                : "unlimited"
+          }
+        />
         <Stat
           label="budget"
           value={
