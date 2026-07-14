@@ -51,7 +51,7 @@ Counts: **1 CRITICAL · 4 HIGH · 6 MEDIUM · 2 LOW**.
 | ISSUE-010 | Il JWT admin persistito in `localStorage` è leggibile da script same-origin | medium | `ui/src/features/auth/AuthProvider.tsx:12-23` | **Fixed** ([#255](https://github.com/carlo99999/LiteStarGateway/pull/255)) |
 | ISSUE-011 | La rotazione non è atomica e può lasciare una replacement key orfana | medium | `application/service.py:128-140`; `persistence/repository.py:22-39,75-83` | **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250)) |
 | ISSUE-012 | Il rate limiter in-memory non elimina mai i bucket inattivi | low | `infrastructure/rate_limiter.py:27-42` | open |
-| ISSUE-013 | La UI trasforma qualsiasi errore budget in “nessun budget” | low | `ui/src/features/teams/api.ts:43-49` | open |
+| ISSUE-013 | La UI trasforma qualsiasi errore budget in “nessun budget” | low | `ui/src/features/teams/api.ts:43-49` | **Fixed** ([#257](https://github.com/carlo99999/LiteStarGateway/pull/257)) |
 
 ## Resolution status — IN PROGRESS
 
@@ -102,6 +102,12 @@ inference. Il JWT non è mai esposto a JavaScript; HTTPS usa il prefisso `__Host
 le configurazioni non-local insecure falliscono all'avvio e il token legacy viene
 solo eliminato da `localStorage` durante il bootstrap.
 
+**ISSUE-013** è risolta dalla
+[#257](https://github.com/carlo99999/LiteStarGateway/pull/257): il client converte in
+`null` esclusivamente una response 404; errori auth, server, rete e risposte anomale
+restano errori con messaggi utili. La pagina team distingue ora `unavailable` da
+`none` e rende il dettaglio in un alert accessibile.
+
 | ID | Priorità | Stato | PR |
 |---|---|---|---|
 | ISSUE-001 | critical | **Fixed** | [#249](https://github.com/carlo99999/LiteStarGateway/pull/249) |
@@ -114,6 +120,7 @@ solo eliminato da `localStorage` durante il bootstrap.
 | ISSUE-008 | medium | **Fixed** | [#254](https://github.com/carlo99999/LiteStarGateway/pull/254) |
 | ISSUE-010 | medium | **Fixed** | [#255](https://github.com/carlo99999/LiteStarGateway/pull/255) |
 | ISSUE-011 | medium | **Fixed** | [#250](https://github.com/carlo99999/LiteStarGateway/pull/250) |
+| ISSUE-013 | low | **Fixed** | [#257](https://github.com/carlo99999/LiteStarGateway/pull/257) |
 
 ## Issues
 
@@ -410,7 +417,7 @@ corretto perché usa `EXPIRE`.
 ### ISSUE-013 — La UI trasforma qualsiasi errore budget in “nessun budget”
 
 **Priorità:** low
-**Stato:** open
+**Stato:** **Fixed** ([#257](https://github.com/carlo99999/LiteStarGateway/pull/257))
 **File coinvolti:** `ui/src/features/teams/api.ts:43-49`
 
 **Problema**

@@ -122,6 +122,8 @@ export function TeamDetailPage() {
           value={
             budget.isLoading
               ? "…"
+              : budget.isError
+                ? "unavailable"
               : budget.data
                 ? `${formatUsd(budget.data.limit_cost)} / ${budget.data.window}`
                 : "none"
@@ -129,6 +131,12 @@ export function TeamDetailPage() {
         />
         <Stat label="usage · all-time" value={usage.isLoading ? "…" : formatUsd(usageTotal)} />
       </div>
+
+      {budget.isError ? (
+        <p role="alert" className="mb-6 font-mono text-xs text-destructive">
+          ! {budget.error instanceof Error ? budget.error.message : "Failed to load budget"}
+        </p>
+      ) : null}
 
       <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
         // members
