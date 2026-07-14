@@ -346,6 +346,11 @@ class TeamController(Controller):
         """Issue a replacement key (same scope/rate-limit/owner) and give the old
         one a grace window before it stops working. Returns the new plaintext once."""
         await team_service.ensure_team_permission(current_user, team_id, Permission.KEYS_ISSUE)
+        key = await api_key_service.get_active_for_team(team_id, key_id)
+        if key.is_service_principal:
+            await team_service.ensure_team_permission(
+                current_user, team_id, Permission.SERVICE_PRINCIPALS_MANAGE
+            )
         issued = await api_key_service.rotate_for_team(team_id, key_id, current_user.id)
         await record_audit(
             audit_log,

@@ -114,6 +114,13 @@ class APIKeyService:
         if key.is_active:
             await self._repo.update(dataclasses.replace(key, revoked_at=_now()))
 
+    async def get_active_for_team(self, team_id: UUID, key_id: UUID) -> APIKey:
+        """Return an active key belonging to ``team_id``, or raise not-found."""
+        key = await self._repo.get(key_id)
+        if key is None or key.team_id != team_id or not key.is_active:
+            raise APIKeyNotFound(str(key_id))
+        return key
+
     async def rotate_for_team(
         self,
         team_id: UUID,
@@ -125,9 +132,7 @@ class APIKeyService:
         """Issue a replacement key (same scope, rate limit, and owner) and schedule
         the old one to stop working after `grace`, so clients can migrate without
         downtime. For an immediate cut-over (e.g. a leaked key), revoke instead."""
-        key = await self._repo.get(key_id)
-        if key is None or key.team_id != team_id or not key.is_active:
-            raise APIKeyNotFound(str(key_id))
+        key = await self.get_active_for_team(team_id, key_id)
         issued = await self.issue(
             team_id=team_id,
             created_by=created_by,
