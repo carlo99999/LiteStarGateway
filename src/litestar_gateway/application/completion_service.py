@@ -426,8 +426,13 @@ class CompletionService:
         operation: str,
         request: dict[str, Any],
         expected_type: ModelType,
-        api_key_id: UUID | None = None,
+        api_key_id: UUID,
     ) -> tuple[Model, dict[str, str], float, dict[str, Any]]:
+        # Gate the caller before router strategies: judge/embedding strategies
+        # may make billable provider calls while resolving a virtual model.
+        # The later admit handles team RPM + budget and omits the key so this
+        # external request consumes exactly one key-RPM hit.
+        await self._meter.enforce_key_rate_limit(api_key_id)
         alias = request.get("model")
         model = await self._models.get_by_name(team_id, alias) if alias else None
         if (
@@ -448,7 +453,7 @@ class CompletionService:
         # Per-model output ceiling: clamp/inject now that the model is known, and
         # reserve from the clamped request so admission and the provider call agree.
         clean = clamp_output_tokens(operation, request, model.max_output_tokens)
-        reservation = await self._meter.admit(team_id, model, clean, api_key_id=api_key_id)
+        reservation = await self._meter.admit(team_id, model, clean)
         try:
             values = await self._credentials.get_values(model.credential_id)
             if values is None:
@@ -564,7 +569,7 @@ class CompletionService:
     ) -> dict[str, Any]:
         clean = sanitize_request("embeddings", request)
         model, values, reservation, clean = await self._prepare(
-            team_id, "embeddings", clean, ModelType.EMBEDDINGS
+            team_id, "embeddings", clean, ModelType.EMBEDDINGS, api_key_id
         )
         return await self._dispatch(
             team_id,
@@ -581,7 +586,7 @@ class CompletionService:
     ) -> dict[str, Any]:
         clean = sanitize_request("images", request)
         model, values, reservation, clean = await self._prepare(
-            team_id, "images", clean, ModelType.IMAGE
+            team_id, "images", clean, ModelType.IMAGE, api_key_id
         )
         return await self._dispatch(
             team_id,

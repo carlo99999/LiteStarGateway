@@ -76,3 +76,38 @@ async def test_key_rpm_limit_blocks_after_limit(
     second = await client.post("/v1/chat/completions", json=_CHAT, headers=_bearer(limited))
     assert second.status_code == HTTP_429_TOO_MANY_REQUESTS, second.text
     assert "retry-after" in {k.lower() for k in second.headers}
+
+
+@pytest.mark.parametrize(
+    ("endpoint", "model_type", "payload"),
+    [
+        ("/v1/embeddings", "embeddings", {"model": "m", "input": "hello"}),
+        (
+            "/v1/images/generations",
+            "image",
+            {"model": "m", "prompt": "a cat"},
+        ),
+    ],
+)
+async def test_key_rpm_limit_covers_embeddings_and_images(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    endpoint: str,
+    model_type: str,
+    payload: dict[str, object],
+) -> None:
+    _patch(monkeypatch)
+    _key, team_id, admin = await _setup_team(client, model_type=model_type)
+    issued = await client.post(
+        f"/teams/{team_id}/keys",
+        json={"name": "capped", "scope": "inference", "rate_limit_rpm": 1},
+        headers=_bearer(admin),
+    )
+    assert issued.status_code in (HTTP_200_OK, HTTP_201_CREATED), issued.text
+    limited = issued.json()["plaintext"]
+
+    first = await client.post(endpoint, json=payload, headers=_bearer(limited))
+    assert first.status_code == HTTP_200_OK, first.text
+    second = await client.post(endpoint, json=payload, headers=_bearer(limited))
+    assert second.status_code == HTTP_429_TOO_MANY_REQUESTS, second.text
+    assert "retry-after" in {key.lower() for key in second.headers}

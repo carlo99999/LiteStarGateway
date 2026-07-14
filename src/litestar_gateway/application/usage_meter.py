@@ -253,7 +253,7 @@ class UsageMeter:
         the gate before the first one settles (streams widen that blind spot
         to minutes)."""
         await self._enforce_team_rate_limit(team_id)
-        await self._enforce_key_rate_limit(api_key_id)
+        await self.enforce_key_rate_limit(api_key_id)
         if self._budgets is None:
             return 0.0
         budget = await self._budgets.get(team_id)
@@ -291,7 +291,7 @@ class UsageMeter:
                 retry_after=decision.retry_after,
             )
 
-    async def _enforce_key_rate_limit(self, api_key_id: UUID | None) -> None:
+    async def enforce_key_rate_limit(self, api_key_id: UUID | None) -> None:
         """Per-key requests/minute gate. No-op for internal calls with no user key
         (e.g. router judge/embeddings strategies) or when unwired / no limit set."""
         if self._rate_limiter is None or self._api_keys is None or api_key_id is None:
