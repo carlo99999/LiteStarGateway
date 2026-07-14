@@ -3,10 +3,12 @@ plus member/admin unchanged and the last-admin guard against demotion."""
 
 from __future__ import annotations
 
+import pytest
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_204_NO_CONTENT,
+    HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_409_CONFLICT,
 )
@@ -66,6 +68,8 @@ async def test_key_issuer_mints_lists_and_revokes_keys_only(client: AsyncTestCli
     assert (
         await client.get(f"/teams/{team}/keys", headers=_bearer(token))
     ).status_code == HTTP_200_OK
+    rotated = await client.post(f"/teams/{team}/keys/{key_id}/rotate", headers=_bearer(token))
+    assert rotated.status_code == HTTP_201_CREATED, rotated.text
     revoked = await client.delete(f"/teams/{team}/keys/{key_id}", headers=_bearer(token))
     assert revoked.status_code == HTTP_204_NO_CONTENT
 
@@ -75,6 +79,58 @@ async def test_key_issuer_mints_lists_and_revokes_keys_only(client: AsyncTestCli
         client.get(f"/teams/{team}/members", headers=_bearer(token)),
     ):
         assert (await request).status_code == HTTP_403_FORBIDDEN
+
+
+@pytest.mark.parametrize("scope", ["inference", "management", "all"])
+async def test_key_issuer_cannot_rotate_service_principal_key(
+    client: AsyncTestClient, scope: str
+) -> None:
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    key_issuer = await _member_token(client, admin, team, "ki-sp@corp.com", "key-issuer")
+
+    service_principal = await client.post(
+        f"/teams/{team}/service-principals",
+        json={"name": "deployment-bot"},
+        headers=_bearer(admin),
+    )
+    assert service_principal.status_code == HTTP_201_CREATED, service_principal.text
+    service_principal_id = service_principal.json()["id"]
+    issued = await client.post(
+        f"/teams/{team}/service-principals/{service_principal_id}/keys",
+        json={"name": f"{scope}-key", "scope": scope, "rate_limit_rpm": 37},
+        headers=_bearer(admin),
+    )
+    assert issued.status_code == HTTP_201_CREATED, issued.text
+    key_id = issued.json()["id"]
+
+    keys_before = await client.get(f"/teams/{team}/keys", headers=_bearer(key_issuer))
+    denied = await client.post(
+        f"/teams/{team}/keys/{key_id}/rotate",
+        headers=_bearer(key_issuer),
+    )
+    keys_after = await client.get(f"/teams/{team}/keys", headers=_bearer(key_issuer))
+
+    assert denied.status_code == HTTP_403_FORBIDDEN
+    assert keys_after.json() == keys_before.json()
+
+    rotated = await client.post(
+        f"/teams/{team}/keys/{key_id}/rotate",
+        headers=_bearer(admin),
+    )
+    assert rotated.status_code == HTTP_201_CREATED, rotated.text
+    assert rotated.json()["scope"] == scope
+    assert rotated.json()["rate_limit_rpm"] == 37
+
+    disabled = await client.patch(
+        f"/teams/{team}/service-principals/{service_principal_id}",
+        json={"enabled": False},
+        headers=_bearer(admin),
+    )
+    assert disabled.status_code == HTTP_200_OK, disabled.text
+    assert (
+        await client.get("/whoami", headers=_bearer(rotated.json()["plaintext"]))
+    ).status_code == HTTP_401_UNAUTHORIZED
 
 
 async def test_billing_viewer_reads_usage_budget_and_spend_only(client: AsyncTestClient) -> None:
