@@ -23,6 +23,13 @@ class APIKeyRepository(Protocol):
         self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
     ) -> list[APIKey]: ...
 
+    async def list_by_creator(
+        self, created_by: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[APIKey]:
+        """Keys the user created (their `created_by`) — used to guard user
+        deletion so a key's creator is never orphaned."""
+        ...
+
     async def update(self, key: APIKey) -> APIKey: ...
 
     async def revoke_personal_keys_for_user(self, user_id: UUID, revoked_at: datetime) -> None:

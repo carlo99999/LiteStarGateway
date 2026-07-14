@@ -5,13 +5,13 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import User
 from litestar_gateway.domain.exceptions import EmailAlreadyRegistered, UserNotFound
-from litestar_gateway.infrastructure.persistence.orm import UserModel
+from litestar_gateway.infrastructure.persistence.orm import PasswordResetModel, UserModel
 
 
 class SQLAlchemyUserRepository:
@@ -194,3 +194,12 @@ class SQLAlchemyUserRepository:
     async def count(self) -> int:
         result = await self._session.scalar(select(func.count()).select_from(UserModel))
         return result or 0
+
+    async def delete(self, user_id: UUID) -> None:
+        # Clear the user's pending password resets first (that FK is RESTRICT);
+        # membership/created-key references are checked by the service beforehand.
+        await self._session.execute(
+            delete(PasswordResetModel).where(PasswordResetModel.user_id == user_id)
+        )
+        await self._session.execute(delete(UserModel).where(UserModel.id == user_id))
+        await self._session.commit()

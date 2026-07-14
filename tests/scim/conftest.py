@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
+from _invite_helpers import seed_team_and_invite
 from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED
 from litestar.testing import AsyncTestClient
 
@@ -70,10 +71,11 @@ async def _create_user(
 
 
 async def _signup_password_user(client: AsyncTestClient, email: str, password: str) -> None:
-    invite = await client.post("/invites", headers=await _admin_headers(client))
-    assert invite.status_code == HTTP_201_CREATED, invite.text
+    headers = await _admin_headers(client)
+    admin_token = headers["Authorization"].removeprefix("Bearer ")
+    invite_token = await seed_team_and_invite(client, admin_token)
     resp = await client.post(
         "/signup",
-        json={"invite_token": invite.json()["token"], "email": email, "password": password},
+        json={"invite_token": invite_token, "email": email, "password": password},
     )
     assert resp.status_code == HTTP_201_CREATED, resp.text

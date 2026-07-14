@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from _invite_helpers import seed_team_and_invite
 from litestar.status_codes import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 from litestar.testing import AsyncTestClient
 
@@ -54,7 +55,7 @@ async def test_sp_creation_requires_team_management(client: AsyncTestClient) -> 
     admin = await _admin(client)
     team, _ = await _team_and_credential(client, admin)
     # A plain member (not team admin) cannot create SPs.
-    invite = (await client.post("/invites", headers=_bearer(admin))).json()["token"]
+    invite = await seed_team_and_invite(client, admin)
     await client.post(
         "/signup",
         json={"invite_token": invite, "email": "m@example.com", "password": DEV_PASSWORD},

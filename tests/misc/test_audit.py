@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
+from _invite_helpers import seed_team, seed_team_and_invite
 from litestar.status_codes import HTTP_200_OK, HTTP_403_FORBIDDEN
 from litestar.testing import AsyncTestClient
 
@@ -77,7 +78,10 @@ async def test_invite_and_password_reset_issuance_are_audited(client: AsyncTestC
     # M35: minting an invite or a password-reset token — the two primitives that
     # can create or take over an account — must leave an attributable audit trail.
     admin = await _admin_token(client)
-    invite = await client.post("/invites", headers=_bearer(admin))
+    team_id = await seed_team(client, admin)
+    invite = await client.post(
+        "/invites", json={"team_id": team_id, "role": "member"}, headers=_bearer(admin)
+    )
     assert invite.status_code < 300
     reset = await client.post(
         "/password-resets", json={"email": ADMIN_EMAIL}, headers=_bearer(admin)
@@ -95,7 +99,7 @@ async def test_invite_and_password_reset_issuance_are_audited(client: AsyncTestC
 
 async def test_audit_read_requires_platform_admin(client: AsyncTestClient) -> None:
     admin = await _admin_token(client)
-    invite = (await client.post("/invites", headers=_bearer(admin))).json()["token"]
+    invite = await seed_team_and_invite(client, admin)
     await client.post(
         "/signup",
         json={"invite_token": invite, "email": "bob@b.com", "password": LOGIN_CODE},

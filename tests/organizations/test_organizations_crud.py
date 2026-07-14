@@ -12,6 +12,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from _invite_helpers import seed_team_and_invite
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -60,7 +61,7 @@ async def _admin(client: AsyncTestClient) -> str:
 
 async def _member(client: AsyncTestClient, admin: str, email: str) -> str:
     """Register a plain (non-admin) user via an invite and log them in."""
-    invite = (await client.post("/invites", headers=_bearer(admin))).json()["token"]
+    invite = await seed_team_and_invite(client, admin)
     await client.post(
         "/signup",
         json={"invite_token": invite, "email": email, "password": MEMBER_PASSWORD},

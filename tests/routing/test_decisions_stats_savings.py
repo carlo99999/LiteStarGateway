@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
+from _invite_helpers import seed_team_and_invite
 from advanced_alchemy.extensions.litestar import base
 from litestar.status_codes import HTTP_200_OK, HTTP_403_FORBIDDEN
 from litestar.testing import AsyncTestClient
@@ -311,7 +312,7 @@ async def test_savings_counts_fully_priced_rows(session: AsyncSession) -> None:
 
 async def test_observability_requires_usage_read(client: AsyncTestClient) -> None:
     key, team, router, admin = await _setup(client)
-    invite = (await client.post("/invites", headers=_bearer(admin))).json()["token"]
+    invite = await seed_team_and_invite(client, admin)
     await client.post(
         "/signup",
         json={

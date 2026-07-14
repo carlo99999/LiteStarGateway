@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from _invite_helpers import issue_invite, seed_team
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_204_NO_CONTENT,
@@ -58,9 +59,8 @@ async def _signup(client: AsyncTestClient) -> str:
     admin = (
         await client.post("/login", json={"email": ADMIN_EMAIL, "password": MASTER_KEY})
     ).json()["access_token"]
-    token = (await client.post("/invites", headers={"Authorization": f"Bearer {admin}"})).json()[
-        "token"
-    ]
+    team_id = await seed_team(client, admin)
+    token = await issue_invite(client, admin, team_id)
     resp = await client.post(
         "/signup",
         json={"invite_token": token, "email": USER_EMAIL, "password": USER_PASSWORD},

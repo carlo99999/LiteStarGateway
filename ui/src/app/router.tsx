@@ -9,10 +9,12 @@ import { PlannedPage } from "@/app/PlannedPage";
 import { ApiKeysPage } from "@/features/api-keys/ApiKeysPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RequireAuth } from "@/features/auth/RequireAuth";
+import { SignupPage } from "@/features/auth/SignupPage";
 import { OrganizationDetailPage } from "@/features/organizations/OrganizationDetailPage";
 import { OrganizationsPage } from "@/features/organizations/OrganizationsPage";
 import { TeamDetailPage } from "@/features/teams/TeamDetailPage";
 import { TeamsPage } from "@/features/teams/TeamsPage";
+import { UsersPage } from "@/features/users/UsersPage";
 
 const rootRoute = createRootRoute({ component: Outlet });
 
@@ -20,6 +22,13 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
   component: LoginPage,
+});
+
+// Public invite-redemption page (reads the invite token from `?token=`).
+const signupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/signup",
+  component: SignupPage,
 });
 
 // Pathless layout route: everything under it requires an authenticated session.
@@ -69,6 +78,12 @@ const apiKeysRoute = createRoute({
   component: ApiKeysPage,
 });
 
+const usersRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/users",
+  component: UsersPage,
+});
+
 // Scaffolded-but-not-implemented feature areas (Phase 1 lands their views),
 // grouped in the sidebar under gateway / governance / observability.
 const planned: { path: string; command: string; title: string }[] = [
@@ -77,7 +92,6 @@ const planned: { path: string; command: string; title: string }[] = [
   { path: "/routing", command: "routing inspect", title: "Routing" },
   { path: "/credentials", command: "credentials list", title: "Credentials" },
   // governance
-  { path: "/users", command: "users list", title: "Users" },
   {
     path: "/service-principals",
     command: "service-principals list",
@@ -99,6 +113,7 @@ const plannedRoutes = planned.map((p) =>
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
+  signupRoute,
   appRoute.addChildren([
     indexRoute,
     organizationsRoute,
@@ -106,6 +121,7 @@ const routeTree = rootRoute.addChildren([
     teamsRoute,
     teamDetailRoute,
     apiKeysRoute,
+    usersRoute,
     ...plannedRoutes,
   ]),
 ]);

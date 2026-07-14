@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 
@@ -26,6 +27,10 @@ from .conftest import (
     FakeUserRepository,
 )
 
+# These invite tests don't exercise team membership (the service fixture wires no
+# membership repo), so any team id is fine — it is just stored on the invite.
+_TEAM_ID = uuid4()
+
 
 async def test_register_requires_valid_invite(service: UserService) -> None:
     with pytest.raises(InvalidInvite):
@@ -33,7 +38,7 @@ async def test_register_requires_valid_invite(service: UserService) -> None:
 
 
 async def test_register_consumes_invite(service: UserService) -> None:
-    issued = await service.create_invite()
+    issued = await service.create_invite(team_id=_TEAM_ID)
     await service.register(issued.token, "a@b.com", "Passw0rd!")
     with pytest.raises(InvalidInvite):
         await service.register(issued.token, "c@d.com", "Passw0rd!")
@@ -47,7 +52,7 @@ async def test_register_rejects_expired_invite() -> None:
         invites=invites,
         password_resets=FakePasswordResetRepository(),
     )
-    issued = await svc.create_invite()
+    issued = await svc.create_invite(team_id=_TEAM_ID)
     # Force the stored invite past its expiry.
     invites._by_id[issued.invite.id] = dataclasses.replace(
         invites._by_id[issued.invite.id], expires_at=datetime.now(UTC) - timedelta(seconds=1)
@@ -57,13 +62,13 @@ async def test_register_rejects_expired_invite() -> None:
 
 
 async def test_create_invite_sets_future_expiry(service: UserService) -> None:
-    issued = await service.create_invite()
+    issued = await service.create_invite(team_id=_TEAM_ID)
     assert issued.invite.expires_at > datetime.now(UTC)
 
 
 async def test_register_rejects_duplicate_email(service: UserService) -> None:
-    i1 = await service.create_invite()
-    i2 = await service.create_invite()
+    i1 = await service.create_invite(team_id=_TEAM_ID)
+    i2 = await service.create_invite(team_id=_TEAM_ID)
     await service.register(i1.token, "dup@b.com", "Passw0rd!")
     with pytest.raises(EmailAlreadyRegistered):
         await service.register(i2.token, "dup@b.com", "Passw0rd!")
@@ -80,7 +85,7 @@ async def test_register_rejects_duplicate_email(service: UserService) -> None:
     ],
 )
 async def test_register_rejects_weak_password(service: UserService, password: str) -> None:
-    issued = await service.create_invite()
+    issued = await service.create_invite(team_id=_TEAM_ID)
     with pytest.raises(WeakPassword):
         await service.register(issued.token, "weak@b.com", password)
 
@@ -93,7 +98,7 @@ async def _admin(service: UserService) -> User:
 
 
 async def _make_user(service: UserService, email: str, password: str) -> None:
-    issued = await service.create_invite()
+    issued = await service.create_invite(team_id=_TEAM_ID)
     await service.register(issued.token, email, password)
 
 

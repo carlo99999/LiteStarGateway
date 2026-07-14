@@ -111,6 +111,10 @@ class Invite:
     created_at: datetime
     expires_at: datetime
     used_at: datetime | None
+    # The team (and role) the invitee joins on signup. Required for new invites;
+    # nullable for backward compatibility with any pre-existing teamless invite.
+    team_id: UUID | None = None
+    role: str | None = None
 
     def is_usable(self, now: datetime) -> bool:
         return self.used_at is None and now < self.expires_at

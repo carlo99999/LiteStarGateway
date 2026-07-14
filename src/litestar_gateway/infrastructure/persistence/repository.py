@@ -60,6 +60,18 @@ class SQLAlchemyAPIKeyRepository:
         )
         return [m.to_entity() for m in models]
 
+    async def list_by_creator(
+        self, created_by: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[APIKey]:
+        models = await self._session.scalars(
+            select(APIKeyModel)
+            .where(APIKeyModel.created_by == created_by)
+            .order_by(APIKeyModel.created_at)
+            .limit(limit)
+            .offset(offset)
+        )
+        return [m.to_entity() for m in models]
+
     async def update(self, key: APIKey) -> APIKey:
         model = await self._session.get(APIKeyModel, key.id)
         if model is None:  # pragma: no cover - guarded by callers

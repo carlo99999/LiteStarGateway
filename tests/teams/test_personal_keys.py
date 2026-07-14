@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from _invite_helpers import seed_team_and_invite
 from litestar.status_codes import (
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
@@ -35,7 +36,7 @@ async def test_personal_keys_revoked_when_user_deactivated(client: AsyncTestClie
     admin = await _admin(client)
     team, cred = await _team_and_credential(client, admin)
     # Onboard a member and give them a personal (inference) key.
-    invite = (await client.post("/invites", headers=_bearer(admin))).json()["token"]
+    invite = await seed_team_and_invite(client, admin)
     await client.post(
         "/signup",
         json={"invite_token": invite, "email": "dev@example.com", "password": DEV_PASSWORD},
