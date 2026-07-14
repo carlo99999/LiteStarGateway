@@ -20,6 +20,13 @@ class UserRepository(Protocol):
         """Load and lock a user for a transactional lifecycle change."""
         ...
 
+    async def lock_platform_admins(self) -> list[User]:
+        """Serialize platform-admin lifecycle changes and return the live admins.
+
+        The lock is held until the surrounding transaction completes.
+        """
+        ...
+
     async def get_by_email(self, email: str) -> User | None: ...
 
     async def get_by_sso_subject(self, subject: str) -> User | None: ...
@@ -53,8 +60,9 @@ class UserRepository(Protocol):
         ...
 
     async def set_admin(self, user_id: UUID, is_admin: bool) -> None:
-        """Grant/revoke the account's platform-admin role. Read live per request
-        (not carried in the JWT), so it takes effect immediately — no token bump."""
+        """Stage grant/revocation of the platform-admin role. It is read live per
+        request (not carried in the JWT), so no token bump is required. The
+        surrounding unit of work owns the commit."""
         ...
 
     async def bind_sso(self, user_id: UUID, sso_subject: str, is_admin: bool) -> User:
@@ -87,7 +95,8 @@ class UserRepository(Protocol):
         ...
 
     async def delete(self, user_id: UUID) -> None:
-        """Hard-delete the user. Callers must first ensure the account has no
+        """Stage a hard-delete. Callers must first ensure the account has no
         team memberships or created API keys (those FKs are RESTRICT); pending
-        password resets — which cascade — are removed with the row."""
+        password resets are removed with the row. The surrounding unit of work
+        owns the commit."""
         ...

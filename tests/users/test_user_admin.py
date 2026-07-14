@@ -32,9 +32,10 @@ def _service(
     *,
     memberships: FakeTeamMembershipRepository | None = None,
     api_keys: FakeAPIKeyRepository | None = None,
+    transaction: FakeTransaction | None = None,
 ) -> UserService:
     return UserService(
-        transaction=FakeTransaction(),
+        transaction=transaction or FakeTransaction(),
         users=users,
         invites=FakeInviteRepository(),
         password_resets=FakePasswordResetRepository(),
@@ -74,13 +75,43 @@ async def test_delete_user_unknown() -> None:
         await _service(users).delete_user(admin, uuid4())
 
 
+async def test_delete_user_forbids_self_delete() -> None:
+    users = FakeUserRepository()
+    transaction = FakeTransaction()
+    admin = await users.add(_account("admin@b.com", is_admin=True))
+    member = await users.add(_account("member@b.com"))
+
+    with pytest.raises(PermissionDenied, match="Cannot delete your own account"):
+        await _service(users, transaction=transaction).delete_user(admin, admin.id)
+
+    assert await users.get(admin.id) == admin
+    assert await users.get(member.id) == member
+    assert transaction.commits == 0
+    assert transaction.rollbacks == 0
+
+
+async def test_delete_user_revalidates_actor_while_admins_are_locked() -> None:
+    users = FakeUserRepository()
+    stale_admin = await users.add(_account("admin@b.com", is_admin=True))
+    victim = await users.add(_account("victim@b.com"))
+    await users.set_admin(stale_admin.id, False)
+
+    with pytest.raises(PermissionDenied, match="Platform admin privileges required"):
+        await _service(users).delete_user(stale_admin, victim.id)
+
+    assert await users.get(victim.id) == victim
+
+
 async def test_delete_user_removes_clean_account() -> None:
     users = FakeUserRepository()
+    transaction = FakeTransaction()
     admin = await users.add(_account("admin@b.com", is_admin=True))
     victim = await users.add(_account("victim@b.com"))
-    deleted = await _service(users).delete_user(admin, victim.id)
+    deleted = await _service(users, transaction=transaction).delete_user(admin, victim.id)
     assert deleted.email == "victim@b.com"
     assert await users.get(victim.id) is None
+    assert transaction.commits == 1
+    assert transaction.rollbacks == 0
 
 
 async def test_delete_user_blocked_by_membership() -> None:

@@ -337,6 +337,20 @@ async def test_delete_user_blocked_while_on_a_team(client: AsyncTestClient) -> N
     assert resp.status_code == HTTP_409_CONFLICT
 
 
+async def test_platform_admin_cannot_delete_self(client: AsyncTestClient) -> None:
+    token = await _admin_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    admin = (await client.get("/me", headers=headers)).json()
+
+    deleted = await client.delete(f"/users/{admin['id']}", headers=headers)
+
+    assert deleted.status_code == HTTP_403_FORBIDDEN
+    assert deleted.json()["detail"] == "Cannot delete your own account"
+    current = await client.get("/me", headers=headers)
+    assert current.status_code == HTTP_200_OK
+    assert current.json()["is_admin"] is True
+
+
 async def test_delete_user_succeeds_once_off_all_teams(client: AsyncTestClient) -> None:
     admin = await _admin_token(client)
     team_id = await seed_team(client, admin)

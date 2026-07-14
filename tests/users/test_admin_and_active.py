@@ -44,6 +44,21 @@ async def test_set_user_active_requires_platform_admin(service: UserService) -> 
         await service.set_user_active(non_admin, other.id, is_active=False)
 
 
+async def test_set_user_active_rejects_stale_deleted_actor(service: UserService) -> None:
+    stale_admin = _account("admin@b.com", is_admin=True)
+    target = _account("other@b.com", is_admin=True)
+    await service._users.add(stale_admin)
+    await service._users.add(target)
+    await service._users.delete(stale_admin.id)
+
+    with pytest.raises(PermissionDenied, match="Platform admin privileges required"):
+        await service.set_user_active(stale_admin, target.id, is_active=False)
+
+    unchanged = await service._users.get(target.id)
+    assert unchanged is not None
+    assert unchanged.is_active is True
+
+
 async def test_set_user_active_forbids_self_disable(service: UserService) -> None:
     admin = _account("admin@b.com", is_admin=True)
     await service._users.add(admin)
@@ -80,6 +95,21 @@ async def test_set_user_admin_requires_platform_admin(service: UserService) -> N
     await service._users.add(other)
     with pytest.raises(PermissionDenied):
         await service.set_user_admin(non_admin, other.id, is_admin=True)
+
+
+async def test_set_user_admin_rejects_stale_deleted_actor(service: UserService) -> None:
+    stale_admin = _account("admin@b.com", is_admin=True)
+    target = _account("other@b.com", is_admin=True)
+    await service._users.add(stale_admin)
+    await service._users.add(target)
+    await service._users.delete(stale_admin.id)
+
+    with pytest.raises(PermissionDenied, match="Platform admin privileges required"):
+        await service.set_user_admin(stale_admin, target.id, is_admin=False)
+
+    unchanged = await service._users.get(target.id)
+    assert unchanged is not None
+    assert unchanged.is_admin is True
 
 
 async def test_set_user_admin_forbids_changing_own_role(service: UserService) -> None:
