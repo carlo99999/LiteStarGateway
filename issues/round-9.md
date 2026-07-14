@@ -43,7 +43,7 @@ Counts: **1 CRITICAL · 4 HIGH · 6 MEDIUM · 2 LOW**.
 | ISSUE-002 | La rotazione trasferisce la proprietà della personal key all'operatore | high | `application/service.py:117-140`; `infrastructure/web/teams/controller.py:335-359` | **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250)) |
 | ISSUE-003 | La disattivazione utente non revoca subito la vecchia key in grace | high | `application/service.py:139`; `persistence/repository.py:85-95` | **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250)) |
 | ISSUE-004 | Il rate limit per API key è bypassabile su embeddings e images | high | `application/completion_service.py:423-451,562-594` | **Fixed** ([#251](https://github.com/carlo99999/LiteStarGateway/pull/251)) |
-| ISSUE-005 | L'admin può cancellare se stesso e lasciare la piattaforma senza admin | high | `application/user_service.py:186-204` | open |
+| ISSUE-005 | L'admin può cancellare se stesso e lasciare la piattaforma senza admin | high | `application/user_service.py:186-204` | **Fixed** ([#252](https://github.com/carlo99999/LiteStarGateway/pull/252)) |
 | ISSUE-006 | Qualsiasi invite persistito rende il team non cancellabile | medium | `persistence/team_repository.py:85-101`; `orm.py:112-130` | open |
 | ISSUE-007 | Creare un invite per un team inesistente restituisce 500 | medium | `application/user_service.py:160-177`; `persistence/invite_repository.py:20-32` | open |
 | ISSUE-008 | L'invite token nella query string finisce in log e history | medium | `ui/src/features/users/InviteUserDialog.tsx:56-59`; `SignupPage.tsx:11-17` | open |
@@ -192,7 +192,7 @@ test rate-limit su chat, responses, embeddings, images e le due superfici native
 ### ISSUE-005 — L'admin può cancellare se stesso e lasciare la piattaforma senza admin
 
 **Priorità:** high
-**Stato:** open
+**Stato:** **Fixed** ([#252](https://github.com/carlo99999/LiteStarGateway/pull/252))
 **File coinvolti:** `src/litestar_gateway/application/user_service.py:186-204`
 
 **Problema**
