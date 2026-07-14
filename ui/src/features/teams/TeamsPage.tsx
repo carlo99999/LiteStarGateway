@@ -1,31 +1,47 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { PaginationControls } from "@/components/common/PaginationControls";
 import { StatusDot } from "@/components/common/StatusDot";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { listOrganizations } from "@/features/organizations/api";
+import { listAllOrganizations } from "@/features/organizations/api";
 import { CreateTeamDialog } from "@/features/teams/CreateTeamDialog";
 import { DeleteTeamDialog } from "@/features/teams/DeleteTeamDialog";
 import { TeamEditDialog } from "@/features/teams/TeamEditDialog";
-import { listTeams, type Team } from "@/features/teams/api";
+import { listTeamsPage, type Team } from "@/features/teams/api";
+import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
 
 function formatDate(iso: string): string {
   return new Date(iso).toISOString().slice(0, 19).replace("T", " ");
 }
 
 export function TeamsPage() {
-  const teams = useQuery({ queryKey: ["teams"], queryFn: listTeams });
+  const [offset, setOffset] = useState(0);
+  const teams = useQuery({
+    queryKey: ["teams", "page", offset],
+    queryFn: () => listTeamsPage(offset),
+  });
   // Teams carry only organization_id; resolve names from the orgs list (cached).
-  const orgs = useQuery({ queryKey: ["organizations"], queryFn: listOrganizations });
+  const orgs = useQuery({
+    queryKey: ["organizations", "all"],
+    queryFn: ({ signal }) => listAllOrganizations(signal),
+    retry: false,
+  });
   const orgName = new Map((orgs.data ?? []).map((o) => [o.id, o.name]));
 
   const [editing, setEditing] = useState<Team | null>(null);
   const [deleting, setDeleting] = useState<Team | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+
+  useEffect(() => {
+    if (!teams.isFetching && teams.data?.items.length === 0 && offset > 0) {
+      setOffset(previousPageOffset(offset));
+    }
+  }, [offset, teams.data, teams.isFetching]);
 
   const columns: Column<Team>[] = [
     { key: "status", header: "", className: "w-8", cell: () => <StatusDot tone="green" /> },
@@ -122,24 +138,36 @@ export function TeamsPage() {
         title="Teams"
         description="Every team across all organizations. Members, budget, and usage live on each team."
         actions={
-          <span className="flex items-center gap-3">
-            <Badge variant="muted">{teams.data ? `${teams.data.length} total` : "…"}</Badge>
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4" />
-              New team
-            </Button>
-          </span>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            New team
+          </Button>
         }
       />
+      {orgs.isError ? (
+        <p role="alert" className="mb-3 font-mono text-xs text-[color:var(--warning)]">
+          ! Organization names are unavailable; IDs are shown instead.
+        </p>
+      ) : null}
       <DataTable
         columns={columns}
-        rows={teams.data}
+        rows={teams.data?.items}
         rowKey={(t) => t.id}
         isLoading={teams.isLoading}
         error={teams.error as Error | null}
         emptyTitle="no teams"
         emptyDescription="Create a team from an organization's detail page."
       />
+      {teams.data ? (
+        <PaginationControls
+          offset={teams.data.offset}
+          pageSize={TABLE_PAGE_SIZE}
+          itemCount={teams.data.items.length}
+          hasNext={teams.data.hasNext}
+          isFetching={teams.isFetching}
+          onOffsetChange={setOffset}
+        />
+      ) : null}
 
       <CreateTeamDialog open={createOpen} onOpenChange={setCreateOpen} />
       <TeamEditDialog

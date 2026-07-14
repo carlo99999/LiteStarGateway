@@ -67,7 +67,7 @@ class SQLAlchemyUsageRepository:
             )
             .where(UsageEventModel.team_id == team_id)
             .group_by(UsageEventModel.model_id, UsageEventModel.model_name)
-            .order_by(UsageEventModel.model_name)
+            .order_by(UsageEventModel.model_name, UsageEventModel.model_id)
             .limit(limit)
             .offset(offset)
         )

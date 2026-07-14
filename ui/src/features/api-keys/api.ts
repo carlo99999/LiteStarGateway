@@ -1,5 +1,12 @@
 import { api } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
+import {
+  fetchAllPages,
+  pageRequest,
+  pageResult,
+  type PageRequest,
+  type PageResult,
+} from "@/lib/api/pagination";
 
 export type ApiKey = components["schemas"]["KeyResponse"];
 export type IssuedKey = components["schemas"]["CreatedKeyResponse"];
@@ -15,13 +22,21 @@ function fail(error: unknown, fallback: string): Error {
   return new Error(fallback);
 }
 
-/** GET /teams/{id}/keys — the team's API keys (active and revoked). */
-export async function listTeamKeys(teamId: string): Promise<ApiKey[]> {
+async function requestTeamKeys(teamId: string, request: PageRequest): Promise<ApiKey[]> {
   const { data, error } = await api.GET("/teams/{team_id}/keys", {
-    params: { path: { team_id: teamId } },
+    params: { path: { team_id: teamId }, query: request },
   });
   if (error || !data) throw fail(error, "Failed to load API keys");
   return data;
+}
+
+/** GET /teams/{id}/keys — one table page (active and revoked). */
+export async function listTeamKeysPage(
+  teamId: string,
+  offset: number,
+): Promise<PageResult<ApiKey>> {
+  const request = pageRequest(offset);
+  return pageResult(await requestTeamKeys(teamId, request), offset);
 }
 
 /** POST /teams/{id}/keys — issue a personal (inference-scoped) key. The plaintext
@@ -58,13 +73,27 @@ export async function rotateTeamKey(teamId: string, keyId: string): Promise<Issu
   return data;
 }
 
-/** GET /teams/{id}/service-principals — the team's service principals. */
-export async function listServicePrincipals(teamId: string): Promise<ServicePrincipal[]> {
+async function requestServicePrincipals(
+  teamId: string,
+  request: PageRequest,
+  signal?: AbortSignal,
+): Promise<ServicePrincipal[]> {
   const { data, error } = await api.GET("/teams/{team_id}/service-principals", {
-    params: { path: { team_id: teamId } },
+    params: { path: { team_id: teamId }, query: request },
+    signal,
   });
   if (error || !data) throw fail(error, "Failed to load service principals");
   return data;
+}
+
+/** Complete team-scoped collection for the issue-key selector. */
+export async function listAllServicePrincipals(
+  teamId: string,
+  signal?: AbortSignal,
+): Promise<ServicePrincipal[]> {
+  return fetchAllPages((request) => requestServicePrincipals(teamId, request, signal), {
+    keyOf: (servicePrincipal) => servicePrincipal.id,
+  });
 }
 
 /** POST /teams/{id}/service-principals/{spId}/keys — issue a key for an existing

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { buildInviteSignupLink } from "@/features/auth/inviteToken";
-import { listTeams } from "@/features/teams/api";
+import { listAllTeams } from "@/features/teams/api";
 import { inviteUser, type Invite, type TeamRole } from "@/features/users/api";
 
 interface InviteUserDialogProps {
@@ -45,7 +45,12 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
     }
   }, [open]);
 
-  const teams = useQuery({ queryKey: ["teams"], queryFn: listTeams, enabled: open });
+  const teams = useQuery({
+    queryKey: ["teams", "all"],
+    queryFn: ({ signal }) => listAllTeams(signal),
+    enabled: open,
+    retry: false,
+  });
 
   const mutation = useMutation({
     mutationFn: () => inviteUser(teamId, role),
@@ -114,7 +119,11 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
                   onChange={(e) => setTeamId(e.target.value)}
                 >
                   <option value="" disabled>
-                    {teams.isLoading ? "loading…" : "select a team"}
+                    {teams.isLoading
+                      ? "loading…"
+                      : teams.isError
+                        ? "failed to load teams"
+                        : "select a team"}
                   </option>
                   {(teams.data ?? []).map((t) => (
                     <option key={t.id} value={t.id}>
@@ -122,6 +131,9 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
                     </option>
                   ))}
                 </select>
+                {teams.isError ? (
+                  <p className="font-mono text-xs text-destructive">{teams.error.message}</p>
+                ) : null}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="invite-role">role</Label>

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { listOrganizations } from "@/features/organizations/api";
+import { listAllOrganizations } from "@/features/organizations/api";
 import { createTeam, parseRpm, parseTags } from "@/features/teams/api";
 
 interface CreateTeamDialogProps {
@@ -40,9 +40,10 @@ export function CreateTeamDialog({ organizationId, open, onOpenChange }: CreateT
 
   // Only need the org list when no organization is fixed.
   const orgs = useQuery({
-    queryKey: ["organizations"],
-    queryFn: listOrganizations,
+    queryKey: ["organizations", "all"],
+    queryFn: ({ signal }) => listAllOrganizations(signal),
     enabled: open && !organizationId,
+    retry: false,
   });
 
   useEffect(() => {
@@ -105,7 +106,11 @@ export function CreateTeamDialog({ organizationId, open, onOpenChange }: CreateT
                 onChange={(e) => setOrgId(e.target.value)}
               >
                 <option value="" disabled>
-                  {orgs.isLoading ? "loading…" : "select an organization"}
+                  {orgs.isLoading
+                    ? "loading…"
+                    : orgs.isError
+                      ? "failed to load organizations"
+                      : "select an organization"}
                 </option>
                 {(orgs.data ?? []).map((o) => (
                   <option key={o.id} value={o.id}>
@@ -113,6 +118,9 @@ export function CreateTeamDialog({ organizationId, open, onOpenChange }: CreateT
                   </option>
                 ))}
               </select>
+              {orgs.isError ? (
+                <p className="font-mono text-xs text-destructive">{orgs.error.message}</p>
+              ) : null}
             </div>
           ) : null}
           <div className="grid gap-2">

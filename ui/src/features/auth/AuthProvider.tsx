@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { setCsrfToken } from "@/lib/api/client";
 import { config } from "@/lib/config";
@@ -14,6 +15,7 @@ import {
  * browser sends its HttpOnly cookie, while only the CSRF value lives in memory.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<CurrentUser | null>(null);
 
@@ -27,25 +29,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus("authenticated");
       })
       .catch(() => {
+        queryClient.clear();
         setCsrfToken(null);
         setUser(null);
         setStatus("unauthenticated");
       });
-  }, []);
+  }, [queryClient]);
 
   const login = useCallback(async (email: string, password: string) => {
     const session = await loginRequest(email, password);
+    queryClient.clear();
     setCsrfToken(session.csrf_token);
     setUser(session.user);
     setStatus("authenticated");
-  }, []);
+  }, [queryClient]);
 
   const logout = useCallback(async () => {
     await logoutRequest();
+    queryClient.clear();
     setCsrfToken(null);
     setUser(null);
     setStatus("unauthenticated");
-  }, []);
+  }, [queryClient]);
 
   const value = useMemo(
     () => ({ status, user, login, logout }),

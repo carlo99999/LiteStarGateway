@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { PaginationControls } from "@/components/common/PaginationControls";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,10 +11,11 @@ import { TeamKeys } from "@/features/api-keys/TeamKeys";
 import {
   getTeam,
   getTeamBudget,
-  listTeamMembers,
-  listTeamUsage,
+  listAllTeamUsage,
+  listTeamMembersPage,
   type TeamMember,
 } from "@/features/teams/api";
+import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
 
 const route = getRouteApi("/app/teams/$teamId");
 
@@ -46,22 +49,34 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 
 export function TeamDetailPage() {
   const { teamId } = route.useParams();
+  const [memberOffset, setMemberOffset] = useState(0);
 
   const team = useQuery({ queryKey: ["teams", teamId], queryFn: () => getTeam(teamId) });
   const members = useQuery({
-    queryKey: ["teams", teamId, "members"],
-    queryFn: () => listTeamMembers(teamId),
+    queryKey: ["teams", teamId, "members", "page", memberOffset],
+    queryFn: () => listTeamMembersPage(teamId, memberOffset),
   });
   const budget = useQuery({
     queryKey: ["teams", teamId, "budget"],
     queryFn: () => getTeamBudget(teamId),
   });
   const usage = useQuery({
-    queryKey: ["teams", teamId, "usage"],
-    queryFn: () => listTeamUsage(teamId),
+    queryKey: ["teams", teamId, "usage", "all"],
+    queryFn: ({ signal }) => listAllTeamUsage(teamId, signal),
+    retry: false,
   });
 
+  useEffect(() => setMemberOffset(0), [teamId]);
+  useEffect(() => {
+    if (!members.isFetching && members.data?.items.length === 0 && memberOffset > 0) {
+      setMemberOffset(previousPageOffset(memberOffset));
+    }
+  }, [memberOffset, members.data, members.isFetching]);
+
   const usageTotal = (usage.data ?? []).reduce((sum, u) => sum + u.cost, 0);
+  const memberCount = members.data
+    ? `${members.data.offset + members.data.items.length}${members.data.hasNext ? "+" : ""}`
+    : "—";
 
   return (
     <>
@@ -106,7 +121,7 @@ export function TeamDetailPage() {
       ) : null}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="members" value={members.isLoading ? "…" : (members.data?.length ?? "—")} />
+        <Stat label="members" value={members.isLoading ? "…" : memberCount} />
         <Stat
           label="rate limit"
           value={
@@ -129,12 +144,20 @@ export function TeamDetailPage() {
                 : "none"
           }
         />
-        <Stat label="usage · all-time" value={usage.isLoading ? "…" : formatUsd(usageTotal)} />
+        <Stat
+          label="usage · all-time"
+          value={usage.isLoading ? "…" : usage.isError ? "unavailable" : formatUsd(usageTotal)}
+        />
       </div>
 
       {budget.isError ? (
         <p role="alert" className="mb-6 font-mono text-xs text-destructive">
           ! {budget.error instanceof Error ? budget.error.message : "Failed to load budget"}
+        </p>
+      ) : null}
+      {usage.isError ? (
+        <p role="alert" className="mb-6 font-mono text-xs text-destructive">
+          ! {usage.error instanceof Error ? usage.error.message : "Failed to load usage"}
         </p>
       ) : null}
 
@@ -143,13 +166,23 @@ export function TeamDetailPage() {
       </p>
       <DataTable
         columns={memberColumns}
-        rows={members.data}
+        rows={members.data?.items}
         rowKey={(m) => m.id}
         isLoading={members.isLoading}
         error={members.error as Error | null}
         emptyTitle="no members"
         emptyDescription="This team has no members."
       />
+      {members.data ? (
+        <PaginationControls
+          offset={members.data.offset}
+          pageSize={TABLE_PAGE_SIZE}
+          itemCount={members.data.items.length}
+          hasNext={members.data.hasNext}
+          isFetching={members.isFetching}
+          onOffsetChange={setMemberOffset}
+        />
+      ) : null}
 
       <div className="mt-8">
         <TeamKeys teamId={teamId} />

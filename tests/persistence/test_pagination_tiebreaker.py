@@ -31,12 +31,23 @@ from litestar_gateway.infrastructure.persistence.membership_repository import (
 from litestar_gateway.infrastructure.persistence.model_repository import (
     SQLAlchemyModelRepository,
 )
+from litestar_gateway.infrastructure.persistence.organization_repository import (
+    SQLAlchemyOrganizationRepository,
+)
+from litestar_gateway.infrastructure.persistence.repository import SQLAlchemyAPIKeyRepository
 from litestar_gateway.infrastructure.persistence.router_repository import (
     SQLAlchemyRoutingDecisionLog,
 )
 from litestar_gateway.infrastructure.persistence.service_principal_repository import (
     SQLAlchemyServicePrincipalRepository,
 )
+from litestar_gateway.infrastructure.persistence.team_repository import SQLAlchemyTeamRepository
+from litestar_gateway.infrastructure.persistence.usage_repository import SQLAlchemyUsageRepository
+
+
+class _EmptyRows:
+    def all(self) -> list[Any]:
+        return []
 
 
 class _CapturingSession:
@@ -49,6 +60,10 @@ class _CapturingSession:
     async def scalars(self, stmt: Select[Any]) -> list[Any]:
         self.captured = stmt
         return []
+
+    async def execute(self, stmt: Select[Any]) -> _EmptyRows:
+        self.captured = stmt
+        return _EmptyRows()
 
 
 def _order_by_sql(stmt: Select[Any]) -> str:
@@ -67,7 +82,7 @@ async def test_membership_list_by_team_order_by_includes_id() -> None:
     assert session.captured is not None
     order_by = _order_by_sql(session.captured)
     assert "created_at" in order_by
-    assert re.search(r"\bid\b", order_by), order_by
+    assert order_by.rstrip().endswith("team_membership.id"), order_by
 
 
 async def test_model_list_by_team_order_by_includes_id() -> None:
@@ -118,3 +133,57 @@ async def test_routing_decision_list_decisions_order_by_includes_id() -> None:
     order_by = _order_by_sql(session.captured)
     assert "created_at" in order_by
     assert re.search(r"\bid\b", order_by), order_by
+
+
+async def test_organization_list_order_by_includes_id() -> None:
+    session = _CapturingSession()
+    repo = SQLAlchemyOrganizationRepository(session)  # type: ignore[arg-type]
+    await repo.list(limit=1, offset=0)
+    assert session.captured is not None
+    order_by = _order_by_sql(session.captured)
+    assert "created_at" in order_by
+    assert order_by.rstrip().endswith("organization.id"), order_by
+
+
+async def test_team_lists_order_by_include_id() -> None:
+    session = _CapturingSession()
+    repo = SQLAlchemyTeamRepository(session)  # type: ignore[arg-type]
+
+    await repo.list(limit=1, offset=0)
+    assert session.captured is not None
+    order_by = _order_by_sql(session.captured)
+    assert "created_at" in order_by
+    assert order_by.rstrip().endswith("team.id"), order_by
+
+    await repo.list_by_organization(uuid4(), limit=1, offset=0)
+    assert session.captured is not None
+    order_by = _order_by_sql(session.captured)
+    assert "created_at" in order_by
+    assert order_by.rstrip().endswith("team.id"), order_by
+
+
+async def test_api_key_lists_order_by_include_id() -> None:
+    session = _CapturingSession()
+    repo = SQLAlchemyAPIKeyRepository(session)  # type: ignore[arg-type]
+
+    await repo.list_by_team(uuid4(), limit=1, offset=0)
+    assert session.captured is not None
+    order_by = _order_by_sql(session.captured)
+    assert "created_at" in order_by
+    assert order_by.rstrip().endswith("api_key.id"), order_by
+
+    await repo.list_by_creator(uuid4(), limit=1, offset=0)
+    assert session.captured is not None
+    order_by = _order_by_sql(session.captured)
+    assert "created_at" in order_by
+    assert order_by.rstrip().endswith("api_key.id"), order_by
+
+
+async def test_usage_aggregate_order_by_includes_model_id() -> None:
+    session = _CapturingSession()
+    repo = SQLAlchemyUsageRepository(session)  # type: ignore[arg-type]
+    await repo.aggregate(uuid4(), limit=1, offset=0)
+    assert session.captured is not None
+    order_by = _order_by_sql(session.captured)
+    assert "model_name" in order_by
+    assert order_by.rstrip().endswith("usage_event.model_id"), order_by
