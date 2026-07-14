@@ -318,7 +318,7 @@ altra attività; impostare una `Referrer-Policy` restrittiva.
 ### ISSUE-009 — L'admin UI mostra solo i primi 100 record di ogni collezione
 
 **Priorità:** medium
-**Stato:** **Fixed** ([#255](https://github.com/carlo99999/LiteStarGateway/pull/255))
+**Stato:** open
 **File coinvolti:** `ui/src/features/organizations/api.ts:24-31`, `ui/src/features/teams/api.ts:18-23,34-40,52-58`, `ui/src/features/users/api.ts:17-22`, `ui/src/features/api-keys/api.ts:18-25`
 
 **Problema**
@@ -342,7 +342,7 @@ del Round 2 (mancanza metadata) rende utile aggiungere anche `total/next_offset`
 ### ISSUE-010 — Il JWT admin persistito in `localStorage` è leggibile da script same-origin
 
 **Priorità:** medium
-**Stato:** open
+**Stato:** **Fixed** ([#255](https://github.com/carlo99999/LiteStarGateway/pull/255))
 **File coinvolti:** `ui/src/features/auth/AuthProvider.tsx:12-23`, `ui/src/lib/api/client.ts:11-21`
 
 **Problema**
