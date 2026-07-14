@@ -10,11 +10,21 @@ import { ApiKeysPage } from "@/features/api-keys/ApiKeysPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { SignupPage } from "@/features/auth/SignupPage";
+import { inviteTokenStore } from "@/features/auth/inviteToken";
 import { OrganizationDetailPage } from "@/features/organizations/OrganizationDetailPage";
 import { OrganizationsPage } from "@/features/organizations/OrganizationsPage";
 import { TeamDetailPage } from "@/features/teams/TeamDetailPage";
 import { TeamsPage } from "@/features/teams/TeamsPage";
 import { UsersPage } from "@/features/users/UsersPage";
+
+function captureInviteTokenFromWindow() {
+  if (typeof window !== "undefined") {
+    inviteTokenStore.capture(window.location, window.history);
+  }
+}
+
+// Initial document load: scrub before TanStack Router observes the location.
+captureInviteTokenFromWindow();
 
 const rootRoute = createRootRoute({ component: Outlet });
 
@@ -24,10 +34,12 @@ const loginRoute = createRoute({
   component: LoginPage,
 });
 
-// Public invite-redemption page (reads the invite token from `?token=`).
+// Public invite-redemption page (consumes the token from the URL fragment).
 const signupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/signup",
+  // Also covers a client-side transition from another public route.
+  beforeLoad: captureInviteTokenFromWindow,
   component: SignupPage,
 });
 

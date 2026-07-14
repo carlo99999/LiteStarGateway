@@ -29,6 +29,7 @@ from litestar.status_codes import HTTP_308_PERMANENT_REDIRECT
 # This module is src/litestar_gateway/infrastructure/web/ui_site.py, so the repo
 # root (which holds ui/dist) is four parents up — the same anchor docs_site uses.
 UI_DIST_DIR = Path(__file__).resolve().parents[4] / "ui" / "dist"
+_UI_SECURITY_HEADERS = {"Referrer-Policy": "no-referrer"}
 
 
 def _resolve_within(root: Path, relative: str) -> Path | None:
@@ -80,7 +81,12 @@ def create_ui_router(dist_dir: Path | None = None) -> Router | None:
         # content_disposition_type="inline": Litestar's File defaults to
         # "attachment", which makes the browser DOWNLOAD index.html instead of
         # rendering the app. Serve it (and every asset) inline.
-        return File(index_html, media_type="text/html", content_disposition_type="inline")
+        return File(
+            index_html,
+            media_type="text/html",
+            content_disposition_type="inline",
+            headers=dict(_UI_SECURITY_HEADERS),
+        )
 
     # Two handlers, not one with both paths: Litestar only binds `file_path` when
     # the path parameter is the handler's sole route, so `/ui/` gets its own
@@ -97,7 +103,12 @@ def create_ui_router(dist_dir: Path | None = None) -> Router | None:
             # asset would be served as octet-stream — which the browser refuses
             # to run as a module script. Set it from the suffix explicitly.
             media_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
-            return File(target, media_type=media_type, content_disposition_type="inline")
+            return File(
+                target,
+                media_type=media_type,
+                content_disposition_type="inline",
+                headers=dict(_UI_SECURITY_HEADERS),
+            )
         # A missing hashed asset is a genuine 404 (a broken reference), not a
         # client-side route — don't mask it as the app shell.
         if file_path.strip("/").startswith("assets/"):
