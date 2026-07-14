@@ -268,7 +268,10 @@ async def test_cookie_management_get_is_csrf_exempt(client: AsyncTestClient) -> 
 async def test_failed_browser_login_does_not_issue_a_cookie(client: AsyncTestClient) -> None:
     response = await client.post(
         "/session/login",
-        json={"email": ADMIN_EMAIL, "password": "wrong-password"},
+        json={
+            "email": ADMIN_EMAIL,
+            "password": "wrong-password",  # pragma: allowlist secret
+        },
         headers={"Origin": ORIGIN},
     )
 
