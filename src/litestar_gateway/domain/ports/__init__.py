@@ -29,7 +29,11 @@ from litestar_gateway.domain.ports.routing import (
 from litestar_gateway.domain.ports.scim_token import ScimTokenRepository
 from litestar_gateway.domain.ports.secret_key import SecretKeyRepository
 from litestar_gateway.domain.ports.service_principal import ServicePrincipalRepository
-from litestar_gateway.domain.ports.team import TeamMembershipRepository, TeamRepository
+from litestar_gateway.domain.ports.team import (
+    TeamLifecycleRepository,
+    TeamMembershipRepository,
+    TeamRepository,
+)
 from litestar_gateway.domain.ports.trace import TraceSink
 from litestar_gateway.domain.ports.transaction import Transaction
 from litestar_gateway.domain.ports.usage import UsageRepository
@@ -57,6 +61,7 @@ __all__ = [
     "SecretKeyRepository",
     "ServicePrincipalRepository",
     "TeamMembershipRepository",
+    "TeamLifecycleRepository",
     "TeamRepository",
     "Transaction",
     "TraceSink",

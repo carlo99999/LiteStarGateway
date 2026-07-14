@@ -7,11 +7,12 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from _invite_helpers import seed_team_and_invite
+from _invite_helpers import issue_invite, seed_team_and_invite
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_204_NO_CONTENT,
+    HTTP_400_BAD_REQUEST,
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
     HTTP_409_CONFLICT,
@@ -285,6 +286,51 @@ async def test_delete_empty_team(client: AsyncTestClient) -> None:
     resp = await client.delete(f"/teams/{team_id}", headers=_bearer(admin))
     assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
     # Gone, along with its membership.
+    assert (
+        await client.get(f"/teams/{team_id}", headers=_bearer(admin))
+    ).status_code == HTTP_404_NOT_FOUND
+
+
+async def test_delete_team_removes_its_pending_invites(client: AsyncTestClient) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, ADMIN_EMAIL)
+    invite = await issue_invite(client, admin, team_id)
+
+    deleted = await client.delete(f"/teams/{team_id}", headers=_bearer(admin))
+
+    assert deleted.status_code == HTTP_204_NO_CONTENT, deleted.text
+    rejected = await client.post(
+        "/signup",
+        json={
+            "invite_token": invite,
+            "email": "orphan@example.com",
+            "password": "Passw0rd!",
+        },
+    )
+    assert rejected.status_code == HTTP_400_BAD_REQUEST
+
+
+async def test_delete_team_removes_used_invites_and_memberships(
+    client: AsyncTestClient,
+) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = await _org(client, admin)
+    team_id = await _team(client, admin, org_id, ADMIN_EMAIL)
+    invite = await issue_invite(client, admin, team_id)
+    registered = await client.post(
+        "/signup",
+        json={
+            "invite_token": invite,
+            "email": "former-member@example.com",
+            "password": "Passw0rd!",
+        },
+    )
+    assert registered.status_code == HTTP_201_CREATED, registered.text
+
+    deleted = await client.delete(f"/teams/{team_id}", headers=_bearer(admin))
+
+    assert deleted.status_code == HTTP_204_NO_CONTENT, deleted.text
     assert (
         await client.get(f"/teams/{team_id}", headers=_bearer(admin))
     ).status_code == HTTP_404_NOT_FOUND

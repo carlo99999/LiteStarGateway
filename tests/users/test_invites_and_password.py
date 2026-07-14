@@ -16,6 +16,7 @@ from litestar_gateway.domain.exceptions import (
     InvalidInvite,
     InvalidPasswordReset,
     PermissionDenied,
+    TeamNotFound,
     UserNotFound,
     WeakPassword,
 )
@@ -23,6 +24,7 @@ from litestar_gateway.domain.exceptions import (
 from .conftest import (
     FakeInviteRepository,
     FakePasswordResetRepository,
+    FakeTeamRepository,
     FakeTransaction,
     FakeUserRepository,
 )
@@ -51,6 +53,7 @@ async def test_register_rejects_expired_invite() -> None:
         users=FakeUserRepository(),
         invites=invites,
         password_resets=FakePasswordResetRepository(),
+        teams=FakeTeamRepository(),
     )
     issued = await svc.create_invite(team_id=_TEAM_ID)
     # Force the stored invite past its expiry.
@@ -64,6 +67,22 @@ async def test_register_rejects_expired_invite() -> None:
 async def test_create_invite_sets_future_expiry(service: UserService) -> None:
     issued = await service.create_invite(team_id=_TEAM_ID)
     assert issued.invite.expires_at > datetime.now(UTC)
+
+
+async def test_create_invite_rejects_unknown_team_before_persisting() -> None:
+    invites = FakeInviteRepository()
+    service = UserService(
+        transaction=FakeTransaction(),
+        users=FakeUserRepository(),
+        invites=invites,
+        password_resets=FakePasswordResetRepository(),
+        teams=FakeTeamRepository(allow_all=False),
+    )
+
+    with pytest.raises(TeamNotFound):
+        await service.create_invite(team_id=uuid4())
+
+    assert invites._by_id == {}
 
 
 async def test_register_rejects_duplicate_email(service: UserService) -> None:

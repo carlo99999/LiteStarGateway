@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import bindparam, delete, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import Team
+from litestar_gateway.domain.exceptions import TeamNotEmpty
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.infrastructure.persistence.orm import (
+    InviteModel,
     PendingUsageEventModel,
     RouterModel,
     ServicePrincipalModel,
@@ -41,6 +45,19 @@ class SQLAlchemyTeamRepository:
         return model.to_entity()
 
     async def get(self, team_id: UUID) -> Team | None:
+        model = await self._session.get(TeamModel, team_id)
+        return model.to_entity() if model else None
+
+    async def lock_for_lifecycle(self, team_id: UUID) -> Team | None:
+        # A no-op write is a cross-database lifecycle mutex: PostgreSQL takes a
+        # row-level NO KEY UPDATE lock and SQLite takes its writer lock. Raw SQL
+        # avoids SQLAlchemy's automatic `updated_at` value on ORM updates.
+        statement = text("UPDATE team SET name = name WHERE id = :team_id").bindparams(
+            bindparam("team_id", type_=TeamModel.id.type)
+        )
+        result: Any = await self._session.execute(statement, {"team_id": team_id})
+        if result.rowcount != 1:
+            return None
         model = await self._session.get(TeamModel, team_id)
         return model.to_entity() if model else None
 
@@ -88,14 +105,21 @@ class SQLAlchemyTeamRepository:
         # API keys are intentionally NOT touched — the caller refuses the delete
         # when any remain. pending_usage_event has no FK but is team-scoped, so
         # it's cleared for hygiene. Staged only; the service commits.
-        for child in (
-            UsageEventModel,
-            PendingUsageEventModel,
-            RouterModel,
-            ServicePrincipalModel,
-            TeamMembershipModel,
-            TeamBudgetModel,
-        ):
-            await self._session.execute(delete(child).where(child.team_id == team_id))
-        await self._session.execute(delete(TeamModel).where(TeamModel.id == team_id))
-        await self._session.flush()
+        try:
+            for child in (
+                InviteModel,
+                UsageEventModel,
+                PendingUsageEventModel,
+                RouterModel,
+                ServicePrincipalModel,
+                TeamMembershipModel,
+                TeamBudgetModel,
+            ):
+                await self._session.execute(delete(child).where(child.team_id == team_id))
+            await self._session.execute(delete(TeamModel).where(TeamModel.id == team_id))
+            await self._session.flush()
+        except IntegrityError as exc:
+            # A concurrent non-intrinsic child (model/API key) may appear after
+            # the service recheck. Preserve the lifecycle contract as a 409,
+            # never leak a database 500; the service UoW rolls everything back.
+            raise TeamNotEmpty(str(team_id)) from exc

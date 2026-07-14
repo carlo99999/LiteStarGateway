@@ -11,6 +11,7 @@ from litestar_gateway.domain.exceptions import EmailAlreadyRegistered, MasterKey
 from .conftest import (
     FakeInviteRepository,
     FakePasswordResetRepository,
+    FakeTeamRepository,
     FakeTransaction,
     FakeUserRepository,
 )
@@ -59,6 +60,7 @@ async def test_ensure_admin_tolerates_concurrent_replica_bootstrap() -> None:
         users=users,
         invites=FakeInviteRepository(),
         password_resets=FakePasswordResetRepository(),
+        teams=FakeTeamRepository(),
     )
     await service.ensure_admin("admin@example.com", master_key="secret")
     # Second replica loses the insert race; ensure_admin must swallow the conflict.

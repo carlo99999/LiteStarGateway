@@ -44,8 +44,8 @@ Counts: **1 CRITICAL · 4 HIGH · 6 MEDIUM · 2 LOW**.
 | ISSUE-003 | La disattivazione utente non revoca subito la vecchia key in grace | high | `application/service.py:139`; `persistence/repository.py:85-95` | **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250)) |
 | ISSUE-004 | Il rate limit per API key è bypassabile su embeddings e images | high | `application/completion_service.py:423-451,562-594` | **Fixed** ([#251](https://github.com/carlo99999/LiteStarGateway/pull/251)) |
 | ISSUE-005 | L'admin può cancellare se stesso e lasciare la piattaforma senza admin | high | `application/user_service.py:186-204` | **Fixed** ([#252](https://github.com/carlo99999/LiteStarGateway/pull/252)) |
-| ISSUE-006 | Qualsiasi invite persistito rende il team non cancellabile | medium | `persistence/team_repository.py:85-101`; `orm.py:112-130` | open |
-| ISSUE-007 | Creare un invite per un team inesistente restituisce 500 | medium | `application/user_service.py:160-177`; `persistence/invite_repository.py:20-32` | open |
+| ISSUE-006 | Qualsiasi invite persistito rende il team non cancellabile | medium | `persistence/team_repository.py:85-101`; `orm.py:112-130` | **Fixed** ([#253](https://github.com/carlo99999/LiteStarGateway/pull/253)) |
+| ISSUE-007 | Creare un invite per un team inesistente restituisce 500 | medium | `application/user_service.py:160-177`; `persistence/invite_repository.py:20-32` | **Fixed** ([#253](https://github.com/carlo99999/LiteStarGateway/pull/253)) |
 | ISSUE-008 | L'invite token nella query string finisce in log e history | medium | `ui/src/features/users/InviteUserDialog.tsx:56-59`; `SignupPage.tsx:11-17` | open |
 | ISSUE-009 | L'admin UI mostra solo i primi 100 record di ogni collezione | medium | `ui/src/features/*/api.ts` | open |
 | ISSUE-010 | Il JWT admin persistito in `localStorage` è leggibile da script same-origin | medium | `ui/src/features/auth/AuthProvider.tsx:12-23` | open |
@@ -76,12 +76,26 @@ propagano l'ID della key al gate RPM, mentre `_prepare` lo richiede e applica il
 limite prima di eventuali strategie di routing fatturabili. I test verificano sia i
 due endpoint diretti sia il diniego prima della provider call del judge.
 
+**ISSUE-005** è risolta dalla
+[#252](https://github.com/carlo99999/LiteStarGateway/pull/252): le operazioni sul
+ciclo di vita degli admin sono serializzate e rifiutano self-delete, self-demote e
+self-disable, preservando almeno un accesso amministrativo anche nelle race.
+
+**ISSUE-006** e **ISSUE-007** sono risolte insieme dalla
+[#253](https://github.com/carlo99999/LiteStarGateway/pull/253): create, redeem e
+delete condividono un lock lifecycle sul team; gli invite sono eliminati con il
+team e i riferimenti stale diventano 404/409 di dominio. Registrazione, consumo
+single-use e membership sono atomici, inclusi expiry e conflitti email concorrenti.
+
 | ID | Priorità | Stato | PR |
 |---|---|---|---|
 | ISSUE-001 | critical | **Fixed** | [#249](https://github.com/carlo99999/LiteStarGateway/pull/249) |
 | ISSUE-002 | high | **Fixed** | [#250](https://github.com/carlo99999/LiteStarGateway/pull/250) |
 | ISSUE-003 | high | **Fixed** | [#250](https://github.com/carlo99999/LiteStarGateway/pull/250) |
 | ISSUE-004 | high | **Fixed** | [#251](https://github.com/carlo99999/LiteStarGateway/pull/251) |
+| ISSUE-005 | high | **Fixed** | [#252](https://github.com/carlo99999/LiteStarGateway/pull/252) |
+| ISSUE-006 | medium | **Fixed** | [#253](https://github.com/carlo99999/LiteStarGateway/pull/253) |
+| ISSUE-007 | medium | **Fixed** | [#253](https://github.com/carlo99999/LiteStarGateway/pull/253) |
 | ISSUE-011 | medium | **Fixed** | [#250](https://github.com/carlo99999/LiteStarGateway/pull/250) |
 
 ## Issues
@@ -216,7 +230,7 @@ stessa transazione della cancellazione.
 ### ISSUE-006 — Qualsiasi invite persistito rende il team non cancellabile
 
 **Priorità:** medium
-**Stato:** open
+**Stato:** **Fixed** ([#253](https://github.com/carlo99999/LiteStarGateway/pull/253))
 **File coinvolti:** `src/litestar_gateway/infrastructure/persistence/team_repository.py:85-101`, `src/litestar_gateway/infrastructure/persistence/orm.py:112-130`
 
 **Problema**
@@ -240,7 +254,7 @@ bloccante e restituire un 409 gestibile, con un modo per rimuoverli.
 ### ISSUE-007 — Creare un invite per un team inesistente restituisce 500
 
 **Priorità:** medium
-**Stato:** open
+**Stato:** **Fixed** ([#253](https://github.com/carlo99999/LiteStarGateway/pull/253))
 **File coinvolti:** `src/litestar_gateway/application/user_service.py:160-177`, `src/litestar_gateway/infrastructure/persistence/invite_repository.py:20-32`
 
 **Problema**

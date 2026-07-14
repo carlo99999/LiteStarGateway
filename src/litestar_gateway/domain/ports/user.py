@@ -14,6 +14,10 @@ class UserRepository(Protocol):
 
     async def add(self, user: User) -> User: ...
 
+    async def add_staged(self, user: User) -> User:
+        """Stage a user insert; the surrounding unit of work owns the commit."""
+        ...
+
     async def get(self, user_id: UUID) -> User | None: ...
 
     async def get_for_update(self, user_id: UUID) -> User | None:
