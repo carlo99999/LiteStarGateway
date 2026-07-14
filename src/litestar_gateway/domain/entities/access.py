@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from .enums import KeyPurpose, KeyScope
@@ -68,7 +68,12 @@ class APIKey:
 
     @property
     def is_active(self) -> bool:
-        return self.revoked_at is None
+        """Usable right now: never revoked, or revocation scheduled in the future
+        (the rotation grace window, during which the old key keeps working)."""
+        if self.revoked_at is None:
+            return True
+        revoked = self.revoked_at if self.revoked_at.tzinfo else self.revoked_at.replace(tzinfo=UTC)
+        return revoked > datetime.now(UTC)
 
 
 @dataclass(frozen=True)

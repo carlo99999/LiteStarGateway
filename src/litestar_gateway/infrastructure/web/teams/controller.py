@@ -332,6 +332,32 @@ class TeamController(Controller):
             detail=f"team {team_id}",
         )
 
+    @post("/{team_id:uuid}/keys/{key_id:uuid}/rotate")
+    async def rotate_key(
+        self,
+        request: Request,
+        team_id: FromPath[UUID],
+        key_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        api_key_service: NamedDependency[APIKeyService],
+        audit_log: NamedDependency[AuditLog],
+    ) -> CreatedKeyResponse:
+        """Issue a replacement key (same scope/rate-limit/owner) and give the old
+        one a grace window before it stops working. Returns the new plaintext once."""
+        await team_service.ensure_team_permission(current_user, team_id, Permission.KEYS_ISSUE)
+        issued = await api_key_service.rotate_for_team(team_id, key_id, current_user.id)
+        await record_audit(
+            audit_log,
+            request,
+            current_user,
+            "api_key.rotate",
+            target_type="api_key",
+            target_id=key_id,
+            detail=f"team {team_id} -> new key {issued.key.id}",
+        )
+        return CreatedKeyResponse.from_issued(issued)
+
     @get("/{team_id:uuid}/budget", dependencies={"principal": Provide(provide_principal)})
     async def get_budget(
         self,

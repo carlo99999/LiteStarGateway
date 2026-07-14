@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Trash2 } from "lucide-react";
+import { RotateCw, Trash2 } from "lucide-react";
 import { StatusDot } from "@/components/common/StatusDot";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ interface KeysTableProps {
   showTeam: boolean;
   /** The signed-in user's id, so their own keys read "me". */
   currentUserId: string | undefined;
+  onRotate: (key: ApiKey) => void;
   onRevoke: (key: ApiKey) => void;
   emptyDescription: string;
 }
@@ -31,6 +32,7 @@ export function KeysTable({
   error,
   showTeam,
   currentUserId,
+  onRotate,
   onRevoke,
   emptyDescription,
 }: KeysTableProps) {
@@ -46,7 +48,20 @@ export function KeysTable({
           <span className="font-mono text-[9px] uppercase text-muted-foreground/60">rvkd</span>
         ),
     },
-    { key: "name", header: "name", cell: (k) => <span className="text-foreground">{k.name ?? "—"}</span> },
+    {
+      key: "name",
+      header: "name",
+      cell: (k) => (
+        <span className="flex flex-col">
+          <span className="text-foreground">{k.name ?? "—"}</span>
+          {k.is_active && k.revoked_at ? (
+            <span className="text-[10px] text-[color:var(--warning)]">
+              expires {formatWhen(k.revoked_at)}
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
     ...(showTeam
       ? [
           {
@@ -100,19 +115,30 @@ export function KeysTable({
     {
       key: "actions",
       header: "",
-      className: "w-12",
+      className: "w-20",
       numeric: true,
       cell: (k) =>
         k.is_active ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-            aria-label={`Revoke ${k.name ?? k.prefix}`}
-            onClick={() => onRevoke(k)}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          <span className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label={`Rotate ${k.name ?? k.prefix}`}
+              onClick={() => onRotate(k)}
+            >
+              <RotateCw className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+              aria-label={`Revoke ${k.name ?? k.prefix}`}
+              onClick={() => onRevoke(k)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </span>
         ) : null,
     },
   ];
