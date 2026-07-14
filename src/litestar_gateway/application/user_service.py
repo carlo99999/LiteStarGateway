@@ -22,6 +22,8 @@ from litestar_gateway.domain.entities import (
     IssuedInvite,
     IssuedPasswordReset,
     PasswordReset,
+    TeamMembership,
+    TeamRole,
     User,
 )
 from litestar_gateway.domain.exceptions import (
@@ -33,15 +35,18 @@ from litestar_gateway.domain.exceptions import (
     PermissionDenied,
     SSOEmailNotVerified,
     SSOIdentityConflict,
+    UserHasReferences,
     UserNotFound,
     WeakPassword,
 )
 from litestar_gateway.domain.key_generator import hash_key
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.domain.password import ahash_password, averify_password
 from litestar_gateway.domain.ports import (
     APIKeyRepository,
     InviteRepository,
     PasswordResetRepository,
+    TeamMembershipRepository,
     Transaction,
     UserRepository,
 )
@@ -110,12 +115,14 @@ class UserService:
         password_resets: PasswordResetRepository,
         transaction: Transaction,
         api_keys: APIKeyRepository | None = None,
+        memberships: TeamMembershipRepository | None = None,
     ) -> None:
         self._users = users
         self._invites = invites
         self._password_resets = password_resets
         self._transaction = transaction
         self._api_keys = api_keys
+        self._memberships = memberships
 
     @asynccontextmanager
     async def _unit_of_work(self) -> AsyncGenerator[None]:
@@ -150,7 +157,11 @@ class UserService:
             # admin exists, which is all this hook guarantees.
             return
 
-    async def create_invite(self) -> IssuedInvite:
+    async def create_invite(
+        self, *, team_id: UUID, role: TeamRole = TeamRole.MEMBER
+    ) -> IssuedInvite:
+        """Create a single-use invite that, on signup, adds the new user to
+        `team_id` with `role`."""
         token = secrets.token_urlsafe(_INVITE_TOKEN_BYTES)
         now = _now()
         invite = Invite(
@@ -159,9 +170,38 @@ class UserService:
             created_at=now,
             expires_at=now + _INVITE_TTL,
             used_at=None,
+            team_id=team_id,
+            role=role.value,
         )
         stored = await self._invites.add(invite)
         return IssuedInvite(invite=stored, token=token)
+
+    async def list_users(
+        self, actor: User, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[User]:
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        return await self._users.list(limit=limit, offset=offset)
+
+    async def delete_user(self, actor: User, user_id: UUID) -> User:
+        """Hard-delete a user — platform-admin only. Refused (UserHasReferences →
+        409) if they still have team memberships or API keys they created, so
+        nothing is orphaned; their pending password resets are cleared first."""
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        user = await self._users.get(user_id)
+        if user is None:
+            raise UserNotFound(str(user_id))
+        if self._memberships is not None and await self._memberships.list_by_user(
+            user_id, limit=1, offset=0
+        ):
+            raise UserHasReferences(str(user_id))
+        if self._api_keys is not None and await self._api_keys.list_by_creator(
+            user_id, limit=1, offset=0
+        ):
+            raise UserHasReferences(str(user_id))
+        await self._users.delete(user_id)
+        return user
 
     def _check_password_complexity(self, password: str) -> None:
         if len(password) < 8:
@@ -200,7 +240,7 @@ class UserService:
         if await self._users.get_by_email(email) is not None:
             raise EmailAlreadyRegistered(email)
 
-        return await self._users.add(
+        user = await self._users.add(
             User(
                 id=uuid4(),
                 email=email,
@@ -209,6 +249,21 @@ class UserService:
                 created_at=_now(),
             )
         )
+        # New invites carry the team the user joins; add the membership (a second
+        # commit — user.add already committed, so this can't be one unit of work).
+        if invite.team_id is not None and self._memberships is not None:
+            role = TeamRole(invite.role) if invite.role else TeamRole.MEMBER
+            await self._memberships.add(
+                TeamMembership(
+                    id=uuid4(),
+                    team_id=invite.team_id,
+                    user_id=user.id,
+                    role=role,
+                    created_at=_now(),
+                )
+            )
+            await self._transaction.commit()
+        return user
 
     async def authenticate(self, email: str, password: str) -> User:
         """Verify login credentials. Raises InvalidCredentials on any mismatch.

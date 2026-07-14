@@ -35,3 +35,18 @@ export async function fetchCurrentUser(): Promise<CurrentUser> {
 export async function logout(): Promise<void> {
   await api.POST("/logout");
 }
+
+/** POST /signup — redeem an invite token to create the account and set its
+ * password. The invite determines which team (and role) the user joins. */
+export async function signup(
+  inviteToken: string,
+  email: string,
+  password: string,
+): Promise<void> {
+  const { error } = await api.POST("/signup", {
+    body: { invite_token: inviteToken, email, password },
+  });
+  if (error) {
+    throw new Error(messageFrom(error, "Signup failed — the invite may be invalid or expired"));
+  }
+}

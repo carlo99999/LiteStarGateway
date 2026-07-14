@@ -138,6 +138,11 @@ class FakeUserRepository:
                 return updated
         raise AssertionError(f"no user {user_id}")
 
+    async def delete(self, user_id: UUID) -> None:
+        for email, user in list(self._by_email.items()):
+            if user.id == user_id:
+                del self._by_email[email]
+
 
 class FakeInviteRepository:
     def __init__(self) -> None:
@@ -177,6 +182,32 @@ class FakePasswordResetRepository:
             return False
         self._by_id[reset_id] = dataclasses.replace(reset, used_at=used_at)
         return True
+
+
+class FakeTeamMembershipRepository:
+    """Minimal fake — only what user deletion/registration needs."""
+
+    def __init__(self) -> None:
+        self._items: list = []
+
+    async def add(self, membership):  # noqa: ANN001, ANN201
+        self._items.append(membership)
+        return membership
+
+    async def list_by_user(self, user_id: UUID, *, limit: int = 50, offset: int = 0):  # noqa: ANN201
+        matches = [m for m in self._items if m.user_id == user_id]
+        return matches[offset : offset + limit]
+
+
+class FakeAPIKeyRepository:
+    """Minimal fake — only the creator lookup used by the delete guard."""
+
+    def __init__(self) -> None:
+        self._items: list = []
+
+    async def list_by_creator(self, created_by: UUID, *, limit: int = 50, offset: int = 0):  # noqa: ANN201
+        matches = [k for k in self._items if k.created_by == created_by]
+        return matches[offset : offset + limit]
 
 
 @pytest.fixture

@@ -42,6 +42,12 @@ class FakeAPIKeyRepository:
         keys = [k for k in self._store.values() if k.team_id == team_id]
         return keys[offset : offset + limit]
 
+    async def list_by_creator(
+        self, created_by: UUID, *, limit: int = 100, offset: int = 0
+    ) -> list[APIKey]:
+        keys = [k for k in self._store.values() if k.created_by == created_by]
+        return keys[offset : offset + limit]
+
     async def update(self, key: APIKey) -> APIKey:
         self.update_calls += 1
         self._store[key.id] = key

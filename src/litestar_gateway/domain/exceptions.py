@@ -50,6 +50,12 @@ class UserNotFound(DomainError):
     """No user exists for the given identifier/email."""
 
 
+class UserHasReferences(DomainError):
+    """The user still has team memberships or API keys they created, and cannot
+    be hard-deleted without orphaning them. Remove those first, or deactivate the
+    account instead (→ 409)."""
+
+
 class InvalidScimToken(DomainError):
     """The SCIM provisioning token is missing, unknown, or revoked."""
 

@@ -4,15 +4,19 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
+from _invite_helpers import issue_invite, seed_team
 from litestar import Litestar
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
+    HTTP_204_NO_CONTENT,
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
+    HTTP_409_CONFLICT,
 )
 from litestar.testing import AsyncTestClient
 
@@ -98,12 +102,14 @@ async def _admin_token(client: AsyncTestClient) -> str:
 
 async def _new_invite(client: AsyncTestClient) -> str:
     token = await _admin_token(client)
-    resp = await client.post("/invites", headers={"Authorization": f"Bearer {token}"})
-    return resp.json()["token"]
+    team_id = await seed_team(client, token)
+    return await issue_invite(client, token, team_id)
 
 
 async def test_invite_creation_requires_auth(client: AsyncTestClient) -> None:
-    assert (await client.post("/invites")).status_code == HTTP_401_UNAUTHORIZED
+    # Body present so only the missing auth can fail the request.
+    resp = await client.post("/invites", json={"team_id": str(uuid4()), "role": "member"})
+    assert resp.status_code == HTTP_401_UNAUTHORIZED
 
 
 async def test_invite_creation_rejects_non_admin(client: AsyncTestClient) -> None:
@@ -115,15 +121,25 @@ async def test_invite_creation_rejects_non_admin(client: AsyncTestClient) -> Non
     user_token = (
         await client.post("/login", json={"email": "user@b.com", "password": "Passw0rd!"})
     ).json()["access_token"]
-    resp = await client.post("/invites", headers={"Authorization": f"Bearer {user_token}"})
+    resp = await client.post(
+        "/invites",
+        json={"team_id": str(uuid4()), "role": "member"},
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
     assert resp.status_code == HTTP_403_FORBIDDEN
 
 
 async def test_invite_creation_with_admin_token(client: AsyncTestClient) -> None:
     token = await _admin_token(client)
-    resp = await client.post("/invites", headers={"Authorization": f"Bearer {token}"})
+    team_id = await seed_team(client, token)
+    resp = await client.post(
+        "/invites",
+        json={"team_id": team_id, "role": "member"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert resp.status_code == HTTP_201_CREATED
     assert resp.json()["token"]
+    assert resp.json()["team_id"] == team_id
 
 
 async def test_signup_requires_valid_invite(client: AsyncTestClient) -> None:
@@ -279,6 +295,59 @@ async def test_reset_password_invalid_token_is_non_revealing(client: AsyncTestCl
         "/reset-password", json={"reset_token": "nope", "new_password": "NewPassw0rd!"}
     )
     assert resp.status_code == HTTP_400_BAD_REQUEST
+
+
+async def _signup_on_team(client: AsyncTestClient, admin: str, team_id: str, email: str) -> str:
+    """Sign a user up via an invite for `team_id`; returns the new user's id."""
+    token = await issue_invite(client, admin, team_id)
+    resp = await client.post(
+        "/signup",
+        json={"invite_token": token, "email": email, "password": "Passw0rd!"},
+    )
+    assert resp.status_code == HTTP_201_CREATED
+    return resp.json()["id"]
+
+
+async def test_list_users_requires_admin(client: AsyncTestClient) -> None:
+    await _register(client, "u@b.com", "Passw0rd!")
+    user = (await client.post("/login", json={"email": "u@b.com", "password": "Passw0rd!"})).json()[
+        "access_token"
+    ]
+    resp = await client.get("/users", headers={"Authorization": f"Bearer {user}"})
+    assert resp.status_code == HTTP_403_FORBIDDEN
+
+
+async def test_list_users_returns_users_for_admin(client: AsyncTestClient) -> None:
+    admin = await _admin_token(client)
+    team_id = await seed_team(client, admin)
+    await _signup_on_team(client, admin, team_id, "alice@b.com")
+    resp = await client.get("/users", headers={"Authorization": f"Bearer {admin}"})
+    assert resp.status_code == HTTP_200_OK
+    emails = {u["email"] for u in resp.json()}
+    assert {"admin@example.com", "alice@b.com"} <= emails
+
+
+async def test_delete_user_blocked_while_on_a_team(client: AsyncTestClient) -> None:
+    # Signing up via an invite joins the user to its team, so deletion is refused
+    # (409) until that membership is removed — this also proves signup added it.
+    admin = await _admin_token(client)
+    team_id = await seed_team(client, admin)
+    user_id = await _signup_on_team(client, admin, team_id, "alice@b.com")
+    resp = await client.delete(f"/users/{user_id}", headers={"Authorization": f"Bearer {admin}"})
+    assert resp.status_code == HTTP_409_CONFLICT
+
+
+async def test_delete_user_succeeds_once_off_all_teams(client: AsyncTestClient) -> None:
+    admin = await _admin_token(client)
+    team_id = await seed_team(client, admin)
+    user_id = await _signup_on_team(client, admin, team_id, "alice@b.com")
+    headers = {"Authorization": f"Bearer {admin}"}
+    removed = await client.delete(f"/teams/{team_id}/members/{user_id}", headers=headers)
+    assert removed.status_code in (HTTP_200_OK, HTTP_204_NO_CONTENT)
+    deleted = await client.delete(f"/users/{user_id}", headers=headers)
+    assert deleted.status_code in (HTTP_200_OK, HTTP_204_NO_CONTENT)
+    listed = (await client.get("/users", headers=headers)).json()
+    assert all(u["email"] != "alice@b.com" for u in listed)
 
 
 def test_app_imports_and_routes() -> None:

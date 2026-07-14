@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
+from _invite_helpers import seed_team_and_invite
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -51,7 +52,7 @@ async def _admin_token(client: AsyncTestClient) -> str:
 
 
 async def _register_and_login(client: AsyncTestClient, admin: str, email: str) -> str:
-    invite = (await client.post("/invites", headers=_bearer(admin))).json()["token"]
+    invite = await seed_team_and_invite(client, admin)
     await client.post(
         "/signup",
         json={"invite_token": invite, "email": email, "password": "Passw0rd!"},

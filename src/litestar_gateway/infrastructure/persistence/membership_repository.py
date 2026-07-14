@@ -59,6 +59,18 @@ class SQLAlchemyTeamMembershipRepository:
         )
         return [m.to_entity() for m in models]
 
+    async def list_by_user(
+        self, user_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[TeamMembership]:
+        models = await self._session.scalars(
+            select(TeamMembershipModel)
+            .where(TeamMembershipModel.user_id == user_id)
+            .order_by(TeamMembershipModel.created_at, TeamMembershipModel.id)
+            .limit(limit)
+            .offset(offset)
+        )
+        return [m.to_entity() for m in models]
+
     async def count_admins(self, team_id: UUID) -> int:
         count = await self._session.scalar(
             select(func.count())

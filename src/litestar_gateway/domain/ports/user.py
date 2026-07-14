@@ -81,3 +81,9 @@ class UserRepository(Protocol):
         """Reset the failure counter, any lock, and the lock-cycle escalation
         (after a successful login or an admin unlock)."""
         ...
+
+    async def delete(self, user_id: UUID) -> None:
+        """Hard-delete the user. Callers must first ensure the account has no
+        team memberships or created API keys (those FKs are RESTRICT); pending
+        password resets — which cascade — are removed with the row."""
+        ...

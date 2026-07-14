@@ -56,6 +56,12 @@ class TeamMembershipRepository(Protocol):
         self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
     ) -> list[TeamMembership]: ...
 
+    async def list_by_user(
+        self, user_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[TeamMembership]:
+        """The user's memberships across all teams — used to guard user deletion."""
+        ...
+
     async def count_admins(self, team_id: UUID) -> int:
         """Number of admin memberships on the team. Unpaginated on purpose: the
         last-admin invariant must see every admin, not just the first page."""

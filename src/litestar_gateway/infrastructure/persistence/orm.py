@@ -115,6 +115,8 @@ class InviteModel(base.UUIDAuditBase):
     token_hash: Mapped[str] = mapped_column(unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column()
     used_at: Mapped[datetime | None] = mapped_column(default=None)
+    team_id: Mapped[UUID | None] = mapped_column(ForeignKey("team.id"), default=None, index=True)
+    role: Mapped[str | None] = mapped_column(default=None)
 
     def to_entity(self) -> Invite:
         return Invite(
@@ -123,6 +125,8 @@ class InviteModel(base.UUIDAuditBase):
             created_at=self.created_at,
             expires_at=self.expires_at,
             used_at=self.used_at,
+            team_id=self.team_id,
+            role=self.role,
         )
 
 

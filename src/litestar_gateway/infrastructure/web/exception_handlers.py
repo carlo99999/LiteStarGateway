@@ -65,6 +65,7 @@ from litestar_gateway.domain.exceptions import (
     UpstreamRequestRejected,
     UpstreamTimeout,
     UpstreamUnavailable,
+    UserHasReferences,
     UserNotFound,
     WeakPassword,
 )
@@ -86,6 +87,7 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     (ModelNotFound, HTTP_404_NOT_FOUND),
     (RouterNotFound, HTTP_404_NOT_FOUND),
     (AlreadyMember, HTTP_409_CONFLICT),
+    (UserHasReferences, HTTP_409_CONFLICT),
     (OrganizationNotEmpty, HTTP_409_CONFLICT),
     (TeamNotEmpty, HTTP_409_CONFLICT),
     (LastTeamAdmin, HTTP_409_CONFLICT),

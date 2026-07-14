@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from litestar_gateway.domain.entities import IssuedInvite, IssuedPasswordReset, User
+from litestar_gateway.domain.entities import IssuedInvite, IssuedPasswordReset, TeamRole, User
 
 
 @dataclass(frozen=True)
@@ -14,6 +14,16 @@ class SignupRequest:
     invite_token: str
     email: str
     password: str
+
+
+@dataclass(frozen=True)
+class InviteCreateRequest:
+    """Admin picks the team the invited user joins and their role there — both
+    required, so a new account is never created team-less. `role` is validated
+    against the TeamRole enum by the framework."""
+
+    team_id: UUID
+    role: TeamRole = TeamRole.MEMBER
 
 
 @dataclass(frozen=True)
@@ -70,6 +80,9 @@ class InviteResponse:
     id: UUID
     token: str
     created_at: datetime
+    expires_at: datetime
+    team_id: UUID | None
+    role: str | None
 
     @classmethod
     def from_issued(cls, issued: IssuedInvite) -> InviteResponse:
@@ -77,6 +90,9 @@ class InviteResponse:
             id=issued.invite.id,
             token=issued.token,
             created_at=issued.invite.created_at,
+            expires_at=issued.invite.expires_at,
+            team_id=issued.invite.team_id,
+            role=issued.invite.role,
         )
 
 

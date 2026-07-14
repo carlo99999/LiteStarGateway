@@ -23,6 +23,8 @@ class SQLAlchemyInviteRepository:
             token_hash=invite.token_hash,
             expires_at=invite.expires_at,
             used_at=invite.used_at,
+            team_id=invite.team_id,
+            role=invite.role,
         )
         self._session.add(model)
         await self._session.commit()

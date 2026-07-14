@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from litestar.router import Router
 
+from litestar_gateway.infrastructure.web.users.delete_user import delete_user
 from litestar_gateway.infrastructure.web.users.invites import create_invite
+from litestar_gateway.infrastructure.web.users.list_users import list_users
 from litestar_gateway.infrastructure.web.users.password_reset import (
     create_password_reset,
     reset_password,
@@ -24,6 +26,8 @@ def create_users_router() -> Router:
         route_handlers=[
             signup,
             create_invite,
+            list_users,
+            delete_user,
             create_password_reset,
             reset_password,
             set_user_active,

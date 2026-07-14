@@ -12,6 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from _invite_helpers import seed_team_and_invite
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_400_BAD_REQUEST,
@@ -225,7 +226,7 @@ async def test_only_platform_admin_can_set_or_remove_budget(client: AsyncTestCli
 
     # Onboard a regular user (invite → signup → login) and make them team admin:
     # they manage the team but must NOT be able to raise their own spend cap.
-    invite = (await client.post("/invites", headers=_bearer(admin))).json()["token"]
+    invite = await seed_team_and_invite(client, admin)
     await client.post(
         "/signup",
         json={

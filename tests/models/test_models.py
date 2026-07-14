@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 import pytest
+from _invite_helpers import seed_team_and_invite
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -195,7 +196,7 @@ async def test_non_team_admin_forbidden(client: AsyncTestClient) -> None:
     admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
     cred = await _credential(client, admin, "openai")
     team = await _team(client, admin)
-    invite = (await client.post("/invites", headers=_bearer(admin))).json()["token"]
+    invite = await seed_team_and_invite(client, admin)
     await client.post(
         "/signup",
         json={"invite_token": invite, "email": "out@b.com", "password": "Passw0rd!"},
