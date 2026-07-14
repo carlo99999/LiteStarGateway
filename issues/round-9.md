@@ -39,7 +39,7 @@ Counts: **1 CRITICAL · 4 HIGH · 6 MEDIUM · 2 LOW**.
 
 | ID | Titolo | Priorità | File coinvolti | Stato |
 |---|---|---|---|---|
-| ISSUE-001 | `key-issuer` può ruotare una key di service principal e ottenere scope management | critical | `infrastructure/web/teams/controller.py:335-359`; `application/service.py:117-140` | open |
+| ISSUE-001 | `key-issuer` può ruotare una key di service principal e ottenere scope management | critical | `infrastructure/web/teams/controller.py:335-359`; `application/service.py:117-140` | **Fixed** ([#249](https://github.com/carlo99999/LiteStarGateway/pull/249)) |
 | ISSUE-002 | La rotazione trasferisce la proprietà della personal key all'operatore | high | `application/service.py:117-140`; `infrastructure/web/teams/controller.py:335-359` | open |
 | ISSUE-003 | La disattivazione utente non revoca subito la vecchia key in grace | high | `application/service.py:139`; `persistence/repository.py:85-95` | open |
 | ISSUE-004 | Il rate limit per API key è bypassabile su embeddings e images | high | `application/completion_service.py:423-451,562-594` | open |
@@ -53,12 +53,25 @@ Counts: **1 CRITICAL · 4 HIGH · 6 MEDIUM · 2 LOW**.
 | ISSUE-012 | Il rate limiter in-memory non elimina mai i bucket inattivi | low | `infrastructure/rate_limiter.py:27-42` | open |
 | ISSUE-013 | La UI trasforma qualsiasi errore budget in “nessun budget” | low | `ui/src/features/teams/api.ts:43-49` | open |
 
+## Resolution status — IN PROGRESS
+
+La remediation è iniziata dal finding critical. **ISSUE-001** è risolta dalla
+[#249](https://github.com/carlo99999/LiteStarGateway/pull/249): il rotate risolve prima
+la key attiva nel team e, per qualsiasi key associata a un service principal, richiede
+anche `SERVICE_PRINCIPALS_MANAGE` prima di emettere la replacement. I test RBAC coprono
+gli scope `inference`, `management` e `all`, verificano che il diniego non modifichi la
+key e che la replacement autorizzata resti soggetta al kill switch dello SP.
+
+| ID | Priorità | Stato | PR |
+|---|---|---|---|
+| ISSUE-001 | critical | **Fixed** | [#249](https://github.com/carlo99999/LiteStarGateway/pull/249) |
+
 ## Issues
 
 ### ISSUE-001 — `key-issuer` può ruotare una key di service principal e ottenere scope management
 
 **Priorità:** critical
-**Stato:** open
+**Stato:** **Fixed** ([#249](https://github.com/carlo99999/LiteStarGateway/pull/249))
 **File coinvolti:** `src/litestar_gateway/infrastructure/web/teams/controller.py:335-359`, `src/litestar_gateway/application/service.py:117-140`
 
 **Problema**
@@ -387,7 +400,7 @@ React Query mostri lo stato di errore.
 | Admin UI | **6.5/10** | Build typed e pulita, ma token storage, pagination e masking errori non sono production-ready. |
 | Test / CI | **8.5/10** | 807 test verdi e gate forti; mancano test di interazione RBAC/rotation/FK che avrebbero catturato i finding principali. |
 
-**Overall: 6.8/10.** La base resta buona e verificata, ma ISSUE-001 va chiusa prima di
-considerare sicura la rotazione in presenza dei ruoli estesi. ISSUE-002..005 sono il
+**Overall: 6.8/10.** La base resta buona e verificata. ISSUE-001 è stata chiusa dalla
+[#249](https://github.com/carlo99999/LiteStarGateway/pull/249); ISSUE-002..005 sono il
 blocco successivo perché riguardano controlli di revoca e governance, non semplici
 rifiniture UI.

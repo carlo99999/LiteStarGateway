@@ -10,7 +10,7 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 | Round | Focus | New findings (C·H·M·L) | Status |
 |---|---|---|---|
-| [Round 9](round-9.md) — 2026-07-14 | Full-tree post-R8 (admin UI, org/team CRUD, invites, RPM, API-key rotation) | 1·4·6·2 | Open |
+| [Round 9](round-9.md) — 2026-07-14 | Full-tree post-R8 (admin UI, org/team CRUD, invites, RPM, API-key rotation) | 1·4·6·2 | C001 fixed; 4H+6M+2L open |
 | [Round 8](round-8.md) — 2026-07-09 | Native provider-endpoint surface (Anthropic/Gemini passthrough, conformance, auth/error changes) | 1·3·3·3 | 1C+3H+3M+L008 fixed; L010 covered; L009 deferred |
 | [Round 7](round-7.md) — 2026-07-08 | Fresh-eyes full-tree review (5 lenses: web/auth, concurrency, adapters, persistence, ops/tests) | 0·3·10·6 | 3H+10M fixed; 6L deferred |
 | [Round 6](round-6.md) — 2026-07-08 | New-feature deep review (routing, SCIM, Bedrock, RBAC/SSO, maintainability) | 2·6·12·5 | Fully remediated |
@@ -23,8 +23,8 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 ## Overall
 
 **As of Round 9: 6.8/10** — see [round-9.md](round-9.md#category-scores-this-round) for the
-category breakdown. The historical auth/tenancy core remains intact, but the new generic
-API-key rotate endpoint has one verified RBAC escalation and two regressions in personal-key
-revocation/ownership; these dominate the current score. The remaining post-R8 work is bounded
-to rate-limit coverage, invite/FK lifecycle, and admin-UI session/pagination correctness.
+category breakdown. The historical auth/tenancy core remains intact; the RBAC escalation in
+the generic API-key rotate endpoint is fixed by #249, while the two regressions in personal-key
+revocation/ownership remain open and dominate the current score. The remaining post-R8 work
+covers rate-limit coverage, invite/FK lifecycle, and admin-UI session/pagination correctness.
 Each round's own deferred items remain listed in that round's "Resolution status" section.
