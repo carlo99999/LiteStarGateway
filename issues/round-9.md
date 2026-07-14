@@ -46,7 +46,7 @@ Counts: **1 CRITICAL · 4 HIGH · 6 MEDIUM · 2 LOW**.
 | ISSUE-005 | L'admin può cancellare se stesso e lasciare la piattaforma senza admin | high | `application/user_service.py:186-204` | **Fixed** ([#252](https://github.com/carlo99999/LiteStarGateway/pull/252)) |
 | ISSUE-006 | Qualsiasi invite persistito rende il team non cancellabile | medium | `persistence/team_repository.py:85-101`; `orm.py:112-130` | **Fixed** ([#253](https://github.com/carlo99999/LiteStarGateway/pull/253)) |
 | ISSUE-007 | Creare un invite per un team inesistente restituisce 500 | medium | `application/user_service.py:160-177`; `persistence/invite_repository.py:20-32` | **Fixed** ([#253](https://github.com/carlo99999/LiteStarGateway/pull/253)) |
-| ISSUE-008 | L'invite token nella query string finisce in log e history | medium | `ui/src/features/users/InviteUserDialog.tsx:56-59`; `SignupPage.tsx:11-17` | open |
+| ISSUE-008 | L'invite token nella query string finisce in log e history | medium | `ui/src/features/users/InviteUserDialog.tsx:56-59`; `SignupPage.tsx:11-17` | **Fixed** ([#254](https://github.com/carlo99999/LiteStarGateway/pull/254)) |
 | ISSUE-009 | L'admin UI mostra solo i primi 100 record di ogni collezione | medium | `ui/src/features/*/api.ts` | open |
 | ISSUE-010 | Il JWT admin persistito in `localStorage` è leggibile da script same-origin | medium | `ui/src/features/auth/AuthProvider.tsx:12-23` | open |
 | ISSUE-011 | La rotazione non è atomica e può lasciare una replacement key orfana | medium | `application/service.py:128-140`; `persistence/repository.py:22-39,75-83` | **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250)) |
@@ -87,6 +87,13 @@ delete condividono un lock lifecycle sul team; gli invite sono eliminati con il
 team e i riferimenti stale diventano 404/409 di dominio. Registrazione, consumo
 single-use e membership sono atomici, inclusi expiry e conflitti email concorrenti.
 
+**ISSUE-008** è risolta dalla
+[#254](https://github.com/carlo99999/LiteStarGateway/pull/254): i link trasportano
+il bearer soltanto nel fragment, che viene catturato e rimosso dalla history prima
+del router. Il token resta in memoria per i retry, viene cancellato dopo il signup
+e la SPA imposta `Referrer-Policy: no-referrer`; i link query legacy sono redatti ma
+non più accettati.
+
 | ID | Priorità | Stato | PR |
 |---|---|---|---|
 | ISSUE-001 | critical | **Fixed** | [#249](https://github.com/carlo99999/LiteStarGateway/pull/249) |
@@ -96,6 +103,7 @@ single-use e membership sono atomici, inclusi expiry e conflitti email concorren
 | ISSUE-005 | high | **Fixed** | [#252](https://github.com/carlo99999/LiteStarGateway/pull/252) |
 | ISSUE-006 | medium | **Fixed** | [#253](https://github.com/carlo99999/LiteStarGateway/pull/253) |
 | ISSUE-007 | medium | **Fixed** | [#253](https://github.com/carlo99999/LiteStarGateway/pull/253) |
+| ISSUE-008 | medium | **Fixed** | [#254](https://github.com/carlo99999/LiteStarGateway/pull/254) |
 | ISSUE-011 | medium | **Fixed** | [#250](https://github.com/carlo99999/LiteStarGateway/pull/250) |
 
 ## Issues
@@ -277,7 +285,7 @@ delete-vs-create.
 ### ISSUE-008 — L'invite token nella query string finisce in log e history
 
 **Priorità:** medium
-**Stato:** open
+**Stato:** **Fixed** ([#254](https://github.com/carlo99999/LiteStarGateway/pull/254))
 **File coinvolti:** `ui/src/features/users/InviteUserDialog.tsx:56-59`, `ui/src/features/auth/SignupPage.tsx:11-17`
 
 **Problema**
