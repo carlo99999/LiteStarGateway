@@ -3,10 +3,16 @@ team isolation, and the no-self-replication rule (SP admin is JWT-only)."""
 
 from __future__ import annotations
 
-from litestar.status_codes import HTTP_201_CREATED, HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
+from _invite_helpers import issue_invite
+from litestar.status_codes import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_401_UNAUTHORIZED,
+    HTTP_403_FORBIDDEN,
+)
 from litestar.testing import AsyncTestClient
 
-from .conftest import _admin, _bearer, _model, _sp, _sp_key, _team_and_credential
+from .conftest import DEV_PASSWORD, _admin, _bearer, _model, _sp, _sp_key, _team_and_credential
 
 
 async def test_sp_key_can_manage_its_team(client: AsyncTestClient) -> None:
@@ -65,6 +71,31 @@ async def test_disabling_sp_is_a_kill_switch_for_inference_too(client: AsyncTest
     assert denied.status_code == HTTP_401_UNAUTHORIZED
 
 
+async def test_deleting_sp_revokes_and_detaches_its_keys(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    team, _ = await _team_and_credential(client, admin)
+    sp = await _sp(client, admin, team)
+    issued = await client.post(
+        f"/teams/{team}/service-principals/{sp}/keys",
+        json={"name": "machine", "scope": "all"},
+        headers=_bearer(admin),
+    )
+    assert issued.status_code == HTTP_201_CREATED, issued.text
+
+    deleted = await client.delete(f"/teams/{team}/service-principals/{sp}", headers=_bearer(admin))
+    assert deleted.status_code in (HTTP_200_OK, 204), deleted.text
+    assert (
+        await client.get("/whoami", headers=_bearer(issued.json()["plaintext"]))
+    ).status_code == HTTP_401_UNAUTHORIZED
+    principals = (
+        await client.get(f"/teams/{team}/service-principals", headers=_bearer(admin))
+    ).json()
+    assert all(principal["id"] != sp for principal in principals)
+    keys = (await client.get(f"/teams/{team}/keys", headers=_bearer(admin))).json()
+    deleted_key = next(key for key in keys if key["id"] == issued.json()["id"])
+    assert deleted_key["is_active"] is False
+
+
 async def test_sp_is_scoped_to_its_own_team(client: AsyncTestClient) -> None:
     admin = await _admin(client)
     team_a, cred = await _team_and_credential(client, admin, "A")
@@ -119,3 +150,39 @@ async def test_management_sp_key_cannot_administer_service_principals(
     # Nor a personal key on the same team.
     personal = await client.post(f"/teams/{team}/keys", json={"name": "p"}, headers=_bearer(key))
     assert personal.status_code == HTTP_401_UNAUTHORIZED
+
+
+async def test_deactivating_human_issuer_does_not_revoke_rotated_sp_keys(
+    client: AsyncTestClient,
+) -> None:
+    admin = await _admin(client)
+    team, _ = await _team_and_credential(client, admin)
+    invite = await issue_invite(client, admin, team, role="admin")
+    signup = await client.post(
+        "/signup",
+        json={"invite_token": invite, "email": "issuer@example.com", "password": DEV_PASSWORD},
+    )
+    assert signup.status_code == HTTP_201_CREATED, signup.text
+    issuer = (
+        await client.post("/login", json={"email": "issuer@example.com", "password": DEV_PASSWORD})
+    ).json()["access_token"]
+    sp_id = await _sp(client, issuer, team)
+    issued = await client.post(
+        f"/teams/{team}/service-principals/{sp_id}/keys",
+        json={"name": "machine", "scope": "all"},
+        headers=_bearer(issuer),
+    )
+    assert issued.status_code == HTTP_201_CREATED, issued.text
+    rotated = await client.post(
+        f"/teams/{team}/keys/{issued.json()['id']}/rotate", headers=_bearer(admin)
+    )
+    assert rotated.status_code == HTTP_201_CREATED, rotated.text
+
+    disabled = await client.patch(
+        f"/users/{signup.json()['id']}",
+        json={"is_active": False},
+        headers=_bearer(admin),
+    )
+    assert disabled.status_code == HTTP_200_OK, disabled.text
+    for plaintext in (issued.json()["plaintext"], rotated.json()["plaintext"]):
+        assert (await client.get("/whoami", headers=_bearer(plaintext))).status_code == HTTP_200_OK

@@ -25,6 +25,7 @@ def provide_scim_service(db_session: NamedDependency[AsyncSession]) -> ScimServi
     return ScimService(
         users=SQLAlchemyUserRepository(db_session),
         tokens=SQLAlchemyScimTokenRepository(db_session),
+        transaction=db_session,
         api_keys=SQLAlchemyAPIKeyRepository(db_session),
     )
 

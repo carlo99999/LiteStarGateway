@@ -7,6 +7,8 @@ create service principals or mint keys, so a leaked key cannot self-replicate.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -17,7 +19,7 @@ from litestar_gateway.domain.exceptions import (
     ServicePrincipalNotFound,
 )
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_gateway.domain.ports import ServicePrincipalRepository
+from litestar_gateway.domain.ports import ServicePrincipalRepository, Transaction
 
 
 def _now() -> datetime:
@@ -29,9 +31,20 @@ class ServicePrincipalService:
         self,
         service_principals: ServicePrincipalRepository,
         api_keys: APIKeyService,
+        transaction: Transaction,
     ) -> None:
         self._sps = service_principals
         self._keys = api_keys
+        self._transaction = transaction
+
+    @asynccontextmanager
+    async def _unit_of_work(self) -> AsyncGenerator[None]:
+        try:
+            yield
+            await self._transaction.commit()
+        except Exception:
+            await self._transaction.rollback()
+            raise
 
     _MAX_NAME = 200
 
@@ -67,11 +80,14 @@ class ServicePrincipalService:
         return await self._sps.set_enabled(sp_id, enabled)
 
     async def delete(self, team_id: UUID, sp_id: UUID) -> None:
-        await self._get_in_team(team_id, sp_id)
-        # Revoke the SP's keys first: the identity is going away, its
-        # credentials must not outlive it.
-        await self._keys.revoke_for_service_principal(sp_id, _now())
-        await self._sps.remove(sp_id)
+        async with self._unit_of_work():
+            # Match issue/rotate lock order (SP → API keys), then commit the
+            # credential revocation and identity deletion together.
+            service_principal = await self._sps.get_for_update(sp_id)
+            if service_principal is None or service_principal.team_id != team_id:
+                raise ServicePrincipalNotFound(str(sp_id))
+            await self._keys.revoke_for_service_principal(sp_id, _now())
+            await self._sps.remove(sp_id)
 
     async def issue_key(
         self,

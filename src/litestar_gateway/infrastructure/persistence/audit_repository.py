@@ -19,7 +19,7 @@ class SQLAlchemyAuditLog:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def record(self, event: AuditEvent) -> None:
+    async def stage(self, event: AuditEvent) -> None:
         self._session.add(
             AuditEventModel(
                 id=event.id,
@@ -33,6 +33,10 @@ class SQLAlchemyAuditLog:
                 detail=event.detail,
             )
         )
+        await self._session.flush()
+
+    async def record(self, event: AuditEvent) -> None:
+        await self.stage(event)
         await self._session.commit()
 
     async def list_recent(

@@ -15,6 +15,37 @@ from litestar_gateway.domain.entities import AuditEvent, Principal, User
 from litestar_gateway.domain.ports import AuditLog
 
 
+def make_audit_event(
+    request: Request,
+    actor: User | Principal | None,
+    action: str,
+    *,
+    target_type: str | None = None,
+    target_id: str | UUID | None = None,
+    detail: str | None = None,
+) -> AuditEvent:
+    # A Principal may be a human or a team service principal (API key); the
+    # trail records which one acted (email, or "api-key:<prefix>").
+    if isinstance(actor, Principal):
+        actor_id, actor_type = actor.audit_actor_id, actor.audit_actor_type
+        actor_email = actor.audit_label
+    else:
+        actor_id, actor_email = (actor.id, actor.email) if actor else (None, None)
+        actor_type = "user" if actor else None
+    return AuditEvent(
+        id=uuid4(),
+        action=action,
+        actor_id=actor_id,
+        actor_type=actor_type,
+        actor_email=actor_email,
+        target_type=target_type,
+        target_id=str(target_id) if target_id is not None else None,
+        ip=request.client.host if request.client else None,
+        detail=detail,
+        created_at=datetime.now(UTC),
+    )
+
+
 async def record_audit(
     audit_log: AuditLog,
     request: Request,
@@ -25,25 +56,13 @@ async def record_audit(
     target_id: str | UUID | None = None,
     detail: str | None = None,
 ) -> None:
-    # A Principal may be a human or a team service principal (API key); the
-    # trail records which one acted (email, or "api-key:<prefix>").
-    if isinstance(actor, Principal):
-        actor_id, actor_type = actor.audit_actor_id, actor.audit_actor_type
-        actor_email = actor.audit_label
-    else:
-        actor_id, actor_email = (actor.id, actor.email) if actor else (None, None)
-        actor_type = "user" if actor else None
     await audit_log.record(
-        AuditEvent(
-            id=uuid4(),
-            action=action,
-            actor_id=actor_id,
-            actor_type=actor_type,
-            actor_email=actor_email,
+        make_audit_event(
+            request,
+            actor,
+            action,
             target_type=target_type,
-            target_id=str(target_id) if target_id is not None else None,
-            ip=request.client.host if request.client else None,
+            target_id=target_id,
             detail=detail,
-            created_at=datetime.now(UTC),
         )
     )

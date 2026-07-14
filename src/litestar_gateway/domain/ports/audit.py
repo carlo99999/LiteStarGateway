@@ -12,6 +12,10 @@ from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 class AuditLog(Protocol):
     """Append-only audit trail of privileged actions."""
 
+    async def stage(self, event: AuditEvent) -> None:
+        """Stage an event in the caller-owned transaction."""
+        ...
+
     async def record(self, event: AuditEvent) -> None: ...
 
     async def list_recent(

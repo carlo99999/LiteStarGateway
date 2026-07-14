@@ -11,6 +11,9 @@ from litestar_gateway.infrastructure.persistence.repository import SQLAlchemyAPI
 from litestar_gateway.infrastructure.persistence.service_principal_repository import (
     SQLAlchemyServicePrincipalRepository,
 )
+from litestar_gateway.infrastructure.persistence.user_repository import (
+    SQLAlchemyUserRepository,
+)
 
 
 def provide_service_principal_service(
@@ -18,5 +21,11 @@ def provide_service_principal_service(
 ) -> ServicePrincipalService:
     return ServicePrincipalService(
         SQLAlchemyServicePrincipalRepository(db_session),
-        APIKeyService(SQLAlchemyAPIKeyRepository(db_session)),
+        APIKeyService(
+            SQLAlchemyAPIKeyRepository(db_session),
+            transaction=db_session,
+            users=SQLAlchemyUserRepository(db_session),
+            service_principals=SQLAlchemyServicePrincipalRepository(db_session),
+        ),
+        transaction=db_session,
     )
