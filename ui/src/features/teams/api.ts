@@ -1,5 +1,6 @@
 import { api } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
+import { loadOptionalBudget } from "@/features/teams/budgetRequest";
 
 export type Team = components["schemas"]["TeamResponse"];
 export type TeamMember = components["schemas"]["MembershipResponse"];
@@ -42,11 +43,11 @@ export async function listTeamMembers(id: string): Promise<TeamMember[]> {
 
 /** GET /teams/{id}/budget — the team budget, or null when none is configured (404). */
 export async function getTeamBudget(id: string): Promise<TeamBudget | null> {
-  const { data, error } = await api.GET("/teams/{team_id}/budget", {
-    params: { path: { team_id: id } },
-  });
-  if (error || !data) return null;
-  return data;
+  return loadOptionalBudget(() =>
+    api.GET("/teams/{team_id}/budget", {
+      params: { path: { team_id: id } },
+    }),
+  );
 }
 
 /** GET /teams/{id}/usage — per-model token/cost totals for the team. */
