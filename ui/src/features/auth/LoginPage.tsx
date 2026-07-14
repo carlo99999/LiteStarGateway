@@ -87,7 +87,7 @@ export function LoginPage() {
         </Card>
 
         <p className="mt-4 text-center font-mono text-[11px] text-muted-foreground">
-          bearer-token session · phase 0
+          HttpOnly cookie session · CSRF protected
         </p>
       </div>
     </div>

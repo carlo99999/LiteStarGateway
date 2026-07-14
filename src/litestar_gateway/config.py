@@ -187,9 +187,9 @@ class Settings:
     # Public and unauthenticated when on — disable in production to avoid exposing
     # the full admin/credential API surface.
     openapi_enabled: bool = True
-    # Mark the SSO state cookie `Secure` (HTTPS-only). Defaults on outside local
-    # envs; set explicitly (SESSION_COOKIE_SECURE) when TLS terminates at a proxy
-    # that speaks HTTP to the app, so the request scheme alone can't be trusted.
+    # Mark browser-session and SSO cookies `Secure` (HTTPS-only). Mandatory
+    # outside local envs because a TLS-terminating proxy may speak HTTP to the app,
+    # so the request scheme alone cannot be trusted.
     session_cookie_secure: bool = False
     # Optional Redis backing for the rate-limit store, shared across replicas. When
     # unset, an in-memory per-process store is used (fine for a single instance).
@@ -244,6 +244,10 @@ class Settings:
         # or a brute-forceable short key.
         if self.is_local:
             return
+        if not self.session_cookie_secure:
+            raise InsecureConfigurationError(
+                "SESSION_COOKIE_SECURE must be true outside local environments"
+            )
         # Production runs on PostgreSQL, full stop. SQLite is single-writer,
         # per-container storage: with N replicas each one gets its own silently
         # diverging database, and an unmounted volume loses everything on
@@ -313,8 +317,8 @@ class Settings:
             mlflow_experiment=os.environ.get("MLFLOW_EXPERIMENT", DEFAULT_MLFLOW_EXPERIMENT),
             mlflow_metrics_interval=_env_int("MLFLOW_METRICS_INTERVAL", 60, minimum=0),
             openapi_enabled=_env_bool("OPENAPI_ENABLED", True),
-            # Secure cookies on by default outside local envs; overridable for
-            # proxy topologies where the request scheme is HTTP behind TLS.
+            # Secure cookies are mandatory outside local environments. Local HTTPS
+            # requests also force Secure at response time.
             session_cookie_secure=_env_bool("SESSION_COOKIE_SECURE", not is_local),
             redis_url=os.environ.get("REDIS_URL"),
             oidc_discovery_url=os.environ.get("OIDC_DISCOVERY_URL"),

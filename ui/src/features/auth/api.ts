@@ -2,7 +2,7 @@ import { api } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 
 export type CurrentUser = components["schemas"]["UserResponse"];
-type TokenResponse = components["schemas"]["TokenResponse"];
+export type BrowserSession = components["schemas"]["BrowserSessionResponse"];
 
 /** Extract a human-readable message from an openapi-fetch error payload. */
 function messageFrom(error: unknown, fallback: string): string {
@@ -13,27 +13,32 @@ function messageFrom(error: unknown, fallback: string): string {
   return fallback;
 }
 
-/** POST /login — exchange email + password for a bearer JWT. */
-export async function login(email: string, password: string): Promise<TokenResponse> {
-  const { data, error } = await api.POST("/login", { body: { email, password } });
+/** Establish a browser-only HttpOnly cookie session. */
+export async function login(email: string, password: string): Promise<BrowserSession> {
+  const { data, error } = await api.POST("/session/login", {
+    body: { email, password },
+  });
   if (error || !data) {
     throw new Error(messageFrom(error, "Invalid email or password"));
   }
   return data;
 }
 
-/** GET /me — the authenticated user (also validates the current token). */
-export async function fetchCurrentUser(): Promise<CurrentUser> {
-  const { data, error } = await api.GET("/me");
+/** Restore and validate the cookie session after a reload. */
+export async function fetchBrowserSession(): Promise<BrowserSession> {
+  const { data, error } = await api.GET("/session");
   if (error || !data) {
     throw new Error(messageFrom(error, "Not authenticated"));
   }
   return data;
 }
 
-/** POST /logout — revoke the session token (best-effort). */
+/** Revoke the session server-side and expire its HttpOnly cookie. */
 export async function logout(): Promise<void> {
-  await api.POST("/logout");
+  const { error } = await api.POST("/session/logout");
+  if (error) {
+    throw new Error(messageFrom(error, "Logout failed"));
+  }
 }
 
 /** POST /signup — redeem an invite token to create the account and set its

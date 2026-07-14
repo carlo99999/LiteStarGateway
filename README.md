@@ -183,10 +183,12 @@ Notes:
   the per-IP rate limit. The image default is loopback: forwarded headers from
   any other peer are ignored, so a direct client cannot forge its IP to bypass
   the auth rate limit or spoof the audit log.
-  When TLS terminates at the proxy (the app sees plain HTTP), also set
-  `SESSION_COOKIE_SECURE=true` so the SSO state cookie is still marked `Secure`
-  (it defaults on outside local envs), and set `OIDC_REDIRECT_URI` to the public
-  callback URL so the IdP redirect matches what's registered.
+  Preserve the public `Host` header when proxying the same-origin admin console:
+  browser-session CSRF validation compares it with the browser's `Origin`.
+  `SESSION_COOKIE_SECURE=true` is mandatory outside local environments so SSO
+  and admin-session cookies remain HTTPS-only when TLS terminates at the proxy.
+  Set `OIDC_REDIRECT_URI` to the public callback URL so the IdP redirect matches
+  what's registered.
 - **Database**: production requires Postgres. `docker-compose.yml` runs it
   (`postgresql+asyncpg://…`) and the app connects to it. Pool sizing is
   configurable via `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` (Postgres only). The image

@@ -255,6 +255,9 @@ def _build_dependencies(
         "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
         "rate_limiter": Provide(lambda: rate_limiter, sync_to_thread=False),
         "keyring": Provide(keyring_provider, sync_to_thread=False),
+        "browser_session_cookie_secure": Provide(
+            lambda: settings.session_cookie_secure, sync_to_thread=False
+        ),
     }
 
 

@@ -27,6 +27,7 @@ def _settings(tmp_path: Path, **overrides) -> Settings:
         "jwt_secret": "a-strong-random-jwt-secret-0123456789",  # pragma: allowlist secret
         "salt_key": "a-strong-random-salt-key-0123456789",  # pragma: allowlist secret
         "environment": "production",
+        "session_cookie_secure": True,
     }
     values.update(overrides)
     return Settings(**values)
