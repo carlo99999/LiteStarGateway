@@ -36,7 +36,7 @@ class SQLAlchemyOrganizationRepository:
     async def list(self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0) -> list[Organization]:
         models = await self._session.scalars(
             select(OrganizationModel)
-            .order_by(OrganizationModel.created_at)
+            .order_by(OrganizationModel.created_at, OrganizationModel.id)
             .limit(limit)
             .offset(offset)
         )

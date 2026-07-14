@@ -65,7 +65,7 @@ class SQLAlchemyAPIKeyRepository:
         models = await self._session.scalars(
             select(APIKeyModel)
             .where(APIKeyModel.team_id == team_id)
-            .order_by(APIKeyModel.created_at)
+            .order_by(APIKeyModel.created_at, APIKeyModel.id)
             .limit(limit)
             .offset(offset)
         )
@@ -77,7 +77,7 @@ class SQLAlchemyAPIKeyRepository:
         models = await self._session.scalars(
             select(APIKeyModel)
             .where(APIKeyModel.created_by == created_by)
-            .order_by(APIKeyModel.created_at)
+            .order_by(APIKeyModel.created_at, APIKeyModel.id)
             .limit(limit)
             .offset(offset)
         )

@@ -15,11 +15,11 @@ import { Label } from "@/components/ui/label";
 import {
   issueServicePrincipalKey,
   issueTeamKey,
-  listServicePrincipals,
+  listAllServicePrincipals,
   type IssuedKey,
   type KeyScope,
 } from "@/features/api-keys/api";
-import { listTeams, parseRpm } from "@/features/teams/api";
+import { listAllTeams, parseRpm } from "@/features/teams/api";
 
 interface IssueKeyDialogProps {
   /** Fixed team (from the team detail page). Omit to show a team picker (from
@@ -67,9 +67,10 @@ export function IssueKeyDialog({ teamId, open, onOpenChange }: IssueKeyDialogPro
 
   // Team picker (only when no fixed team).
   const teams = useQuery({
-    queryKey: ["teams"],
-    queryFn: listTeams,
+    queryKey: ["teams", "all"],
+    queryFn: ({ signal }) => listAllTeams(signal),
     enabled: open && !teamId,
+    retry: false,
   });
 
   // Service principals are team-scoped, so reset the pick when the team changes.
@@ -78,9 +79,10 @@ export function IssueKeyDialog({ teamId, open, onOpenChange }: IssueKeyDialogPro
   }, [effectiveTeamId]);
 
   const sps = useQuery({
-    queryKey: ["team-service-principals", effectiveTeamId],
-    queryFn: () => listServicePrincipals(effectiveTeamId),
+    queryKey: ["team-service-principals", effectiveTeamId, "all"],
+    queryFn: ({ signal }) => listAllServicePrincipals(effectiveTeamId, signal),
     enabled: open && subject === "service_principal" && effectiveTeamId.length > 0,
+    retry: false,
   });
 
   const mutation = useMutation({
@@ -160,7 +162,11 @@ export function IssueKeyDialog({ teamId, open, onOpenChange }: IssueKeyDialogPro
                     onChange={(e) => setTeamPick(e.target.value)}
                   >
                     <option value="" disabled>
-                      {teams.isLoading ? "loading…" : "select a team"}
+                      {teams.isLoading
+                        ? "loading…"
+                        : teams.isError
+                          ? "failed to load teams"
+                          : "select a team"}
                     </option>
                     {(teams.data ?? []).map((t) => (
                       <option key={t.id} value={t.id}>
@@ -168,6 +174,9 @@ export function IssueKeyDialog({ teamId, open, onOpenChange }: IssueKeyDialogPro
                       </option>
                     ))}
                   </select>
+                  {teams.isError ? (
+                    <p className="font-mono text-xs text-destructive">{teams.error.message}</p>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -200,6 +209,8 @@ export function IssueKeyDialog({ teamId, open, onOpenChange }: IssueKeyDialogPro
                           ? "select a team first"
                           : sps.isLoading
                             ? "loading…"
+                            : sps.isError
+                              ? "failed to load service principals"
                             : "select a service principal"}
                       </option>
                       {(sps.data ?? []).map((sp) => (
@@ -209,6 +220,9 @@ export function IssueKeyDialog({ teamId, open, onOpenChange }: IssueKeyDialogPro
                         </option>
                       ))}
                     </select>
+                    {sps.isError ? (
+                      <p className="font-mono text-xs text-destructive">{sps.error.message}</p>
+                    ) : null}
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="key-scope">scope</Label>

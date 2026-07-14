@@ -1,4 +1,11 @@
 import { api } from "@/lib/api/client";
+import {
+  fetchAllPages,
+  pageRequest,
+  pageResult,
+  type PageRequest,
+  type PageResult,
+} from "@/lib/api/pagination";
 import type { components } from "@/lib/api/schema";
 
 export type Organization = components["schemas"]["OrganizationResponse"];
@@ -21,13 +28,31 @@ function errorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-/** GET /organizations — platform-admin list (offset-paginated, stable order). */
-export async function listOrganizations(): Promise<Organization[]> {
-  const { data, error } = await api.GET("/organizations");
+async function requestOrganizations(
+  request: PageRequest,
+  signal?: AbortSignal,
+): Promise<Organization[]> {
+  const { data, error } = await api.GET("/organizations", {
+    params: { query: request },
+    signal,
+  });
   if (error || !data) {
     throw new Error(errorMessage(error, "Failed to load organizations"));
   }
   return data;
+}
+
+/** One visible table page plus a sentinel-derived next-page flag. */
+export async function listOrganizationsPage(offset: number): Promise<PageResult<Organization>> {
+  const request = pageRequest(offset);
+  return pageResult(await requestOrganizations(request), offset);
+}
+
+/** Complete organization collection for selectors and cross-page lookups. */
+export async function listAllOrganizations(signal?: AbortSignal): Promise<Organization[]> {
+  return fetchAllPages((request) => requestOrganizations(request, signal), {
+    keyOf: (organization) => organization.id,
+  });
 }
 
 /** GET /organizations/{id} — one tenant (platform-admin). */

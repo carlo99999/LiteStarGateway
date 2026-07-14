@@ -1,26 +1,38 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { PaginationControls } from "@/components/common/PaginationControls";
 import { StatusDot } from "@/components/common/StatusDot";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteOrganizationDialog } from "@/features/organizations/DeleteOrganizationDialog";
 import { OrganizationFormDialog } from "@/features/organizations/OrganizationFormDialog";
-import { listOrganizations, type Organization } from "@/features/organizations/api";
+import { listOrganizationsPage, type Organization } from "@/features/organizations/api";
+import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
 
 function formatDate(iso: string): string {
   return new Date(iso).toISOString().slice(0, 19).replace("T", " ");
 }
 
 export function OrganizationsPage() {
-  const query = useQuery({ queryKey: ["organizations"], queryFn: listOrganizations });
+  const [offset, setOffset] = useState(0);
+  const query = useQuery({
+    queryKey: ["organizations", "page", offset],
+    queryFn: () => listOrganizationsPage(offset),
+  });
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Organization | null>(null);
   const [deleting, setDeleting] = useState<Organization | null>(null);
+
+  useEffect(() => {
+    if (!query.isFetching && query.data?.items.length === 0 && offset > 0) {
+      setOffset(previousPageOffset(offset));
+    }
+  }, [offset, query.data, query.isFetching]);
 
   function openCreate() {
     setEditing(null);
@@ -119,24 +131,31 @@ export function OrganizationsPage() {
         title="Organizations"
         description="Platform-scoped tenants. Create, rename, and delete — the API enforces every permission."
         actions={
-          <span className="flex items-center gap-3">
-            <Badge variant="muted">{query.data ? `${query.data.length} total` : "…"}</Badge>
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="h-4 w-4" />
-              New organization
-            </Button>
-          </span>
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            New organization
+          </Button>
         }
       />
       <DataTable
         columns={columns}
-        rows={query.data}
+        rows={query.data?.items}
         rowKey={(org) => org.id}
         isLoading={query.isLoading}
         error={query.error as Error | null}
         emptyTitle="no organizations"
         emptyDescription="Create your first tenant with the New organization button."
       />
+      {query.data ? (
+        <PaginationControls
+          offset={query.data.offset}
+          pageSize={TABLE_PAGE_SIZE}
+          itemCount={query.data.items.length}
+          hasNext={query.data.hasNext}
+          isFetching={query.isFetching}
+          onOffsetChange={setOffset}
+        />
+      ) : null}
 
       <OrganizationFormDialog
         mode={editing ? "edit" : "create"}

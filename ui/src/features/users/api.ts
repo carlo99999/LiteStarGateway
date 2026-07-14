@@ -1,5 +1,6 @@
 import { api } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
+import { pageRequest, pageResult, type PageResult } from "@/lib/api/pagination";
 
 export type User = components["schemas"]["UserResponse"];
 export type Invite = components["schemas"]["InviteResponse"];
@@ -14,11 +15,12 @@ function fail(error: unknown, fallback: string): Error {
   return new Error(fallback);
 }
 
-/** GET /users — every platform user (platform-admin). */
-export async function listUsers(): Promise<User[]> {
-  const { data, error } = await api.GET("/users");
+/** GET /users — one platform-admin table page. */
+export async function listUsersPage(offset: number): Promise<PageResult<User>> {
+  const request = pageRequest(offset);
+  const { data, error } = await api.GET("/users", { params: { query: request } });
   if (error || !data) throw fail(error, "Failed to load users");
-  return data;
+  return pageResult(data, offset);
 }
 
 /** POST /invites — mint a single-use invite that joins the new account to
