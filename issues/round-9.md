@@ -48,7 +48,7 @@ Counts: **1 CRITICAL · 4 HIGH · 6 MEDIUM · 2 LOW**.
 | ISSUE-007 | Creare un invite per un team inesistente restituisce 500 | medium | `application/user_service.py:160-177`; `persistence/invite_repository.py:20-32` | **Fixed** ([#253](https://github.com/carlo99999/LiteStarGateway/pull/253)) |
 | ISSUE-008 | L'invite token nella query string finisce in log e history | medium | `ui/src/features/users/InviteUserDialog.tsx:56-59`; `SignupPage.tsx:11-17` | **Fixed** ([#254](https://github.com/carlo99999/LiteStarGateway/pull/254)) |
 | ISSUE-009 | L'admin UI mostra solo i primi 100 record di ogni collezione | medium | `ui/src/features/*/api.ts` | open |
-| ISSUE-010 | Il JWT admin persistito in `localStorage` è leggibile da script same-origin | medium | `ui/src/features/auth/AuthProvider.tsx:12-23` | open |
+| ISSUE-010 | Il JWT admin persistito in `localStorage` è leggibile da script same-origin | medium | `ui/src/features/auth/AuthProvider.tsx:12-23` | **Fixed** ([#255](https://github.com/carlo99999/LiteStarGateway/pull/255)) |
 | ISSUE-011 | La rotazione non è atomica e può lasciare una replacement key orfana | medium | `application/service.py:128-140`; `persistence/repository.py:22-39,75-83` | **Fixed** ([#250](https://github.com/carlo99999/LiteStarGateway/pull/250)) |
 | ISSUE-012 | Il rate limiter in-memory non elimina mai i bucket inattivi | low | `infrastructure/rate_limiter.py:27-42` | open |
 | ISSUE-013 | La UI trasforma qualsiasi errore budget in “nessun budget” | low | `ui/src/features/teams/api.ts:43-49` | open |
@@ -94,6 +94,14 @@ del router. Il token resta in memoria per i retry, viene cancellato dopo il sign
 e la SPA imposta `Referrer-Policy: no-referrer`; i link query legacy sono redatti ma
 non più accettati.
 
+**ISSUE-010** è risolta dalla
+[#255](https://github.com/carlo99999/LiteStarGateway/pull/255): la console usa una
+sessione cookie host-only `HttpOnly; SameSite=Strict` con CSRF legato al JWT e
+controllo same-origin, mentre bearer e API key restano isolati per CLI/SDK e
+inference. Il JWT non è mai esposto a JavaScript; HTTPS usa il prefisso `__Host-`,
+le configurazioni non-local insecure falliscono all'avvio e il token legacy viene
+solo eliminato da `localStorage` durante il bootstrap.
+
 | ID | Priorità | Stato | PR |
 |---|---|---|---|
 | ISSUE-001 | critical | **Fixed** | [#249](https://github.com/carlo99999/LiteStarGateway/pull/249) |
@@ -104,6 +112,7 @@ non più accettati.
 | ISSUE-006 | medium | **Fixed** | [#253](https://github.com/carlo99999/LiteStarGateway/pull/253) |
 | ISSUE-007 | medium | **Fixed** | [#253](https://github.com/carlo99999/LiteStarGateway/pull/253) |
 | ISSUE-008 | medium | **Fixed** | [#254](https://github.com/carlo99999/LiteStarGateway/pull/254) |
+| ISSUE-010 | medium | **Fixed** | [#255](https://github.com/carlo99999/LiteStarGateway/pull/255) |
 | ISSUE-011 | medium | **Fixed** | [#250](https://github.com/carlo99999/LiteStarGateway/pull/250) |
 
 ## Issues
@@ -309,7 +318,7 @@ altra attività; impostare una `Referrer-Policy` restrittiva.
 ### ISSUE-009 — L'admin UI mostra solo i primi 100 record di ogni collezione
 
 **Priorità:** medium
-**Stato:** open
+**Stato:** **Fixed** ([#255](https://github.com/carlo99999/LiteStarGateway/pull/255))
 **File coinvolti:** `ui/src/features/organizations/api.ts:24-31`, `ui/src/features/teams/api.ts:18-23,34-40,52-58`, `ui/src/features/users/api.ts:17-22`, `ui/src/features/api-keys/api.ts:18-25`
 
 **Problema**
