@@ -7,6 +7,8 @@ import {
 import { AppShell } from "@/app/layout/AppShell";
 import { PlannedPage } from "@/app/PlannedPage";
 import { ApiKeysPage } from "@/features/api-keys/ApiKeysPage";
+import { AuditPage } from "@/features/audit/AuditPage";
+import { BudgetsPage } from "@/features/budgets/BudgetsPage";
 import { CredentialsPage } from "@/features/credentials/CredentialsPage";
 import { ModelsPage } from "@/features/models/ModelsPage";
 import { RouterDetailPage } from "@/features/routing/RouterDetailPage";
@@ -20,6 +22,7 @@ import { OrganizationsPage } from "@/features/organizations/OrganizationsPage";
 import { ServicePrincipalsPage } from "@/features/service-principals/ServicePrincipalsPage";
 import { TeamDetailPage } from "@/features/teams/TeamDetailPage";
 import { TeamsPage } from "@/features/teams/TeamsPage";
+import { UsagePage } from "@/features/usage/UsagePage";
 import { UsersPage } from "@/features/users/UsersPage";
 
 function captureInviteTokenFromWindow() {
@@ -131,22 +134,23 @@ const routerDetailRoute = createRoute({
   component: RouterDetailPage,
 });
 
-// Scaffolded-but-not-implemented feature areas (Phase 1 lands their views),
-// grouped in the sidebar under gateway / governance / observability.
-const planned: { path: string; command: string; title: string }[] = [
-  // observability
-  { path: "/usage", command: "usage report", title: "Usage & Cost" },
-  { path: "/budgets", command: "budgets list", title: "Budgets" },
-  { path: "/audit", command: "audit log", title: "Audit Log" },
-];
+const usageRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/usage",
+  component: UsagePage,
+});
 
-const plannedRoutes = planned.map((p) =>
-  createRoute({
-    getParentRoute: () => appRoute,
-    path: p.path,
-    component: () => <PlannedPage command={p.command} title={p.title} />,
-  }),
-);
+const budgetsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/budgets",
+  component: BudgetsPage,
+});
+
+const auditRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/audit",
+  component: AuditPage,
+});
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -164,7 +168,9 @@ const routeTree = rootRoute.addChildren([
     modelsRoute,
     routingRoute,
     routerDetailRoute,
-    ...plannedRoutes,
+    usageRoute,
+    budgetsRoute,
+    auditRoute,
   ]),
 ]);
 

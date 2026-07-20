@@ -60,9 +60,9 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "observability",
     items: [
-      { to: "/usage", label: "usage", icon: BarChart3 },
-      { to: "/budgets", label: "budgets", icon: Wallet },
-      { to: "/audit", label: "audit", icon: ScrollText },
+      { to: "/usage", label: "usage", icon: BarChart3, ready: true },
+      { to: "/budgets", label: "budgets", icon: Wallet, ready: true },
+      { to: "/audit", label: "audit", icon: ScrollText, ready: true },
     ],
   },
 ];
