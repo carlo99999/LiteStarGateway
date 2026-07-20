@@ -41,7 +41,7 @@ class RoutingDecisionLog(Protocol):
     async def list_decisions(
         self,
         team_id: UUID,
-        router_name: str,
+        router_id: UUID,
         *,
         strategy: str | None = None,
         chosen_model: str | None = None,
@@ -51,14 +51,16 @@ class RoutingDecisionLog(Protocol):
     ) -> list[RoutingDecisionRecord]: ...
 
     async def distribution(
-        self, team_id: UUID, router_name: str
+        self, team_id: UUID, router_id: UUID
     ) -> list[tuple[str, str | None, bool, int]]:
         """(chosen_model, tier, is_shadow, count) rows for the router."""
         ...
 
-    async def savings(self, team_id: UUID, router_name: str) -> tuple[float, int, int]:
+    async def savings(self, team_id: UUID, router_id: UUID) -> tuple[float, int, int]:
         """(total_estimated_savings, decisions_counted, decisions_without_usage)
-        over non-shadow decisions: Σ (alt−chosen unit cost) × actual tokens."""
+        over one router's non-shadow decisions: Σ (alt−chosen unit cost) ×
+        actual tokens. Keyed by router id, so a deleted router's history never
+        leaks into a later router that reused its name."""
         ...
 
     async def platform_savings(self) -> tuple[float, int, int]:

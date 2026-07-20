@@ -504,6 +504,7 @@ class RouterService:
                     RoutingDecisionRecord(
                         id=uuid4(),
                         team_id=router.team_id,
+                        router_id=router.id,
                         router_name=router.name,
                         strategy=decision.strategy,
                         chosen_model=decision.model_name,
@@ -585,11 +586,11 @@ class RouterService:
 
     async def list_decisions(self, team_id: UUID, router_id: UUID, **filters):
         router = await self.get(team_id, router_id)
-        return await self._decisions.list_decisions(team_id, router.name, **filters)
+        return await self._decisions.list_decisions(team_id, router.id, **filters)
 
     async def stats(self, team_id: UUID, router_id: UUID) -> dict[str, Any]:
         router = await self.get(team_id, router_id)
-        rows = await self._decisions.distribution(team_id, router.name)
+        rows = await self._decisions.distribution(team_id, router.id)
         by_model: dict[str, int] = {}
         by_tier: dict[str, int] = {}
         shadow_by_model: dict[str, int] = {}
@@ -610,7 +611,7 @@ class RouterService:
 
     async def savings(self, team_id: UUID, router_id: UUID) -> dict[str, Any]:
         router = await self.get(team_id, router_id)
-        total, counted, without_usage = await self._decisions.savings(team_id, router.name)
+        total, counted, without_usage = await self._decisions.savings(team_id, router.id)
         return {
             "router": router.name,
             "estimated_savings": total,
@@ -661,6 +662,7 @@ class RouterService:
                 RoutingDecisionRecord(
                     id=record_id,
                     team_id=router.team_id,
+                    router_id=router.id,
                     router_name=router.name,
                     strategy=decision.strategy,
                     chosen_model=decision.model_name,

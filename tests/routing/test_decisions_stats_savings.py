@@ -183,6 +183,48 @@ async def test_stats_distribution(client: AsyncTestClient) -> None:
     assert stats["by_tier"] == {"SIMPLE": 2, "COMPLEX": 1}
 
 
+async def test_recreated_router_name_does_not_inherit_old_decisions(
+    client: AsyncTestClient,
+) -> None:
+    # ISSUE-001: decisions are keyed by router id, not name. Deleting "auto" and
+    # recreating a router with the same name must NOT surface the old router's
+    # decisions/stats under the new router.
+    key, team, old_router, admin = await _setup(client)
+    await _chat(client, key, COMPLEX_PROMPT)
+    old_rows = (
+        await client.get(f"/teams/{team}/routers/{old_router}/decisions", headers=_bearer(admin))
+    ).json()
+    assert len(old_rows) == 1
+
+    assert (
+        await client.delete(f"/teams/{team}/routers/{old_router}", headers=_bearer(admin))
+    ).status_code in (200, 204)
+
+    new_router = (
+        await client.post(
+            f"/teams/{team}/routers",
+            json={
+                "name": "auto",  # same name, freed by the delete
+                "default_model": "big-model",
+                "candidates": [
+                    {"model_name": "big-model", "description": "large", "quality_tier": "COMPLEX"}
+                ],
+            },
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    assert new_router != old_router
+
+    new_rows = (
+        await client.get(f"/teams/{team}/routers/{new_router}/decisions", headers=_bearer(admin))
+    ).json()
+    assert new_rows == []
+    stats = (
+        await client.get(f"/teams/{team}/routers/{new_router}/stats", headers=_bearer(admin))
+    ).json()
+    assert stats["total"] == 0
+
+
 async def test_savings_use_actual_tokens_and_unit_cost_delta(
     client: AsyncTestClient,
 ) -> None:
@@ -245,10 +287,14 @@ async def session(tmp_path: Path) -> AsyncIterator[AsyncSession]:
     await engine.dispose()
 
 
+_ROUTER_ID = uuid4()
+
+
 def _decision(team_id: UUID, **overrides: object) -> RoutingDecisionModel:
     fields: dict[str, object] = {
         "id": uuid4(),
         "team_id": team_id,
+        "router_id": _ROUTER_ID,
         "router_name": "auto",
         "strategy": "heuristic",
         "chosen_model": "cheap-model",
@@ -270,7 +316,7 @@ async def test_savings_excludes_row_with_null_completion_tokens(session: AsyncSe
     await session.commit()
 
     total, counted, without_usage = await SQLAlchemyRoutingDecisionLog(session).savings(
-        team_id, "auto"
+        team_id, _ROUTER_ID
     )
     # The NULL-completion row cannot be priced: out of the SUM *and* the count.
     assert counted == 1
@@ -288,7 +334,7 @@ async def test_savings_excludes_one_sided_output_cost_symmetrically(
     await session.commit()
 
     total, counted, without_usage = await SQLAlchemyRoutingDecisionLog(session).savings(
-        team_id, "auto"
+        team_id, _ROUTER_ID
     )
     # A NULL output cost on either side excludes the row the same way.
     assert counted == 1
@@ -303,7 +349,7 @@ async def test_savings_counts_fully_priced_rows(session: AsyncSession) -> None:
     await session.commit()
 
     total, counted, without_usage = await SQLAlchemyRoutingDecisionLog(session).savings(
-        team_id, "auto"
+        team_id, _ROUTER_ID
     )
     assert counted == 2
     assert without_usage == 0

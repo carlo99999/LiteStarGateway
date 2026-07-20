@@ -113,6 +113,10 @@ class RoutingDecisionRecord:
 
     id: UUID
     team_id: UUID
+    # The router this decision belongs to. Stable across renames and immune to
+    # name reuse — per-router reads filter by this, never by `router_name`.
+    # Nullable only for rows written before the column existed (see migration).
+    router_id: UUID | None
     router_name: str
     strategy: str
     chosen_model: str
