@@ -1,6 +1,12 @@
 import { api } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
-import { pageRequest, pageResult, type PageRequest, type PageResult } from "@/lib/api/pagination";
+import {
+  fetchAllPages,
+  pageRequest,
+  pageResult,
+  type PageRequest,
+  type PageResult,
+} from "@/lib/api/pagination";
 
 export type Model = components["schemas"]["ModelResponse"];
 export type ModelType = components["schemas"]["ModelType"];
@@ -41,6 +47,21 @@ async function requestModels(teamId: string, request: PageRequest): Promise<Mode
 export async function listModelsPage(teamId: string, offset: number): Promise<PageResult<Model>> {
   const request = pageRequest(offset);
   return pageResult(await requestModels(teamId, request), offset);
+}
+
+/** Complete team model collection, for selectors (e.g. router candidates). */
+export async function listAllModels(teamId: string, signal?: AbortSignal): Promise<Model[]> {
+  return fetchAllPages(
+    async (request) => {
+      const { data, error } = await api.GET("/teams/{team_id}/models", {
+        params: { path: { team_id: teamId }, query: request },
+        signal,
+      });
+      if (error || !data) throw fail(error, "Failed to load models");
+      return data;
+    },
+    { keyOf: (model) => model.id },
+  );
 }
 
 /** POST /teams/{id}/models — create a model deployment. `provider` must match
