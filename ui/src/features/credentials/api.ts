@@ -1,6 +1,12 @@
 import { api } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
-import { pageRequest, pageResult, type PageRequest, type PageResult } from "@/lib/api/pagination";
+import {
+  fetchAllPages,
+  pageRequest,
+  pageResult,
+  type PageRequest,
+  type PageResult,
+} from "@/lib/api/pagination";
 
 export type Credential = components["schemas"]["CredentialResponse"];
 export type Provider = components["schemas"]["Provider"];
@@ -24,6 +30,18 @@ async function requestCredentials(request: PageRequest): Promise<Credential[]> {
 export async function listCredentialsPage(offset: number): Promise<PageResult<Credential>> {
   const request = pageRequest(offset);
   return pageResult(await requestCredentials(request), offset);
+}
+
+/** Complete credentials collection, for selectors (e.g. the model create form). */
+export async function listAllCredentials(signal?: AbortSignal): Promise<Credential[]> {
+  return fetchAllPages(
+    async (request) => {
+      const { data, error } = await api.GET("/credentials", { params: { query: request }, signal });
+      if (error || !data) throw fail(error, "Failed to load credentials");
+      return data;
+    },
+    { keyOf: (credential) => credential.id },
+  );
 }
 
 /** POST /credentials — create a provider credential. `values` are encrypted at
