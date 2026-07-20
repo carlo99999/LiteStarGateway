@@ -48,6 +48,12 @@ class SQLAlchemyTeamRepository:
         model = await self._session.get(TeamModel, team_id)
         return model.to_entity() if model else None
 
+    async def list_by_ids(self, team_ids: Sequence[UUID]) -> list[Team]:
+        if not team_ids:
+            return []
+        models = await self._session.scalars(select(TeamModel).where(TeamModel.id.in_(team_ids)))
+        return [model.to_entity() for model in models]
+
     async def lock_for_lifecycle(self, team_id: UUID) -> Team | None:
         # A no-op write is a cross-database lifecycle mutex: PostgreSQL takes a
         # row-level NO KEY UPDATE lock and SQLite takes its writer lock. Raw SQL

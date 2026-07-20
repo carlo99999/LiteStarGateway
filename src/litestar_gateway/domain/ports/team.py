@@ -29,6 +29,11 @@ class TeamRepository(TeamLifecycleRepository, Protocol):
 
     async def get(self, team_id: UUID) -> Team | None: ...
 
+    async def list_by_ids(self, team_ids: Sequence[UUID]) -> list[Team]:
+        """Fetch many teams in one query (batch lookup, avoids N+1). Missing ids
+        are simply absent from the result; order is not guaranteed."""
+        ...
+
     async def list_by_organization(
         self, organization_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
     ) -> list[Team]: ...

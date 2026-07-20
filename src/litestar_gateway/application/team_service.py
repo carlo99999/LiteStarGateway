@@ -282,15 +282,26 @@ class TeamService:
         return await self._memberships.list_by_team(team_id, limit=limit, offset=offset)
 
     async def list_user_teams(self, user: User) -> list[tuple[Team, TeamRole]]:
-        """The teams `user` belongs to, with their role there. Self-scoped: the
-        caller only ever sees their own memberships, so no permission gate."""
-        memberships = await self._memberships.list_by_user(user.id)
-        teams: list[tuple[Team, TeamRole]] = []
-        for membership in memberships:
-            team = await self._teams.get(membership.team_id)
-            if team is not None:
-                teams.append((team, membership.role))
-        return teams
+        """Every team `user` belongs to, with their role there. Self-scoped: the
+        caller only ever sees their own memberships, so no permission gate.
+
+        Pages through all memberships (the "my teams" contract is complete, not
+        first-page-only) and resolves the teams in one batch query (no N+1)."""
+        memberships: list[TeamMembership] = []
+        offset = 0
+        while True:
+            page = await self._memberships.list_by_user(
+                user.id, limit=DEFAULT_PAGE_SIZE, offset=offset
+            )
+            memberships.extend(page)
+            if len(page) < DEFAULT_PAGE_SIZE:
+                break
+            offset += len(page)
+        teams_by_id = {
+            team.id: team
+            for team in await self._teams.list_by_ids([m.team_id for m in memberships])
+        }
+        return [(teams_by_id[m.team_id], m.role) for m in memberships if m.team_id in teams_by_id]
 
     async def add_member(
         self, actor: User, team_id: UUID, email: str, role: TeamRole
@@ -301,16 +312,28 @@ class TeamService:
             raise UserNotFound(email)
         if await self._memberships.get(team_id, user.id) is not None:
             raise AlreadyMember(email)
-        async with self._unit_of_work():
-            membership = await self._memberships.add(
-                TeamMembership(
-                    id=uuid4(),
-                    team_id=team_id,
-                    user_id=user.id,
-                    role=role,
-                    created_at=_now(),
+        try:
+            async with self._unit_of_work():
+                membership = await self._memberships.add(
+                    TeamMembership(
+                        id=uuid4(),
+                        team_id=team_id,
+                        user_id=user.id,
+                        role=role,
+                        created_at=_now(),
+                    )
                 )
-            )
+        except AlreadyMember:
+            # The adapter maps *any* insert IntegrityError to AlreadyMember, but
+            # it can also be an FK violation from a concurrent deletion: the
+            # user (or team) vanished between the pre-check and the insert.
+            # Re-read committed state to report the real cause instead of a
+            # misleading 409 "already a member" (round 10 ISSUE-006).
+            if await self._users.get(user.id) is None:
+                raise UserNotFound(email) from None
+            if await self._teams.get(team_id) is None:
+                raise TeamNotFound(str(team_id)) from None
+            raise
         return membership
 
     async def set_role(
