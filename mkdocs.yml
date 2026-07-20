@@ -68,9 +68,13 @@ nav:
       - README: index.md
       - Examples: EXAMPLES.md
       - Contributing: CONTRIBUTING.md
-      - Security: SECURITY.md
+      - Security policy: SECURITY.md
+      - Security model & hardening: docs/security-hardening.md
+  - Admin console:
+      - Console guide: docs/admin-console.md
   - Operations:
-      - Deployment: docs/deployment.md
+      - Operations guide: docs/operations.md
+      - Deployment (design): docs/deployment.md
       - PostgreSQL: docs/postgres.md
       - Database migrations: docs/db-migrations.md
       - CI: docs/ci.md

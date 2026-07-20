@@ -52,7 +52,7 @@ Out of scope:
 ## Known accepted limitations
 
 Deliberate design decisions and tracked follow-ups are documented in
-[README → Security](README.md#security--known-issues--follow-ups) and in the
+[Security model & hardening](docs/security-hardening.md) and in the
 code-review log ([`issues/INDEX.md`](issues/INDEX.md)) — please read those before
 reporting, as some behaviors (e.g. platform-global provider credentials) are
 intentional.
