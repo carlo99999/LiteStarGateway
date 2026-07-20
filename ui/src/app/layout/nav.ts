@@ -54,7 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: "/organizations", label: "organizations", icon: Building2, ready: true },
       { to: "/teams", label: "teams", icon: Users, ready: true },
       { to: "/users", label: "users", icon: UserRound, ready: true },
-      { to: "/service-principals", label: "service-principals", icon: Bot },
+      { to: "/service-principals", label: "service-principals", icon: Bot, ready: true },
     ],
   },
   {

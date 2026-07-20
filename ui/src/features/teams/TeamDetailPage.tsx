@@ -8,6 +8,7 @@ import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TeamKeys } from "@/features/api-keys/TeamKeys";
+import { TeamServicePrincipals } from "@/features/service-principals/TeamServicePrincipals";
 import {
   getTeam,
   getTeamBudget,
@@ -186,6 +187,10 @@ export function TeamDetailPage() {
 
       <div className="mt-8">
         <TeamKeys teamId={teamId} />
+      </div>
+
+      <div className="mt-8">
+        <TeamServicePrincipals teamId={teamId} />
       </div>
     </>
   );
