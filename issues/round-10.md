@@ -197,3 +197,11 @@ non-Error verrebbe mistipata in silenzio. Fix a basso costo: narrowing
 prodotto finding nuovi e le fix precedenti sono confermate da verifica avversaria. Il
 lavoro rimasto è robustezza di prodotto: un `router_id` sulle decision e stati di
 errore onesti nella console.
+
+## Resolution status — FULLY REMEDIATED
+
+All nine findings are fixed across three PRs:
+
+- **#282** — ISSUE-001 (routing decisions keyed by `router_id`, not name; deleted/reused-name history no longer leaks) and ISSUE-007 (savings aggregate collapsed to one point-in-time query).
+- **#283** — ISSUE-002 (dashboard no longer fabricates "$0.00" on load failure), ISSUE-004 (Budgets/audit/router-detail surface errors distinctly), ISSUE-005 (explicit `0` costs accepted; embeddings threshold validated in-form), ISSUE-009 (shared `toError` helper replaces the `as Error | null` casts).
+- **#284** — ISSUE-003 (`/me/teams` complete, no 100-cap, batched lookup), ISSUE-006 (`add_member` reports the real cause on a concurrent-deletion race), ISSUE-008 (schema-invariant test guards the `user_account` FK set used by `delete_user`).

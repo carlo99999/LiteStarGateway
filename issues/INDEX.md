@@ -10,7 +10,7 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 | Round | Focus | New findings (C·H·M·L) | Status |
 |---|---|---|---|
-| [Round 10](round-10.md) — 2026-07-21 | Post-R9 delta (console completa, savings/me-teams endpoints, R9-fix verification) | 0·2·4·3 | Open |
+| [Round 10](round-10.md) — 2026-07-21 | Post-R9 delta (console completa, savings/me-teams endpoints, R9-fix verification) | 0·2·4·3 | Fully remediated |
 | [Round 9](round-9.md) — 2026-07-14 | Full-tree post-R8 (admin UI, org/team CRUD, invites, RPM, API-key rotation) | 1·4·6·2 | Fully remediated |
 | [Round 8](round-8.md) — 2026-07-09 | Native provider-endpoint surface (Anthropic/Gemini passthrough, conformance, auth/error changes) | 1·3·3·3 | 1C+3H+3M+L008 fixed; L010 covered; L009 deferred |
 | [Round 7](round-7.md) — 2026-07-08 | Fresh-eyes full-tree review (5 lenses: web/auth, concurrency, adapters, persistence, ops/tests) | 0·3·10·6 | 3H+10M fixed; 6L deferred |
