@@ -281,6 +281,17 @@ class TeamService:
         await self.ensure_team_permission(actor, team_id, Permission.MEMBERS_READ)
         return await self._memberships.list_by_team(team_id, limit=limit, offset=offset)
 
+    async def list_user_teams(self, user: User) -> list[tuple[Team, TeamRole]]:
+        """The teams `user` belongs to, with their role there. Self-scoped: the
+        caller only ever sees their own memberships, so no permission gate."""
+        memberships = await self._memberships.list_by_user(user.id)
+        teams: list[tuple[Team, TeamRole]] = []
+        for membership in memberships:
+            team = await self._teams.get(membership.team_id)
+            if team is not None:
+                teams.append((team, membership.role))
+        return teams
+
     async def add_member(
         self, actor: User, team_id: UUID, email: str, role: TeamRole
     ) -> TeamMembership:

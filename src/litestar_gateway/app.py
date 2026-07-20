@@ -58,7 +58,10 @@ from litestar_gateway.infrastructure.web.organizations.dependencies import (
     provide_organization_service,
     provide_team_service,
 )
-from litestar_gateway.infrastructure.web.routing import RouterController
+from litestar_gateway.infrastructure.web.routing import (
+    RouterController,
+    platform_routing_savings,
+)
 from litestar_gateway.infrastructure.web.routing.dependencies import (
     make_shadow_log_factory,
     make_shadow_repos_factory,
@@ -208,6 +211,7 @@ def _build_route_handlers(database: Database) -> list:
         TeamController,  # team-admin: members + team-scoped API keys
         ModelController,  # team-admin: team-scoped model deployments
         RouterController,  # team-admin: smart routers (virtual models)
+        platform_routing_savings,  # platform-admin: cross-team routing savings
         ServicePrincipalController,  # team-admin: service principals + their keys
         CredentialController,  # platform-admin: encrypted provider credentials
         AuditController,  # platform-admin: read the audit trail

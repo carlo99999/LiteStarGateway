@@ -61,6 +61,15 @@ class RoutingDecisionLog(Protocol):
         over non-shadow decisions: Σ (alt−chosen unit cost) × actual tokens."""
         ...
 
+    async def platform_savings(self) -> tuple[float, int, int]:
+        """The same savings aggregate across every team and router — the
+        platform-wide "what smart routing saved" figure (admin dashboard)."""
+        ...
+
+    async def team_savings(self, team_id: UUID) -> tuple[float, int, int]:
+        """The savings aggregate for one team across all of its routers."""
+        ...
+
 
 @runtime_checkable
 class RoutingDecisionLogFactory(Protocol):

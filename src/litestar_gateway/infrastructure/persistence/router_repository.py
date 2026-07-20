@@ -270,13 +270,26 @@ class SQLAlchemyRoutingDecisionLog:
         return [tuple(row) for row in await self._session.execute(stmt)]
 
     async def savings(self, team_id: UUID, router_name: str) -> tuple[float, int, int]:
-        # Σ over non-shadow decisions with usage AND both cost profiles:
-        # (alt − chosen) unit cost × the request's actual tokens.
-        base = (
+        return await self._savings_aggregate(
             RoutingDecisionModel.team_id == team_id,
             RoutingDecisionModel.router_name == router_name,
             RoutingDecisionModel.is_shadow.is_(False),
         )
+
+    async def platform_savings(self) -> tuple[float, int, int]:
+        # Every team and router — the dashboard's platform-wide figure.
+        return await self._savings_aggregate(RoutingDecisionModel.is_shadow.is_(False))
+
+    async def team_savings(self, team_id: UUID) -> tuple[float, int, int]:
+        # One team, all of its routers.
+        return await self._savings_aggregate(
+            RoutingDecisionModel.team_id == team_id,
+            RoutingDecisionModel.is_shadow.is_(False),
+        )
+
+    async def _savings_aggregate(self, *base: Any) -> tuple[float, int, int]:
+        # Σ over non-shadow decisions with usage AND both cost profiles:
+        # (alt − chosen) unit cost × the request's actual tokens.
         counted = (
             *base,
             RoutingDecisionModel.prompt_tokens.is_not(None),

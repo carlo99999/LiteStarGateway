@@ -56,6 +56,12 @@ class RecordingDecisionLog:
     async def savings(self, team_id: UUID, router_name: str) -> tuple[float, int, int]:
         return (0.0, 0, 0)
 
+    async def platform_savings(self) -> tuple[float, int, int]:
+        return (0.0, 0, 0)
+
+    async def team_savings(self, team_id: UUID) -> tuple[float, int, int]:
+        return (0.0, 0, 0)
+
 
 def _router(default_model: str) -> RouterConfig:
     return RouterConfig(

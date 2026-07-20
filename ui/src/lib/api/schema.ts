@@ -383,6 +383,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** MyTeams */
+        get: operations["MeTeamsMyTeams"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/session/login": {
         parameters: {
             query?: never;
@@ -820,6 +837,40 @@ export interface paths {
         };
         /** Request distribution per chosen model / tier */
         get: operations["TeamsTeamIdRoutersRouterIdStatsRouterStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/savings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estimated smart-routing savings for the team (all routers) */
+        get: operations["TeamsTeamIdSavingsTeamSavings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/routing/savings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estimated smart-routing savings across the whole platform */
+        get: operations["RoutingSavingsPlatformRoutingSavings"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1328,6 +1379,13 @@ export interface components {
          * @enum {string}
          */
         ModelType: "chat" | "image" | "embeddings";
+        /** MyTeamResponse */
+        MyTeamResponse: {
+            /** Format: uuid */
+            team_id: string;
+            name: string;
+            role: string;
+        };
         /** OrganizationResponse */
         OrganizationResponse: {
             /** Format: uuid */
@@ -2326,6 +2384,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    MeTeamsMyTeams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyTeamResponse"][];
                 };
             };
         };
@@ -3815,6 +3893,67 @@ export interface operations {
                         extra?: null | {
                             [key: string]: unknown;
                         } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdSavingsTeamSavings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    RoutingSavingsPlatformRoutingSavings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
                     };
                 };
             };

@@ -4,10 +4,16 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { StatusDot } from "@/components/common/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { listAuditPage } from "@/features/audit/api";
-import { api } from "@/lib/api/client";
+import { useAuth } from "@/features/auth/use-auth";
+import {
+  listMyTeams,
+  platformSavings,
+  teamSavings,
+} from "@/features/dashboard/api";
 import { getOrganizationSpend, listAllOrganizations } from "@/features/organizations/api";
 import { listAllTeams } from "@/features/teams/api";
 import { listAllUsers } from "@/features/users/api";
+import { api } from "@/lib/api/client";
 
 const SPEND_DAYS = 30;
 const TOP_TEAMS = 6;
@@ -46,10 +52,36 @@ function StatCard({
   return to ? <Link to={to}>{body}</Link> : body;
 }
 
-/** Landing overview: platform counts, gateway readiness, 30-day spend with the
- * top teams, and the latest audit activity. Read-only, built entirely from the
- * endpoints the section pages already use. */
-export function DashboardPage() {
+function GatewayCard() {
+  const health = useQuery({
+    queryKey: ["health"],
+    queryFn: gatewayReady,
+    refetchInterval: 30_000,
+    retry: false,
+  });
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        // gateway
+      </p>
+      <p className="mt-3">
+        {health.isLoading ? (
+          <span className="font-mono text-xs text-muted-foreground">checking…</span>
+        ) : (
+          <StatusDot
+            tone={health.data ? "green" : "amber"}
+            label={health.data ? "ready" : "not ready"}
+            pulse={health.data === true}
+          />
+        )}
+      </p>
+    </div>
+  );
+}
+
+/** Platform-admin landing: counts, gateway readiness, smart-routing savings,
+ * 30-day spend with the top teams, and the latest audit activity. */
+function AdminDashboard() {
   const orgs = useQuery({
     queryKey: ["organizations", "all"],
     queryFn: ({ signal }) => listAllOrganizations(signal),
@@ -65,10 +97,9 @@ export function DashboardPage() {
     queryFn: ({ signal }) => listAllUsers(signal),
     retry: false,
   });
-  const health = useQuery({
-    queryKey: ["health"],
-    queryFn: gatewayReady,
-    refetchInterval: 30_000,
+  const savings = useQuery({
+    queryKey: ["routing", "savings"],
+    queryFn: platformSavings,
     retry: false,
   });
   const audit = useQuery({
@@ -96,32 +127,16 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader
-        command="status"
-        title="Dashboard"
-        description="Platform at a glance — tenancy, gateway readiness, recent spend and activity."
-      />
-
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="organizations" value={orgs.data?.length ?? "—"} to="/organizations" />
         <StatCard label="teams" value={teams.data?.length ?? "—"} to="/teams" />
         <StatCard label="users" value={users.data?.length ?? "—"} to="/users" />
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            // gateway
-          </p>
-          <p className="mt-3">
-            {health.isLoading ? (
-              <span className="font-mono text-xs text-muted-foreground">checking…</span>
-            ) : (
-              <StatusDot
-                tone={health.data ? "green" : "amber"}
-                label={health.data ? "ready" : "not ready"}
-                pulse={health.data === true}
-              />
-            )}
-          </p>
-        </div>
+        <StatCard
+          label="routing saved"
+          value={savings.data ? formatUsd(savings.data.estimated_savings) : "—"}
+          to="/routing"
+        />
+        <GatewayCard />
       </div>
 
       <div className="mb-6 grid gap-3 lg:grid-cols-2">
@@ -149,7 +164,8 @@ export function DashboardPage() {
                     <span
                       className="block h-full rounded bg-primary/60"
                       style={{
-                        width: maxTeamCost > 0 ? `${Math.round((team.cost / maxTeamCost) * 100)}%` : 0,
+                        width:
+                          maxTeamCost > 0 ? `${Math.round((team.cost / maxTeamCost) * 100)}%` : 0,
                       }}
                     />
                   </span>
@@ -166,6 +182,13 @@ export function DashboardPage() {
                 : "no spend recorded yet."}
             </p>
           )}
+          {savings.data && savings.data.decisions_counted > 0 ? (
+            <p className="mt-3 font-mono text-xs text-muted-foreground">
+              smart routing saved{" "}
+              <span className="text-primary">{formatUsd(savings.data.estimated_savings)}</span> vs
+              the priciest capable model ({savings.data.decisions_counted} decisions, all time)
+            </p>
+          ) : null}
         </div>
 
         <div className="rounded-lg border border-border bg-card p-4">
@@ -199,6 +222,81 @@ export function DashboardPage() {
           )}
         </div>
       </div>
+    </>
+  );
+}
+
+/** Non-admin landing: the caller's own teams, with smart-routing savings where
+ * their role grants usage:read (team admin / billing-viewer — a plain member's
+ * 403 renders as "not visible", per the deliberate role design). */
+function MemberDashboard() {
+  const myTeams = useQuery({ queryKey: ["me", "teams"], queryFn: listMyTeams });
+  const savingsQueries = useQueries({
+    queries: (myTeams.data ?? []).map((team) => ({
+      queryKey: ["teams", team.team_id, "savings"],
+      queryFn: () => teamSavings(team.team_id),
+      retry: false,
+    })),
+  });
+
+  return (
+    <>
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="your teams" value={myTeams.data?.length ?? "—"} />
+        <GatewayCard />
+      </div>
+
+      <div className="rounded-lg border border-border bg-card p-4">
+        <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          // your teams
+        </p>
+        {myTeams.isLoading ? (
+          <p className="font-mono text-xs text-muted-foreground">loading…</p>
+        ) : (myTeams.data ?? []).length === 0 ? (
+          <p className="font-mono text-xs text-muted-foreground">
+            you are not a member of any team yet.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {(myTeams.data ?? []).map((team, index) => {
+              const savings = savingsQueries[index];
+              return (
+                <div key={team.team_id} className="flex items-center gap-3 font-mono text-xs">
+                  <span className="w-48 truncate text-foreground">{team.name}</span>
+                  <Badge variant="muted">{team.role}</Badge>
+                  <span className="ml-auto tabular text-muted-foreground">
+                    {savings?.data
+                      ? `routing saved ${formatUsd(savings.data.estimated_savings)}`
+                      : savings?.isError
+                        ? "savings not visible for your role"
+                        : "…"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** Landing overview. Platform admins get the whole platform; everyone else
+ * sees only the teams they belong to. */
+export function DashboardPage() {
+  const { user } = useAuth();
+  return (
+    <>
+      <PageHeader
+        command="status"
+        title="Dashboard"
+        description={
+          user?.is_admin
+            ? "Platform at a glance — tenancy, gateway readiness, spend, routing savings and activity."
+            : "Your teams at a glance."
+        }
+      />
+      {user?.is_admin ? <AdminDashboard /> : <MemberDashboard />}
     </>
   );
 }
