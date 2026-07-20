@@ -5,11 +5,11 @@ import {
   Outlet,
 } from "@tanstack/react-router";
 import { AppShell } from "@/app/layout/AppShell";
-import { PlannedPage } from "@/app/PlannedPage";
 import { ApiKeysPage } from "@/features/api-keys/ApiKeysPage";
 import { AuditPage } from "@/features/audit/AuditPage";
 import { BudgetsPage } from "@/features/budgets/BudgetsPage";
 import { CredentialsPage } from "@/features/credentials/CredentialsPage";
+import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ModelsPage } from "@/features/models/ModelsPage";
 import { RouterDetailPage } from "@/features/routing/RouterDetailPage";
 import { RoutingPage } from "@/features/routing/RoutingPage";
@@ -65,7 +65,7 @@ const appRoute = createRoute({
 const indexRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/",
-  component: () => <PlannedPage command="dashboard" title="Dashboard" />,
+  component: DashboardPage,
 });
 
 const organizationsRoute = createRoute({

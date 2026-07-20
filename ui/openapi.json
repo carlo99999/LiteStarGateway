@@ -1386,6 +1386,32 @@
                 "deprecated": false
             }
         },
+        "/me/teams": {
+            "get": {
+                "tags": [
+                    "session"
+                ],
+                "summary": "MyTeams",
+                "operationId": "MeTeamsMyTeams",
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/MyTeamResponse"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/session/login": {
             "post": {
                 "tags": [
@@ -4744,6 +4770,104 @@
                 "deprecated": false
             }
         },
+        "/teams/{team_id}/savings": {
+            "get": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "Estimated smart-routing savings for the team (all routers)",
+                "operationId": "TeamsTeamIdSavingsTeamSavings",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {},
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/routing/savings": {
+            "get": {
+                "tags": [
+                    "routing"
+                ],
+                "summary": "Estimated smart-routing savings across the whole platform",
+                "operationId": "RoutingSavingsPlatformRoutingSavings",
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {},
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/teams/{team_id}/service-principals": {
             "get": {
                 "tags": [
@@ -7210,6 +7334,27 @@
                     "embeddings"
                 ],
                 "title": "ModelType"
+            },
+            "MyTeamResponse": {
+                "properties": {
+                    "team_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name",
+                    "role",
+                    "team_id"
+                ],
+                "title": "MyTeamResponse"
             },
             "OrganizationResponse": {
                 "properties": {

@@ -618,6 +618,27 @@ class RouterService:
             "decisions_without_usage": without_usage,
         }
 
+    async def platform_savings(self) -> dict[str, Any]:
+        """Savings across every team and router — the platform-admin dashboard
+        figure. Authorization is the caller's job (admin-only endpoint)."""
+        total, counted, without_usage = await self._decisions.platform_savings()
+        return {
+            "estimated_savings": total,
+            "decisions_counted": counted,
+            "decisions_without_usage": without_usage,
+        }
+
+    async def team_savings(self, team_id: UUID) -> dict[str, Any]:
+        """Savings for one team across all of its routers. Authorization is the
+        caller's job (team USAGE_READ, checked at the endpoint)."""
+        total, counted, without_usage = await self._decisions.team_savings(team_id)
+        return {
+            "team_id": str(team_id),
+            "estimated_savings": total,
+            "decisions_counted": counted,
+            "decisions_without_usage": without_usage,
+        }
+
     @staticmethod
     def _distillation_text(decision: RoutingDecision, ctx) -> tuple[str | None, str | None]:
         """§S6: keep the text only for judge decisions and hybrid escalations —

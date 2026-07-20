@@ -1,6 +1,11 @@
 import { api } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
-import { pageRequest, pageResult, type PageResult } from "@/lib/api/pagination";
+import {
+  fetchAllPages,
+  pageRequest,
+  pageResult,
+  type PageResult,
+} from "@/lib/api/pagination";
 
 export type User = components["schemas"]["UserResponse"];
 export type Invite = components["schemas"]["InviteResponse"];
@@ -21,6 +26,18 @@ export async function listUsersPage(offset: number): Promise<PageResult<User>> {
   const { data, error } = await api.GET("/users", { params: { query: request } });
   if (error || !data) throw fail(error, "Failed to load users");
   return pageResult(data, offset);
+}
+
+/** Complete user collection, for counts/aggregates (platform-admin). */
+export async function listAllUsers(signal?: AbortSignal): Promise<User[]> {
+  return fetchAllPages(
+    async (request) => {
+      const { data, error } = await api.GET("/users", { params: { query: request }, signal });
+      if (error || !data) throw fail(error, "Failed to load users");
+      return data;
+    },
+    { keyOf: (user) => user.id },
+  );
 }
 
 /** POST /invites — mint a single-use invite that joins the new account to

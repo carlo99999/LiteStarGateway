@@ -78,6 +78,22 @@ async def test_me_rejects_garbage_token(client: AsyncTestClient) -> None:
     assert resp.status_code == HTTP_401_UNAUTHORIZED
 
 
+async def test_me_teams_lists_only_own_memberships(client: AsyncTestClient) -> None:
+    # Signup via invite joins its team; /me/teams shows that membership (and
+    # only the caller's own) with the role from the invite.
+    await _signup(client, "alice@b.com", "S3cret!!")
+    token = (
+        await client.post("/login", json={"email": "alice@b.com", "password": "S3cret!!"})
+    ).json()["access_token"]
+    resp = await client.get("/me/teams", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == HTTP_200_OK
+    rows = resp.json()
+    assert len(rows) == 1
+    assert rows[0]["role"] == "member"
+    assert rows[0]["name"]
+    assert rows[0]["team_id"]
+
+
 async def test_me_returns_current_user(client: AsyncTestClient) -> None:
     await _signup(client, "alice@b.com", "S3cret!!")
     token = (

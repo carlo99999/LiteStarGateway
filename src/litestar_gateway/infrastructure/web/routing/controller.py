@@ -30,7 +30,10 @@ from litestar_gateway.domain.routing import (
     RouterConfig,
 )
 from litestar_gateway.infrastructure.web.audit.recorder import record_audit
-from litestar_gateway.infrastructure.web.session.dependencies import provide_current_user
+from litestar_gateway.infrastructure.web.session.dependencies import (
+    provide_current_admin,
+    provide_current_user,
+)
 
 
 @dataclass(frozen=True)
@@ -321,6 +324,20 @@ class RouterController(Controller):
         return await router_service.savings(team_id, router_id)
 
     @get(
+        "/{team_id:uuid}/savings",
+        summary="Estimated smart-routing savings for the team (all routers)",
+    )
+    async def team_savings(
+        self,
+        team_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        router_service: NamedDependency[RouterService],
+    ) -> dict[str, Any]:
+        await team_service.ensure_team_permission(current_user, team_id, Permission.USAGE_READ)
+        return await router_service.team_savings(team_id)
+
+    @get(
         "/{team_id:uuid}/routers/{router_id:uuid}/decisions/export",
         summary="JSONL export of judge/escalation decisions (distillation dataset, §S6)",
     )
@@ -367,3 +384,18 @@ class RouterController(Controller):
         ]
         body = "\n".join(lines) + ("\n" if lines else "")
         return Response(body, media_type="application/x-ndjson")
+
+
+# Platform-wide savings aggregate — outside the /teams controller because it
+# spans every team (platform-admin only, for the dashboard).
+@get(
+    "/routing/savings",
+    summary="Estimated smart-routing savings across the whole platform",
+    dependencies={"admin_user": Provide(provide_current_admin)},
+    tags=["routing"],
+)
+async def platform_routing_savings(
+    admin_user: NamedDependency[User],
+    router_service: NamedDependency[RouterService],
+) -> dict[str, Any]:
+    return await router_service.platform_savings()

@@ -11,7 +11,7 @@ from litestar_gateway.infrastructure.web.session.browser import (
 )
 from litestar_gateway.infrastructure.web.session.login import login
 from litestar_gateway.infrastructure.web.session.logout import logout
-from litestar_gateway.infrastructure.web.session.me import me
+from litestar_gateway.infrastructure.web.session.me import me, my_teams
 
 
 def create_session_router() -> Router:
@@ -21,6 +21,7 @@ def create_session_router() -> Router:
             login,
             logout,
             me,
+            my_teams,
             browser_login,
             browser_logout,
             get_browser_session,

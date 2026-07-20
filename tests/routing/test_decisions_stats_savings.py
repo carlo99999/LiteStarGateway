@@ -310,6 +310,93 @@ async def test_savings_counts_fully_priced_rows(session: AsyncSession) -> None:
     assert total == pytest.approx(3.6e-4)
 
 
+async def test_platform_and_team_savings_aggregate_across_scopes(
+    session: AsyncSession,
+) -> None:
+    # Two teams, two routers: team_savings sums one team's routers; platform
+    # sums everything. Shadow rows never count.
+    team_a, team_b = uuid4(), uuid4()
+    session.add(_decision(team_a))
+    session.add(_decision(team_a, router_name="other"))
+    session.add(_decision(team_b))
+    session.add(_decision(team_b, is_shadow=True))
+    await session.commit()
+
+    log = SQLAlchemyRoutingDecisionLog(session)
+    team_total, team_counted, _ = await log.team_savings(team_a)
+    assert team_counted == 2
+    assert team_total == pytest.approx(3.6e-4)
+
+    platform_total, platform_counted, _ = await log.platform_savings()
+    assert platform_counted == 3
+    assert platform_total == pytest.approx(5.4e-4)
+
+
+async def test_platform_savings_requires_platform_admin(client: AsyncTestClient) -> None:
+    _key, team, _router, admin = await _setup(client)
+    resp = await client.get("/routing/savings", headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+    body = resp.json()
+    assert {"estimated_savings", "decisions_counted", "decisions_without_usage"} <= set(body)
+
+    # A plain (non-platform-admin) user is refused.
+    invite = await seed_team_and_invite(client, admin)
+    await client.post(
+        "/signup",
+        json={
+            "invite_token": invite,
+            "email": "pleb@corp.com",
+            "password": "Sup3r-Secret!",  # pragma: allowlist secret
+        },
+    )
+    member = (
+        await client.post(
+            "/login",
+            json={
+                "email": "pleb@corp.com",
+                "password": "Sup3r-Secret!",  # pragma: allowlist secret
+            },
+        )
+    ).json()["access_token"]
+    resp = await client.get("/routing/savings", headers=_bearer(member))
+    assert resp.status_code == HTTP_403_FORBIDDEN
+
+
+async def test_team_savings_endpoint_requires_usage_read(client: AsyncTestClient) -> None:
+    _key, team, _router, admin = await _setup(client)
+    # The platform admin (also the team admin here) reads the team aggregate.
+    resp = await client.get(f"/teams/{team}/savings", headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+    assert resp.json()["team_id"] == team
+
+    # A plain member holds no usage:read -> 403 (deliberate role design).
+    invite = await seed_team_and_invite(client, admin)
+    await client.post(
+        "/signup",
+        json={
+            "invite_token": invite,
+            "email": "plain2@corp.com",
+            "password": "Sup3r-Secret!",  # pragma: allowlist secret
+        },
+    )
+    await client.post(
+        f"/teams/{team}/members",
+        json={"email": "plain2@corp.com", "role": "member"},
+        headers=_bearer(admin),
+    )
+    member = (
+        await client.post(
+            "/login",
+            json={
+                "email": "plain2@corp.com",
+                "password": "Sup3r-Secret!",  # pragma: allowlist secret
+            },
+        )
+    ).json()["access_token"]
+    resp = await client.get(f"/teams/{team}/savings", headers=_bearer(member))
+    assert resp.status_code == HTTP_403_FORBIDDEN
+
+
 async def test_observability_requires_usage_read(client: AsyncTestClient) -> None:
     key, team, router, admin = await _setup(client)
     invite = await seed_team_and_invite(client, admin)
