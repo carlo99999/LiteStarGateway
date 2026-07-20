@@ -11,6 +11,7 @@ import { RevokeKeyDialog } from "@/features/api-keys/RevokeKeyDialog";
 import { RotateKeyDialog } from "@/features/api-keys/RotateKeyDialog";
 import { listTeamKeysPage, type ApiKey } from "@/features/api-keys/api";
 import { useAuth } from "@/features/auth/use-auth";
+import { useServicePrincipalNames } from "@/features/service-principals/useServicePrincipalNames";
 import { listAllTeams } from "@/features/teams/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
 
@@ -29,6 +30,7 @@ export function ApiKeysPage() {
   });
   const [teamId, setTeamId] = useState("");
   const [offset, setOffset] = useState(0);
+  const spNames = useServicePrincipalNames(teamId || undefined);
   const selectedTeam = teams.data?.find((team) => team.id === teamId);
   const keys = useQuery({
     queryKey: ["team-keys", teamId, "page", offset],
@@ -94,6 +96,7 @@ export function ApiKeysPage() {
         error={error}
         showTeam
         currentUserId={user?.id}
+        servicePrincipalNames={spNames}
         onRotate={setRotating}
         onRevoke={setRevoking}
         emptyDescription={teamId ? "Issue a key with the button above." : "Select a team."}

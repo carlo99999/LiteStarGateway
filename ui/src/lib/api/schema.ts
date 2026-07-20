@@ -1254,6 +1254,7 @@ export interface components {
             team_id: string;
             /** Format: uuid */
             created_by: string;
+            service_principal_id: string | null;
             name: string | null;
             prefix: string;
             is_active: boolean;

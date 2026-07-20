@@ -177,6 +177,10 @@ class KeyResponse:
     id: UUID
     team_id: UUID
     created_by: UUID
+    # Set when the key belongs to a service principal (a team identity); None for
+    # a personal key attributed to the `created_by` user. Lets the console show
+    # who a key acts as without a second lookup.
+    service_principal_id: UUID | None
     name: str | None
     prefix: str
     is_active: bool
@@ -192,6 +196,7 @@ class KeyResponse:
             id=key.id,
             team_id=key.team_id,
             created_by=key.created_by,
+            service_principal_id=key.service_principal_id,
             name=key.name,
             prefix=key.prefix,
             is_active=key.is_active,
