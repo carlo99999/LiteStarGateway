@@ -42,7 +42,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "gateway",
     items: [
-      { to: "/models", label: "models", icon: Boxes },
+      { to: "/models", label: "models", icon: Boxes, ready: true },
       { to: "/routing", label: "routing", icon: Route },
       { to: "/credentials", label: "credentials", icon: ShieldCheck, ready: true },
       { to: "/api-keys", label: "api-keys", icon: KeyRound, ready: true },

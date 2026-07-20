@@ -8,6 +8,7 @@ import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TeamKeys } from "@/features/api-keys/TeamKeys";
+import { TeamModels } from "@/features/models/TeamModels";
 import { TeamServicePrincipals } from "@/features/service-principals/TeamServicePrincipals";
 import {
   getTeam,
@@ -184,6 +185,10 @@ export function TeamDetailPage() {
           onOffsetChange={setMemberOffset}
         />
       ) : null}
+
+      <div className="mt-8">
+        <TeamModels teamId={teamId} />
+      </div>
 
       <div className="mt-8">
         <TeamKeys teamId={teamId} />
