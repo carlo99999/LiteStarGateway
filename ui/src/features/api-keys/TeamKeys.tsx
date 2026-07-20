@@ -9,6 +9,7 @@ import { RevokeKeyDialog } from "@/features/api-keys/RevokeKeyDialog";
 import { RotateKeyDialog } from "@/features/api-keys/RotateKeyDialog";
 import { listTeamKeysPage, type ApiKey } from "@/features/api-keys/api";
 import { useAuth } from "@/features/auth/use-auth";
+import { useServicePrincipalNames } from "@/features/service-principals/useServicePrincipalNames";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
 
 interface TeamKeysProps {
@@ -18,6 +19,7 @@ interface TeamKeysProps {
 /** API keys for one team (team detail): list + issue + revoke. */
 export function TeamKeys({ teamId }: TeamKeysProps) {
   const { user } = useAuth();
+  const spNames = useServicePrincipalNames(teamId);
   const [offset, setOffset] = useState(0);
   const keys = useQuery({
     queryKey: ["team-keys", teamId, "page", offset],
@@ -51,6 +53,7 @@ export function TeamKeys({ teamId }: TeamKeysProps) {
         error={keys.error as Error | null}
         showTeam={false}
         currentUserId={user?.id}
+        servicePrincipalNames={spNames}
         onRotate={setRotating}
         onRevoke={setRevoking}
         emptyDescription="Issue a key to call the gateway on this team's behalf."

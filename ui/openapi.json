@@ -6878,6 +6878,17 @@
                         "type": "string",
                         "format": "uuid"
                     },
+                    "service_principal_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
                     "name": {
                         "oneOf": [
                             {
@@ -6946,6 +6957,7 @@
                     "rate_limit_rpm",
                     "revoked_at",
                     "scope",
+                    "service_principal_id",
                     "team_id"
                 ],
                 "title": "KeyResponse"

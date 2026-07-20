@@ -118,6 +118,29 @@ async def test_list_keys_hides_secret(client: AsyncTestClient) -> None:
     assert rows[0]["is_active"] is True
 
 
+async def test_list_keys_distinguishes_service_principal_from_personal(
+    client: AsyncTestClient,
+) -> None:
+    # A personal key reports service_principal_id=None; a service-principal key
+    # reports the SP's id, so the console can show who each key acts as.
+    token, team_id = await _setup_team(client)
+    await _create_key(client, token, team_id)  # personal
+    sp = await client.post(
+        f"/teams/{team_id}/service-principals", json={"name": "bot"}, headers=_bearer(token)
+    )
+    sp_id = sp.json()["id"]
+    await client.post(
+        f"/teams/{team_id}/service-principals/{sp_id}/keys",
+        json={"name": "botkey", "scope": "management"},
+        headers=_bearer(token),
+    )
+
+    rows = (await client.get(f"/teams/{team_id}/keys", headers=_bearer(token))).json()
+    by_name = {row["name"]: row for row in rows}
+    assert by_name["ci"]["service_principal_id"] is None
+    assert by_name["botkey"]["service_principal_id"] == sp_id
+
+
 async def test_key_creation_requires_team_admin(client: AsyncTestClient) -> None:
     admin_token, team_id = await _setup_team(client)
     invite = await seed_team_and_invite(client, admin_token)

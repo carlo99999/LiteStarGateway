@@ -17,6 +17,9 @@ interface KeysTableProps {
   showTeam: boolean;
   /** The signed-in user's id, so their own keys read "me". */
   currentUserId: string | undefined;
+  /** Service-principal id → display name, so SP keys show the principal's name
+   * instead of an opaque id. Personal keys are unaffected. */
+  servicePrincipalNames?: Map<string, string>;
   onRotate: (key: ApiKey) => void;
   onRevoke: (key: ApiKey) => void;
   emptyDescription: string;
@@ -32,6 +35,7 @@ export function KeysTable({
   error,
   showTeam,
   currentUserId,
+  servicePrincipalNames,
   onRotate,
   onRevoke,
   emptyDescription,
@@ -80,14 +84,28 @@ export function KeysTable({
         ]
       : []),
     {
-      key: "user",
-      header: "user",
-      cell: (k) =>
-        k.created_by === currentUserId ? (
+      key: "owner",
+      header: "owner",
+      cell: (k) => {
+        // Service-principal keys act as a team identity; personal keys are
+        // attributed to the user who created them.
+        if (k.service_principal_id) {
+          const name =
+            servicePrincipalNames?.get(k.service_principal_id) ??
+            `${k.service_principal_id.slice(0, 8)}…`;
+          return (
+            <span className="flex items-center gap-1.5">
+              <Badge variant="accent">sp</Badge>
+              <span className="text-xs text-muted-foreground">{name}</span>
+            </span>
+          );
+        }
+        return k.created_by === currentUserId ? (
           <Badge variant="muted">me</Badge>
         ) : (
           <span className="tabular text-xs text-muted-foreground">{k.created_by.slice(0, 8)}…</span>
-        ),
+        );
+      },
     },
     {
       key: "prefix",
