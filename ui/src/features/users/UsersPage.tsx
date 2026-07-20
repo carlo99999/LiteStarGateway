@@ -10,6 +10,7 @@ import { InviteUserDialog } from "@/features/users/InviteUserDialog";
 import { UsersTable } from "@/features/users/UsersTable";
 import { listUsersPage, type User } from "@/features/users/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 /** Platform users: list, toggle roles (admin/auditor), enable/disable, unlock,
  * delete, and invite. New accounts are created by invite — pick the team and
@@ -47,7 +48,7 @@ export function UsersPage() {
       <UsersTable
         rows={users.isLoading ? undefined : users.data?.items}
         isLoading={users.isLoading}
-        error={(users.error ?? null) as Error | null}
+        error={toError(users.error)}
         currentUserId={user?.id}
         onDelete={setDeleting}
       />

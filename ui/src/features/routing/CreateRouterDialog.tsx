@@ -71,6 +71,22 @@ function parsePositive(text: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/** A route threshold: blank → null (backend default 0.80); otherwise valid only
+ * in (0, 1] per the embeddings contract, else null. */
+function parseThreshold(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n > 0 && n <= 1 ? n : null;
+}
+
+/** True when a threshold field is acceptable to submit: blank (use default) or
+ * a valid (0, 1] value. A non-blank out-of-range value is rejected in-form
+ * instead of being silently dropped to the default. */
+function thresholdValid(text: string): boolean {
+  return text.trim() === "" || parseThreshold(text) !== null;
+}
+
 /** Create a smart router (virtual model). Candidates reference the team's
  * models by name; the strategy picks among them per request. Per-candidate
  * costs are omitted here — the gateway falls back to the model's own costs. */
@@ -161,8 +177,8 @@ export function CreateRouterDialog({ teamId, open, onOpenChange }: CreateRouterD
               .split("\n")
               .map((u) => u.trim())
               .filter(Boolean),
-            ...(parsePositive(r.threshold) !== null
-              ? { threshold: parsePositive(r.threshold) }
+            ...(parseThreshold(r.threshold) !== null
+              ? { threshold: parseThreshold(r.threshold) }
               : {}),
           })),
         };
@@ -210,7 +226,11 @@ export function CreateRouterDialog({ teamId, open, onOpenChange }: CreateRouterD
       (embeddingModel.length > 0 &&
         routes.length > 0 &&
         routes.every(
-          (r) => r.name.trim() && r.targetModel && r.utterances.trim().length > 0,
+          (r) =>
+            r.name.trim() &&
+            r.targetModel &&
+            r.utterances.trim().length > 0 &&
+            thresholdValid(r.threshold),
         )));
   const canSubmit =
     !mutation.isPending &&
@@ -585,6 +605,12 @@ export function CreateRouterDialog({ teamId, open, onOpenChange }: CreateRouterD
                     value={route.utterances}
                     onChange={(e) => patchRoute(index, { utterances: e.target.value })}
                   />
+                  {thresholdValid(route.threshold) ? null : (
+                    <p className="font-mono text-xs text-destructive">
+                      threshold must be between 0 and 1 (0 excluded) — leave blank for the default
+                      0.80
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

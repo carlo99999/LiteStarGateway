@@ -16,6 +16,7 @@ import {
   type Decision,
 } from "@/features/routing/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 const route = getRouteApi("/app/routing/$teamId/$routerId");
 
@@ -145,6 +146,9 @@ export function RouterDetailPage() {
     queryFn: () => listDecisionsPage(teamId, routerId, offset),
   });
 
+  // Stats and savings share a scope (USAGE_READ); surface either failure.
+  const statsError = toError(stats.error) ?? toError(savings.error);
+
   useEffect(() => setOffset(0), [routerId]);
   useEffect(() => {
     if (!decisions.isFetching && decisions.data?.items.length === 0 && offset > 0) {
@@ -180,22 +184,30 @@ export function RouterDetailPage() {
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <Stat label="decisions" value={stats.data?.total ?? "—"} />
-        <Stat
-          label="estimated savings"
-          value={savings.data ? formatUsd(savings.data.estimated_savings) : "—"}
-        />
-        <Stat label="decisions costed" value={savings.data?.decisions_counted ?? "—"} />
-      </div>
+      {statsError ? (
+        <p className="mb-6 font-mono text-xs text-destructive">
+          ! couldn&apos;t load router metrics — {statsError.message}
+        </p>
+      ) : (
+        <>
+          <div className="mb-6 grid gap-3 sm:grid-cols-3">
+            <Stat label="decisions" value={stats.data?.total ?? "—"} />
+            <Stat
+              label="estimated savings"
+              value={savings.data ? formatUsd(savings.data.estimated_savings) : "—"}
+            />
+            <Stat label="decisions costed" value={savings.data?.decisions_counted ?? "—"} />
+          </div>
 
-      <div className="mb-6 grid gap-3 lg:grid-cols-2">
-        {stats.data ? <Distribution label="by model" entries={stats.data.by_model} /> : null}
-        {stats.data ? <Distribution label="by tier" entries={stats.data.by_tier} /> : null}
-        {stats.data && Object.keys(stats.data.shadow_by_model).length > 0 ? (
-          <Distribution label="shadow · by model" entries={stats.data.shadow_by_model} />
-        ) : null}
-      </div>
+          <div className="mb-6 grid gap-3 lg:grid-cols-2">
+            {stats.data ? <Distribution label="by model" entries={stats.data.by_model} /> : null}
+            {stats.data ? <Distribution label="by tier" entries={stats.data.by_tier} /> : null}
+            {stats.data && Object.keys(stats.data.shadow_by_model).length > 0 ? (
+              <Distribution label="shadow · by model" entries={stats.data.shadow_by_model} />
+            ) : null}
+          </div>
+        </>
+      )}
 
       <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
         // recent decisions
@@ -205,7 +217,7 @@ export function RouterDetailPage() {
         rows={decisions.data?.items}
         rowKey={(d) => d.id}
         isLoading={decisions.isLoading}
-        error={decisions.error as Error | null}
+        error={toError(decisions.error)}
         emptyTitle="no decisions yet"
         emptyDescription="Decisions appear once clients start calling this router."
       />

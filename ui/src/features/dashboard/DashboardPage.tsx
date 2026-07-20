@@ -14,6 +14,7 @@ import { getOrganizationSpend, listAllOrganizations } from "@/features/organizat
 import { listAllTeams } from "@/features/teams/api";
 import { listAllUsers } from "@/features/users/api";
 import { api } from "@/lib/api/client";
+import { toError } from "@/lib/toError";
 
 const SPEND_DAYS = 30;
 const TOP_TEAMS = 6;
@@ -115,6 +116,9 @@ function AdminDashboard() {
       retry: false,
     })),
   });
+  // Any failure in the org list or a per-org rollup means the total is a
+  // partial sum, not a real zero — never present it as "$0.00 spend".
+  const spendError = toError(orgs.error) ?? toError(spendQueries.find((q) => q.error)?.error);
   const spendLoaded = spendQueries.length > 0 && spendQueries.every((q) => q.data);
   const totalSpend = spendQueries.reduce((sum, q) => sum + (q.data?.total_cost ?? 0), 0);
   const teamSpend = spendQueries
@@ -122,6 +126,8 @@ function AdminDashboard() {
     .sort((a, b) => b.cost - a.cost)
     .slice(0, TOP_TEAMS);
   const maxTeamCost = teamSpend[0]?.cost ?? 0;
+  // A true zero only when the org list loaded and reported no organizations.
+  const spendIsRealZero = !spendError && !orgs.isLoading && (orgs.data?.length ?? 0) === 0;
 
   const events = (audit.data?.items ?? []).slice(0, RECENT_EVENTS);
 
@@ -146,10 +152,14 @@ function AdminDashboard() {
               // spend · last {SPEND_DAYS} days
             </p>
             <p className="tabular text-xl text-foreground">
-              {spendLoaded || spendQueries.length === 0 ? formatUsd(totalSpend) : "—"}
+              {spendError ? "—" : spendLoaded || spendIsRealZero ? formatUsd(totalSpend) : "—"}
             </p>
           </div>
-          {teamSpend.length > 0 ? (
+          {spendError ? (
+            <p className="font-mono text-xs text-destructive">
+              ! couldn&apos;t load spend — {spendError.message}
+            </p>
+          ) : teamSpend.length > 0 ? (
             <div className="space-y-2">
               {teamSpend.map((team) => (
                 <div key={team.team_id} className="flex items-center gap-2 font-mono text-xs">
@@ -182,7 +192,7 @@ function AdminDashboard() {
                 : "no spend recorded yet."}
             </p>
           )}
-          {savings.data && savings.data.decisions_counted > 0 ? (
+          {!spendError && savings.data && savings.data.decisions_counted > 0 ? (
             <p className="mt-3 font-mono text-xs text-muted-foreground">
               smart routing saved{" "}
               <span className="text-primary">{formatUsd(savings.data.estimated_savings)}</span> vs
@@ -200,7 +210,11 @@ function AdminDashboard() {
               audit log →
             </Link>
           </div>
-          {events.length > 0 ? (
+          {audit.isError ? (
+            <p className="font-mono text-xs text-destructive">
+              ! couldn&apos;t load activity — {toError(audit.error)?.message}
+            </p>
+          ) : events.length > 0 ? (
             <div className="space-y-2">
               {events.map((event) => (
                 <div key={event.id} className="flex items-center gap-2 font-mono text-xs">

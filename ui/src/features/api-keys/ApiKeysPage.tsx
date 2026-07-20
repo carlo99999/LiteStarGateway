@@ -14,6 +14,7 @@ import { useAuth } from "@/features/auth/use-auth";
 import { useServicePrincipalNames } from "@/features/service-principals/useServicePrincipalNames";
 import { listAllTeams } from "@/features/teams/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 const SELECT_CLASS =
   "flex h-9 min-w-64 rounded-md border border-input bg-background px-3 py-1 font-mono text-sm " +
@@ -52,7 +53,7 @@ export function ApiKeysPage() {
     ...key,
     teamName: selectedTeam?.name,
   }));
-  const error = (teams.error ?? keys.error ?? null) as Error | null;
+  const error = toError(teams.error ?? keys.error);
 
   const [issueOpen, setIssueOpen] = useState(false);
   const [revoking, setRevoking] = useState<ApiKey | null>(null);

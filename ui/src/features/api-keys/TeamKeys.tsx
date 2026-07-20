@@ -11,6 +11,7 @@ import { listTeamKeysPage, type ApiKey } from "@/features/api-keys/api";
 import { useAuth } from "@/features/auth/use-auth";
 import { useServicePrincipalNames } from "@/features/service-principals/useServicePrincipalNames";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 interface TeamKeysProps {
   teamId: string;
@@ -50,7 +51,7 @@ export function TeamKeys({ teamId }: TeamKeysProps) {
       <KeysTable
         rows={keys.data?.items}
         isLoading={keys.isLoading}
-        error={keys.error as Error | null}
+        error={toError(keys.error)}
         showTeam={false}
         currentUserId={user?.id}
         servicePrincipalNames={spNames}

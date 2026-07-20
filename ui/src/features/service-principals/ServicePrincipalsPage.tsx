@@ -17,6 +17,7 @@ import {
 } from "@/features/service-principals/api";
 import { listAllTeams } from "@/features/teams/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 const SELECT_CLASS =
   "flex h-9 min-w-64 rounded-md border border-input bg-background px-3 py-1 font-mono text-sm " +
@@ -53,7 +54,7 @@ export function ServicePrincipalsPage() {
     ...sp,
     teamName: selectedTeam?.name,
   }));
-  const error = (teams.error ?? sps.error ?? null) as Error | null;
+  const error = toError(teams.error ?? sps.error);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<ServicePrincipal | null>(null);

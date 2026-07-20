@@ -11,6 +11,7 @@ import {
   type ServicePrincipal,
 } from "@/features/service-principals/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 interface TeamServicePrincipalsProps {
   teamId: string;
@@ -48,7 +49,7 @@ export function TeamServicePrincipals({ teamId }: TeamServicePrincipalsProps) {
       <ServicePrincipalsTable
         rows={sps.data?.items}
         isLoading={sps.isLoading}
-        error={sps.error as Error | null}
+        error={toError(sps.error)}
         showTeam={false}
         onDelete={setDeleting}
         emptyDescription="Create a service principal to hold this team's management-scoped keys."

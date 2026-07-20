@@ -6,6 +6,7 @@ import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { listAuditPage, type AuditEvent } from "@/features/audit/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 function formatWhen(iso: string): string {
   return new Date(iso).toISOString().slice(0, 19).replace("T", " ");
@@ -91,7 +92,7 @@ export function AuditPage() {
         rows={events.data?.items}
         rowKey={(e) => e.id}
         isLoading={events.isLoading}
-        error={events.error as Error | null}
+        error={toError(events.error)}
         emptyTitle="no audit events"
         emptyDescription="Privileged actions are recorded here as they happen."
       />

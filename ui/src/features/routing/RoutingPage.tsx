@@ -9,6 +9,7 @@ import { DeleteRouterDialog } from "@/features/routing/DeleteRouterDialog";
 import { RoutersTable } from "@/features/routing/RoutersTable";
 import { listRouters, type Router } from "@/features/routing/api";
 import { listAllTeams } from "@/features/teams/api";
+import { toError } from "@/lib/toError";
 
 const SELECT_CLASS =
   "flex h-9 min-w-64 rounded-md border border-input bg-background px-3 py-1 font-mono text-sm " +
@@ -34,7 +35,7 @@ export function RoutingPage() {
     if (!teamId && teams.data?.length) setTeamId(teams.data[0].id);
   }, [teamId, teams.data]);
 
-  const error = (teams.error ?? routers.error ?? null) as Error | null;
+  const error = toError(teams.error ?? routers.error);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<Router | null>(null);
