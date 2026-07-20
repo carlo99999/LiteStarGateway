@@ -13,6 +13,13 @@ from litestar.logging.config import BaseLoggingConfig, default_structlog_process
 
 from litestar_gateway.config import Settings
 
+# Routine client noise, not app bugs: unknown paths (browser/scanner probes like
+# Chrome's /.well-known/appspecific/com.chrome.devtools.json) and wrong methods
+# would otherwise be logged as ERROR with a full traceback on every hit. The
+# access-log line (404/405) still records the request; real errors (5xx) and
+# every other status keep their stack traces.
+_QUIET_STATUSES: set[int | type[Exception]] = {404, 405}
+
 
 def build_logging_config(settings: Settings) -> BaseLoggingConfig:
     if settings.is_production:
@@ -20,6 +27,7 @@ def build_logging_config(settings: Settings) -> BaseLoggingConfig:
         return StructLoggingConfig(
             processors=default_structlog_processors(as_json=True),
             log_exceptions="always",
+            disable_stack_trace=_QUIET_STATUSES,
         )
     # Human-readable console output for local development.
-    return LoggingConfig(log_exceptions="always")
+    return LoggingConfig(log_exceptions="always", disable_stack_trace=_QUIET_STATUSES)
