@@ -12,6 +12,7 @@ import {
   type OrganizationSpend,
 } from "@/features/organizations/api";
 import { CreateTeamDialog } from "@/features/teams/CreateTeamDialog";
+import { toError } from "@/lib/toError";
 
 // The route lives under the pathless "app" layout route, so its id is prefixed
 // with /app (the URL stays /organizations/$organizationId).
@@ -129,7 +130,7 @@ export function OrganizationDetailPage() {
         rows={spend.data?.teams}
         rowKey={(t) => t.team_id}
         isLoading={spend.isLoading}
-        error={spend.error as Error | null}
+        error={toError(spend.error)}
         emptyTitle="no teams"
         emptyDescription="This organization has no teams yet."
       />

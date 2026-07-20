@@ -11,6 +11,7 @@ import {
   type BudgetWindow,
 } from "@/features/budgets/api";
 import { getTeamBudget, listAllTeams } from "@/features/teams/api";
+import { toError } from "@/lib/toError";
 
 const SELECT_CLASS =
   "flex h-9 rounded-md border border-input bg-background px-3 py-1 font-mono text-sm " +
@@ -133,6 +134,10 @@ export function BudgetsPage() {
             </p>
           </div>
         </>
+      ) : budget.isError ? (
+        <p className="mb-6 font-mono text-xs text-destructive">
+          ! couldn&apos;t load the budget — {toError(budget.error)?.message}
+        </p>
       ) : teamId && !budget.isLoading ? (
         <p className="mb-6 font-mono text-xs text-muted-foreground">
           // no budget configured — this team's spend is unlimited.

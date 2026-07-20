@@ -12,6 +12,7 @@ import { ModelsTable } from "@/features/models/ModelsTable";
 import { listModelsPage, type Model } from "@/features/models/api";
 import { listAllTeams } from "@/features/teams/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 const SELECT_CLASS =
   "flex h-9 min-w-64 rounded-md border border-input bg-background px-3 py-1 font-mono text-sm " +
@@ -44,7 +45,7 @@ export function ModelsPage() {
     }
   }, [models.data, models.isFetching, offset]);
 
-  const error = (teams.error ?? models.error ?? null) as Error | null;
+  const error = toError(teams.error ?? models.error);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<Model | null>(null);

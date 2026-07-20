@@ -9,6 +9,7 @@ import { DeleteModelDialog } from "@/features/models/DeleteModelDialog";
 import { ModelsTable } from "@/features/models/ModelsTable";
 import { listModelsPage, type Model } from "@/features/models/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 interface TeamModelsProps {
   teamId: string;
@@ -46,7 +47,7 @@ export function TeamModels({ teamId }: TeamModelsProps) {
       <ModelsTable
         rows={models.data?.items}
         isLoading={models.isLoading}
-        error={models.error as Error | null}
+        error={toError(models.error)}
         credentialNames={credentialNames}
         onDelete={setDeleting}
       />

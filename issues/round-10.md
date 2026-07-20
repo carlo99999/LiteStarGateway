@@ -42,14 +42,14 @@ Counts: **0 CRITICAL · 2 HIGH · 4 MEDIUM · 3 LOW**.
 | ID | Titolo | Priorità | File coinvolti | Stato |
 |---|---|---|---|---|
 | ISSUE-001 | Le routing decision sono chiavate per nome: router cancellati inquinano i savings e il riuso del nome contamina la storia (export incluso) | high | `persistence/orm.py:212-223`; `domain/ports/routing.py:41-59`; `application/routing/service.py:586-640`; `persistence/router_repository.py:279-288` | **Fixed** (#282) |
-| ISSUE-002 | La dashboard mostra "$0.00 · no spend recorded" quando la fetch delle organizzazioni fallisce | high | `ui/src/features/dashboard/DashboardPage.tsx:117-152` | Open |
+| ISSUE-002 | La dashboard mostra "$0.00 · no spend recorded" quando la fetch delle organizzazioni fallisce | high | `ui/src/features/dashboard/DashboardPage.tsx:117-152` | **Fixed** (#283) |
 | ISSUE-003 | `GET /me/teams` tronca silenziosamente a 100 membership e fa N+1 lookup | medium | `application/team_service.py:284-293`; `web/session/me.py:31-39` | Open |
-| ISSUE-004 | Le pagine Budgets / Audit / Router-detail rendono gli errori come empty-state ("illimitato", "no events", "—") | medium | `ui/src/features/budgets/BudgetsPage.tsx:117-140`; `ui/src/features/dashboard/DashboardPage.tsx:105-108,218-221`; `ui/src/features/routing/RouterDetailPage.tsx:135-142,183-198` | Open |
-| ISSUE-005 | Lo `0` esplicito nei campi costo/threshold viene scartato senza feedback (`parsePositive`) | medium | `ui/src/features/models/CreateModelDialog.tsx:35-40,252-259`; `ui/src/features/routing/CreateRouterDialog.tsx:67-72,558-568` | Open |
+| ISSUE-004 | Le pagine Budgets / Audit / Router-detail rendono gli errori come empty-state ("illimitato", "no events", "—") | medium | `ui/src/features/budgets/BudgetsPage.tsx:117-140`; `ui/src/features/dashboard/DashboardPage.tsx:105-108,218-221`; `ui/src/features/routing/RouterDetailPage.tsx:135-142,183-198` | **Fixed** (#283) |
+| ISSUE-005 | Lo `0` esplicito nei campi costo/threshold viene scartato senza feedback (`parsePositive`) | medium | `ui/src/features/models/CreateModelDialog.tsx:35-40,252-259`; `ui/src/features/routing/CreateRouterDialog.tsx:67-72,558-568` | **Fixed** (#283) |
 | ISSUE-006 | Race `delete_user`↔`add_member`: la FK violation viene rietichettata `AlreadyMember` (409 fuorviante) | medium | `application/user_service.py:211-224`; `persistence/membership_repository.py:21-39` | Open |
 | ISSUE-007 | `_savings_aggregate` esegue 3 SELECT non-atomiche per una cifra sola | low | `persistence/router_repository.py:290-323` | **Fixed** (#282) |
 | ISSUE-008 | La guard di `delete_user` è una lista manuale di FK: una futura FK verso `user_account` produrrebbe un 500 | low | `application/user_service.py:201-225` | Open |
-| ISSUE-009 | Cast diffusi `error as Error \| null` sugli errori di useQuery | low | ~15 call site in `ui/src/features/*` | Open |
+| ISSUE-009 | Cast diffusi `error as Error \| null` sugli errori di useQuery | low | ~15 call site in `ui/src/features/*` | **Fixed** (#283) |
 
 ## Findings
 

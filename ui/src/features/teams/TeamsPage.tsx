@@ -14,6 +14,7 @@ import { DeleteTeamDialog } from "@/features/teams/DeleteTeamDialog";
 import { TeamEditDialog } from "@/features/teams/TeamEditDialog";
 import { listTeamsPage, type Team } from "@/features/teams/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 function formatDate(iso: string): string {
   return new Date(iso).toISOString().slice(0, 19).replace("T", " ");
@@ -154,7 +155,7 @@ export function TeamsPage() {
         rows={teams.data?.items}
         rowKey={(t) => t.id}
         isLoading={teams.isLoading}
-        error={teams.error as Error | null}
+        error={toError(teams.error)}
         emptyTitle="no teams"
         emptyDescription="Create a team from an organization's detail page."
       />

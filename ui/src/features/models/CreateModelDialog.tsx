@@ -39,6 +39,16 @@ function parsePositive(text: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/** Parse an optional cost field where an explicit 0 is meaningful ("this model
+ * is free"): blank → null (use the provider default), otherwise the number if
+ * it's a finite value ≥ 0, else null. */
+function parseNonNegative(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 /** Create a model deployment. The credential list is filtered to the chosen
  * provider, since the backend rejects a provider/credential mismatch. */
 export function CreateModelDialog({ teamId, open, onOpenChange }: CreateModelDialogProps) {
@@ -99,8 +109,8 @@ export function CreateModelDialog({ teamId, open, onOpenChange }: CreateModelDia
         providerModelId: providerModelId.trim(),
         maxOutputTokens: parsePositive(maxOutputTokens),
         apiVersion: apiVersion.trim() || null,
-        inputCostPerToken: parsePositive(inputCost),
-        outputCostPerToken: parsePositive(outputCost),
+        inputCostPerToken: parseNonNegative(inputCost),
+        outputCostPerToken: parseNonNegative(outputCost),
         enabled: true,
       }),
     onSuccess: async () => {

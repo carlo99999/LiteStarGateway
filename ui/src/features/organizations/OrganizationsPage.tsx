@@ -12,6 +12,7 @@ import { DeleteOrganizationDialog } from "@/features/organizations/DeleteOrganiz
 import { OrganizationFormDialog } from "@/features/organizations/OrganizationFormDialog";
 import { listOrganizationsPage, type Organization } from "@/features/organizations/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 function formatDate(iso: string): string {
   return new Date(iso).toISOString().slice(0, 19).replace("T", " ");
@@ -142,7 +143,7 @@ export function OrganizationsPage() {
         rows={query.data?.items}
         rowKey={(org) => org.id}
         isLoading={query.isLoading}
-        error={query.error as Error | null}
+        error={toError(query.error)}
         emptyTitle="no organizations"
         emptyDescription="Create your first tenant with the New organization button."
       />

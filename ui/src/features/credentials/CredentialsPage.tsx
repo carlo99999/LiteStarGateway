@@ -9,6 +9,7 @@ import { CredentialsTable } from "@/features/credentials/CredentialsTable";
 import { DeleteCredentialDialog } from "@/features/credentials/DeleteCredentialDialog";
 import { listCredentialsPage, type Credential } from "@/features/credentials/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 /** Provider credentials: list, add, and delete. Secret values are write-only —
  * entered on creation, encrypted at rest, and never returned. */
@@ -44,7 +45,7 @@ export function CredentialsPage() {
       <CredentialsTable
         rows={credentials.data?.items}
         isLoading={credentials.isLoading}
-        error={credentials.error as Error | null}
+        error={toError(credentials.error)}
         onDelete={setDeleting}
       />
       {credentials.data ? (

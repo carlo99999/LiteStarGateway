@@ -18,6 +18,7 @@ import {
   type TeamMember,
 } from "@/features/teams/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
+import { toError } from "@/lib/toError";
 
 const route = getRouteApi("/app/teams/$teamId");
 
@@ -171,7 +172,7 @@ export function TeamDetailPage() {
         rows={members.data?.items}
         rowKey={(m) => m.id}
         isLoading={members.isLoading}
-        error={members.error as Error | null}
+        error={toError(members.error)}
         emptyTitle="no members"
         emptyDescription="This team has no members."
       />
