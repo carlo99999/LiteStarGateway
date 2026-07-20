@@ -10,6 +10,7 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 | Round | Focus | New findings (C·H·M·L) | Status |
 |---|---|---|---|
+| [Round 10](round-10.md) — 2026-07-21 | Post-R9 delta (console completa, savings/me-teams endpoints, R9-fix verification) | 0·2·4·3 | Open |
 | [Round 9](round-9.md) — 2026-07-14 | Full-tree post-R8 (admin UI, org/team CRUD, invites, RPM, API-key rotation) | 1·4·6·2 | Fully remediated |
 | [Round 8](round-8.md) — 2026-07-09 | Native provider-endpoint surface (Anthropic/Gemini passthrough, conformance, auth/error changes) | 1·3·3·3 | 1C+3H+3M+L008 fixed; L010 covered; L009 deferred |
 | [Round 7](round-7.md) — 2026-07-08 | Fresh-eyes full-tree review (5 lenses: web/auth, concurrency, adapters, persistence, ops/tests) | 0·3·10·6 | 3H+10M fixed; 6L deferred |
@@ -22,8 +23,16 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 ## Overall
 
-**As of Round 9: 6.8/10** — see [round-9.md](round-9.md#category-scores-this-round) for the
-category breakdown. The historical auth/tenancy core remains intact; the RBAC escalation in
+**As of Round 10: 7.8/10** — see [round-10.md](round-10.md#category-scores-this-round) for the
+category breakdown. Round 10 produced **zero security findings**: a dedicated adversarial pass
+confirmed the Round-9 remediations hold end-to-end (webhook token masking round-trip, invite/team
+lifecycle locks, rotation ownership, per-key RPM coverage, self-scoped /me/teams). The open work
+is product robustness: routing decisions are keyed by router *name* instead of id (deleted-router
+history pollutes savings and a reused name cross-contaminates a new router, ISSUE-001), and the
+console renders several error states as empty/zero states (ISSUE-002/004/005).
+
+Previous: as of Round 9, 6.8/10 — see [round-9.md](round-9.md#category-scores-this-round) for that
+breakdown. The historical auth/tenancy core remains intact; the RBAC escalation in
 the generic API-key rotate endpoint is fixed by #249; personal-key ownership, immediate
 revocation and atomic rotation by #250; inference per-key RPM coverage by #251; and last-admin
 lifecycle races by #252; invite/team FK lifecycle by #253; and invite-token transport by
