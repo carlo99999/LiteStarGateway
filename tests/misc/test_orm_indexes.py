@@ -39,6 +39,21 @@ def test_routing_decision_has_composite_team_router_created_at_index() -> None:
     )
 
 
+def test_routing_decision_has_composite_team_router_id_created_at_index() -> None:
+    # Per-router reads (list_decisions/distribution/savings) filter by
+    # (team_id, router_id): the id-keyed index backs them, immune to name reuse.
+    indexes = RoutingDecisionModel.__table__.indexes  # type: ignore[missing-attribute]
+    composite = [
+        index
+        for index in indexes
+        if _index_column_names(index) == ("team_id", "router_id", "created_at")
+    ]
+    assert len(composite) == 1, (
+        f"expected exactly one composite (team_id, router_id, created_at) index, found: "
+        f"{[_index_column_names(i) for i in indexes]}"
+    )
+
+
 def test_routing_decision_has_no_independent_single_column_indexes() -> None:
     """The composite index replaces the two single-column indexes (R7-M55)."""
     single_column_index_columns = {

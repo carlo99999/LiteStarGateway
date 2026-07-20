@@ -6,7 +6,7 @@ import dataclasses
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import and_, case, delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -187,6 +187,7 @@ class SQLAlchemyRoutingDecisionLog:
             RoutingDecisionModel(
                 id=decision.id,
                 team_id=decision.team_id,
+                router_id=decision.router_id,
                 router_name=decision.router_name,
                 strategy=decision.strategy,
                 chosen_model=decision.chosen_model,
@@ -222,7 +223,7 @@ class SQLAlchemyRoutingDecisionLog:
     async def list_decisions(
         self,
         team_id: UUID,
-        router_name: str,
+        router_id: UUID,
         *,
         strategy: str | None = None,
         chosen_model: str | None = None,
@@ -232,7 +233,7 @@ class SQLAlchemyRoutingDecisionLog:
     ) -> list[RoutingDecisionRecord]:
         stmt = select(RoutingDecisionModel).where(
             RoutingDecisionModel.team_id == team_id,
-            RoutingDecisionModel.router_name == router_name,
+            RoutingDecisionModel.router_id == router_id,
         )
         if strategy is not None:
             stmt = stmt.where(RoutingDecisionModel.strategy == strategy)
@@ -248,7 +249,7 @@ class SQLAlchemyRoutingDecisionLog:
         return [model.to_entity() for model in await self._session.scalars(stmt)]
 
     async def distribution(
-        self, team_id: UUID, router_name: str
+        self, team_id: UUID, router_id: UUID
     ) -> list[tuple[str, str | None, bool, int]]:
         stmt = (
             select(
@@ -259,7 +260,7 @@ class SQLAlchemyRoutingDecisionLog:
             )
             .where(
                 RoutingDecisionModel.team_id == team_id,
-                RoutingDecisionModel.router_name == router_name,
+                RoutingDecisionModel.router_id == router_id,
             )
             .group_by(
                 RoutingDecisionModel.chosen_model,
@@ -269,10 +270,10 @@ class SQLAlchemyRoutingDecisionLog:
         )
         return [tuple(row) for row in await self._session.execute(stmt)]
 
-    async def savings(self, team_id: UUID, router_name: str) -> tuple[float, int, int]:
+    async def savings(self, team_id: UUID, router_id: UUID) -> tuple[float, int, int]:
         return await self._savings_aggregate(
             RoutingDecisionModel.team_id == team_id,
-            RoutingDecisionModel.router_name == router_name,
+            RoutingDecisionModel.router_id == router_id,
             RoutingDecisionModel.is_shadow.is_(False),
         )
 
@@ -288,10 +289,12 @@ class SQLAlchemyRoutingDecisionLog:
         )
 
     async def _savings_aggregate(self, *base: Any) -> tuple[float, int, int]:
-        # Σ over non-shadow decisions with usage AND both cost profiles:
-        # (alt − chosen) unit cost × the request's actual tokens.
-        counted = (
-            *base,
+        # One point-in-time query (a single row snapshot, so the three figures
+        # can't drift under concurrent inserts) for: Σ savings over *priced*
+        # decisions, the priced count, and the total count. "Priced" = actual
+        # token usage AND both cost profiles present; savings = (alt − chosen)
+        # unit cost × the request's actual tokens.
+        priced = and_(
             RoutingDecisionModel.prompt_tokens.is_not(None),
             RoutingDecisionModel.completion_tokens.is_not(None),
             RoutingDecisionModel.alt_input_cost.is_not(None),
@@ -299,25 +302,18 @@ class SQLAlchemyRoutingDecisionLog:
             RoutingDecisionModel.alt_output_cost.is_not(None),
             RoutingDecisionModel.chosen_output_cost.is_not(None),
         )
-        total = await self._session.scalar(
-            select(
-                func.coalesce(
-                    func.sum(
-                        (
-                            RoutingDecisionModel.alt_input_cost
-                            - RoutingDecisionModel.chosen_input_cost
-                        )
-                        * RoutingDecisionModel.prompt_tokens
-                        + (
-                            RoutingDecisionModel.alt_output_cost
-                            - RoutingDecisionModel.chosen_output_cost
-                        )
-                        * RoutingDecisionModel.completion_tokens
-                    ),
-                    0.0,
-                )
-            ).where(*counted)
-        )
-        counted_n = await self._session.scalar(select(func.count()).where(*counted)) or 0
-        all_n = await self._session.scalar(select(func.count()).where(*base)) or 0
-        return float(total or 0.0), int(counted_n), int(all_n - counted_n)
+        savings_expr = (
+            RoutingDecisionModel.alt_input_cost - RoutingDecisionModel.chosen_input_cost
+        ) * RoutingDecisionModel.prompt_tokens + (
+            RoutingDecisionModel.alt_output_cost - RoutingDecisionModel.chosen_output_cost
+        ) * RoutingDecisionModel.completion_tokens
+        total, counted_n, all_n = (
+            await self._session.execute(
+                select(
+                    func.coalesce(func.sum(case((priced, savings_expr), else_=0.0)), 0.0),
+                    func.coalesce(func.sum(case((priced, 1), else_=0)), 0),
+                    func.count(),
+                ).where(*base)
+            )
+        ).one()
+        return float(total or 0.0), int(counted_n or 0), int((all_n or 0) - (counted_n or 0))

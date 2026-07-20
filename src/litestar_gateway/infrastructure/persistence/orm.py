@@ -218,9 +218,19 @@ class RoutingDecisionModel(base.UUIDAuditBase):
             "router_name",
             "created_at",
         ),
+        # Per-router reads filter by (team_id, router_id): stable across renames,
+        # immune to name reuse. No FK to `router` on purpose — decision history
+        # must survive router deletion.
+        Index(
+            "ix_routing_decision_team_id_router_id_created_at",
+            "team_id",
+            "router_id",
+            "created_at",
+        ),
     )
 
     team_id: Mapped[UUID] = mapped_column()
+    router_id: Mapped[UUID | None] = mapped_column(default=None)
     router_name: Mapped[str] = mapped_column()
     strategy: Mapped[str] = mapped_column()
     chosen_model: Mapped[str] = mapped_column()
@@ -244,6 +254,7 @@ class RoutingDecisionModel(base.UUIDAuditBase):
         return RoutingDecisionRecord(
             id=self.id,
             team_id=self.team_id,
+            router_id=self.router_id,
             router_name=self.router_name,
             strategy=self.strategy,
             chosen_model=self.chosen_model,

@@ -38,7 +38,7 @@ class RecordingDecisionLog:
     async def list_decisions(
         self,
         team_id: UUID,
-        router_name: str,
+        router_id: UUID,
         *,
         strategy: str | None = None,
         chosen_model: str | None = None,
@@ -49,11 +49,11 @@ class RecordingDecisionLog:
         return list(self.records)
 
     async def distribution(
-        self, team_id: UUID, router_name: str
+        self, team_id: UUID, router_id: UUID
     ) -> list[tuple[str, str | None, bool, int]]:
         return []
 
-    async def savings(self, team_id: UUID, router_name: str) -> tuple[float, int, int]:
+    async def savings(self, team_id: UUID, router_id: UUID) -> tuple[float, int, int]:
         return (0.0, 0, 0)
 
     async def platform_savings(self) -> tuple[float, int, int]:

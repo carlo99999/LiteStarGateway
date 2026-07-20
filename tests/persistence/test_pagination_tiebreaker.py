@@ -128,7 +128,7 @@ async def test_audit_list_recent_order_by_includes_id() -> None:
 async def test_routing_decision_list_decisions_order_by_includes_id() -> None:
     session = _CapturingSession()
     log = SQLAlchemyRoutingDecisionLog(session)  # type: ignore[arg-type]
-    await log.list_decisions(uuid4(), "router-a", limit=1, offset=0)
+    await log.list_decisions(uuid4(), uuid4(), limit=1, offset=0)
     assert session.captured is not None
     order_by = _order_by_sql(session.captured)
     assert "created_at" in order_by
