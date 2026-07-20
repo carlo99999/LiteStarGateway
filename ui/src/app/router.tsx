@@ -9,6 +9,8 @@ import { PlannedPage } from "@/app/PlannedPage";
 import { ApiKeysPage } from "@/features/api-keys/ApiKeysPage";
 import { CredentialsPage } from "@/features/credentials/CredentialsPage";
 import { ModelsPage } from "@/features/models/ModelsPage";
+import { RouterDetailPage } from "@/features/routing/RouterDetailPage";
+import { RoutingPage } from "@/features/routing/RoutingPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { SignupPage } from "@/features/auth/SignupPage";
@@ -117,11 +119,21 @@ const modelsRoute = createRoute({
   component: ModelsPage,
 });
 
+const routingRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/routing",
+  component: RoutingPage,
+});
+
+const routerDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/routing/$teamId/$routerId",
+  component: RouterDetailPage,
+});
+
 // Scaffolded-but-not-implemented feature areas (Phase 1 lands their views),
 // grouped in the sidebar under gateway / governance / observability.
 const planned: { path: string; command: string; title: string }[] = [
-  // gateway
-  { path: "/routing", command: "routing inspect", title: "Routing" },
   // observability
   { path: "/usage", command: "usage report", title: "Usage & Cost" },
   { path: "/budgets", command: "budgets list", title: "Budgets" },
@@ -150,6 +162,8 @@ const routeTree = rootRoute.addChildren([
     servicePrincipalsRoute,
     credentialsRoute,
     modelsRoute,
+    routingRoute,
+    routerDetailRoute,
     ...plannedRoutes,
   ]),
 ]);
