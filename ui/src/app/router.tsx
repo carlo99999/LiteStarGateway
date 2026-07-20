@@ -7,6 +7,7 @@ import {
 import { AppShell } from "@/app/layout/AppShell";
 import { PlannedPage } from "@/app/PlannedPage";
 import { ApiKeysPage } from "@/features/api-keys/ApiKeysPage";
+import { CredentialsPage } from "@/features/credentials/CredentialsPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { SignupPage } from "@/features/auth/SignupPage";
@@ -103,13 +104,18 @@ const servicePrincipalsRoute = createRoute({
   component: ServicePrincipalsPage,
 });
 
+const credentialsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/credentials",
+  component: CredentialsPage,
+});
+
 // Scaffolded-but-not-implemented feature areas (Phase 1 lands their views),
 // grouped in the sidebar under gateway / governance / observability.
 const planned: { path: string; command: string; title: string }[] = [
   // gateway
   { path: "/models", command: "models list", title: "Models" },
   { path: "/routing", command: "routing inspect", title: "Routing" },
-  { path: "/credentials", command: "credentials list", title: "Credentials" },
   // observability
   { path: "/usage", command: "usage report", title: "Usage & Cost" },
   { path: "/budgets", command: "budgets list", title: "Budgets" },
@@ -136,6 +142,7 @@ const routeTree = rootRoute.addChildren([
     apiKeysRoute,
     usersRoute,
     servicePrincipalsRoute,
+    credentialsRoute,
     ...plannedRoutes,
   ]),
 ]);
