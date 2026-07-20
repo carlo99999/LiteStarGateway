@@ -58,6 +58,10 @@ class FakeTeamRepo:
     async def get(self, team_id: UUID) -> Team | None:
         return self.items.get(team_id)
 
+    async def list_by_ids(self, team_ids) -> list[Team]:  # noqa: ANN001
+        wanted = set(team_ids)
+        return [t for t in self.items.values() if t.id in wanted]
+
     async def lock_for_lifecycle(self, team_id: UUID) -> Team | None:
         return self.items.get(team_id)
 
@@ -91,6 +95,12 @@ class FakeMembershipRepo:
         # Honor limit/offset like the real repo, so tests can exercise the
         # >1-page truncation that M34 was about.
         rows = [m for m in self.items if m.team_id == team_id]
+        return rows[offset : offset + limit]
+
+    async def list_by_user(
+        self, user_id: UUID, *, limit: int = 100, offset: int = 0
+    ) -> list[TeamMembership]:
+        rows = [m for m in self.items if m.user_id == user_id]
         return rows[offset : offset + limit]
 
     async def count_admins(self, team_id: UUID) -> int:
