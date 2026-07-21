@@ -211,14 +211,18 @@ an 80% coverage gate + pip-audit + a Postgres migration job):
 - **Full admin console** at `/ui` — every sidebar entry is a real page.
 - Hardening: `GET /v1/models`, configurable request body-size cap, static
   security response headers, and optional API-key expiry (TTL).
+- **Agent framework compatibility (Level A)** — an executable conformance
+  suite (real `openai` SDK vs the in-process app) covering chat, streaming,
+  tools, structured output, embeddings, router aliases and error shapes, plus
+  a [framework guide](docs/agent-frameworks.md) with copy-paste config for
+  Pydantic AI / LangChain / LlamaIndex / the OpenAI Agents SDK.
+- The full test suite runs on Postgres in CI (not just a subset).
 
 Next up:
 
-- **Agent framework compatibility** — conformance tests + copy-paste examples
-  for Pydantic AI, LangChain, LlamaIndex, OpenAI Agents SDK
+- **Agent framework compatibility (Level B)** — faithful Responses-API
+  streaming + tool events for the OpenAI Agents SDK's Responses path
   ([design](docs/next-steps/agent-framework-compatibility.md)).
-- Run the full test suite on Postgres in CI (today: SQLite + a Postgres
-  migration/persistence subset).
 - Console polish — bundle code-splitting, richer usage charts.
 
 ## Contributing

@@ -70,16 +70,22 @@ for provider features that OpenAI-shaped APIs cannot express safely.
 
 Track support with a small compatibility matrix in docs and tests:
 
-| Framework | Level A chat | Streaming | Tools | Structured output | Embeddings | Router alias | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Pydantic AI | planned | planned | planned | planned | planned | planned | Primary early target |
-| LangChain | planned | planned | planned | planned | planned | planned | Validate `ChatOpenAI` and embeddings |
-| LlamaIndex | planned | planned | planned | planned | planned | planned | Validate chat + embedding/RAG path |
-| OpenAI Agents SDK | planned | planned | planned | planned | n/a | planned | Likely needs Level B for full fidelity |
-| Custom OpenAI client | planned | planned | planned | planned | planned | planned | Baseline protocol conformance |
+The user-facing matrix and per-framework config snippets now live in
+**[docs/agent-frameworks.md](../agent-frameworks.md)**. Compatibility is proven
+at the **protocol** level, not per framework:
 
-Keep this matrix honest. A green cell requires an executable example or test,
-not only manual confidence.
+| Capability | Status | Proof |
+| --- | --- | --- |
+| Chat, streaming, tools + tool-result, structured output, embeddings, router alias, OpenAI errors | delivered | `tests/conformance/` (real `openai` SDK vs the in-process app) |
+| Native Anthropic / Gemini passthrough | delivered | `tests/conformance/test_native_*.py` |
+
+Every framework in the guide (Pydantic AI, LangChain, LlamaIndex, OpenAI Agents
+SDK, custom OpenAI clients) is layered on this protocol and inherits it by
+pointing `base_url`/`api_key`/`model` at the gateway — so the executable proof
+is the shared protocol conformance suite plus copy-paste config, not a
+per-framework test matrix (which would only re-test the frameworks' own OpenAI
+adapters). The Agents SDK's Responses-API path is the remaining Level-B fidelity
+work.
 
 ## Conformance suite
 

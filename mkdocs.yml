@@ -83,6 +83,7 @@ nav:
   - Gateway:
       - API reference (interactive): docs/api-reference.md
       - OpenAI-compatible API: docs/openai-compatible.md
+      - Agent frameworks: docs/agent-frameworks.md
       - Usage and cost: docs/usage-cost.md
       - Observability: docs/observability.md
       - Parameter allowlist: docs/param-allowlist.md
