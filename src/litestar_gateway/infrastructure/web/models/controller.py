@@ -21,6 +21,7 @@ from litestar_gateway.domain.pagination import resolve_page
 from litestar_gateway.domain.ports import AuditLog
 from litestar_gateway.infrastructure.web.audit.recorder import record_audit
 from litestar_gateway.infrastructure.web.models.schemas import (
+    CallableModelResponse,
     CreateModelRequest,
     ModelResponse,
     UpdateModelRequest,
@@ -98,6 +99,23 @@ class ModelController(Controller):
         page_limit, page_offset = resolve_page(limit, offset)
         models = await model_service.list_for_team(team_id, limit=page_limit, offset=page_offset)
         return [ModelResponse.from_entity(m) for m in models]
+
+    @get(
+        "/{team_id:uuid}/models/callable",
+        summary="Every model the team can call (own + extended + global)",
+    )
+    async def list_callable(
+        self,
+        team_id: FromPath[UUID],
+        principal: NamedDependency[Principal],
+        team_service: NamedDependency[TeamService],
+        model_service: NamedDependency[ModelService],
+    ) -> list[CallableModelResponse]:
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.MODELS_READ
+        )
+        callable_models = await model_service.list_callable(team_id)
+        return [CallableModelResponse.from_entity(c) for c in callable_models]
 
     @patch(
         "/{team_id:uuid}/models/{model_id:uuid}",

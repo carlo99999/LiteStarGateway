@@ -210,6 +210,31 @@ async def test_unextend_removes_it_from_the_target(client: AsyncTestClient) -> N
     assert "gpt-4o" not in await _catalog(client, blue_key)
 
 
+async def test_callable_view_shows_own_extended_and_global(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    cred = await _credential(client, admin)
+    org = await _org(client, admin)
+    core = await _team(client, admin, org, "Core")
+    blue = await _team(client, admin, org, "Blue")
+    await _global_model(client, admin, cred, "g")
+    await _team_model(client, admin, core, cred, "own-m")
+    blue_model = await _team_model(client, admin, blue, cred, "from-blue")
+    await client.post(
+        f"/platform/models/{blue_model}/extend",
+        json={"team_ids": [core]},
+        headers=_bearer(admin),
+    )
+
+    resp = await client.get(f"/teams/{core}/models/callable", headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+    by_alias = {row["alias"]: row for row in resp.json()}
+
+    assert by_alias["own-m"]["origin"] == "own"
+    assert by_alias["g"]["origin"] == "global"
+    assert by_alias["from-blue"]["origin"] == "extended"
+    assert by_alias["from-blue"]["source_team_id"] == blue
+
+
 async def test_platform_routes_require_admin(client: AsyncTestClient) -> None:
     # No token → the platform-admin guard rejects before any work.
     resp = await client.get("/platform/models")

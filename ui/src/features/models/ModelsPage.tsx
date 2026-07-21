@@ -1,19 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { Globe, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/common/PageHeader";
-import { PaginationControls } from "@/components/common/PaginationControls";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useCredentialNames } from "@/features/credentials/useCredentialNames";
+import { CallableModelsTable } from "@/features/models/CallableModelsTable";
 import { CreateModelDialog } from "@/features/models/CreateModelDialog";
 import { DeleteModelDialog } from "@/features/models/DeleteModelDialog";
 import { EditModelDialog } from "@/features/models/EditModelDialog";
 import { ExtendModelDialog } from "@/features/models/ExtendModelDialog";
 import { ModelsTable } from "@/features/models/ModelsTable";
-import { listAllGlobalModels, listModelsPage, type Model } from "@/features/models/api";
+import { listAllGlobalModels, listCallableModels, type Model } from "@/features/models/api";
 import { listAllTeams } from "@/features/teams/api";
-import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
 import { toError } from "@/lib/toError";
 
 const SELECT_CLASS =
@@ -40,22 +39,19 @@ export function ModelsPage() {
   });
 
   const [teamId, setTeamId] = useState("");
-  const [offset, setOffset] = useState(0);
   const models = useQuery({
-    queryKey: ["team-models", teamId, "page", offset],
-    queryFn: () => listModelsPage(teamId, offset),
+    queryKey: ["team-models", teamId, "callable"],
+    queryFn: ({ signal }) => listCallableModels(teamId, signal),
     enabled: teamId.length > 0,
   });
+  const teamNames = useMemo(
+    () => new Map((teams.data ?? []).map((t) => [t.id, t.name])),
+    [teams.data],
+  );
 
   useEffect(() => {
     if (!teamId && teams.data?.length) setTeamId(teams.data[0].id);
   }, [teamId, teams.data]);
-  useEffect(() => setOffset(0), [teamId]);
-  useEffect(() => {
-    if (!models.isFetching && models.data?.items.length === 0 && offset > 0) {
-      setOffset(previousPageOffset(offset));
-    }
-  }, [models.data, models.isFetching, offset]);
 
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [createGlobalOpen, setCreateGlobalOpen] = useState(false);
@@ -121,25 +117,16 @@ export function ModelsPage() {
           Add team model
         </Button>
       </div>
-      <ModelsTable
-        rows={models.data?.items}
+      <CallableModelsTable
+        rows={models.data}
         isLoading={teams.isLoading || (teamId.length > 0 && models.isLoading)}
         error={toError(teams.error ?? models.error)}
         credentialNames={credentialNames}
+        teamNames={teamNames}
         onEdit={setEditing}
         onDelete={setDeleting}
         onExtend={setExtending}
       />
-      {models.data ? (
-        <PaginationControls
-          offset={models.data.offset}
-          pageSize={TABLE_PAGE_SIZE}
-          itemCount={models.data.items.length}
-          hasNext={models.data.hasNext}
-          isFetching={models.isFetching}
-          onOffsetChange={setOffset}
-        />
-      ) : null}
 
       <CreateModelDialog open={createTeamOpen} teamId={teamId} onOpenChange={setCreateTeamOpen} />
       <CreateModelDialog global open={createGlobalOpen} onOpenChange={setCreateGlobalOpen} />

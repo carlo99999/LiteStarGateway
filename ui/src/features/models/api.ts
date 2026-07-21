@@ -12,6 +12,7 @@ export type Model = components["schemas"]["ModelResponse"];
 export type ModelType = components["schemas"]["ModelType"];
 export type Provider = components["schemas"]["Provider"];
 export type Grant = components["schemas"]["GrantResponse"];
+export type CallableModel = components["schemas"]["CallableModelResponse"];
 
 /** The fields the create form collects. Costs and ceilings are optional. */
 export interface NewModel {
@@ -48,6 +49,20 @@ async function requestModels(teamId: string, request: PageRequest): Promise<Mode
 export async function listModelsPage(teamId: string, offset: number): Promise<PageResult<Model>> {
   const request = pageRequest(offset);
   return pageResult(await requestModels(teamId, request), offset);
+}
+
+/** GET /teams/{id}/models/callable — everything the team can call: its own
+ * models, models extended to it, and global models, each by effective alias. */
+export async function listCallableModels(
+  teamId: string,
+  signal?: AbortSignal,
+): Promise<CallableModel[]> {
+  const { data, error } = await api.GET("/teams/{team_id}/models/callable", {
+    params: { path: { team_id: teamId } },
+    signal,
+  });
+  if (error || !data) throw fail(error, "Failed to load models");
+  return data;
 }
 
 /** Complete team model collection, for selectors (e.g. router candidates). */
