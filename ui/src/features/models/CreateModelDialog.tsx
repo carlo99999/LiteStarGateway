@@ -13,12 +13,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listAllCredentials } from "@/features/credentials/api";
 import { PROVIDER_LABELS, PROVIDERS } from "@/features/credentials/providerFields";
-import { createModel, lookupModelPrice, type ModelType, type Provider } from "@/features/models/api";
+import {
+  createGlobalModel,
+  createModel,
+  lookupModelPrice,
+  type ModelType,
+  type Provider,
+} from "@/features/models/api";
 import { listAllTeams } from "@/features/teams/api";
 
 interface CreateModelDialogProps {
   /** Fixed team (team detail page). Omit to show a team picker (global page). */
   teamId?: string;
+  /** Create a global (platform) model callable by every team, instead of a
+   * team-owned one. Hides the team picker. */
+  global?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -51,7 +60,12 @@ function parseNonNegative(text: string): number | null {
 
 /** Create a model deployment. The credential list is filtered to the chosen
  * provider, since the backend rejects a provider/credential mismatch. */
-export function CreateModelDialog({ teamId, open, onOpenChange }: CreateModelDialogProps) {
+export function CreateModelDialog({
+  teamId,
+  global = false,
+  open,
+  onOpenChange,
+}: CreateModelDialogProps) {
   const queryClient = useQueryClient();
   const [teamPick, setTeamPick] = useState("");
   const [name, setName] = useState("");
@@ -98,7 +112,7 @@ export function CreateModelDialog({ teamId, open, onOpenChange }: CreateModelDia
   const teams = useQuery({
     queryKey: ["teams", "all"],
     queryFn: ({ signal }) => listAllTeams(signal),
-    enabled: open && !teamId,
+    enabled: open && !teamId && !global,
   });
   const credentials = useQuery({
     queryKey: ["credentials", "all"],
@@ -111,8 +125,8 @@ export function CreateModelDialog({ teamId, open, onOpenChange }: CreateModelDia
   );
 
   const mutation = useMutation({
-    mutationFn: () =>
-      createModel(effectiveTeamId, {
+    mutationFn: () => {
+      const model = {
         name: name.trim(),
         provider,
         credentialId,
@@ -123,16 +137,19 @@ export function CreateModelDialog({ teamId, open, onOpenChange }: CreateModelDia
         inputCostPerToken: parseNonNegative(inputCost),
         outputCostPerToken: parseNonNegative(outputCost),
         enabled: true,
-      }),
+      };
+      return global ? createGlobalModel(model) : createModel(effectiveTeamId, model);
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["team-models", effectiveTeamId] });
+      await queryClient.invalidateQueries({ queryKey: ["global-models"] });
       onOpenChange(false);
     },
   });
 
   const canSubmit =
     !mutation.isPending &&
-    effectiveTeamId.length > 0 &&
+    (global || effectiveTeamId.length > 0) &&
     name.trim().length > 0 &&
     credentialId.length > 0 &&
     providerModelId.trim().length > 0;
@@ -152,14 +169,15 @@ export function CreateModelDialog({ teamId, open, onOpenChange }: CreateModelDia
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add model</DialogTitle>
+          <DialogTitle>{global ? "Add global model" : "Add model"}</DialogTitle>
           <DialogDescription>
-            A model deployment backed by one of this team&apos;s provider credentials. The
-            provider must match the chosen credential.
+            {global
+              ? "A platform model callable by every team, present and future. The provider must match the chosen credential."
+              : "A model deployment backed by one of this team’s provider credentials. The provider must match the chosen credential."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
-          {!teamId ? (
+          {!teamId && !global ? (
             <div className="grid gap-2">
               <Label htmlFor="model-team">team</Label>
               <select

@@ -8,10 +8,12 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_gateway.domain.entities import Model
+from litestar_gateway.domain.entities import Model, ModelGrant
 from litestar_gateway.domain.exceptions import ModelNameExists
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_gateway.infrastructure.persistence.orm import ModelRecord
+from litestar_gateway.infrastructure.persistence.orm import ModelGrantRecord, ModelRecord
+
+_GLOBAL_SUFFIX = "-global"
 
 
 class SQLAlchemyModelRepository:
@@ -39,9 +41,9 @@ class SQLAlchemyModelRepository:
         try:
             await self._session.commit()
         except IntegrityError as exc:
-            # Loser of a concurrent create with the same (team_id, name): the
-            # service's pre-check passed for both, the unique constraint catches
-            # the race. Translate to the domain 409 instead of an opaque 500.
+            # Loser of a concurrent create with the same name (per team, or global):
+            # the service's pre-check passed for both, the unique constraint (or the
+            # partial global index) catches the race. Translate to the domain 409.
             await self._session.rollback()
             raise ModelNameExists(model.name) from exc
         await self._session.refresh(record)
@@ -52,10 +54,61 @@ class SQLAlchemyModelRepository:
         return record.to_entity() if record else None
 
     async def get_by_name(self, team_id: UUID, name: str) -> Model | None:
-        record = await self._session.scalar(
+        # 1. The team's own model always wins.
+        own = await self._session.scalar(
             select(ModelRecord).where(ModelRecord.team_id == team_id, ModelRecord.name == name)
         )
-        return record.to_entity() if record else None
+        if own is not None:
+            return own.to_entity()
+        # 2. A model extended to this team under this alias.
+        grant = await self._session.scalar(
+            select(ModelGrantRecord).where(
+                ModelGrantRecord.team_id == team_id, ModelGrantRecord.alias == name
+            )
+        )
+        if grant is not None:
+            source = await self._session.get(ModelRecord, grant.model_id)
+            return source.to_entity() if source else None
+        # 3. A global model by its plain name — reachable here only because the
+        #    team has no own model of that name (step 1 missed).
+        glob = await self._session.scalar(
+            select(ModelRecord).where(ModelRecord.team_id.is_(None), ModelRecord.name == name)
+        )
+        if glob is not None:
+            return glob.to_entity()
+        # 4. The disambiguated `<base>-global`, valid only when the team's own
+        #    `<base>` shadows a global of that base name.
+        if name.endswith(_GLOBAL_SUFFIX):
+            base = name[: -len(_GLOBAL_SUFFIX)]
+            shadows = await self._session.scalar(
+                select(ModelRecord.id)
+                .where(ModelRecord.team_id == team_id, ModelRecord.name == base)
+                .limit(1)
+            )
+            if shadows is not None:
+                glob = await self._session.scalar(
+                    select(ModelRecord).where(
+                        ModelRecord.team_id.is_(None), ModelRecord.name == base
+                    )
+                )
+                if glob is not None:
+                    return glob.to_entity()
+        return None
+
+    async def name_taken_in_team(self, team_id: UUID, name: str) -> bool:
+        own = await self._session.scalar(
+            select(ModelRecord.id)
+            .where(ModelRecord.team_id == team_id, ModelRecord.name == name)
+            .limit(1)
+        )
+        if own is not None:
+            return True
+        grant = await self._session.scalar(
+            select(ModelGrantRecord.id)
+            .where(ModelGrantRecord.team_id == team_id, ModelGrantRecord.alias == name)
+            .limit(1)
+        )
+        return grant is not None
 
     async def list_by_team(
         self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
@@ -66,6 +119,24 @@ class SQLAlchemyModelRepository:
             .order_by(ModelRecord.created_at, ModelRecord.id)
             .limit(limit)
             .offset(offset)
+        )
+        return [r.to_entity() for r in records]
+
+    async def list_global(self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0) -> list[Model]:
+        records = await self._session.scalars(
+            select(ModelRecord)
+            .where(ModelRecord.team_id.is_(None))
+            .order_by(ModelRecord.created_at, ModelRecord.id)
+            .limit(limit)
+            .offset(offset)
+        )
+        return [r.to_entity() for r in records]
+
+    async def all_global(self) -> list[Model]:
+        records = await self._session.scalars(
+            select(ModelRecord)
+            .where(ModelRecord.team_id.is_(None))
+            .order_by(ModelRecord.created_at, ModelRecord.id)
         )
         return [r.to_entity() for r in records]
 
@@ -96,3 +167,47 @@ class SQLAlchemyModelRepository:
             select(ModelRecord.id).where(ModelRecord.credential_id == credential_id).limit(1)
         )
         return record is not None
+
+    # Grants (extending a team model to other teams).
+
+    async def add_grant(self, grant: ModelGrant) -> ModelGrant:
+        record = ModelGrantRecord(
+            id=grant.id,
+            model_id=grant.model_id,
+            team_id=grant.team_id,
+            alias=grant.alias,
+        )
+        self._session.add(record)
+        try:
+            await self._session.commit()
+        except IntegrityError as exc:
+            await self._session.rollback()
+            # Either the alias collides in the target team, or the model is
+            # already extended to it — both surface as a 409.
+            raise ModelNameExists(grant.alias) from exc
+        await self._session.refresh(record)
+        return record.to_entity()
+
+    async def get_grant(self, grant_id: UUID) -> ModelGrant | None:
+        record = await self._session.get(ModelGrantRecord, grant_id)
+        return record.to_entity() if record else None
+
+    async def remove_grant(self, grant_id: UUID) -> None:
+        await self._session.execute(delete(ModelGrantRecord).where(ModelGrantRecord.id == grant_id))
+        await self._session.commit()
+
+    async def list_grants_for_model(self, model_id: UUID) -> list[ModelGrant]:
+        records = await self._session.scalars(
+            select(ModelGrantRecord)
+            .where(ModelGrantRecord.model_id == model_id)
+            .order_by(ModelGrantRecord.created_at, ModelGrantRecord.id)
+        )
+        return [r.to_entity() for r in records]
+
+    async def list_grants_for_team(self, team_id: UUID) -> list[ModelGrant]:
+        records = await self._session.scalars(
+            select(ModelGrantRecord)
+            .where(ModelGrantRecord.team_id == team_id)
+            .order_by(ModelGrantRecord.created_at, ModelGrantRecord.id)
+        )
+        return [r.to_entity() for r in records]

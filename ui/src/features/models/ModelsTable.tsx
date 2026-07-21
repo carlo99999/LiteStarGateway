@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PROVIDER_LABELS } from "@/features/credentials/providerFields";
-import { setModelEnabled, type Model } from "@/features/models/api";
+import { setGlobalModelEnabled, setModelEnabled, type Model } from "@/features/models/api";
 
 interface ModelsTableProps {
   rows: Model[] | undefined;
@@ -22,6 +22,11 @@ interface ModelsTableProps {
   credentialNames: Map<string, string>;
   onEdit: (model: Model) => void;
   onDelete: (model: Model) => void;
+  /** Extend a team-owned model to other teams. Omit to hide the action (e.g.
+   * for the global-models table, where extension does not apply). */
+  onExtend?: (model: Model) => void;
+  /** Show a scope column (Global vs Team) — used on the mixed admin view. */
+  showScope?: boolean;
 }
 
 function formatCost(perToken: number | null): string {
@@ -37,12 +42,20 @@ export function ModelsTable({
   credentialNames,
   onEdit,
   onDelete,
+  onExtend,
+  showScope = false,
 }: ModelsTableProps) {
   const queryClient = useQueryClient();
   const toggle = useMutation({
-    mutationFn: (model: Model) => setModelEnabled(model.team_id, model.id, !model.enabled),
-    onSettled: (_data, _err, model) =>
-      queryClient.invalidateQueries({ queryKey: ["team-models", model.team_id] }),
+    // A global model (team_id === null) toggles through the platform endpoint.
+    mutationFn: (model: Model) =>
+      model.team_id === null
+        ? setGlobalModelEnabled(model.id, !model.enabled)
+        : setModelEnabled(model.team_id, model.id, !model.enabled),
+    onSettled: (_data, _err, model) => {
+      queryClient.invalidateQueries({ queryKey: ["team-models", model.team_id] });
+      queryClient.invalidateQueries({ queryKey: ["global-models"] });
+    },
   });
 
   const columns: Column<Model>[] = [
@@ -68,6 +81,20 @@ export function ModelsTable({
       ),
     },
     { key: "type", header: "type", cell: (m) => <Badge variant="muted">{m.type}</Badge> },
+    ...(showScope
+      ? [
+          {
+            key: "scope",
+            header: "scope",
+            cell: (m: Model) =>
+              m.team_id === null ? (
+                <Badge variant="accent">global</Badge>
+              ) : (
+                <Badge variant="muted">team</Badge>
+              ),
+          } satisfies Column<Model>,
+        ]
+      : []),
     {
       key: "provider",
       header: "provider",
@@ -116,6 +143,9 @@ export function ModelsTable({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={() => onEdit(m)}>edit</DropdownMenuItem>
+            {onExtend && m.team_id !== null ? (
+              <DropdownMenuItem onSelect={() => onExtend(m)}>extend…</DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem onSelect={() => toggle.mutate(m)}>
               {m.enabled ? "disable" : "enable"}
             </DropdownMenuItem>

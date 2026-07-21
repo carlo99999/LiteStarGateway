@@ -23,13 +23,15 @@ class Credential:
 
 @dataclass(frozen=True)
 class Model:
-    """A configured model deployment owned by a team.
+    """A configured model deployment.
 
-    `provider` must match the referenced credential's provider (enforced on write).
+    Owned by a team (`team_id` set) or by the platform (`team_id is None`, a
+    "global" model callable by every team, present and future). `provider` must
+    match the referenced credential's provider (enforced on write).
     """
 
     id: UUID
-    team_id: UUID
+    team_id: UUID | None
     name: str
     provider: Provider
     credential_id: UUID
@@ -57,3 +59,20 @@ class Model:
         client may override), then the sanitized client `request`, then
         `params_enforced` (admin policy the client cannot override)."""
         return {**self.params, **request, **self.params_enforced}
+
+
+@dataclass(frozen=True)
+class ModelGrant:
+    """An "extension" of a team-owned model to another team.
+
+    The grant points at the source `Model` (single source of truth — costs and
+    config are read from it, never copied), and carries the `alias` the target
+    team calls it by. The alias defaults to the source model's name and is
+    suffixed to avoid a clash with a name the target team already uses.
+    """
+
+    id: UUID
+    model_id: UUID
+    team_id: UUID  # the team the model is extended to
+    alias: str
+    created_at: datetime

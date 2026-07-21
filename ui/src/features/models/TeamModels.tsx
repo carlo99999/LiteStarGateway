@@ -7,6 +7,7 @@ import { useCredentialNames } from "@/features/credentials/useCredentialNames";
 import { CreateModelDialog } from "@/features/models/CreateModelDialog";
 import { DeleteModelDialog } from "@/features/models/DeleteModelDialog";
 import { EditModelDialog } from "@/features/models/EditModelDialog";
+import { ExtendModelDialog } from "@/features/models/ExtendModelDialog";
 import { ModelsTable } from "@/features/models/ModelsTable";
 import { listModelsPage, type Model } from "@/features/models/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
@@ -27,6 +28,7 @@ export function TeamModels({ teamId }: TeamModelsProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Model | null>(null);
   const [deleting, setDeleting] = useState<Model | null>(null);
+  const [extending, setExtending] = useState<Model | null>(null);
 
   useEffect(() => setOffset(0), [teamId]);
   useEffect(() => {
@@ -53,6 +55,7 @@ export function TeamModels({ teamId }: TeamModelsProps) {
         credentialNames={credentialNames}
         onEdit={setEditing}
         onDelete={setDeleting}
+        onExtend={setExtending}
       />
       {models.data ? (
         <PaginationControls
@@ -70,6 +73,12 @@ export function TeamModels({ teamId }: TeamModelsProps) {
         model={editing}
         onOpenChange={(open) => {
           if (!open) setEditing(null);
+        }}
+      />
+      <ExtendModelDialog
+        model={extending}
+        onOpenChange={(open) => {
+          if (!open) setExtending(null);
         }}
       />
       <DeleteModelDialog

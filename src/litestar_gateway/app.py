@@ -51,7 +51,11 @@ from litestar_gateway.infrastructure.web.credentials.dependencies import (
 from litestar_gateway.infrastructure.web.dependencies import provide_api_key_service
 from litestar_gateway.infrastructure.web.docs_site import create_docs_router
 from litestar_gateway.infrastructure.web.exception_handlers import domain_exception_handler
-from litestar_gateway.infrastructure.web.models import ModelController, ModelPricesController
+from litestar_gateway.infrastructure.web.models import (
+    ModelController,
+    ModelPricesController,
+    PlatformModelController,
+)
 from litestar_gateway.infrastructure.web.models.dependencies import provide_model_service
 from litestar_gateway.infrastructure.web.openapi import OPENAPI_DESCRIPTION
 from litestar_gateway.infrastructure.web.organizations import OrganizationController
@@ -213,6 +217,7 @@ def _build_route_handlers(database: Database) -> list:
         OrganizationController,  # platform-admin: orgs + team creation
         TeamController,  # team-admin: members + team-scoped API keys
         ModelController,  # team-admin: team-scoped model deployments
+        PlatformModelController,  # platform-admin: global models + extension grants
         ModelPricesController,  # default per-token pricing lookup (console prefill)
         RouterController,  # team-admin: smart routers (virtual models)
         platform_routing_savings,  # platform-admin: cross-team routing savings

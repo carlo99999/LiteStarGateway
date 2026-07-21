@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { deleteModel, type Model } from "@/features/models/api";
+import { deleteGlobalModel, deleteModel, type Model } from "@/features/models/api";
 
 interface DeleteModelDialogProps {
   /** The model pending deletion, or null when the dialog is closed. */
@@ -21,9 +21,11 @@ interface DeleteModelDialogProps {
 export function DeleteModelDialog({ model, onOpenChange }: DeleteModelDialogProps) {
   const queryClient = useQueryClient();
   const mutation = useMutation({
-    mutationFn: (m: Model) => deleteModel(m.team_id, m.id),
+    mutationFn: (m: Model) =>
+      m.team_id === null ? deleteGlobalModel(m.id) : deleteModel(m.team_id, m.id),
     onSuccess: async (_data, m) => {
       await queryClient.invalidateQueries({ queryKey: ["team-models", m.team_id] });
+      await queryClient.invalidateQueries({ queryKey: ["global-models"] });
       onOpenChange(false);
     },
   });
