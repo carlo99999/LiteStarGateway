@@ -1,4 +1,4 @@
-# Round 2 — Enterprise-readiness review (2026-07-02)
+# Code Review — Round 2 (2026-07-02)
 
 [← Index](INDEX.md)
 
@@ -10,7 +10,7 @@ IDs continue the round-1 sequence to avoid collision.
 
 New counts: **0 CRITICAL · 7 HIGH · 7 MEDIUM · 4 LOW** + an enterprise-gap roadmap.
 
-## Resolution status (Round 2, updated after remediation)
+## Resolution status
 
 **Fixed (PRs open/merged):**
 

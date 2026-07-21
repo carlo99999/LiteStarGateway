@@ -49,459 +49,365 @@ Counts: **1 CRITICAL · 3 HIGH · 3 MEDIUM · 3 LOW.**
 
 ## Issue summary
 
-| ID | Titolo | Priorità | File coinvolti | Stato |
-|----|--------|----------|----------------|-------|
-| ISSUE-001 | Native Anthropic passthrough: client override della credenziale del gateway via `extra_headers` (kwargs injection / open relay) | critical | `infrastructure/llm/anthropic_adapter.py:205-245` | open |
-| ISSUE-002 | Reservation di budget sempre `$0` sulla superficie Gemini nativa (guard in-flight burst annullata) | high | `application/usage_meter.py:38-62,120-127,149-160`; `application/completion_service.py:319,369` | open |
-| ISSUE-003 | Gli endpoint nativi saltano `sanitize_request`/`clamp_output_tokens`: ceiling `max_output_tokens` (H15) non applicato + self-DoS da reservation illimitata (L23) | high | `application/completion_service.py:186-207,224-268,313-376`; `domain/request_policy.py:86,121-142` | open |
-| ISSUE-004 | Gemini non-streaming `generate_content` forka `_dispatch` e perde il fallback di stima H14 → billing $0 silenzioso | high | `application/completion_service.py:297-348` (vs `:125-156`) | open |
-| ISSUE-005 | Il passthrough Gemini usa l'API privata `google-genai` `_api_client.async_request` con pin aperto | medium | `infrastructure/llm/vertex_adapter.py:299,315`; `pyproject.toml:21` | open |
-| ISSUE-006 | I metodi nativi risolvono via slot capability `"chat.completions"`: la matrice del gateway non protegge, unica guardia è il check applicativo | medium | `infrastructure/llm/gateway.py:117-160`; `application/completion_service.py:225-229,314-318` | open |
-| ISSUE-007 | Gli endpoint nativi emettono l'envelope errori OpenAI (non quello del provider); contratto non testato né documentato | medium | `infrastructure/web/api_router/router.py:49`; `infrastructure/web/exception_handlers.py:160-174` | open |
-| ISSUE-008 | La stima prompt (`_request_text`) ignora il campo top-level `system` di Anthropic → under-count della reservation | low | `application/usage_meter.py:38-62` | open |
-| ISSUE-009 | Triplicazione dello scheletro di stream-metering (`_metered`/`_metered_native`/`_metered_gemini`, `metered_*_stream`) — debito DRY | low | `application/completion_service.py:270-295,378-404,515-543`; `application/usage_meter.py:392-569` | open |
-| ISSUE-010 | Asimmetria di copertura test: nessun test di budget/concorrenza sulla superficie Gemini nativa | low | `tests/native/test_generate_content.py` | open |
+| ID | Title | Severity | Files | Status |
+|----|-------|----------|-------|--------|
+| ISSUE-001 | Native Anthropic passthrough: client can override the gateway credential via `extra_headers` (kwargs injection / open relay) | critical | `infrastructure/llm/anthropic_adapter.py:205-245` | **Fixed** (#221) |
+| ISSUE-002 | Budget reservation always `$0` on the native Gemini surface (in-flight burst guard defeated) | high | `application/usage_meter.py:38-62,120-127,149-160`; `application/completion_service.py:319,369` | **Fixed** (#221) |
+| ISSUE-003 | Native endpoints skip `sanitize_request`/`clamp_output_tokens`: `max_output_tokens` ceiling (H15) unenforced + self-DoS from unbounded reservation (L23) | high | `application/completion_service.py:186-207,224-268,313-376`; `domain/request_policy.py:86,121-142` | **Fixed** (#221) |
+| ISSUE-004 | Gemini non-streaming `generate_content` forks `_dispatch` and loses the H14 estimate fallback → silent $0 billing | high | `application/completion_service.py:297-348` (vs `:125-156`) | **Fixed** (#221) |
+| ISSUE-005 | The Gemini passthrough uses the private `google-genai` `_api_client.async_request` with an open pin | medium | `infrastructure/llm/vertex_adapter.py:299,315`; `pyproject.toml:21` | **Fixed** (#222) |
+| ISSUE-006 | Native methods resolve via the `"chat.completions"` capability slot: the gateway matrix doesn't protect them | medium | `infrastructure/llm/gateway.py:117-160`; `application/completion_service.py:225-229,314-318` | **Fixed** (#224) |
+| ISSUE-007 | Native endpoints emit the OpenAI error envelope (not the provider's); the contract is neither tested nor documented | medium | `infrastructure/web/api_router/router.py:49`; `infrastructure/web/exception_handlers.py:160-174` | **Fixed** (#223) |
+| ISSUE-008 | The prompt estimate (`_request_text`) ignores Anthropic's top-level `system` field → reservation under-count | low | `application/usage_meter.py:38-62` | **Fixed** (Round 8 close) |
+| ISSUE-009 | Triplicated stream-metering skeleton (`_metered`/`_metered_native`/`_metered_gemini`, `metered_*_stream`) — DRY debt | low | `application/completion_service.py:270-295,378-404,515-543`; `application/usage_meter.py:392-569` | **Deferred** |
+| ISSUE-010 | Test coverage asymmetry: no budget/concurrency test on the native Gemini surface | low | `tests/native/test_generate_content.py` | **Covered** (#221) |
+
+## Findings
+
+### ISSUE-001 — Native Anthropic passthrough: client can override the gateway credential via `extra_headers` (critical)
+
+**Problem.** `anative_messages` builds `body = {**native_body, "model":
+model.provider_model_id}` and calls `await client.messages.create(**body)`,
+where `native_body` is the client's **raw JSON body** on `POST /v1/messages`,
+forwarded "verbatim". But `messages.create()` is an **`anthropic` Python SDK**
+method, not an HTTP POST: it accepts the reserved kwargs `extra_headers`,
+`extra_query`, `extra_body`, `timeout` alongside the Messages API fields.
+Verified against the installed SDK
+(`anthropic/resources/messages/messages.py:143-146`, docstring: "Send extra
+headers / Add additional query parameters / Add additional JSON properties /
+Override the client-level default timeout") and against
+`_base_client._build_headers`/`merge_headers`: custom headers **win** over the
+defaults on collision, and `x-api-key` isn't in the `_APPEND_HEADERS` allowlist.
+Reproduction: a body with `"extra_headers": {"X-Api-Key": "<anything>"}` makes
+`_build_headers` return `x-api-key = <anything>`, replacing the vaulted
+credential passed to `AsyncAnthropic(api_key=...)`.
+
+**Why it's a problem.** It violates the project's explicit invariant ("the
+client must never control the upstream credentials/base_url; server-side only")
+for the auth headers, which are as sensitive as `base_url`. It's the same
+kwargs-injection class that `domain/request_policy.py` / `sanitize_request`
+block **for the OpenAI surface** (which builds kwargs field-by-field from an
+allowlist, with no `**request`), reopened by the native path alone. The Gemini
+path is **not** affected (it passes the body as a single positional dict to
+`_api_client.async_request`, and the SDK strips `_`-prefixed keys).
+
+**Impact.** Any authenticated user can turn the gateway into an **anonymous
+relay** to the real Anthropic API using a credential of their choice (their own,
+or a stolen one), routing traffic through the gateway's IP/infrastructure and
+bypassing the team's configured credential entirely. Via
+`extra_query`/`extra_body`/`timeout` they can also add arbitrary query/JSON
+fields to the upstream request or force degenerate timeouts (resilience
+bypass). Security + request integrity + possible credential abuse.
+
+**Suggested fix.** Before spreading the body, **reject (400) or strip** the
+reserved control keys (`extra_headers`, `extra_query`, `extra_body`, `timeout`,
+and any `_`-prefixed key) — ideally in `prepare_native`/`native_messages` so it
+covers both streaming and non-streaming — or pass the body as a single
+validated dict instead of `**kwargs`, aligning with the (safer) Gemini form. Add
+a regression test asserting that `extra_headers`/`extra_query`/`extra_body`/`timeout`
+in the native body do **not** reach the outbound HTTP request.
+
+### ISSUE-002 — Budget reservation always `$0` on the native Gemini surface (high)
+
+**Problem.** The native Gemini body carries the prompt under `contents` and the
+output ceiling under `generationConfig.maxOutputTokens` (nested). But
+`_request_text` reads only `messages`/`input`/`instructions` and
+`_max_output_tokens` only the top-level `max_tokens`/`max_completion_tokens`/
+`max_output_tokens`. Neither key exists in a Gemini body, so `_reservation_cost()`
+returns **`0.0`** for every native Gemini call, regardless of prompt/output size.
+Empirically confirmed by two reviewers (`GEMINI native → reservation 0.0` vs
+`ANTHROPIC native → honest reservation`). Native Anthropic isn't affected
+because its Messages API uses exactly top-level `messages` and `max_tokens`.
+
+**Why it's a problem.** `InFlightSpend` (the pre-call reservation) exists to
+bound overshoot from a concurrent burst: each admitted request reserves its
+pessimistic cost until settled, so a burst can't all pass under a nearly-
+exhausted cap before the first settles (streams widen the window to minutes).
+With a `$0` reservation, that protection is a **complete no-op** on the Gemini
+surface — the same budget-cap bypass class R7-H22/M50 addressed for other
+surfaces.
+
+**Impact.** A team whose committed spend is near (but under) the cap can launch
+N concurrent native Gemini requests (bounded only by the reachable 120/min
+per-IP rate limit), all admitted because each contributes `0` to the reservation
+the others see → overshoot past the hard cap by ~N × per-request cost. Final
+billing stays correct (settlement reads the authoritative `usageMetadata`), so
+it's not unbilled spend, but it's a real budget-overshoot window — worse for
+long streams.
+
+**Suggested fix.** Give `_reservation_cost`/`admit` a Gemini-aware path that
+reads `contents[].parts[].text` and `generationConfig.maxOutputTokens` (+
+`candidateCount`) when the body isn't OpenAI-shaped — mirroring how
+`_gemini_usage` maps the native form in settlement. Add a test asserting a
+non-zero reservation and `BudgetExceeded` throttling on concurrent native Gemini
+bursts.
+
+### ISSUE-003 — Native endpoints skip sanitize/clamp: max_output_tokens unenforced + self-DoS (high)
+
+**Problem.** The OpenAI surface runs every request through `sanitize_request`
+(clamp `max_tokens`/`n`) and `clamp_output_tokens` (apply the per-model
+`model.max_output_tokens` ceiling, the Round 5 H15 fix) before `admit`. The
+native path skips both by design (passthrough). Two consequences:
+
+1. **The admin cost ceiling (`max_output_tokens`) isn't applied** to the native
+   body: a client can request (and the provider **really bills**) output well
+   past the admin's governance policy.
+2. For Anthropic (where the reservation reads `max_tokens`) a client can set a
+   huge `max_tokens` and inflate `InFlightSpend` without limit, failing the
+   admission of all their other requests with `BudgetExceeded` until it settles
+   — the reopening of L23 (Round 4), closed on the OpenAI surface by reserving
+   from the sanitized body.
+
+**Why it's a problem.** `docs/native-anthropic.md:8` and `docs/native-gemini.md:8`
+explicitly promise the gateway "keeps the same governance as
+`/v1/chat/completions` (auth, per-team budget, metering, rate limiting)" —
+**false** for the cost-ceiling half. No test in `tests/native/`/`tests/conformance/`
+references `max_output_tokens` (grep: zero hits).
+
+**Impact.** Real upstream spend unbounded past the admin policy (economic
+loss / abuse), and self-DoS of one's own team on Anthropic. Reliability + cost +
+governance divergence between two surfaces over the same models.
+
+**Suggested fix.** Apply the `model.max_output_tokens` ceiling as a real clamp on
+the native body's output field before dispatch (translating to the provider's
+field: `max_tokens` for Anthropic, `generationConfig.maxOutputTokens` for
+Gemini), and clamp what `_reservation_cost` reads too. Absent a per-model
+ceiling, impose a global upper bound. Tests: an oversized
+`max_tokens`/`maxOutputTokens` is clamped/rejected; a model with
+`max_output_tokens` set bounds native output as it does on chat.
+
+### ISSUE-004 — Gemini non-streaming generate_content forks _dispatch and loses the H14 fallback (high)
+
+**Problem.** `_dispatch` (used by chat/responses/embeddings/images and by
+`native_messages`) always calls `settle_ok(..., response, latency_ms, request)`,
+and `settle_ok` (`usage_meter.py:248-278`) estimates prompt tokens from the
+request text when the provider reports no usable usage (the H14 fix).
+`generate_content` **doesn't** use `_dispatch`: it hand-reimplements the same
+try/except/finally shape but calls
+`settle_ok(team_id, api_key_id, model, "native.generate_content", _gemini_usage(response), latency_ms)`
+**without the `request` argument** → `request=None` by default → the estimate
+branch (`if not _has_tokens(usage) and request is not None`) can never fire on
+this path.
+
+**Why it's a problem.** If the upstream Gemini response omits `usageMetadata`
+(error responses, safety-blocked completions, or an upstream change),
+`_gemini_usage` maps to `{"input_tokens": None, "output_tokens": None}`,
+`_has_tokens` is `False`, and with `request=None` the estimate is skipped →
+`_parse_usage` bills `prompt=0, completion=0, cost=0.0`, **with no warning or
+log**. It reintroduces exactly the zero-cost bug class H14 closed, on the
+Gemini non-streaming path alone (streaming always passes `request`, so it's
+immune).
+
+**Impact.** Revenue loss / free inference when the provider omits usage data on
+the native Gemini non-streaming surface — completely silent. It's also the
+clearest instance of "duplication hiding a divergence": `generate_content` is a
+fork of `_dispatch` that drifted.
+
+**Suggested fix.** Route `generate_content` through `_dispatch` (as
+`native_messages` does via a lambda), or at least pass `request=data` to the
+manual `settle_ok`. To reuse `_dispatch` with the native usage view, add an
+optional `settle_view: Callable = lambda r: r` and call
+`_dispatch(..., settle_view=_gemini_usage)`.
+
+### ISSUE-005 — Gemini passthrough uses the private google-genai `_api_client.async_request` with an open pin (medium)
+
+**Problem.** The native Gemini path calls two **private** (underscore) SDK
+methods on `client.aio._api_client`. The signature matches
+`google-genai==2.10.0`, but it's non-public API with no stability guarantee, and
+the pin is open. The only tests exercising the path
+(`tests/completions/conftest.py` `FakeGenaiClient`, used by `tests/native/` and
+`tests/conformance/`) hardcode a fake with **exactly the same private shape** the
+adapter assumes → they can't catch a release that renames/restructures
+`_api_client`.
+
+**Why it's a problem.** A dependency bump (Dependabot active since R7-L40) can
+silently break the Gemini passthrough in production with zero CI signal — the
+same silent-until-deploy class as R7-L38 (`mlflow>=3.14`). Runtime 500 on the
+money/inference path after an upgrade.
+
+**Impact.** Reliability: native Gemini surface breakage after an upgrade, found
+only in prod.
+
+**Suggested fix.** Add an upper bound (`>=2.10,<3`) and/or wrap the private call
+behind a function with a targeted test that fails with a clear message if the
+private method changes presence/signature (against a real `genai.Client` offline,
+e.g. an httpx mock transport), so the breakage is in CI not prod. Migrate to a
+public raw-request API if one appears.
+
+### ISSUE-006 — Native methods resolve via the "chat.completions" capability slot (medium)
+
+**Problem.** The gateway's four native methods resolve the adapter via the
+`"chat.completions"` slot and then call the native method directly, even though
+only `AnthropicAdapter`/`VertexAdapter` implement them
+(`OpenAIAdapter`/`AzureOpenAIAdapter`/`BedrockAdapter` don't). The capability
+matrix (`gateway.py:39-69`), which for every other operation raises
+`UnsupportedOperation` (→501) on unsupported providers, is bypassed. The only
+thing stopping `gateway.anative_messages(...)` on a Bedrock model is the single
+`if model.provider is not Provider.ANTHROPIC: raise ProviderMismatch(...)` check
+in the application layer (duplicated for Gemini).
+
+**Why it's a problem.** Defense-in-depth is missing in exactly the layer
+(`gateway.py`) that exists to provide it. If the application check is
+removed/refactored, or a new caller reaches the gateway directly, the failure is
+an unhandled `AttributeError` → opaque 500, not the clean 501 the rest of the
+code guarantees (contradicting the file's docstring).
+
+**Impact.** Maintainability / latent-bug trap on future provider additions;
+potential opaque 500 instead of 501.
+
+**Suggested fix.** Add `"native.messages"`/`"native.generate_content"` as real
+keys in the `_registry`, gate `_resolve` on them, and make the gateway matrix
+authoritative (keeping or removing the application check, but so its removal
+can't produce a 500).
+
+### ISSUE-007 — Native endpoints emit the OpenAI error envelope, not the provider's (medium)
+
+**Problem.** The native routes live on the same `api_router` whose `DomainError`
+handler emits the OpenAI envelope `{"error": {"message","type","code"}}`. A
+domain error on `/v1/messages` or `:generateContent` (404/409/402/501…) thus
+returns the OpenAI shape, not Anthropic's native
+(`{"type":"error","error":{...}}`) or Gemini's
+(`{"error":{"code","message","status"}}`). It works today only because the SDKs
+derive the exception **type** from the HTTP status, not the body. No test
+asserts the body shape on a native route (grep: zero body-shape assertions in
+the native/conformance tests).
+
+**Why it's a problem.** The native endpoints' premise ("point the stock SDK and
+it works") extends to error handling a sophisticated client may inspect
+(`exc.body["error"]["type"]`, retry-reason parsing). Nothing pins whether the
+body should stay OpenAI-shaped (a defensible, simpler choice) or become native,
+and there's no regression in either direction.
+
+**Impact.** Error ergonomics for native clients (not correctness or security:
+the status is right, so retry/backoff on 429/5xx work). Test/contract debt.
+
+**Suggested fix.** Decide and **document** the native surfaces' error-body
+contract (OpenAI-shaped is defensible — say so in `docs/native-*.md`) and add at
+least one test per surface asserting the body shape on a domain error, not just
+the status.
+
+### ISSUE-008 — The prompt estimate ignores Anthropic's top-level `system` field (low)
+
+**Problem.** The native Anthropic body carries the system prompt in a top-level
+`system` field (string or list of blocks), separate from `messages`; message
+content can include `tool_use`/`tool_result`/image blocks. `_request_text` reads
+only textual `messages[].content`, never `system`.
+
+**Why it's a problem.** Under-count of the prompt side of the pessimistic
+reservation for native Anthropic calls (e.g. a large system prompt is invisible
+to the reservation). Limited impact: the dominant term (`max_tokens`, the output
+ceiling) **is** captured for Anthropic, and the final bill always settles on the
+provider's authoritative usage — so not independently exploitable at meaningful
+scale.
+
+**Impact.** Slightly under-estimated reservation (in-flight throttle accuracy),
+not the bill.
+
+**Suggested fix.** Add `system` (string or list of blocks) and other prompt
+fields outside `messages` to `_request_text`'s extraction when present.
+
+### ISSUE-009 — Triplicated stream-metering skeleton (DRY debt) (low)
+
+**Problem.** The critical parts (release-exactly-once, shielded settlement,
+timeout, error-vs-ok branching) are correctly already factored into
+`_finalize_stream_billing` (not duplicated). But the relay loop and its
+exception handling are copied three times, differing only in the 4-8 lines that
+extract usage/text from the OpenAI, Anthropic and Gemini chunk shapes.
+
+**Why it's a problem.** A future fix to the loop structure (a new cancellation
+edge, or a change in what counts as "disconnect vs error") would have to be
+carried by hand to three call sites, with nothing guaranteeing they stay in
+sync. Not a bug yet (the three are faithful, well-tested mirrors), but a
+divergence risk to watch at the next stream-metering change.
+
+**Impact.** Maintainability; future divergence risk.
+
+**Suggested fix** (non-urgent). Extract the shared skeleton into a generic
+`_metered_wire_stream(..., extract_usage, extract_text)` and make the three
+public methods thin parameter bindings. Given "simplicity first" and that the
+triplication is small and consistent, it's a nice-to-have, not a blocker.
+
+### ISSUE-010 — No budget/concurrency test on the native Gemini surface (low)
+
+**Problem.** An over-budget test exists for native Anthropic but not the Gemini
+equivalent. Combined with ISSUE-002 (Gemini `$0` reservation), it's exactly the
+area where a test would have caught the bug.
+
+**Why it's a problem.** The `admit()` path is shared and tested via Anthropic +
+the OpenAI surface, but the absence of a Gemini-native budget/concurrency test
+is precisely what let ISSUE-002 slip through.
+
+**Impact.** Coverage; risk of an undetected regression on the Gemini surface.
+
+**Suggested fix.** Add the over-budget test to `test_generate_content.py` (and,
+for ISSUE-002, a concurrent-burst test asserting a non-zero reservation and
+`BudgetExceeded`).
 
 ## Resolution status — REMEDIATED
 
-Tutti i finding risolti e mergiati, tranne un LOW già coperto e uno deferito con
-motivazione. `main` è rimasta verde per tutta la remediation (740 test passati,
-`ruff`/`pyrefly`/`pre-commit` puliti).
+All findings fixed and merged, except one LOW already covered and one deferred
+with rationale. `main` stayed green throughout the remediation (740 tests
+passing, `ruff`/`pyrefly`/`pre-commit` clean).
 
-| ID | Priorità | Stato | PR |
-|----|----------|-------|----|
-| ISSUE-001 | critical | **Fixed** | #221 |
-| ISSUE-002 | high | **Fixed** | #221 |
-| ISSUE-003 | high | **Fixed** | #221 |
-| ISSUE-004 | high | **Fixed** | #221 |
-| ISSUE-005 | medium | **Fixed** | #222 |
-| ISSUE-006 | medium | **Fixed** | #224 |
-| ISSUE-007 | medium | **Fixed** | #223 |
-| ISSUE-008 | low | **Fixed** | (chiusura Round 8) |
-| ISSUE-009 | low | **Deferred** | — |
-| ISSUE-010 | low | **Covered** | #221 |
-
-Note:
-
-- **001+002+003+004** sono atterrate come un'unica modifica coesa (#221): reject dei
-  control-kwargs SDK, clamp del ceiling di output, reservation per-provider centralizzati
-  in `prepare_native` + `domain/request_policy.py`, e `generate_content` reinstradato su
-  `_dispatch` (con `settle_view`). Il body **clampato** è quello realmente inviato upstream.
-- **ISSUE-010** (test budget/concorrenza Gemini) è coperto da
+- **001+002+003+004** landed as one cohesive change (#221): reject SDK
+  control-kwargs, clamp the output ceiling, per-provider reservations
+  centralized in `prepare_native` + `domain/request_policy.py`, and
+  `generate_content` re-routed through `_dispatch` (with `settle_view`). The
+  **clamped** body is what's actually sent upstream.
+- **ISSUE-010** (Gemini budget/concurrency test) is covered by
   `tests/native/test_generate_content.py::test_gemini_reservation_nonzero_gates_concurrent_burst`
-  aggiunto in #221.
-- **ISSUE-009** (refactor DRY dello scheletro stream-metering) è **deferito**: le parti
-  correttezza-critiche (release-once, settlement shielded) sono già fattorizzate in
-  `_finalize_stream_billing`; rifattorizzare il residuo relay-loop su codice money-critical
-  di streaming è un rischio/beneficio sfavorevole (simplicity-first) — segnalato, non
-  schedulato.
-
-## Issues
-
-### ISSUE-001 — Native Anthropic passthrough: client override della credenziale del gateway via `extra_headers` (kwargs injection / open relay)
-
-**Priorità:** critical
-**Stato:** open
-**File coinvolti:** `src/litestar_gateway/infrastructure/llm/anthropic_adapter.py:205-223` (`anative_messages`), `:225-245` (`astream_native_messages`)
-
-**Problema**
-`anative_messages` costruisce `body = {**native_body, "model": model.provider_model_id}`
-e chiama `await client.messages.create(**body)`, dove `native_body` è il **body JSON
-grezzo** del client su `POST /v1/messages`, inoltrato "verbatim". Ma `messages.create()`
-è un metodo dell'**SDK Python** `anthropic`, non una POST HTTP: accetta i kwargs riservati
-`extra_headers`, `extra_query`, `extra_body`, `timeout` oltre ai campi della Messages API.
-Verificato contro l'SDK installato (`anthropic/resources/messages/messages.py:143-146`, docstring: "Send extra headers / Add additional query parameters / Add additional JSON
-properties / Override the client-level default timeout") e contro `_base_client._build_headers`/`merge_headers`: gli header custom **prevalgono** su quelli di default in caso di
-collisione, e `x-api-key` non è nella allowlist `_APPEND_HEADERS`. Riproduzione: un body
-con `"extra_headers": {"X-Api-Key": "<qualsiasi>"}` fa sì che `_build_headers` restituisca
-`x-api-key = <qualsiasi>`, sostituendo la credenziale vaultata passata a
-`AsyncAnthropic(api_key=...)`.
-
-**Perché è un problema**
-Viola l'invariante esplicito del progetto ("il client non deve mai controllare le
-credenziali/base_url upstream; solo server-side") per gli header di autenticazione, che
-sono sensibili quanto `base_url`. È la stessa classe di kwargs-injection che
-`domain/request_policy.py` / `sanitize_request` bloccano **per la superficie OpenAI**
-(che costruisce i kwargs campo-per-campo da allowlist, senza `**request`), riaperta dal
-solo path nativo. Il path Gemini **non** è affetto (passa il body come singolo dict
-posizionale a `_api_client.async_request`, e l'SDK strippa le chiavi con prefisso `_`).
-
-**Impatto possibile**
-Un qualsiasi utente autenticato può trasformare il gateway in un **relay anonimo** verso
-l'API Anthropic reale usando una credenziale a sua scelta (la propria, o una rubata),
-facendo passare il traffico per IP/infrastruttura del gateway e bypassando del tutto la
-credenziale configurata per il team. Via `extra_query`/`extra_body`/`timeout` può inoltre
-aggiungere query/campi JSON arbitrari alla richiesta upstream o forzare timeout degeneri
-(resilience bypass). Sicurezza + integrità della richiesta + possibile abuso di credenziali.
-
-**Soluzione consigliata**
-Prima di splattare il body, **rifiutare (400) o rimuovere** le chiavi di controllo
-riservate (`extra_headers`, `extra_query`, `extra_body`, `timeout`, e qualsiasi chiave con
-prefisso `_`) — idealmente in `prepare_native`/`native_messages` così vale sia per lo
-streaming sia per il non-streaming — oppure passare il body come singolo dict validato
-invece che come `**kwargs`, allineandosi alla forma (più sicura) del path Gemini. Aggiungere
-un test di regressione che verifica che `extra_headers`/`extra_query`/`extra_body`/`timeout`
-nel body nativo **non** raggiungano la richiesta HTTP in uscita.
-
-**Esempio**
-
-```python
-# anthropic_adapter.py — prima dello splat
-_RESERVED = ("extra_headers", "extra_query", "extra_body", "timeout")
-def _reject_sdk_control_kwargs(body: dict[str, Any]) -> None:
-    bad = [k for k in body if k in _RESERVED or k.startswith("_")]
-    if bad:
-        raise UnsupportedOperation(f"fields not allowed on the native surface: {bad}")
-# ... poi: _reject_sdk_control_kwargs(native_body); body = {**native_body, "model": ...}
-```
-
----
-
-### ISSUE-002 — Reservation di budget sempre `$0` sulla superficie Gemini nativa
-
-**Priorità:** high
-**Stato:** open
-**File coinvolti:** `src/litestar_gateway/application/usage_meter.py:38-62` (`_request_text`), `:120-127` (`_max_output_tokens`), `:149-160` (`_reservation_cost`), `:214-242` (`admit`); chiamati con il body grezzo in `application/completion_service.py:319` (`generate_content`), `:369` (`open_generate_content_stream`)
-
-**Problema**
-Il body nativo Gemini porta il prompt sotto `contents` e il ceiling di output sotto
-`generationConfig.maxOutputTokens` (annidato). Ma `_request_text` legge solo
-`messages`/`input`/`instructions` e `_max_output_tokens` solo i top-level
-`max_tokens`/`max_completion_tokens`/`max_output_tokens`. Nessuna delle due chiavi esiste
-in un body Gemini, quindi `_reservation_cost()` restituisce **`0.0`** per ogni chiamata
-Gemini nativa, indipendentemente da dimensione del prompt/output. Confermato empiricamente
-da due reviewer (`GEMINI native → reservation 0.0` vs `ANTHROPIC native → reservation
-onesta`). Anthropic nativo non è affetto perché la sua Messages API usa proprio `messages`
-e `max_tokens` top-level.
-
-**Perché è un problema**
-`InFlightSpend` (reservation pre-call) esiste per limitare l'overshoot da burst concorrente:
-ogni richiesta ammessa riserva il suo costo pessimistico finché non viene settlata, così un
-burst non può passare tutto sotto un cap quasi esaurito prima che il primo settli (gli
-stream allargano la finestra a minuti). Con reservation `$0`, quella protezione è **un no-op
-completo** sulla superficie Gemini — la stessa classe di bypass del budget-cap che R7-H22/M50
-hanno affrontato per altre superfici.
-
-**Impatto possibile**
-Un team con spend committato vicino (ma sotto) al cap può lanciare N richieste Gemini native
-concorrenti (limitate solo dal rate limit 120/min per-IP, raggiungibile), tutte ammesse
-perché ognuna contribuisce `0` alla reservation vista dalle altre → overshoot oltre il cap
-hard di ~N × costo-per-richiesta. Il billing finale resta corretto (settlement legge
-`usageMetadata` autorevole), quindi non è spesa non fatturata, ma è una finestra reale di
-sforamento del budget — peggiore per gli stream lunghi.
-
-**Soluzione consigliata**
-Dare a `_reservation_cost`/`admit` un path Gemini-aware che legge `contents[].parts[].text`
-e `generationConfig.maxOutputTokens` (+ `candidateCount`) quando il body non ha la forma
-OpenAI — specularmente a come `_gemini_usage` mappa la forma nativa in settlement. Aggiungere
-un test che verifica reservation non-zero e throttling `BudgetExceeded` su burst Gemini
-nativi concorrenti.
-
-**Esempio**
-
-```python
-def _gemini_reservation_view(body: dict[str, Any]) -> dict[str, Any]:
-    texts = [p.get("text", "") for c in body.get("contents", []) for p in c.get("parts", [])]
-    return {"messages": [{"content": "\n".join(texts)}],
-            "max_tokens": (body.get("generationConfig") or {}).get("maxOutputTokens", 0)}
-# generate_content / open_generate_content_stream:
-#   reservation = await self._meter.admit(team_id, model, _gemini_reservation_view(data))
-```
-
----
-
-### ISSUE-003 — Gli endpoint nativi saltano `sanitize_request`/`clamp_output_tokens`: ceiling `max_output_tokens` (H15) non applicato + self-DoS da reservation illimitata (L23)
-
-**Priorità:** high
-**Stato:** open
-**File coinvolti:** `application/completion_service.py:186-207` (`prepare_native`, non clampa), `:224-268` (`native_messages`/`open_native_messages_stream`), `:313-376` (`generate_content`/`open_generate_content_stream`) — tutti chiamano `admit(team_id, model, data)` sul body grezzo; contrasto con `_prepare` (`:406-434`), che esegue `sanitize_request` + `clamp_output_tokens`; `domain/request_policy.py:86` (`MAX_TOKENS=32_000`), `:121-142` (`clamp_output_tokens`)
-
-**Problema**
-La superficie OpenAI passa ogni richiesta per `sanitize_request` (clamp `max_tokens`/`n`) e
-`clamp_output_tokens` (applica il ceiling per-modello `model.max_output_tokens`, il fix H15
-di Round 5) prima di `admit`. Il path nativo salta entrambi by-design (passthrough). Due
-conseguenze:
-
-1. **Il ceiling di costo admin (`max_output_tokens`) non è applicato** al body nativo: un
-   client può richiedere (e il provider **fattura davvero**) output ben oltre la policy
-   di governance dell'admin.
-2. Per Anthropic (dove la reservation legge `max_tokens`) un client può settare un
-   `max_tokens` enorme e gonfiare senza limite `InFlightSpend`, facendo fallire l'admission
-   di tutte le altre proprie richieste con `BudgetExceeded` finché questa non settla — la
-   riapertura di L23 (Round 4), chiuso sulla superficie OpenAI riservando dal body sanitizzato.
-
-**Perché è un problema**
-`docs/native-anthropic.md:8` e `docs/native-gemini.md:8` promettono esplicitamente che il
-gateway "mantiene la stessa governance di `/v1/chat/completions` (auth, budget per-team,
-metering, rate limiting)" — **falso** per la metà cost-ceiling. Nessun test in
-`tests/native/`/`tests/conformance/` referenzia `max_output_tokens` (grep: zero hit).
-
-**Impatto possibile**
-Spesa upstream reale non limitata oltre la policy admin (perdita economica / abuso), e
-self-DoS del proprio team su Anthropic. Affidabilità + costi + divergenza di governance tra
-due superfici sugli stessi modelli.
-
-**Soluzione consigliata**
-Applicare il ceiling `model.max_output_tokens` come clamp reale sul campo output del body
-nativo prima del dispatch (traducendo al campo del provider: `max_tokens` per Anthropic,
-`generationConfig.maxOutputTokens` per Gemini), e comunque clampare ciò che
-`_reservation_cost` legge. In assenza di ceiling per-modello, imporre un upper bound globale.
-Test: un `max_tokens`/`maxOutputTokens` oversized è clampato/rifiutato; un modello con
-`max_output_tokens` settato limita l'output nativo come sul chat.
-
----
-
-### ISSUE-004 — Gemini non-streaming `generate_content` forka `_dispatch` e perde il fallback di stima H14 → billing $0 silenzioso
-
-**Priorità:** high
-**Stato:** open
-**File coinvolti:** `application/completion_service.py:297-348` (`generate_content`), da confrontare con `:125-156` (`_dispatch`) e `:150-151` (`settle_ok(..., request)`)
-
-**Problema**
-`_dispatch` (usato da chat/responses/embeddings/images e da `native_messages`) chiama sempre
-`settle_ok(..., response, latency_ms, request)`, e `settle_ok` (`usage_meter.py:248-278`)
-stima i prompt token dal testo della richiesta quando il provider non riporta usage usabile
-(il fix H14). `generate_content` **non** usa `_dispatch`: reimplementa a mano la stessa forma
-try/except/finally ma chiama
-`settle_ok(team_id, api_key_id, model, "native.generate_content", _gemini_usage(response), latency_ms)`
-**senza l'argomento `request`** → `request=None` di default → il ramo di stima
-(`if not _has_tokens(usage) and request is not None`) non può mai scattare su questo path.
-
-**Perché è un problema**
-Se la risposta upstream Gemini omette `usageMetadata` (risposte d'errore, completamenti
-bloccati per safety, o un cambio upstream), `_gemini_usage` mappa a
-`{"input_tokens": None, "output_tokens": None}`, `_has_tokens` è `False`, e con `request=None`
-la stima è saltata → `_parse_usage` fattura `prompt=0, completion=0, cost=0.0`, **senza
-warning né log**. Reintroduce esattamente la classe di bug zero-cost che H14 chiudeva, sul
-solo path Gemini non-streaming (lo streaming passa sempre `request`, quindi è immune).
-
-**Impatto possibile**
-Perdita di ricavi / inferenza gratuita quando il provider omette i dati di usage sulla
-superficie Gemini nativa non-streaming — completamente silenziosa. È anche l'istanza più
-chiara della "duplicazione che nasconde una divergenza": `generate_content` è un fork di
-`_dispatch` andato alla deriva.
-
-**Soluzione consigliata**
-Far passare `generate_content` per `_dispatch` (come fa `native_messages` con una lambda),
-o almeno passare `request=data` alla `settle_ok` manuale. Per riusare `_dispatch` con la
-vista usage nativa, aggiungere un parametro opzionale `settle_view: Callable = lambda r: r`
-e chiamare `_dispatch(..., settle_view=_gemini_usage)`.
-
----
-
-### ISSUE-005 — Il passthrough Gemini usa l'API privata `google-genai` `_api_client.async_request` con pin aperto
-
-**Priorità:** medium
-**Stato:** open
-**File coinvolti:** `infrastructure/llm/vertex_adapter.py:299` (`client.aio._api_client.async_request(...)`), `:315` (`async_request_streamed`); `pyproject.toml:21` (`google-genai>=2.10.0`, senza upper bound)
-
-**Problema**
-Il path Gemini nativo chiama due metodi **privati** (underscore) dell'SDK su
-`client.aio._api_client`. La firma combacia a `google-genai==2.10.0`, ma è API non pubblica
-senza garanzie di stabilità, e il pin è aperto. Gli unici test che esercitano il path
-(`tests/completions/conftest.py` `FakeGenaiClient`, usato da `tests/native/` e
-`tests/conformance/`) hardcodano un fake con **esattamente la stessa forma privata** che
-l'adapter assume → non possono catturare un rilascio che rinomina/ristruttura `_api_client`.
-
-**Perché è un problema**
-Un bump di dipendenza (Dependabot attivo da R7-L40) può rompere silenziosamente il
-passthrough Gemini in produzione con zero segnale CI — la stessa classe silent-until-deploy
-di R7-L38 (`mlflow>=3.14`). 500 a runtime sul path money/inference dopo un upgrade.
-
-**Impatto possibile**
-Affidabilità: rottura del surface Gemini nativo dopo upgrade, individuata solo in prod.
-
-**Soluzione consigliata**
-Aggiungere un upper bound (`>=2.10,<3`) e/o incapsulare la chiamata privata dietro una
-funzione con un test mirato che fallisce con messaggio chiaro se il metodo privato
-cambia presenza/firma (contro un `genai.Client` reale offline, es. httpx mock transport),
-così la rottura è in CI e non in prod. Migrare a un'eventuale API pubblica di raw-request.
-
----
-
-### ISSUE-006 — I metodi nativi risolvono via slot capability `"chat.completions"`: la matrice del gateway non protegge
-
-**Priorità:** medium
-**Stato:** open
-**File coinvolti:** `infrastructure/llm/gateway.py:117-160` (i quattro metodi nativi fanno `_resolve(model.provider, "chat.completions")`); unica guardia in `application/completion_service.py:225-229,256-260` (Anthropic) e `:314-318,364-368` (Gemini)
-
-**Problema**
-I quattro metodi nativi del gateway risolvono l'adapter via lo slot `"chat.completions"` e
-poi chiamano direttamente il metodo nativo, anche se solo `AnthropicAdapter`/`VertexAdapter`
-li implementano (`OpenAIAdapter`/`AzureOpenAIAdapter`/`BedrockAdapter` no). La matrice di
-capability (`gateway.py:39-69`), che per ogni altra operazione alza `UnsupportedOperation`
-(→501) sui provider non supportati, è bypassata. L'unica cosa che impedisce
-`gateway.anative_messages(...)` su un modello Bedrock è il singolo check
-`if model.provider is not Provider.ANTHROPIC: raise ProviderMismatch(...)` nel layer
-applicativo (duplicato per Gemini).
-
-**Perché è un problema**
-Manca la difesa-in-profondità proprio nel layer (`gateway.py`) che esiste per fornirla. Se
-il check applicativo viene rimosso/refattorizzato, o un nuovo chiamante raggiunge il gateway
-direttamente, il fallimento è un `AttributeError` non gestito → 500 opaco, non il 501 pulito
-che il resto del codice garantisce (contraddice la docstring del file).
-
-**Impatto possibile**
-Manutenibilità / trappola per bug latenti su future aggiunte di provider; potenziale 500
-opaco al posto di 501.
-
-**Soluzione consigliata**
-Aggiungere `"native.messages"`/`"native.generate_content"` come chiavi reali nel `_registry`,
-gattare `_resolve` su di esse, e rendere la matrice del gateway autoritativa (mantenendo o
-rimuovendo il check applicativo, ma così la sua rimozione non può produrre un 500).
-
----
-
-### ISSUE-007 — Gli endpoint nativi emettono l'envelope errori OpenAI, non quello del provider; contratto non testato né documentato
-
-**Priorità:** medium
-**Stato:** open
-**File coinvolti:** `infrastructure/web/api_router/router.py:49` (`exception_handlers={DomainError: openai_error_handler}` sull'intero router, inclusi i nativi); `infrastructure/web/exception_handlers.py:160-174`
-
-**Problema**
-Le route native vivono sullo stesso `api_router` il cui handler `DomainError` emette
-l'envelope OpenAI `{"error": {"message","type","code"}}`. Un errore di dominio su
-`/v1/messages` o `:generateContent` (404/409/402/501…) restituisce quindi la forma OpenAI, non
-quella nativa di Anthropic (`{"type":"error","error":{...}}`) o Gemini
-(`{"error":{"code","message","status"}}`). Funziona oggi solo perché gli SDK derivano il
-**tipo** di eccezione dallo status HTTP, non dal body. Nessun test asserisce la forma del
-body su una route nativa (grep: zero asserzioni body-shape sui test native/conformance).
-
-**Perché è un problema**
-La premessa degli endpoint nativi ("punta l'SDK stock e funziona") si estende alla gestione
-errori che un client sofisticato può ispezionare (`exc.body["error"]["type"]`, parsing del
-retry-reason). Nulla fissa se il body debba restare OpenAI-shaped (scelta difendibile e più
-semplice) o diventare nativo, e non esiste regressione in nessuna delle due direzioni.
-
-**Impatto possibile**
-Ergonomia degli errori per i client nativi (non correttezza né sicurezza: lo status è giusto,
-quindi retry/backoff su 429/5xx funzionano). Debito di test/contratto.
-
-**Soluzione consigliata**
-Decidere e **documentare** il contratto di body errori delle superfici native (OpenAI-shaped
-è difendibile — dirlo in `docs/native-*.md`) e aggiungere almeno un test per superficie che
-asserisce la forma del body su un errore di dominio, non solo lo status.
-
----
-
-### ISSUE-008 — La stima prompt (`_request_text`) ignora il campo top-level `system` di Anthropic
-
-**Priorità:** low
-**Stato:** open
-**File coinvolti:** `application/usage_meter.py:38-62` (`_request_text`), consumato da `_reservation_cost` (`:149-160`) su `completion_service.py:230,261`
-
-**Problema**
-Il body nativo Anthropic porta il system prompt in un campo top-level `system` (stringa o
-lista di blocchi), separato da `messages`; il contenuto dei messaggi può includere blocchi
-`tool_use`/`tool_result`/immagini. `_request_text` legge solo `messages[].content` testuale,
-mai `system`.
-
-**Perché è un problema**
-Under-count del lato prompt della reservation pessimistica per le chiamate Anthropic native
-(es. un grande system prompt è invisibile alla reservation). Impatto limitato: il termine
-dominante (`max_tokens`, il ceiling di output) **è** catturato per Anthropic, e il bill finale
-è sempre settlato sull'usage autorevole del provider — quindi non indipendentemente
-sfruttabile a scala significativa.
-
-**Impatto possibile**
-Reservation leggermente sotto-stimata (accuratezza del throttle in-flight), non del bill.
-
-**Soluzione consigliata**
-Aggiungere `system` (stringa o lista di blocchi) e altri campi prompt fuori da `messages`
-all'estrazione di `_request_text` quando presenti.
-
----
-
-### ISSUE-009 — Triplicazione dello scheletro di stream-metering (debito DRY)
-
-**Priorità:** low
-**Stato:** open
-**File coinvolti:** `application/completion_service.py:270-295` (`_metered_native`), `:378-404` (`_metered_gemini`), `:515-543` (`_metered`); `application/usage_meter.py:392-455` (`metered_stream`), `:456-515` (`metered_native_stream`), `:516-569` (`metered_gemini_stream`)
-
-**Problema**
-Le parti critiche (release-esattamente-una-volta, settlement shielded, timeout, branching
-error-vs-ok) sono correttamente già fattorizzate in `_finalize_stream_billing` (non
-duplicate). Ma il loop di relay e la sua gestione eccezioni sono copiati tre volte,
-differendo solo nelle 4-8 righe che estraggono usage/testo dalle forme di chunk OpenAI,
-Anthropic e Gemini.
-
-**Perché è un problema**
-Un futuro fix alla struttura del loop (nuovo edge di cancellazione, o cambio di cosa conta
-come "disconnect vs error") andrebbe portato a mano su tre call-site, e nulla ne garantisce
-la sincronia. Non è ancora un bug (i tre sono mirror fedeli e ben testati), ma è il rischio
-di divergenza da tenere d'occhio al prossimo cambio di stream-metering.
-
-**Impatto possibile**
-Manutenibilità; rischio di divergenza futura.
-
-**Soluzione consigliata** (non urgente)
-Estrarre lo scheletro condiviso in un `_metered_wire_stream(..., extract_usage, extract_text)`
-generico e far diventare i tre metodi pubblici sottili binding di parametri. Dato "simplicity
-first" e che la triplicazione è piccola e consistente, è un nice-to-have, non un blocker.
-
----
-
-### ISSUE-010 — Asimmetria di copertura test: nessun test di budget/concorrenza sulla superficie Gemini nativa
-
-**Priorità:** low
-**Stato:** open
-**File coinvolti:** `tests/native/test_generate_content.py` (nessun riferimento a `budget`/`402`/`BudgetExceeded`); contrasto con `tests/native/test_messages.py` (`test_over_budget_rejected_at_admit_and_not_dispatched`)
-
-**Problema**
-Esiste un test di over-budget per Anthropic nativo ma non l'equivalente per Gemini. Combinato
-con ISSUE-002 (reservation Gemini $0), è proprio l'area dove un test avrebbe colto il bug.
-
-**Perché è un problema**
-Il path `admit()` è condiviso e testato via Anthropic + superficie OpenAI, ma l'assenza di un
-test Gemini-nativo di budget/concorrenza è esattamente ciò che ha lasciato passare ISSUE-002.
-
-**Impatto possibile**
-Copertura; rischio di regressione non individuata sulla superficie Gemini.
-
-**Soluzione consigliata**
-Aggiungere a `test_generate_content.py` il test di over-budget (e, per ISSUE-002, un test di
-burst concorrente che asserisce reservation non-zero e `BudgetExceeded`).
+  added in #221.
+- **ISSUE-009** (DRY refactor of the stream-metering skeleton) is **deferred**:
+  the correctness-critical parts (release-once, shielded settlement) are already
+  factored into `_finalize_stream_billing`; refactoring the residual relay loop
+  over money-critical streaming code is an unfavorable risk/benefit
+  (simplicity-first) — flagged, not scheduled.
 
 ## Recommended resolution order
 
-1. **ISSUE-001** (critical) — chiudere il vettore di override credenziale / open-relay su
-   Anthropic nativo. Bloccante per qualsiasi traffico di produzione sul surface nativo.
-2. **ISSUE-003** (high) — applicare il ceiling `max_output_tokens` + clamp sul path nativo
-   (spesa upstream reale non limitata; allinea entrambe le superfici).
-3. **ISSUE-002** (high) — reservation Gemini-aware (ripristina la guard in-flight burst).
-4. **ISSUE-004** (high) — far passare `generate_content` per `_dispatch`/passare `request`
-   (elimina il billing $0 silenzioso).
-5. **ISSUE-005** (medium) — cap del pin `google-genai` + wrapper/test sull'API privata.
-6. **ISSUE-006** (medium) — chiavi capability native nella matrice del gateway.
-7. **ISSUE-007** (medium) — decidere/documentare + testare il contratto di body errori nativo.
-8. **ISSUE-008** (low) — includere `system` in `_request_text`.
-9. **ISSUE-009** (low) — (opzionale) fattorizzare lo scheletro di stream-metering.
-10. **ISSUE-010** (low) — test di budget/concorrenza Gemini nativo (chiude anche il gap di ISSUE-002).
+1. **ISSUE-001** (critical) — close the credential-override / open-relay vector
+   on native Anthropic. Blocking for any production traffic on the native surface.
+2. **ISSUE-003** (high) — apply the `max_output_tokens` ceiling + clamp on the
+   native path (real unbounded upstream spend; aligns both surfaces).
+3. **ISSUE-002** (high) — Gemini-aware reservation (restores the in-flight burst
+   guard).
+4. **ISSUE-004** (high) — route `generate_content` through `_dispatch`/pass
+   `request` (removes the silent $0 billing).
+5. **ISSUE-005** (medium) — cap the `google-genai` pin + wrapper/test on the
+   private API.
+6. **ISSUE-006** (medium) — native capability keys in the gateway matrix.
+7. **ISSUE-007** (medium) — decide/document + test the native error-body contract.
+8. **ISSUE-008** (low) — include `system` in `_request_text`.
+9. **ISSUE-009** (low) — (optional) factor out the stream-metering skeleton.
+10. **ISSUE-010** (low) — native Gemini budget/concurrency test (also closes the
+    ISSUE-002 gap).
 
-Nota: ISSUE-001/002/003/004 sono tutte istanze dello stesso tema radice — il "verbatim
-passthrough" salta la sanitizzazione/clamp/reservation che la superficie OpenAI applica.
-Un intervento coeso su `prepare_native` (validazione + clamp + vista-reservation per-provider)
-chiude ISSUE-001, ISSUE-002 e ISSUE-003 insieme.
+Note: ISSUE-001/002/003/004 are all instances of the same root theme — "verbatim
+passthrough" skips the sanitization/clamp/reservation the OpenAI surface applies.
+One cohesive change to `prepare_native` (validation + clamp + per-provider
+reservation view) closes ISSUE-001, ISSUE-002 and ISSUE-003 together.
 
 ## Final assessment
 
-Progetto complessivamente solido e maturo: sette round di hardening hanno reso il core
-(sicurezza, tenancy, money, streaming, migrazioni, CI) robusto, e la parte *difficile* del
-nuovo surface nativo — settlement exactly-once, disconnect/cancellation, priming H24,
-lifecycle client, accuratezza del billing settlato — è implementata bene e ben testata.
+The project is solid and mature overall: seven rounds of hardening made the core
+(security, tenancy, money, streaming, migrations, CI) robust, and the *hard* part
+of the new native surface — exactly-once settlement, disconnect/cancellation, H24
+priming, client lifecycle, settled-billing accuracy — is implemented well and
+well tested.
 
-Il debito di questo round è concentrato e monotematico: la superficie **provider-native**,
-introdotta rapidamente, ha preso "passthrough verbatim" **troppo alla lettera sul lato input
-e governance**. Il body del client è fidato più del dovuto (ISSUE-001, kwargs-injection →
-override credenziale, CRITICAL) e la governance che la superficie OpenAI applica (clamp del
-ceiling di output, reservation di budget, stima H14) non è specchiata sul path nativo
-(ISSUE-002/003/004). Nessuno richiede un redesign: sono fix localizzati che riportano il
-surface nativo in linea con le guardie già esistenti, e sono naturalmente accorpabili in un
-unico intervento su `prepare_native` + gli adapter.
+This round's debt is concentrated and single-themed: the **provider-native**
+surface, introduced quickly, took "verbatim passthrough" **too literally on the
+input and governance side**. The client body is trusted more than it should be
+(ISSUE-001, kwargs-injection → credential override, CRITICAL) and the governance
+the OpenAI surface applies (output-ceiling clamp, budget reservation, H14
+estimate) isn't mirrored on the native path (ISSUE-002/003/004). None requires a
+redesign: they're localized fixes bringing the native surface in line with the
+existing guards, naturally combinable into a single change on `prepare_native` +
+the adapters.
 
-Aree di miglioramento principali: (1) trattare il body nativo come **input non fidato**
-(denylist dei kwargs di controllo SDK, clamp del ceiling, reservation per-provider); (2)
-ridurre la dipendenza da API private di SDK con pin e test di contratto; (3) rendere la
-matrice di capability del gateway autoritativa anche per le operazioni native; (4) colmare i
-gap di test (budget/concorrenza Gemini, forma del body errori nativo). Con la CRITICAL e le
-tre HIGH chiuse, il surface nativo è pronto per il traffico di produzione.
+Main improvement areas: (1) treat the native body as **untrusted input** (denylist
+the SDK control kwargs, clamp the ceiling, per-provider reservation); (2) reduce
+reliance on private SDK APIs with pins and contract tests; (3) make the gateway
+capability matrix authoritative for native operations too; (4) close the test
+gaps (Gemini budget/concurrency, native error-body shape). With the CRITICAL and
+the three HIGHs closed, the native surface is ready for production traffic.

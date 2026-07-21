@@ -2,206 +2,217 @@
 
 [← Index](INDEX.md)
 
-Decimo pass completo, eseguito sui cambi successivi al Round 9 (`d4c2871..d1e23d4`,
-PR #248–#280) e ricontrollato contro l'albero corrente. Il delta copre: le remediation
-del Round 9 (#249–#259), le pagine console per service principals / credentials /
-models / routing / observability, la dashboard role-aware con i nuovi endpoint
-(`GET /me/teams`, `GET /teams/{id}/savings`, `GET /routing/savings`,
-`service_principal_id` in `KeyResponse`), il refresh docs e il quiet-404 logging.
+Tenth full pass, over the changes after Round 9 (range `d4c2871..d1e23d4`,
+PRs 248–280), re-checked against the current tree. The delta covers: the Round 9
+remediations (#249–#259), the console pages for service principals / credentials
+/ models / routing / observability, the role-aware dashboard with its new
+endpoints (`GET /me/teams`, `GET /teams/{id}/savings`, `GET /routing/savings`,
+`service_principal_id` on `KeyResponse`), the docs refresh, and quiet-404 logging.
 
-Quattro pass indipendenti (security, correttezza Python, TypeScript/UI, adversarial
-cross-feature); ogni finding riportato qui è stato riverificato sul codice reale con
-citazioni `file:line`. La suite e i gate statici sono verdi (872 passed; Ruff, Pyrefly,
-pre-commit, ESLint, tsc e build Vite puliti).
-
-## Executive summary
-
-**Nessun finding CRITICAL, e — per la prima volta — nessun finding di sicurezza HIGH.**
-Le remediation del Round 9 reggono a un pass adversarial dedicato: mask/envelope del
-bearer token webhook corretti su tutto il round-trip PUT, lifecycle invito↔team
-mutuamente esclusivo via lock, rotate che ripristina owner/SP e blocca le key non
-attive, per-key RPM su tutte le superfici di inferenza, `/me/teams` self-scoped,
-savings gated correttamente.
-
-Il finding più importante è di **modellazione dati**: le `routing_decision` sono
-chiavate per `(team_id, router_name)` senza `router_id`. Un router cancellato continua
-per sempre a gonfiare savings/stats di team e piattaforma, e — peggio — **riusare il
-nome** di un router cancellato contamina il nuovo router con la storia del vecchio,
-incluso l'export JSONL di distillazione che trasporta prompt utente grezzi tra due
-configurazioni logicamente distinte.
-
-Sul piano UI il tema ricorrente è la **fabbricazione di empty/zero-state su errore**:
-la dashboard mostra "$0.00" di spesa se la fetch delle organizzazioni fallisce, la
-pagina Budgets risponde "spend illimitata" a un errore di fetch, stats/savings/audit
-rendono "—"/vuoto indistinguibile da un 403 o un 500.
+Four independent passes (security, Python correctness, TypeScript/UI, adversarial
+cross-feature); every finding reported here was re-verified against the real code
+with `file:line` citations. The suite and static gates are green (872 passed;
+Ruff, Pyrefly, pre-commit, ESLint, tsc and the Vite build all clean).
 
 Counts: **0 CRITICAL · 2 HIGH · 4 MEDIUM · 3 LOW**.
 
+## Executive summary
+
+**No CRITICAL finding, and — for the first time — no HIGH security finding.**
+The Round 9 remediations hold under a dedicated adversarial pass: the webhook
+bearer-token mask/envelope is correct across the whole PUT round-trip, the
+invite↔team lifecycle is mutually exclusive via a lock, rotation restores the
+owner/SP and refuses inactive keys, per-key RPM covers every inference surface,
+`/me/teams` is self-scoped, and savings are correctly gated.
+
+The most important finding is a **data-modelling** one: `routing_decision` rows
+are keyed by `(team_id, router_name)` with no `router_id`. A deleted router
+keeps inflating team and platform savings/stats forever and — worse — **reusing
+the name** of a deleted router contaminates the new router with the old one's
+history, including the JSONL distillation export that carries raw user prompts,
+across two logically distinct configurations.
+
+On the UI side the recurring theme is **fabricating empty/zero states on error**:
+the dashboard shows "$0.00" spend when the organizations fetch fails, Budgets
+answers "unlimited spend" on a fetch error, and stats/savings/audit render a
+"—"/empty that's indistinguishable from a 403 or 500.
+
 ## Issue summary
 
-| ID | Titolo | Priorità | File coinvolti | Stato |
+| ID | Title | Severity | Files | Status |
 |---|---|---|---|---|
-| ISSUE-001 | Le routing decision sono chiavate per nome: router cancellati inquinano i savings e il riuso del nome contamina la storia (export incluso) | high | `persistence/orm.py:212-223`; `domain/ports/routing.py:41-59`; `application/routing/service.py:586-640`; `persistence/router_repository.py:279-288` | **Fixed** (#282) |
-| ISSUE-002 | La dashboard mostra "$0.00 · no spend recorded" quando la fetch delle organizzazioni fallisce | high | `ui/src/features/dashboard/DashboardPage.tsx:117-152` | **Fixed** (#283) |
-| ISSUE-003 | `GET /me/teams` tronca silenziosamente a 100 membership e fa N+1 lookup | medium | `application/team_service.py:284-293`; `web/session/me.py:31-39` | **Fixed** (#284) |
-| ISSUE-004 | Le pagine Budgets / Audit / Router-detail rendono gli errori come empty-state ("illimitato", "no events", "—") | medium | `ui/src/features/budgets/BudgetsPage.tsx:117-140`; `ui/src/features/dashboard/DashboardPage.tsx:105-108,218-221`; `ui/src/features/routing/RouterDetailPage.tsx:135-142,183-198` | **Fixed** (#283) |
-| ISSUE-005 | Lo `0` esplicito nei campi costo/threshold viene scartato senza feedback (`parsePositive`) | medium | `ui/src/features/models/CreateModelDialog.tsx:35-40,252-259`; `ui/src/features/routing/CreateRouterDialog.tsx:67-72,558-568` | **Fixed** (#283) |
-| ISSUE-006 | Race `delete_user`↔`add_member`: la FK violation viene rietichettata `AlreadyMember` (409 fuorviante) | medium | `application/user_service.py:211-224`; `persistence/membership_repository.py:21-39` | **Fixed** (#284) |
-| ISSUE-007 | `_savings_aggregate` esegue 3 SELECT non-atomiche per una cifra sola | low | `persistence/router_repository.py:290-323` | **Fixed** (#282) |
-| ISSUE-008 | La guard di `delete_user` è una lista manuale di FK: una futura FK verso `user_account` produrrebbe un 500 | low | `application/user_service.py:201-225` | **Fixed** (#284) |
-| ISSUE-009 | Cast diffusi `error as Error \| null` sugli errori di useQuery | low | ~15 call site in `ui/src/features/*` | **Fixed** (#283) |
+| ISSUE-001 | Routing decisions keyed by name: deleted routers pollute savings and a reused name contaminates the history (export included) | high | `persistence/orm.py:212-223`; `domain/ports/routing.py:41-59`; `application/routing/service.py:586-640`; `persistence/router_repository.py:279-288` | **Fixed** (#282) |
+| ISSUE-002 | The dashboard shows "$0.00 · no spend recorded" when the organizations fetch fails | high | `ui/src/features/dashboard/DashboardPage.tsx:117-152` | **Fixed** (#283) |
+| ISSUE-003 | `GET /me/teams` silently truncates at 100 memberships and does N+1 lookups | medium | `application/team_service.py:284-293`; `web/session/me.py:31-39` | **Fixed** (#284) |
+| ISSUE-004 | Budgets / Audit / Router-detail render errors as empty states ("unlimited", "no events", "—") | medium | `ui/src/features/budgets/BudgetsPage.tsx:117-140`; `ui/src/features/dashboard/DashboardPage.tsx:105-108,218-221`; `ui/src/features/routing/RouterDetailPage.tsx:135-142,183-198` | **Fixed** (#283) |
+| ISSUE-005 | An explicit `0` in cost/threshold fields is dropped without feedback (`parsePositive`) | medium | `ui/src/features/models/CreateModelDialog.tsx:35-40,252-259`; `ui/src/features/routing/CreateRouterDialog.tsx:67-72,558-568` | **Fixed** (#283) |
+| ISSUE-006 | Race `delete_user`↔`add_member`: the FK violation is relabelled `AlreadyMember` (misleading 409) | medium | `application/user_service.py:211-224`; `persistence/membership_repository.py:21-39` | **Fixed** (#284) |
+| ISSUE-007 | `_savings_aggregate` runs 3 non-atomic SELECTs for a single figure | low | `persistence/router_repository.py:290-323` | **Fixed** (#282) |
+| ISSUE-008 | `delete_user`'s guard is a manual FK list: a future FK to `user_account` would 500 | low | `application/user_service.py:201-225` | **Fixed** (#284) |
+| ISSUE-009 | Widespread `error as Error \| null` casts on useQuery errors | low | ~15 call sites in `ui/src/features/*` | **Fixed** (#283) |
 
 ## Findings
 
-### ISSUE-001 — Routing decision chiavate per nome (high)
+### ISSUE-001 — Routing decisions keyed by name (high)
 
-`RoutingDecisionModel` ha solo `team_id` + `router_name` — nessuna colonna
-`router_id`, nessuna FK verso `router` (`persistence/orm.py:212-223`). La delete del
-router è hard e non tocca le decision (`persistence/router_repository.py:171-178`);
-il vincolo `UniqueConstraint("team_id", "name")` (`orm.py:169-171`) vale solo tra i
-router *esistenti*, quindi il nome torna libero subito. Tutta la lettura —
-`list_decisions`, `distribution`, `savings`, l'export JSONL — filtra per
+`RoutingDecisionModel` has only `team_id` + `router_name` — no `router_id`
+column, no FK to `router` (`persistence/orm.py:212-223`). The router delete is
+hard and doesn't touch the decisions (`persistence/router_repository.py:171-178`);
+the `UniqueConstraint("team_id", "name")` (`orm.py:169-171`) holds only among
+*existing* routers, so the name is freed immediately. Every read —
+`list_decisions`, `distribution`, `savings`, the JSONL export — filters by
 `(team_id, router_name)` (`domain/ports/routing.py:41-59`,
 `application/routing/service.py:586-640`); `team_savings`/`platform_savings`
-aggregano ogni riga senza join verso `router`
+aggregate every row with no join to `router`
 (`persistence/router_repository.py:279-288`).
 
-Riproduzione: (a) crea "prod-router", genera traffico, cancellalo → i suoi numeri
-restano per sempre dentro `GET /routing/savings` e `GET /teams/{id}/savings`, non
-esclusi ed etichettati in dashboard solo come "all time"; (b) ricrea un router con lo
-stesso nome e strategia/candidati diversi → `decisions`, `stats`, `savings` e
-`/decisions/export` del *nuovo* router mostrano mescolata la storia del vecchio.
-L'export di distillazione trasporta prompt utente grezzi: la misattribuzione tra due
-configurazioni distinte è anche un problema di igiene dati, non solo di metriche.
+Reproduction: (a) create "prod-router", generate traffic, delete it → its numbers
+stay in `GET /routing/savings` and `GET /teams/{id}/savings` forever, not
+excluded and labelled in the dashboard only as "all time"; (b) recreate a router
+with the same name and different strategy/candidates → the *new* router's
+`decisions`, `stats`, `savings` and `/decisions/export` show the old one's
+history mixed in. The distillation export carries raw user prompts: the
+misattribution across two distinct configurations is a data-hygiene problem, not
+just a metrics one.
 
-Fix suggerito: aggiungere `router_id: UUID` (nullable, senza FK cascade — la storia
-deve sopravvivere alla delete di proposito) a `routing_decision`, popolarla in
-scrittura e filtrare gli endpoint per-router per id. Se i totali team/piattaforma
-devono includere i router cancellati è una scelta di prodotto legittima, ma va detta
-(copy UI/docs); gli endpoint scoped su *un* router non devono mai mostrare la storia
-di un altro solo perché condivideva il nome.
+Suggested fix: add `router_id: UUID` (nullable, no FK cascade — history must
+survive the delete on purpose) to `routing_decision`, populate it on write, and
+filter the per-router endpoints by id. If team/platform totals should include
+deleted routers that's a legitimate product choice, but it must be stated (UI/docs
+copy); endpoints scoped to *one* router must never show another's history just
+because they shared a name.
 
-### ISSUE-002 — Dashboard: "$0.00" su errore della fetch org (high)
+### ISSUE-002 — Dashboard: "$0.00" on an org-fetch error (high)
 
-`DashboardPage.tsx:117-152`: se la query `["organizations","all"]` fallisce
-(`retry:false`), `spendQueries` diventa un array vuoto; il guard di rendering
-`spendLoaded || spendQueries.length === 0` è vero e mostra `formatUsd(0)` =
-**"$0.00"**, con sotto "no spend recorded yet.". Nella stessa schermata la card
-"organizations" mostra correttamente "—" per lo stesso errore: la pagina si
-contraddice, e una vista finanziaria riporta un falso zero invece di uno stato di
-errore. Fix: branch esplicito su `orgs.isError` (e `orgs.isLoading`) per il pannello
-spend.
+`DashboardPage.tsx:117-152`: if the `["organizations","all"]` query fails
+(`retry:false`), `spendQueries` becomes an empty array; the render guard
+`spendLoaded || spendQueries.length === 0` is true and shows `formatUsd(0)` =
+**"$0.00"**, with "no spend recorded yet." below it. On the same screen the
+"organizations" card correctly shows "—" for the same error: the page
+contradicts itself, and a financial view reports a false zero instead of an
+error state. Fix: an explicit branch on `orgs.isError` (and `orgs.isLoading`)
+for the spend panel.
 
-### ISSUE-003 — `/me/teams` troncato a 100 + N+1 (medium)
+### ISSUE-003 — `/me/teams` truncated at 100 + N+1 (medium)
 
-`TeamService.list_user_teams` (`team_service.py:284-293`) chiama
-`memberships.list_by_user` senza `limit` → cade sul default `DEFAULT_PAGE_SIZE`
-(100): un utente in 101+ team non vede le membership oltre la centesima, senza alcun
-segnale di troncamento (l'endpoint non ha parametri di paginazione). In più fa un
-`teams.get()` per membership (N+1, bounded a 100). Fix: batch fetch (`WHERE id IN`),
-più paginazione esplicita oppure iterazione fino a esaurimento, dato che il
-contratto è "tutti i miei team".
+`TeamService.list_user_teams` (`team_service.py:284-293`) calls
+`memberships.list_by_user` with no `limit` → it falls back to the default
+`DEFAULT_PAGE_SIZE` (100): a user in 101+ teams never sees the memberships past
+the hundredth, with no truncation signal (the endpoint has no pagination
+params). It also does one `teams.get()` per membership (N+1, bounded at 100).
+Fix: batch fetch (`WHERE id IN`), plus explicit pagination or iteration to
+exhaustion, since the contract is "all my teams".
 
-### ISSUE-004 — Errori resi come empty-state in Budgets/Audit/Router detail (medium)
+### ISSUE-004 — Errors rendered as empty states in Budgets/Audit/Router detail (medium)
 
-Stesso pattern su tre superfici: `BudgetsPage.tsx:117-140` non consulta mai
-`budget.isError` e su un errore di fetch mostra il copy "no budget configured — this
-team's spend is unlimited" (il layer API distingue correttamente 404 da errore dopo
-la fix di R9 ISSUE-013, ma la pagina non consuma il segnale);
-`DashboardPage.tsx:218-221` rende un errore della query audit come "no audit events
-yet."; `RouterDetailPage.tsx:135-142,183-198` rende stats/savings come "—" identico
-per loading, 403 e 500 (mentre la tabella decisions sotto passa correttamente
-`error` alla DataTable). Fix: branch `isError` con messaggio, come già fanno le
-pagine-lista.
+Same pattern across three surfaces: `BudgetsPage.tsx:117-140` never consults
+`budget.isError` and on a fetch error shows the "no budget configured — this
+team's spend is unlimited" copy (the API layer correctly distinguishes 404 from
+an error after the R9 ISSUE-013 fix, but the page doesn't consume the signal);
+`DashboardPage.tsx:218-221` renders an audit-query error as "no audit events
+yet."; `RouterDetailPage.tsx:135-142,183-198` renders stats/savings as "—",
+identical for loading, 403 and 500 (while the decisions table below correctly
+passes `error` to the DataTable). Fix: an `isError` branch with a message, as the
+list pages already do.
 
-### ISSUE-005 — `0` esplicito scartato dai form (medium)
+### ISSUE-005 — Explicit `0` dropped by the forms (medium)
 
-`parsePositive` richiede `n > 0`: nei costi del model
-(`CreateModelDialog.tsx:252-259`, input con `min="0"`) uno `0` legittimo ("questo
-modello è gratis") diventa `null` = "non impostato" senza feedback; nella threshold
-delle route embeddings (`CreateRouterDialog.tsx:558-568`, `min="0" max="1"`) il
-backend richiede `0 < t <= 1` e defaulta a `0.80`: chi digita `0` riceve in silenzio
-una threshold 0.80. Fix: validazione inline (errore visibile per i valori fuori
-contratto) e `min` allineati al range reale; accettare `0` dove il backend lo
-consente.
+`parsePositive` requires `n > 0`: in the model cost fields
+(`CreateModelDialog.tsx:252-259`, inputs with `min="0"`) a legitimate `0`
+("this model is free") becomes `null` = "unset" with no feedback; in the
+embeddings route threshold (`CreateRouterDialog.tsx:558-568`, `min="0" max="1"`)
+the backend requires `0 < t <= 1` and defaults to `0.80`, so typing `0` silently
+yields a 0.80 threshold. Fix: inline validation (a visible error for
+out-of-contract values) and `min` attributes aligned to the real range; accept
+`0` where the backend allows it.
 
-### ISSUE-006 — Race delete_user ↔ add_member rietichettata (medium)
+### ISSUE-006 — delete_user ↔ add_member race relabelled (medium)
 
-`delete_user` prende `FOR UPDATE` sull'utente, verifica assenza di membership/key e
-cancella (`user_service.py:211-224`). Un `add_member` concorrente (pre-check +
-INSERT, `membership_repository.py:21-39`) che perde la race fallisce con
-`IntegrityError` per FK sul parent mancante — ma l'adapter cattura *qualsiasi*
-`IntegrityError` e alza incondizionatamente `AlreadyMember`: l'admin riceve un 409
-"già membro" per un utente appena cancellato. Fix: distinguere la causa (FK
-violation vs unique) o ricontrollare l'esistenza dell'utente prima di rietichettare;
-merita un test mirato, in linea con le race chiuse in R9.
+`delete_user` takes `FOR UPDATE` on the user, checks for no memberships/keys and
+deletes (`user_service.py:211-224`). A concurrent `add_member` (pre-check +
+INSERT, `membership_repository.py:21-39`) that loses the race fails with an
+`IntegrityError` on the missing parent FK — but the adapter catches *any*
+`IntegrityError` and unconditionally raises `AlreadyMember`: the admin gets a
+409 "already a member" for a just-deleted user. Fix: distinguish the cause (FK
+violation vs unique) or re-check the user's existence before relabelling;
+deserves a targeted test, in line with the races closed in R9.
 
-### ISSUE-007 — Aggregato savings non point-in-time (low)
+### ISSUE-007 — Non-point-in-time savings aggregate (low)
 
-`_savings_aggregate` (`router_repository.py:290-323`) esegue tre SELECT separate
-(SUM, counted, all) senza snapshot: sotto traffico live `decisions_without_usage`
-può risultare incoerente (in un caso avverso negativo, non è clampato). Solo
-reporting, non billing. Fix: collassare in una query
-(`COUNT(*) FILTER (WHERE …)` + SUM condizionale) — corregge e riduce 3 round trip a 1.
+`_savings_aggregate` (`router_repository.py:290-323`) runs three separate SELECTs
+(SUM, counted, all) with no snapshot: under live traffic `decisions_without_usage`
+can come out inconsistent (negative in an adversarial case, it isn't clamped).
+Reporting only, not billing. Fix: collapse into one query
+(`COUNT(*) FILTER (WHERE …)` + a conditional SUM) — it's both correct and 1 round
+trip instead of 3.
 
-### ISSUE-008 — Guard di delete_user come lista manuale (low)
+### ISSUE-008 — delete_user guard as a manual list (low)
 
-La guard controlla solo membership e `api_key.created_by`; oggi non esistono altre
-FK verso `user_account` non gestite (verificato: `password_reset` è pulita nel
-delete, `audit.actor_id` non è FK), quindi **non è un bug attivo** — ma una futura
-FK aggiunta senza aggiornare la guard produrrebbe un 500 generico (rollback
-corretto, nessuna corruzione). Trappola manutentiva: commentare la guard con
-l'invariante o derivare il check dalle FK a runtime nei test.
+The guard checks only memberships and `api_key.created_by`; today no other FK to
+`user_account` is unhandled (verified: `password_reset` is cleaned in the delete,
+`audit.actor_id` isn't an FK), so it's **not a live bug** — but a future FK added
+without updating the guard would produce a generic 500 (correct rollback, no
+corruption). A maintenance trap: comment the guard with the invariant, or derive
+the check from the FKs at runtime in a test.
 
-### ISSUE-009 — Cast `as Error | null` (low)
+### ISSUE-009 — `as Error | null` casts (low)
 
-~15 call site castano `useQuery().error` a `Error | null`. Oggi ogni `queryFn`
-costruisce `new Error(...)` reali, quindi è un no-op sicuro; ma una futura rejection
-non-Error verrebbe mistipata in silenzio. Fix a basso costo: narrowing
-`instanceof Error` in un helper condiviso.
-
-## Ipotesi verificate e confutate (per il prossimo round)
-
-- **Round-trip enable/disable del router webhook**: il mask `***` echato sul PUT è
-  ripristinato dall'envelope cifrato in `_preserve_masked_tokens`
-  (`router_repository.py:73-99,149-169`), anche per la sezione `shadow`; i candidate
-  dict di risposta combaciano 1:1 con `CandidateRequest`. Nessuna perdita/corruzione.
-- **Invito → team cancellato → redeem**: `register()` e `delete_team()` si
-  serializzano su `lock_for_lifecycle`; `register` verifica l'esistenza del team
-  *prima* di bruciare l'invito. La fix #253 regge.
-- **Rotate + `service_principal_id`**: il rotate ricontrolla owner/SP sotto lock e
-  propaga `service_principal_id`; una key non attiva non è ruotabile.
-- **Cambio finestra budget a metà periodo**: `window_start` è ricalcolato stateless
-  a ogni lettura — nessun contatore persistito da invalidare.
-- **Trasporto invite token post-#254**: solo URL fragment, catturato in store
-  in-memory e ripulito con `history.replaceState` prima che il router osservi la
-  location; il check del path è coerente col basepath `/ui`.
-- **Locale italiano nei campi numerici**: `<input type="number">` normalizza sempre
-  il separatore — la virgola non è un vettore.
-- **Nota (non issue)**: `provide_principal` ora autentica anche via cookie di
-  sessione; il percorso è protetto (SameSite=Strict + CSRF sulle mutazioni), ma il
-  trust boundary di `Principal` include ora un umano via cookie — da tenere presente
-  aggiungendo nuovi endpoint gated su `provide_principal`.
-
-## Category scores (this round)
-
-| Categoria | Score | Sintesi |
-|---|---:|---|
-| Security / RBAC | **8.5/10** | Zero finding: le remediation R9 reggono a un pass adversarial dedicato; authz dei nuovi endpoint corretta end-to-end. |
-| Money / rate limiting | **8/10** | Copertura RPM completa; i savings sono solo reporting ma il keying per nome ne mina l'attendibilità (ISSUE-001). |
-| Persistence / lifecycle | **7.5/10** | UoW e lock ben usati; restano il keying per nome delle decision e una race di etichettatura (ISSUE-006). |
-| Admin UI | **7/10** | Typed, paginata, token hygiene a posto; il tema aperto è la resa degli errori come empty/zero-state (ISSUE-002/004/005). |
-| Test / CI | **8.5/10** | 872 verdi e gate forti; mancano test sugli stati di errore UI e sul riuso del nome router. |
-
-**Overall: 7.8/10.** Salto netto dal 6.8 del Round 9: il core sicurezza/tenancy non ha
-prodotto finding nuovi e le fix precedenti sono confermate da verifica avversaria. Il
-lavoro rimasto è robustezza di prodotto: un `router_id` sulle decision e stati di
-errore onesti nella console.
+~15 call sites cast `useQuery().error` to `Error | null`. Today every `queryFn`
+constructs a real `new Error(...)`, so it's a safe no-op; but a future non-Error
+rejection would be silently mis-typed. Low-cost fix: `instanceof Error` narrowing
+in a shared helper.
 
 ## Resolution status — FULLY REMEDIATED
 
 All nine findings are fixed across three PRs:
 
-- **#282** — ISSUE-001 (routing decisions keyed by `router_id`, not name; deleted/reused-name history no longer leaks) and ISSUE-007 (savings aggregate collapsed to one point-in-time query).
-- **#283** — ISSUE-002 (dashboard no longer fabricates "$0.00" on load failure), ISSUE-004 (Budgets/audit/router-detail surface errors distinctly), ISSUE-005 (explicit `0` costs accepted; embeddings threshold validated in-form), ISSUE-009 (shared `toError` helper replaces the `as Error | null` casts).
-- **#284** — ISSUE-003 (`/me/teams` complete, no 100-cap, batched lookup), ISSUE-006 (`add_member` reports the real cause on a concurrent-deletion race), ISSUE-008 (schema-invariant test guards the `user_account` FK set used by `delete_user`).
+- **#282** — ISSUE-001 (routing decisions keyed by `router_id`, not name;
+  deleted/reused-name history no longer leaks) and ISSUE-007 (savings aggregate
+  collapsed to one point-in-time query).
+- **#283** — ISSUE-002 (the dashboard no longer fabricates "$0.00" on load
+  failure), ISSUE-004 (Budgets/audit/router-detail surface errors distinctly),
+  ISSUE-005 (explicit `0` costs accepted; embeddings threshold validated
+  in-form), ISSUE-009 (a shared `toError` helper replaces the `as Error | null`
+  casts).
+- **#284** — ISSUE-003 (`/me/teams` complete, no 100-cap, batched lookup),
+  ISSUE-006 (`add_member` reports the real cause on a concurrent-deletion race),
+  ISSUE-008 (a schema-invariant test guards the `user_account` FK set used by
+  `delete_user`).
+
+## Verified and refuted (for the next round)
+
+- **Router webhook enable/disable round-trip**: the `***` mask echoed on PUT is
+  restored from the encrypted envelope in `_preserve_masked_tokens`
+  (`router_repository.py:73-99,149-169`), including the `shadow` section; the
+  response candidate dicts match `CandidateRequest` 1:1. No loss/corruption.
+- **Invite → team deleted → redeem**: `register()` and `delete_team()` serialize
+  on `lock_for_lifecycle`; `register` checks the team exists *before* burning the
+  invite. The #253 fix holds.
+- **Rotate + `service_principal_id`**: rotation re-checks the owner/SP under a
+  lock and propagates `service_principal_id`; an inactive key can't be rotated.
+- **Budget window change mid-window**: `window_start` is recomputed statelessly
+  on each read — no persisted counter to invalidate.
+- **Invite-token transport post-#254**: URL fragment only, captured into an
+  in-memory store and scrubbed with `history.replaceState` before the router
+  observes the location; the path check is consistent with the `/ui` basepath.
+- **Italian locale in numeric fields**: `<input type="number">` always
+  normalizes the separator — a comma isn't a vector.
+- **Note (not an issue)**: `provide_principal` now also authenticates via the
+  session cookie; the path is protected (SameSite=Strict + CSRF on mutations),
+  but `Principal`'s trust boundary now includes a human via cookie — worth
+  keeping in mind when adding new `provide_principal`-gated endpoints.
+
+## Category scores (this round)
+
+| Category | Score | Summary |
+|---|---:|---|
+| Security / RBAC | **8.5/10** | Zero findings: the R9 remediations hold under a dedicated adversarial pass; new-endpoint authz correct end-to-end. |
+| Money / rate limiting | **8/10** | Full RPM coverage; savings are reporting-only, but the name-keying undermines their trustworthiness (ISSUE-001). |
+| Persistence / lifecycle | **7.5/10** | UoW and locks well used; the decision name-keying and a labelling race remain (ISSUE-006). |
+| Admin UI | **7/10** | Typed, paginated, token hygiene in place; the open theme is rendering errors as empty/zero states (ISSUE-002/004/005). |
+| Test / CI | **8.5/10** | 872 green and strong gates; missing tests for UI error states and router-name reuse. |
+
+**Overall: 7.8/10.** A clear jump from Round 9's 6.8: the security/tenancy core
+produced no new findings and the earlier fixes are confirmed by adversarial
+verification. The remaining work is product robustness: a `router_id` on the
+decisions and honest error states in the console.
