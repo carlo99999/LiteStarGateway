@@ -6,8 +6,9 @@ Includes the R7-H23 behavior: tools/vision on a provider whose translator cannot
 express them (Anthropic/Vertex/Bedrock) returns 501, which the SDK surfaces as an
 error.
 
-The OpenAI-shaped error *envelope* (`{"error": {...}}`) is a separate contract
-tracked as an xfail (Phase 2, "error-shape parity") — see below."""
+The OpenAI-shaped error *envelope* (`{"error": {...}}`) is asserted below for
+both a route-level domain error (unknown model) and a middleware-level error
+(bad API key), so an SDK reading `error.message` works across the surface."""
 
 from __future__ import annotations
 
@@ -71,6 +72,26 @@ async def test_bad_api_key_surfaces_401(
             model="m", messages=[{"role": "user", "content": "hi"}]
         )
     assert exc.value.status_code == 401
+
+
+async def test_auth_error_body_is_openai_envelope(
+    client: AsyncTestClient,
+    sdk: Callable[[str], AsyncOpenAI],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The auth failure is raised by the API-key middleware (before the route),
+    # so it must still reach the client as the OpenAI `{"error": {...}}` envelope
+    # — not Litestar's default `{"status_code", "detail"}` — or an SDK reading
+    # `error.message` would see nothing.
+    _patch_upstream(monkeypatch)
+    await _setup(client)
+    with pytest.raises(openai.AuthenticationError) as exc:
+        await sdk("lsk-not-a-real-key").chat.completions.create(
+            model="m", messages=[{"role": "user", "content": "hi"}]
+        )
+    body = exc.value.response.json()
+    assert body["error"]["message"]
+    assert body["error"]["type"] == "authentication_error"
 
 
 async def test_h23_tools_on_anthropic_surfaces_501(
