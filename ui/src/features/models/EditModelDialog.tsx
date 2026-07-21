@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { updateModel, type Model } from "@/features/models/api";
+import { lookupModelPrice, updateModel, type Model } from "@/features/models/api";
 
 interface EditModelDialogProps {
   /** The model to edit; null closes the dialog. */
@@ -63,6 +63,18 @@ export function EditModelDialog({ model, onOpenChange }: EditModelDialogProps) {
     }
   }, [model]);
 
+  // Re-price from the catalog when the upstream id changes — only fields left
+  // blank, so a manual cost is never overwritten.
+  async function autofillCosts() {
+    if (!model) return;
+    const id = providerModelId.trim();
+    if (!id || (inputCost.trim() !== "" && outputCost.trim() !== "")) return;
+    const price = await lookupModelPrice(model.provider, id);
+    if (!price) return;
+    if (inputCost.trim() === "") setInputCost(String(price.input_cost_per_token));
+    if (outputCost.trim() === "") setOutputCost(String(price.output_cost_per_token));
+  }
+
   const mutation = useMutation({
     mutationFn: () =>
       updateModel(model!.team_id, model!.id, {
@@ -112,6 +124,7 @@ export function EditModelDialog({ model, onOpenChange }: EditModelDialogProps) {
               id="edit-model-provider-id"
               value={providerModelId}
               onChange={(e) => setProviderModelId(e.target.value)}
+              onBlur={() => void autofillCosts()}
               placeholder="the upstream id, e.g. gpt-4o-2024-08-06"
               autoComplete="off"
             />

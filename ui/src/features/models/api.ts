@@ -132,6 +132,28 @@ export async function updateModel(
   return data;
 }
 
+export interface ModelPrice {
+  input_cost_per_token: number;
+  output_cost_per_token: number;
+}
+
+/** GET /model-prices — bundled default per-token costs for a provider + upstream
+ * model id, to prefill the form. Returns null when the model has no bundled
+ * price (404) or the lookup fails — the caller then leaves the fields blank. */
+export async function lookupModelPrice(
+  provider: Provider,
+  providerModelId: string,
+): Promise<ModelPrice | null> {
+  const { data, error } = await api.GET("/model-prices", {
+    params: { query: { provider, provider_model_id: providerModelId } },
+  });
+  if (error || !data) return null;
+  return {
+    input_cost_per_token: data.input_cost_per_token,
+    output_cost_per_token: data.output_cost_per_token,
+  };
+}
+
 /** DELETE /teams/{id}/models/{modelId} — remove a model. */
 export async function deleteModel(teamId: string, modelId: string): Promise<void> {
   const { error } = await api.DELETE("/teams/{team_id}/models/{model_id}", {
