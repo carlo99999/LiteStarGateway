@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listAllCredentials } from "@/features/credentials/api";
 import { PROVIDER_LABELS, PROVIDERS } from "@/features/credentials/providerFields";
-import { createModel, type ModelType, type Provider } from "@/features/models/api";
+import { createModel, lookupModelPrice, type ModelType, type Provider } from "@/features/models/api";
 import { listAllTeams } from "@/features/teams/api";
 
 interface CreateModelDialogProps {
@@ -81,6 +81,17 @@ export function CreateModelDialog({ teamId, open, onOpenChange }: CreateModelDia
 
   // A credential belongs to one provider; reset the pick when the provider changes.
   useEffect(() => setCredentialId(""), [provider]);
+
+  // Prefill the costs from the bundled price catalog when the upstream id is
+  // known — but only fields the user left blank, never clobbering a manual entry.
+  async function autofillCosts() {
+    const id = providerModelId.trim();
+    if (!id || (inputCost.trim() !== "" && outputCost.trim() !== "")) return;
+    const price = await lookupModelPrice(provider, id);
+    if (!price) return;
+    if (inputCost.trim() === "") setInputCost(String(price.input_cost_per_token));
+    if (outputCost.trim() === "") setOutputCost(String(price.output_cost_per_token));
+  }
 
   const effectiveTeamId = teamId ?? teamPick;
 
@@ -236,9 +247,13 @@ export function CreateModelDialog({ teamId, open, onOpenChange }: CreateModelDia
               id="model-provider-id"
               value={providerModelId}
               onChange={(e) => setProviderModelId(e.target.value)}
+              onBlur={() => void autofillCosts()}
               placeholder="the upstream id, e.g. gpt-4o-2024-08-06"
               autoComplete="off"
             />
+            <p className="text-[10px] text-muted-foreground">
+              Known models auto-fill the costs below; edit as needed.
+            </p>
           </div>
           {provider === "azure_openai" ? (
             <div className="grid gap-2">
