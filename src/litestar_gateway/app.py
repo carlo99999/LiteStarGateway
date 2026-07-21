@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from litestar import Litestar, Request, Response, get
+from litestar.datastructures import ResponseHeader
 from litestar.di import NamedDependency, Provide
 from litestar.openapi.config import OpenAPIConfig
 from litestar.openapi.plugins import ScalarRenderPlugin, StoplightRenderPlugin, SwaggerRenderPlugin
@@ -121,6 +122,8 @@ def create_app(
         lifespan=_build_lifespan(database, settings, trace_dispatcher, metrics_aggregator),
         dependencies=dependencies,
         stores=_build_rate_limit_stores(settings),
+        response_headers=_security_headers(settings),
+        request_max_body_size=settings.max_body_size,
         exception_handlers={DomainError: domain_exception_handler},
     )
     _register_shadow_drain(app)
@@ -289,6 +292,32 @@ def _build_sso_dependencies(settings: Settings, idp: IdentityProvider) -> dict[s
         "sso_redirect_uri": Provide(lambda: settings.oidc_redirect_uri, sync_to_thread=False),
         "sso_cookie_secure": Provide(lambda: settings.session_cookie_secure, sync_to_thread=False),
     }
+
+
+def _security_headers(settings: Settings) -> list[ResponseHeader]:
+    """Static security headers applied to every response (API, console, docs).
+
+    Kept intentionally conservative: no Content-Security-Policy here — a correct
+    CSP for the built SPA needs per-build nonces/hashes and belongs at the
+    reverse proxy. HSTS is emitted only when we're behind TLS (the same
+    `session_cookie_secure` signal), so a plain-HTTP local run doesn't pin the
+    host to HTTPS."""
+    headers = [
+        ResponseHeader(name="X-Content-Type-Options", value="nosniff", description="MIME sniffing"),
+        ResponseHeader(name="X-Frame-Options", value="DENY", description="Clickjacking"),
+        ResponseHeader(
+            name="Referrer-Policy", value="strict-origin-when-cross-origin", description="Referrer"
+        ),
+    ]
+    if settings.session_cookie_secure:
+        headers.append(
+            ResponseHeader(
+                name="Strict-Transport-Security",
+                value="max-age=31536000; includeSubDomains",
+                description="HSTS (TLS deployments only)",
+            )
+        )
+    return headers
 
 
 def _build_openapi_config(settings: Settings) -> OpenAPIConfig | None:
