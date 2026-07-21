@@ -123,12 +123,14 @@ jobs:
       - name: Apply migrations to head (real prod migration path)
         run: uv run litestar --app litestar_gateway.app:app database upgrade --no-prompt
 
-      # Persistence-focused subset: model/credential CRUD, JSON params, unique
-      # constraints, and encrypted-credential storage — the paths most likely to
-      # behave differently on Postgres than on SQLite. Each test gets its own
-      # throwaway database (see tests/models/conftest.py).
-      - name: Tests against Postgres (persistence subset)
-        run: uv run pytest -q tests/models
+      # The full suite on Postgres. Every DB-backed client/persistence fixture
+      # takes its own throwaway Postgres database via the root `database_url`
+      # fixture (tests/conftest.py); the remaining pure-web/config tests keep
+      # their SQLite fixtures. This catches anything that behaves differently on
+      # Postgres than on SQLite (JSON columns, FK enforcement, aggregate SQL,
+      # typing) across the whole suite, not just the persistence subset.
+      - name: Full test suite against Postgres
+        run: uv run pytest -q
 
   # The `checks` job runs the app in-process; it never proves the shipped
   # Dockerfile (multi-stage uv build, slim runtime, HEALTHCHECK) actually boots.

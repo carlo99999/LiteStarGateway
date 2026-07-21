@@ -8,7 +8,6 @@ platform-admin gate (403 for a non-admin).
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -33,9 +32,9 @@ MEMBER_PASSWORD = "Passw0rd!"  # pragma: allowlist secret
 
 
 @pytest.fixture
-async def client(tmp_path: Path) -> AsyncIterator[AsyncTestClient]:
+async def client(database_url: str) -> AsyncIterator[AsyncTestClient]:
     settings = Settings(
-        database_url=f"sqlite+aiosqlite:///{tmp_path / 'orgs.db'}",
+        database_url=database_url,
         admin_email=ADMIN_EMAIL,
         master_key=MASTER_KEY,
         jwt_secret=JWT_SECRET,

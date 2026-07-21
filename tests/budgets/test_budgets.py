@@ -8,7 +8,6 @@ on the inference endpoints (402 once the window's spend reaches the limit).
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -71,10 +70,12 @@ class FakeClient:
 
 
 @pytest.fixture
-async def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncTestClient]:
+async def client(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> AsyncIterator[AsyncTestClient]:
     monkeypatch.setattr(openai_adapter, "AsyncOpenAI", FakeClient)
     settings = Settings(
-        database_url=f"sqlite+aiosqlite:///{tmp_path / 'budget.db'}",
+        database_url=database_url,
         admin_email=ADMIN_EMAIL,
         master_key=MASTER_KEY,
         jwt_secret=JWT_SECRET,

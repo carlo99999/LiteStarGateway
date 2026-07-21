@@ -277,8 +277,8 @@ def test_unit_costs_fully_priced_candidates_unchanged() -> None:
 
 
 @pytest.fixture
-async def session(tmp_path: Path) -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'savings.db'}")
+async def session(database_url: str) -> AsyncIterator[AsyncSession]:
+    engine = create_async_engine(database_url)
     async with engine.begin() as conn:
         await conn.run_sync(base.UUIDAuditBase.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)

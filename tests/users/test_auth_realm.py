@@ -8,7 +8,6 @@ must be rejected (401) in the other.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import pytest
 from litestar.status_codes import HTTP_401_UNAUTHORIZED
@@ -22,9 +21,9 @@ ADMIN_EMAIL = "admin@example.com"
 
 
 @pytest.fixture
-async def client(tmp_path: Path) -> AsyncIterator[AsyncTestClient]:
+async def client(database_url: str) -> AsyncIterator[AsyncTestClient]:
     settings = Settings(
-        database_url=f"sqlite+aiosqlite:///{tmp_path / 'realm.db'}",
+        database_url=database_url,
         admin_email=ADMIN_EMAIL,
         master_key=MASTER_KEY,
         jwt_secret="test-secret-key-0123456789-abcdefghij",

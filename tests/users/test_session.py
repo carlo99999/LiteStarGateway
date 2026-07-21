@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import pytest
 from _invite_helpers import issue_invite, seed_team
@@ -19,10 +18,10 @@ SEVEN_DAYS = 7 * 24 * 60 * 60
 
 
 @pytest.fixture
-async def client(tmp_path: Path) -> AsyncIterator[AsyncTestClient]:
+async def client(database_url: str) -> AsyncIterator[AsyncTestClient]:
     # Explicit Settings keep tests isolated from the developer's env / .env file.
     settings = Settings(
-        database_url=f"sqlite+aiosqlite:///{tmp_path / 'sess.db'}",
+        database_url=database_url,
         admin_email=ADMIN_EMAIL,
         master_key=MASTER_KEY,
         jwt_secret="test-secret-key-0123456789-abcdefghij",
