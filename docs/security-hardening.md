@@ -16,11 +16,16 @@ already shipped (moved here from the README as the list grew).
   CSRF protection.
 - **Authorization**: declarative role → permission mapping, centrally enforced.
   Personal API keys are inference-only by design; management scope requires a
-  service principal. Platform admins are gateway-governed (not deactivatable
-  via SCIM).
+  service principal. Keys support optional expiry (TTL) and grace-window
+  rotation. Platform admins are gateway-governed (not deactivatable via SCIM).
 - **Spend safety**: per-team budgets enforced pre-call (402), per-team and
   per-key rate limits, request parameter allowlist with cost-driver clamping,
-  in-flight spend reservation against burst overshoot.
+  a configurable request body-size cap (`MAX_BODY_SIZE`), and in-flight spend
+  reservation against burst overshoot.
+- **Transport**: static security response headers on every response
+  (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+  `Referrer-Policy`, and HSTS when behind TLS). No CSP is emitted by the app —
+  a correct policy for the built SPA belongs at the reverse proxy.
 - **Attribution**: append-only audit trail for privileged actions; usage
   accounting survives transient DB failures via a durable outbox.
 
@@ -101,3 +106,15 @@ already shipped (moved here from the README as the list grew).
   rotation never needs a downtime window.
 - **`last_used_at` write throttling** — the API-key auth hot path persists
   `last_used_at` at most once per minute per key.
+- **API-key expiry (TTL)** — keys can be issued with `expires_in_days`; a
+  time-aware `is_active` stops them authenticating past `expires_at`, so
+  short-lived credentials lapse on their own instead of relying on manual
+  revocation. Rotation preserves the original's absolute expiry.
+- **Request body-size cap** — bodies over `MAX_BODY_SIZE` (default 10 MB) are
+  rejected before they're read; explicit and tunable per deployment.
+- **Static security headers** — every response carries `nosniff`,
+  `X-Frame-Options: DENY`, a `Referrer-Policy`, and HSTS when behind TLS.
+- **Routing-decision data hygiene** — routing decisions are keyed by
+  `router_id`, so a deleted router's history (including the JSONL distillation
+  export's raw prompts) never surfaces under a later router that reused its
+  name.
