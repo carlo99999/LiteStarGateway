@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import pytest
 from _invite_helpers import seed_team, seed_team_and_invite
@@ -22,9 +21,9 @@ LOGIN_CODE = "Passw0rd!"
 
 
 @pytest.fixture
-async def client(tmp_path: Path) -> AsyncIterator[AsyncTestClient]:
+async def client(database_url: str) -> AsyncIterator[AsyncTestClient]:
     settings = Settings(
-        database_url=f"sqlite+aiosqlite:///{tmp_path / 'audit.db'}",
+        database_url=database_url,
         admin_email=ADMIN_EMAIL,
         master_key=MASTER_KEY,
         jwt_secret=JWT_SECRET,

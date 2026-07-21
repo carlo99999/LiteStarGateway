@@ -53,10 +53,11 @@ test *args:
 
 # Run the Postgres CI checks locally (mirrors the CI `postgres` job): spin up a
 # throwaway Postgres 17, apply the real migration chain (the same command the
-# Docker entrypoint runs on deploy), then run the persistence test subset against
-# it — the paths most likely to differ Postgres-vs-SQLite. Requires Docker; the
-# container is always removed on exit. ENVIRONMENT stays "development" so Settings
-# needs only DATABASE_URL, exactly like the CI job.
+# Docker entrypoint runs on deploy), then run the FULL suite against it — every
+# DB-backed fixture takes its own throwaway database via the root `database_url`
+# fixture, so Postgres-vs-SQLite differences surface across the whole suite.
+# Requires Docker; the container is always removed on exit. ENVIRONMENT stays
+# "development" so Settings needs only DATABASE_URL, exactly like the CI job.
 test-postgres:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -68,7 +69,7 @@ test-postgres:
     until docker exec "$name" pg_isready -U gateway >/dev/null 2>&1; do sleep 1; done
     export DATABASE_URL="postgresql+asyncpg://gateway:gateway@localhost:5433/gateway"  # pragma: allowlist secret
     uv run litestar --app {{app}} database upgrade --no-prompt
-    uv run pytest -q tests/models
+    uv run pytest -q
 
 # Runs all the pr coverage checks (pre-commit, typecheck, pip-audit, pytest coverage).
 pr-coverage:

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -190,9 +189,9 @@ def service(repos) -> TeamService:  # noqa: ANN001
 
 
 @pytest.fixture
-async def client(tmp_path: Path) -> AsyncIterator[AsyncTestClient]:
+async def client(database_url: str) -> AsyncIterator[AsyncTestClient]:
     settings = Settings(
-        database_url=f"sqlite+aiosqlite:///{tmp_path / 'sp.db'}",
+        database_url=database_url,
         admin_email=ADMIN_EMAIL,
         master_key=MASTER_KEY,
         jwt_secret="test-secret-key-0123456789-abcdefghij",  # pragma: allowlist secret

@@ -1,11 +1,12 @@
-"""Shared DB-url fixture for the model persistence tests.
+"""Root `database_url` fixture, shared by every client/persistence fixture.
 
-This is the subset the Postgres CI job runs (see `.github/workflows/ci.yml`): it
-exercises real schema/persistence (JSON params, unique constraints, encrypted
-credential storage), which is exactly where a migration valid under SQLite's
-permissive typing can break under Postgres. When `DATABASE_URL` points at
-Postgres (the CI job), each test gets its own throwaway database so tests stay
-isolated from each other, mirroring the per-test SQLite file used otherwise.
+When `DATABASE_URL` points at Postgres (the CI Postgres job), each test gets its
+own throwaway database — real schema/persistence semantics (JSON params, unique
+constraints, encrypted credential storage, aggregate SQL) exercised where a
+migration valid under SQLite's permissive typing could break on Postgres.
+Otherwise it hands out a per-test SQLite file, so local runs stay zero-config.
+Test bodies that poke the DB file directly (e.g. sqlite3) keep their own SQLite
+fixture on purpose.
 """
 
 from __future__ import annotations

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import pytest
 from _invite_helpers import seed_team_and_invite
@@ -21,9 +20,9 @@ LIST_URN = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
 USER_URN = "urn:ietf:params:scim:schemas:core:2.0:User"
 
 
-def _settings(tmp_path: Path) -> Settings:
+def _settings(database_url: str) -> Settings:
     return Settings(
-        database_url=f"sqlite+aiosqlite:///{tmp_path / 'scim.db'}",
+        database_url=database_url,
         admin_email=ADMIN_EMAIL,
         master_key=MASTER_KEY,
         jwt_secret="test-secret-key-0123456789-abcdefghij",  # pragma: allowlist secret
@@ -32,8 +31,8 @@ def _settings(tmp_path: Path) -> Settings:
 
 
 @pytest.fixture
-async def client(tmp_path: Path) -> AsyncIterator[AsyncTestClient]:
-    app = create_app(_settings(tmp_path))
+async def client(database_url: str) -> AsyncIterator[AsyncTestClient]:
+    app = create_app(_settings(database_url))
     async with AsyncTestClient(app=app) as test_client:
         yield test_client
 
