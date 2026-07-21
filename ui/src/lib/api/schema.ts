@@ -1563,6 +1563,7 @@ export interface components {
             enabled: boolean;
             /** Format: date-time */
             created_at: string;
+            origin_team_id?: string | null;
         };
         /**
          * ModelType

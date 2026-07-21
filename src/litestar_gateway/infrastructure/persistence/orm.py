@@ -477,6 +477,8 @@ class ModelRecord(base.UUIDAuditBase):
     input_cost_per_token: Mapped[float | None] = mapped_column(default=None)
     output_cost_per_token: Mapped[float | None] = mapped_column(default=None)
     enabled: Mapped[bool] = mapped_column(default=True)
+    # The originally-owning team, kept when a model is promoted to global.
+    origin_team_id: Mapped[UUID | None] = mapped_column(default=None)
 
     def to_entity(self) -> Model:
         return Model(
@@ -495,6 +497,7 @@ class ModelRecord(base.UUIDAuditBase):
             output_cost_per_token=self.output_cost_per_token,
             enabled=self.enabled,
             created_at=self.created_at,
+            origin_team_id=self.origin_team_id,
         )
 
 

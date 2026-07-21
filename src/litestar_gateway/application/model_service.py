@@ -105,6 +105,8 @@ class ModelService:
                 output_cost_per_token=output_cost_per_token,
                 enabled=enabled,
                 created_at=_now(),
+                # Remember the owning team so provenance survives a later promote.
+                origin_team_id=team_id,
             )
         )
 
@@ -143,7 +145,8 @@ class ModelService:
         for model in await self._models.all_global():
             alias = model.name if model.name not in by_alias else f"{model.name}{_GLOBAL_SUFFIX}"
             if alias not in by_alias:
-                by_alias[alias] = CallableModel(alias, model, "global", None)
+                # Surface the origin team so a promoted global shows its provenance.
+                by_alias[alias] = CallableModel(alias, model, "global", model.origin_team_id)
 
         return sorted(by_alias.values(), key=lambda c: c.alias)
 
@@ -190,7 +193,10 @@ class ModelService:
             raise ModelNameExists(model.name)
         for grant in await self._models.list_grants_for_model(model.id):
             await self._models.remove_grant(grant.id)
-        return await self._models.update(dataclasses.replace(model, team_id=None))
+        # Keep the origin team for provenance; drop the ownership.
+        return await self._models.update(
+            dataclasses.replace(model, team_id=None, origin_team_id=model.team_id)
+        )
 
     async def extend(
         self, model_id: UUID, source_label: str, team_ids: list[UUID]
