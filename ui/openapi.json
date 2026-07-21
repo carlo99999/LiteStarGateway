@@ -10604,6 +10604,17 @@
                     "created_at": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "origin_team_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",

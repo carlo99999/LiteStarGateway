@@ -235,6 +235,31 @@ async def test_callable_view_shows_own_extended_and_global(client: AsyncTestClie
     assert by_alias["from-blue"]["source_team_id"] == blue
 
 
+async def test_make_global_promotes_and_keeps_provenance(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    cred = await _credential(client, admin)
+    org = await _org(client, admin)
+    core = await _team(client, admin, org, "Core")
+    blue = await _team(client, admin, org, "Blue")
+    model_id = await _team_model(client, admin, core, cred, "promoteme")
+
+    resp = await client.post(f"/platform/models/{model_id}/make-global", headers=_bearer(admin))
+    assert resp.status_code in (HTTP_200_OK, HTTP_201_CREATED), resp.text
+    body = resp.json()
+    # It really became global (regression: update() used to drop team_id)…
+    assert body["team_id"] is None
+    # …and remembers where it came from.
+    assert body["origin_team_id"] == core
+
+    # Another team now sees it as a global model, attributed to Core.
+    callable_rows = (
+        await client.get(f"/teams/{blue}/models/callable", headers=_bearer(admin))
+    ).json()
+    promoted = next(r for r in callable_rows if r["alias"] == "promoteme")
+    assert promoted["origin"] == "global"
+    assert promoted["source_team_id"] == core
+
+
 async def test_platform_routes_require_admin(client: AsyncTestClient) -> None:
     # No token → the platform-admin guard rejects before any work.
     resp = await client.get("/platform/models")

@@ -59,6 +59,7 @@ class ModelResponse:
     output_cost_per_token: float | None
     enabled: bool
     created_at: datetime
+    origin_team_id: UUID | None = None  # team a global model was promoted from
 
     @classmethod
     def from_entity(cls, model: Model) -> ModelResponse:
@@ -78,6 +79,7 @@ class ModelResponse:
             output_cost_per_token=model.output_cost_per_token,
             enabled=model.enabled,
             created_at=model.created_at,
+            origin_team_id=model.origin_team_id,
         )
 
 

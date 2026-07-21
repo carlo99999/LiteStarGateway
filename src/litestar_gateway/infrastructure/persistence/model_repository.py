@@ -36,6 +36,7 @@ class SQLAlchemyModelRepository:
             input_cost_per_token=model.input_cost_per_token,
             output_cost_per_token=model.output_cost_per_token,
             enabled=model.enabled,
+            origin_team_id=model.origin_team_id,
         )
         self._session.add(record)
         try:
@@ -144,6 +145,11 @@ class SQLAlchemyModelRepository:
         record = await self._session.get(ModelRecord, model.id)
         if record is None:  # pragma: no cover - guarded by callers
             raise LookupError(f"Model {model.id} disappeared")
+        # team_id/origin_team_id are unchanged by a normal edit, but writing them
+        # back lets `make_global` (which flips team_id → None) persist through the
+        # same path.
+        record.team_id = model.team_id
+        record.origin_team_id = model.origin_team_id
         record.name = model.name
         record.type = model.type.value
         record.provider_model_id = model.provider_model_id

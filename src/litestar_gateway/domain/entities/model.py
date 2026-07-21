@@ -53,6 +53,10 @@ class Model:
     # clamped down to it (min semantics) and it is injected when the client omits
     # one, so it is a real cap — not bypassable by omission. None = no cap.
     max_output_tokens: int | None = None
+    # The team that originally owned this model, preserved even after it is
+    # promoted to global — so a global model can still show its provenance
+    # ("global · from Team X"). None for a model created global from the start.
+    origin_team_id: UUID | None = None
 
     def merge_params(self, request: dict[str, Any]) -> dict[str, Any]:
         """Effective request for a provider call: admin `params` (defaults the

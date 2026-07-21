@@ -53,8 +53,10 @@ export function CallableModelsTable({
 
   function originBadge(c: CallableModel) {
     if (c.origin === "own") return <Badge variant="muted">team</Badge>;
-    if (c.origin === "global") return <Badge variant="accent">global</Badge>;
     const source = c.source_team_id ? teamNames.get(c.source_team_id) : undefined;
+    if (c.origin === "global") {
+      return <Badge variant="accent">{source ? `global · from ${source}` : "global"}</Badge>;
+    }
     return <Badge variant="accent">extended · {source ?? "another team"}</Badge>;
   }
 
