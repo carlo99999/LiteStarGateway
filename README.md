@@ -116,6 +116,9 @@ billing.
 | `POST /v1/embeddings` | ✅ | ✅ | ✅ | 501 | ✅ | ✅ |
 | `POST /v1/images/generations` | ✅ | ✅ | 501 | 501 | ✅ | ✅ |
 
+`GET /v1/models` lists a team's callable models (its enabled models + routers)
+in the OpenAI shape, so stock clients can discover what to pass as `model`.
+
 Structured outputs (`response_format` / `text.format`) work cross-provider,
 streaming included. Native Anthropic (`/anthropic/v1/messages`) and Gemini
 passthrough endpoints are available too — see the
@@ -158,8 +161,8 @@ See `.env.sample`. Key env vars: `DATABASE_URL` (Postgres in production),
 `ADMIN_EMAIL` + `MASTER_KEY` (bootstrap admin), `JWT_SECRET` (token signing),
 `SALT_KEY` (credential encryption at rest), `ENVIRONMENT` (`production`
 enables startup config checks), `REDIS_URL` (shared rate limits + rotation
-lock for replicas), `MLFLOW_TRACKING_URI` (tracing). Details in the
-[operations guide](docs/operations.md).
+lock for replicas), `MLFLOW_TRACKING_URI` (tracing), `MAX_BODY_SIZE` (request
+body cap, default 10 MB). Details in the [operations guide](docs/operations.md).
 
 ```bash
 uv run litestar --app litestar_gateway.app:app run   # dev server
@@ -184,8 +187,10 @@ in the **[operations guide](docs/operations.md)**.
 Invite-only signup, per-account login lockout, HttpOnly cookie sessions with
 CSRF, envelope-encrypted credentials with scheduled key rotation, scoped API
 keys (personal keys are inference-only; management scope requires a service
-principal), per-team/per-key rate limits, pre-call budget enforcement, request
-allowlisting, SSRF-guarded webhooks, and an append-only audit trail.
+principal) with optional expiry and grace-window rotation, per-team/per-key
+rate limits, pre-call budget enforcement, request allowlisting + a body-size
+cap, SSRF-guarded webhooks, static security response headers, and an
+append-only audit trail.
 
 The full security model, accepted limits, and hardening history:
 [docs/security-hardening.md](docs/security-hardening.md). To report a
@@ -204,14 +209,16 @@ an 80% coverage gate + pip-audit + a Postgres migration job):
 - Smart routing: six strategies, shadow mode, decision observability with
   estimated savings, JSONL distillation export.
 - **Full admin console** at `/ui` — every sidebar entry is a real page.
+- Hardening: `GET /v1/models`, configurable request body-size cap, static
+  security response headers, and optional API-key expiry (TTL).
 
 Next up:
 
 - **Agent framework compatibility** — conformance tests + copy-paste examples
   for Pydantic AI, LangChain, LlamaIndex, OpenAI Agents SDK
   ([design](docs/next-steps/agent-framework-compatibility.md)).
-- **Minor hardening** — `GET /v1/models`, request body-size limits, security
-  headers, Dependabot, API-key expiry.
+- Run the full test suite on Postgres in CI (today: SQLite + a Postgres
+  migration/persistence subset).
 - Console polish — bundle code-splitting, richer usage charts.
 
 ## Contributing

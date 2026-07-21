@@ -17,8 +17,21 @@ The app expects to sit behind a reverse proxy that terminates TLS.
   `Origin`.
 - `SESSION_COOKIE_SECURE=true` is mandatory outside local environments so SSO
   and admin-session cookies remain HTTPS-only when TLS terminates at the proxy.
+  It also enables the `Strict-Transport-Security` (HSTS) response header — the
+  app emits it only when this signal is set, so a plain-HTTP run never pins the
+  host to HTTPS.
 - Set `OIDC_REDIRECT_URI` to the public callback URL so the IdP redirect
   matches what's registered.
+- The app sets static security response headers (`X-Content-Type-Options`,
+  `X-Frame-Options`, `Referrer-Policy`) on every response. It does **not** emit
+  a Content-Security-Policy — set one at the proxy if you want it, since a
+  correct policy for the built SPA needs per-build nonces/hashes.
+
+## Request limits
+
+`MAX_BODY_SIZE` caps the accepted request body in bytes (default 10 MB, 413
+above it). Lower it to tighten the DoS bound; raise it for large multimodal
+payloads — inline base64 images push vision requests past a few MB.
 
 ## Database
 
