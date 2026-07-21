@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useCredentialNames } from "@/features/credentials/useCredentialNames";
 import { CreateModelDialog } from "@/features/models/CreateModelDialog";
 import { DeleteModelDialog } from "@/features/models/DeleteModelDialog";
+import { EditModelDialog } from "@/features/models/EditModelDialog";
 import { ModelsTable } from "@/features/models/ModelsTable";
 import { listModelsPage, type Model } from "@/features/models/api";
 import { listAllTeams } from "@/features/teams/api";
@@ -48,6 +49,7 @@ export function ModelsPage() {
   const error = toError(teams.error ?? models.error);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<Model | null>(null);
   const [deleting, setDeleting] = useState<Model | null>(null);
 
   return (
@@ -91,6 +93,7 @@ export function ModelsPage() {
         isLoading={teams.isLoading || (teamId.length > 0 && models.isLoading)}
         error={error}
         credentialNames={credentialNames}
+        onEdit={setEditing}
         onDelete={setDeleting}
       />
       {models.data ? (
@@ -105,6 +108,12 @@ export function ModelsPage() {
       ) : null}
 
       <CreateModelDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <EditModelDialog
+        model={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+      />
       <DeleteModelDialog
         model={deleting}
         onOpenChange={(open) => {

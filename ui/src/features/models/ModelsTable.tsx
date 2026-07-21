@@ -20,6 +20,7 @@ interface ModelsTableProps {
   error: Error | null;
   /** Credential id → display name, so the credential column shows a name. */
   credentialNames: Map<string, string>;
+  onEdit: (model: Model) => void;
   onDelete: (model: Model) => void;
 }
 
@@ -29,7 +30,14 @@ function formatCost(perToken: number | null): string {
   return `$${(perToken * 1_000_000).toFixed(2)}/M`;
 }
 
-export function ModelsTable({ rows, isLoading, error, credentialNames, onDelete }: ModelsTableProps) {
+export function ModelsTable({
+  rows,
+  isLoading,
+  error,
+  credentialNames,
+  onEdit,
+  onDelete,
+}: ModelsTableProps) {
   const queryClient = useQueryClient();
   const toggle = useMutation({
     mutationFn: (model: Model) => setModelEnabled(model.team_id, model.id, !model.enabled),
@@ -107,6 +115,7 @@ export function ModelsTable({ rows, isLoading, error, credentialNames, onDelete 
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => onEdit(m)}>edit</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => toggle.mutate(m)}>
               {m.enabled ? "disable" : "enable"}
             </DropdownMenuItem>

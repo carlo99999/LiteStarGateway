@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useCredentialNames } from "@/features/credentials/useCredentialNames";
 import { CreateModelDialog } from "@/features/models/CreateModelDialog";
 import { DeleteModelDialog } from "@/features/models/DeleteModelDialog";
+import { EditModelDialog } from "@/features/models/EditModelDialog";
 import { ModelsTable } from "@/features/models/ModelsTable";
 import { listModelsPage, type Model } from "@/features/models/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
@@ -24,6 +25,7 @@ export function TeamModels({ teamId }: TeamModelsProps) {
     queryFn: () => listModelsPage(teamId, offset),
   });
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<Model | null>(null);
   const [deleting, setDeleting] = useState<Model | null>(null);
 
   useEffect(() => setOffset(0), [teamId]);
@@ -49,6 +51,7 @@ export function TeamModels({ teamId }: TeamModelsProps) {
         isLoading={models.isLoading}
         error={toError(models.error)}
         credentialNames={credentialNames}
+        onEdit={setEditing}
         onDelete={setDeleting}
       />
       {models.data ? (
@@ -63,6 +66,12 @@ export function TeamModels({ teamId }: TeamModelsProps) {
       ) : null}
 
       <CreateModelDialog teamId={teamId} open={createOpen} onOpenChange={setCreateOpen} />
+      <EditModelDialog
+        model={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+      />
       <DeleteModelDialog
         model={deleting}
         onOpenChange={(open) => {
