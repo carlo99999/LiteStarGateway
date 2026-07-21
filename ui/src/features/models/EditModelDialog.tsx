@@ -11,7 +11,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { lookupModelPrice, updateModel, type Model } from "@/features/models/api";
+import {
+  lookupModelPrice,
+  updateGlobalModel,
+  updateModel,
+  type Model,
+} from "@/features/models/api";
 
 interface EditModelDialogProps {
   /** The model to edit; null closes the dialog. */
@@ -76,16 +81,22 @@ export function EditModelDialog({ model, onOpenChange }: EditModelDialogProps) {
   }
 
   const mutation = useMutation({
-    mutationFn: () =>
-      updateModel(model!.team_id, model!.id, {
+    mutationFn: () => {
+      const changes = {
         providerModelId: providerModelId.trim(),
         maxOutputTokens: parsePositive(maxOutputTokens),
         apiVersion: apiVersion.trim() || null,
         inputCostPerToken: parseNonNegative(inputCost),
         outputCostPerToken: parseNonNegative(outputCost),
-      }),
+      };
+      // A global model (team_id === null) updates through the platform endpoint.
+      return model!.team_id === null
+        ? updateGlobalModel(model!.id, changes)
+        : updateModel(model!.team_id, model!.id, changes);
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["team-models", model!.team_id] });
+      await queryClient.invalidateQueries({ queryKey: ["global-models"] });
       onOpenChange(false);
     },
   });

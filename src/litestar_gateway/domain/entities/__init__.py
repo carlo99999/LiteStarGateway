@@ -22,7 +22,7 @@ from .identity import (
     ScimToken,
     User,
 )
-from .model import Credential, Model
+from .model import Credential, Model, ModelGrant
 from .organization import Organization, Team, TeamMembership
 
 __all__ = [
@@ -59,6 +59,7 @@ __all__ = [
     # Model
     "Credential",
     "Model",
+    "ModelGrant",
     # Organization
     "Organization",
     "Team",

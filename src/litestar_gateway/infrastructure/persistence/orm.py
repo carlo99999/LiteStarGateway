@@ -7,7 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from advanced_alchemy.extensions.litestar import base
-from sqlalchemy import JSON, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import JSON, ForeignKey, Index, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from litestar_gateway.domain.entities import (
@@ -20,6 +20,7 @@ from litestar_gateway.domain.entities import (
     KeyPurpose,
     KeyScope,
     Model,
+    ModelGrant,
     ModelType,
     Organization,
     PasswordReset,
@@ -448,9 +449,22 @@ class CredentialModel(base.UUIDAuditBase):
 # Named `ModelRecord` (not `ModelModel`) to avoid the awkward double "Model".
 class ModelRecord(base.UUIDAuditBase):
     __tablename__ = "model"
-    __table_args__ = (UniqueConstraint("team_id", "name"),)
+    __table_args__ = (
+        # Unique per owning team. NULLs are distinct in a UNIQUE, so this does
+        # NOT constrain global models (team_id IS NULL); the partial index below
+        # keeps global names unique on their own.
+        UniqueConstraint("team_id", "name"),
+        Index(
+            "uq_global_model_name",
+            "name",
+            unique=True,
+            sqlite_where=text("team_id IS NULL"),
+            postgresql_where=text("team_id IS NULL"),
+        ),
+    )
 
-    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    # NULL ⇒ a global (platform) model, callable by every team.
+    team_id: Mapped[UUID | None] = mapped_column(ForeignKey("team.id"), index=True, default=None)
     name: Mapped[str] = mapped_column(index=True)
     provider: Mapped[str] = mapped_column()
     credential_id: Mapped[UUID] = mapped_column(ForeignKey("credential.id"))
@@ -480,6 +494,34 @@ class ModelRecord(base.UUIDAuditBase):
             input_cost_per_token=self.input_cost_per_token,
             output_cost_per_token=self.output_cost_per_token,
             enabled=self.enabled,
+            created_at=self.created_at,
+        )
+
+
+class ModelGrantRecord(base.UUIDAuditBase):
+    """A team-owned model extended to another team, under `alias`.
+
+    Points at the source model (no copy); the target team calls it by `alias`.
+    Global models need no grant rows — they resolve to every team by name.
+    """
+
+    __tablename__ = "model_grant"
+    __table_args__ = (
+        UniqueConstraint("team_id", "alias"),
+        # A model is extended to a given team at most once.
+        UniqueConstraint("model_id", "team_id"),
+    )
+
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), index=True)
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    alias: Mapped[str] = mapped_column()
+
+    def to_entity(self) -> ModelGrant:
+        return ModelGrant(
+            id=self.id,
+            model_id=self.model_id,
+            team_id=self.team_id,
+            alias=self.alias,
             created_at=self.created_at,
         )
 
