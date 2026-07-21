@@ -76,12 +76,51 @@ still references it.
 
 ### Models
 
-Per-team model deployments: an alias (what clients call) mapped to a provider
-model id and a credential. The credential picker is filtered to the chosen
-provider — the backend rejects a mismatch. Optional per-token input/output
-costs feed usage accounting and routing-savings math; an optional
-`max_output_tokens` caps each call. Models can be disabled without deleting
-them.
+A model is an alias (what clients call) mapped to a provider model id and a
+credential. The credential picker is filtered to the chosen provider — the
+backend rejects a mismatch. Optional per-token input/output costs feed usage
+accounting and routing-savings math; an optional `max_output_tokens` caps each
+call. Models can be **edited** (upstream id, costs, ceiling, Azure api version;
+provider and credential are immutable — recreate to change them) and disabled
+without deleting them.
+
+**Default costs.** When you enter a known upstream model id (e.g. `gpt-4o`),
+the input/output costs prefill from a bundled snapshot of the community price
+map — edit as needed. Unknown ids leave the fields blank. The lookup is served
+locally (`GET /model-prices`), so it works air-gapped.
+
+#### Scope: team, global, and extended
+
+A model belongs to a **team**, or to the **platform** (a *global* model). The
+Models page has a global section (platform-admin) and a per-team section.
+
+- **Global** models are callable by **every team**, present and future. Create
+  one with *Add global model*, or promote a team model with *make global*.
+- **Extend** shares a team-owned model with chosen teams — a *grant*, not a
+  copy: the target team calls the **same** model (one source of truth, so cost
+  and config edits propagate; disabling it affects everyone). Use the *extend*
+  action to pick teams or revoke.
+
+Each team's model list shows everything it can call, tagged by origin: `team`
+(its own — editable here), `extended · <source team>`, and `global · from
+<team>` (or just `global`). `GET /v1/models` lists the same set by effective
+alias, so clients can discover them.
+
+**Alias clashes never hide a model** — they rename. Extending `gpt-4o` to a
+team that already has its own `gpt-4o` exposes the extended one as
+`gpt-4o-<source team>`; a global shadowed by a team's own model is reachable as
+`gpt-4o-global`.
+
+!!! tip "Configuration gotchas"
+    - **`provider_model_id` must exist on that provider.** The gateway forwards
+      it verbatim; a Vertex model pointed at `gpt-4o` gets a 404 *from Vertex*.
+      Use the provider's own deployment/serving name.
+    - **Reasoning models need token headroom.** A model that "thinks" (e.g.
+      Gemini 2.5) spends output tokens on reasoning first — a tiny `max_tokens`
+      can return empty content. Give it room.
+    - Upstream rejections surface as a `4xx`/`5xx` with the provider's status,
+      so a `400`/`404` on one model with others working points at that model's
+      credential or id, not the gateway.
 
 ### API keys
 
