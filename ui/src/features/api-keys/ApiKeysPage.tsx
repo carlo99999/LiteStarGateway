@@ -13,6 +13,7 @@ import { listTeamKeysPage, type ApiKey } from "@/features/api-keys/api";
 import { useAuth } from "@/features/auth/use-auth";
 import { useServicePrincipalNames } from "@/features/service-principals/useServicePrincipalNames";
 import { listAllTeams } from "@/features/teams/api";
+import { useUserEmails } from "@/features/users/useUserEmails";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
 import { toError } from "@/lib/toError";
 
@@ -32,6 +33,7 @@ export function ApiKeysPage() {
   const [teamId, setTeamId] = useState("");
   const [offset, setOffset] = useState(0);
   const spNames = useServicePrincipalNames(teamId || undefined);
+  const userEmails = useUserEmails(Boolean(user?.is_admin));
   const selectedTeam = teams.data?.find((team) => team.id === teamId);
   const keys = useQuery({
     queryKey: ["team-keys", teamId, "page", offset],
@@ -98,6 +100,7 @@ export function ApiKeysPage() {
         showTeam
         currentUserId={user?.id}
         servicePrincipalNames={spNames}
+        userEmails={userEmails}
         onRotate={setRotating}
         onRevoke={setRevoking}
         emptyDescription={teamId ? "Issue a key with the button above." : "Select a team."}
