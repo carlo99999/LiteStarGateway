@@ -153,16 +153,93 @@
   border-radius: 0.35rem;
 }
 
-/* Subtle grid backdrop on the content canvas, like the app + login screens. */
-[data-md-color-scheme="slate"] .md-main {
+/* Very subtle grid backdrop, only behind the header/hero — keeping it off the
+ * article body stops it competing with dense text (the design docs especially). */
+[data-md-color-scheme="slate"] .md-header {
   background-image:
-    linear-gradient(to right, rgba(34, 197, 94, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(34, 197, 94, 0.04) 1px, transparent 1px);
+    linear-gradient(to right, rgba(34, 197, 94, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34, 197, 94, 0.05) 1px, transparent 1px);
   background-size: 32px 32px;
 }
-[data-md-color-scheme="default"] .md-main {
-  background-image:
-    linear-gradient(to right, rgba(22, 163, 74, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(22, 163, 74, 0.05) 1px, transparent 1px);
-  background-size: 32px 32px;
+
+/* ── Readability & polish ─────────────────────────────────────────────────── */
+
+/* A comfortable measure and rhythm for long-form prose (docs are text-heavy). */
+.md-typeset {
+  line-height: 1.72;
+}
+.md-grid {
+  max-width: 62rem; /* ~85 chars — easier to read than the wide default */
+}
+.md-typeset p,
+.md-typeset li {
+  letter-spacing: 0.005em;
+}
+.md-typeset h2 {
+  margin-top: 2.4em;
+  padding-top: 0.4em;
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-typeset h3 {
+  margin-top: 1.8em;
+}
+
+/* Inline code as a quiet chip that clearly separates from prose — a soft
+ * surface + hairline border + accent-tinted text, instead of blending in or
+ * shouting. This is the main fix for the "wall of green tokens" look. */
+.md-typeset code {
+  border-radius: 0.35rem;
+  padding: 0.1em 0.38em;
+  font-size: 0.85em;
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+[data-md-color-scheme="slate"] .md-typeset :not(pre) > code {
+  background-color: rgba(34, 197, 94, 0.08);
+  color: #d7e6db;
+  border-color: rgba(34, 197, 94, 0.18);
+}
+[data-md-color-scheme="default"] .md-typeset :not(pre) > code {
+  background-color: #eef4f0;
+  color: #0f5132;
+  border-color: #d5e5db;
+}
+/* Headings shouldn't inherit the chip — keep inline code in titles flat. */
+.md-typeset h1 code,
+.md-typeset h2 code,
+.md-typeset h3 code,
+.md-typeset h4 code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.9em;
+}
+
+/* Code blocks: consistent rounded, padded surface in both schemes. */
+.md-typeset pre > code {
+  border-radius: 0.6rem;
+  padding: 1rem 1.1rem;
+}
+[data-md-color-scheme="default"] .md-typeset pre > code {
+  border: 1px solid #e2ebe5;
+}
+
+/* Blockquotes (the "Status —" notes atop the design docs) become a left-accent
+ * callout card instead of a plain indented paragraph. */
+.md-typeset blockquote {
+  border-left: 3px solid var(--md-primary-fg-color);
+  border-radius: 0.35rem;
+  padding: 0.6rem 1rem;
+  color: var(--md-default-fg-color--light);
+  background-color: var(--md-code-bg-color);
+}
+
+/* Tables: lighter, roomier — the capability/matrix tables read better. */
+.md-typeset table:not([class]) {
+  border-radius: 0.5rem;
+  overflow: hidden;
+  font-size: 0.82rem;
+}
+.md-typeset table:not([class]) th {
+  font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
 }
