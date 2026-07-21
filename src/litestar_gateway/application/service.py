@@ -100,6 +100,7 @@ class APIKeyService:
         scope: KeyScope,
         service_principal_id: UUID | None,
         rate_limit_rpm: int | None,
+        expires_at: datetime | None = None,
     ) -> IssuedKey:
         material = generate_key()
         stored = await self._repo.add(
@@ -116,6 +117,7 @@ class APIKeyService:
                 scope=scope,
                 service_principal_id=service_principal_id,
                 rate_limit_rpm=rate_limit_rpm,
+                expires_at=expires_at,
             )
         )
         return IssuedKey(key=stored, plaintext=material.plaintext)
@@ -128,6 +130,7 @@ class APIKeyService:
         scope: KeyScope = KeyScope.INFERENCE,
         service_principal_id: UUID | None = None,
         rate_limit_rpm: int | None = None,
+        expires_at: datetime | None = None,
     ) -> IssuedKey:
         # Management/all scope is reserved for service-principal keys: a personal
         # key (no SP) can only ever do inference. A human manages via their JWT.
@@ -147,6 +150,7 @@ class APIKeyService:
                 scope,
                 service_principal_id,
                 rate_limit_rpm,
+                expires_at,
             )
 
     async def authenticate(self, plaintext: str) -> APIKey:
@@ -233,6 +237,9 @@ class APIKeyService:
                 key.scope,
                 key.service_principal_id,
                 key.rate_limit_rpm,
+                # Rotation preserves the key's TTL (absolute): a rotated key
+                # expires when the original would have, never later.
+                key.expires_at,
             )
             if not await self._repo.schedule_revocation(
                 key.id,

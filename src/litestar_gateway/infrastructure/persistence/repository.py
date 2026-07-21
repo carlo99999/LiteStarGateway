@@ -37,6 +37,7 @@ class SQLAlchemyAPIKeyRepository:
             scope=key.scope.value,
             service_principal_id=key.service_principal_id,
             rate_limit_rpm=key.rate_limit_rpm,
+            expires_at=key.expires_at,
         )
         self._session.add(model)
         await self._session.flush()

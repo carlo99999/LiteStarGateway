@@ -91,7 +91,8 @@ Issued per team, shown globally or on the team page. Two kinds:
 - **Service principal** — a team identity; the only kind that may hold
   `management` or `all` scope. The table's *owner* column tells them apart.
 
-Keys support an optional **per-key rate limit** (requests/minute) and
+Keys support an optional **per-key rate limit** (requests/minute), an optional
+**expiry** (TTL in days — the key stops authenticating after it), and
 **rotation with a 1-hour grace window**: rotating issues a replacement (same
 scope, owner, rate limit) and schedules the old key to expire an hour later,
 so deployed clients can switch without downtime. Plaintext is shown exactly

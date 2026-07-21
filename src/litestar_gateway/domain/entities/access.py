@@ -61,6 +61,9 @@ class APIKey:
     service_principal_id: UUID | None = None
     # Requests/minute cap for this key; None = unlimited.
     rate_limit_rpm: int | None = None
+    # Optional TTL: after this instant the key stops authenticating. None = no
+    # expiry (revoke/rotate remain the only ways to end it).
+    expires_at: datetime | None = None
 
     @property
     def is_service_principal(self) -> bool:
@@ -68,12 +71,19 @@ class APIKey:
 
     @property
     def is_active(self) -> bool:
-        """Usable right now: never revoked, or revocation scheduled in the future
-        (the rotation grace window, during which the old key keeps working)."""
+        """Usable right now: not expired, and either never revoked or revocation
+        scheduled in the future (the rotation grace window)."""
+        now = datetime.now(UTC)
+        if self.expires_at is not None:
+            expires = (
+                self.expires_at if self.expires_at.tzinfo else self.expires_at.replace(tzinfo=UTC)
+            )
+            if expires <= now:
+                return False
         if self.revoked_at is None:
             return True
         revoked = self.revoked_at if self.revoked_at.tzinfo else self.revoked_at.replace(tzinfo=UTC)
-        return revoked > datetime.now(UTC)
+        return revoked > now
 
 
 @dataclass(frozen=True)

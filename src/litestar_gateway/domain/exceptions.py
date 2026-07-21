@@ -202,6 +202,10 @@ class InvalidKeyScope(DomainError):
     """The requested API-key scope is not one of inference/management/all."""
 
 
+class InvalidKeyExpiry(DomainError):
+    """The requested API-key TTL is not a positive number of days."""
+
+
 class BudgetExceeded(DomainError):
     """The team's spend cap for the current window is exhausted (→ 402)."""
 
