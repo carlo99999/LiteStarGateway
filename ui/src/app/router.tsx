@@ -1,29 +1,65 @@
-import {
-  createRootRoute,
-  createRoute,
-  createRouter,
-  Outlet,
-} from "@tanstack/react-router";
+import { lazy } from "react";
+import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/react-router";
 import { AppShell } from "@/app/layout/AppShell";
-import { ApiKeysPage } from "@/features/api-keys/ApiKeysPage";
-import { AuditPage } from "@/features/audit/AuditPage";
-import { BudgetsPage } from "@/features/budgets/BudgetsPage";
-import { CredentialsPage } from "@/features/credentials/CredentialsPage";
-import { DashboardPage } from "@/features/dashboard/DashboardPage";
-import { ModelsPage } from "@/features/models/ModelsPage";
-import { RouterDetailPage } from "@/features/routing/RouterDetailPage";
-import { RoutingPage } from "@/features/routing/RoutingPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { SignupPage } from "@/features/auth/SignupPage";
 import { inviteTokenStore } from "@/features/auth/inviteToken";
-import { OrganizationDetailPage } from "@/features/organizations/OrganizationDetailPage";
-import { OrganizationsPage } from "@/features/organizations/OrganizationsPage";
-import { ServicePrincipalsPage } from "@/features/service-principals/ServicePrincipalsPage";
-import { TeamDetailPage } from "@/features/teams/TeamDetailPage";
-import { TeamsPage } from "@/features/teams/TeamsPage";
-import { UsagePage } from "@/features/usage/UsagePage";
-import { UsersPage } from "@/features/users/UsersPage";
+
+// Route-based code splitting: each authenticated page loads from its own chunk
+// on first navigation, so the initial bundle stays small (was one ~535kB chunk
+// holding every page). Login/signup stay eager — they're the first paint for an
+// unauthenticated visitor. The Suspense boundary around <Outlet /> in AppShell
+// shows the pending fallback while a page chunk is in flight.
+const DashboardPage = lazy(() =>
+  import("@/features/dashboard/DashboardPage").then((m) => ({ default: m.DashboardPage })),
+);
+const OrganizationsPage = lazy(() =>
+  import("@/features/organizations/OrganizationsPage").then((m) => ({ default: m.OrganizationsPage })),
+);
+const OrganizationDetailPage = lazy(() =>
+  import("@/features/organizations/OrganizationDetailPage").then((m) => ({
+    default: m.OrganizationDetailPage,
+  })),
+);
+const TeamsPage = lazy(() =>
+  import("@/features/teams/TeamsPage").then((m) => ({ default: m.TeamsPage })),
+);
+const TeamDetailPage = lazy(() =>
+  import("@/features/teams/TeamDetailPage").then((m) => ({ default: m.TeamDetailPage })),
+);
+const ApiKeysPage = lazy(() =>
+  import("@/features/api-keys/ApiKeysPage").then((m) => ({ default: m.ApiKeysPage })),
+);
+const UsersPage = lazy(() =>
+  import("@/features/users/UsersPage").then((m) => ({ default: m.UsersPage })),
+);
+const ServicePrincipalsPage = lazy(() =>
+  import("@/features/service-principals/ServicePrincipalsPage").then((m) => ({
+    default: m.ServicePrincipalsPage,
+  })),
+);
+const CredentialsPage = lazy(() =>
+  import("@/features/credentials/CredentialsPage").then((m) => ({ default: m.CredentialsPage })),
+);
+const ModelsPage = lazy(() =>
+  import("@/features/models/ModelsPage").then((m) => ({ default: m.ModelsPage })),
+);
+const RoutingPage = lazy(() =>
+  import("@/features/routing/RoutingPage").then((m) => ({ default: m.RoutingPage })),
+);
+const RouterDetailPage = lazy(() =>
+  import("@/features/routing/RouterDetailPage").then((m) => ({ default: m.RouterDetailPage })),
+);
+const UsagePage = lazy(() =>
+  import("@/features/usage/UsagePage").then((m) => ({ default: m.UsagePage })),
+);
+const BudgetsPage = lazy(() =>
+  import("@/features/budgets/BudgetsPage").then((m) => ({ default: m.BudgetsPage })),
+);
+const AuditPage = lazy(() =>
+  import("@/features/audit/AuditPage").then((m) => ({ default: m.AuditPage })),
+);
 
 function captureInviteTokenFromWindow() {
   if (typeof window !== "undefined") {

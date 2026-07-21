@@ -20,6 +20,10 @@ interface KeysTableProps {
   /** Service-principal id → display name, so SP keys show the principal's name
    * instead of an opaque id. Personal keys are unaffected. */
   servicePrincipalNames?: Map<string, string>;
+  /** User id → email, so a personal key created by someone other than the
+   * signed-in user reads as an email instead of an opaque id. Only populated
+   * for platform admins (the roster endpoint is admin-only). */
+  userEmails?: Map<string, string>;
   onRotate: (key: ApiKey) => void;
   onRevoke: (key: ApiKey) => void;
   emptyDescription: string;
@@ -36,6 +40,7 @@ export function KeysTable({
   showTeam,
   currentUserId,
   servicePrincipalNames,
+  userEmails,
   onRotate,
   onRevoke,
   emptyDescription,
@@ -105,10 +110,14 @@ export function KeysTable({
             </span>
           );
         }
-        return k.created_by === currentUserId ? (
-          <Badge variant="muted">me</Badge>
-        ) : (
-          <span className="tabular text-xs text-muted-foreground">{k.created_by.slice(0, 8)}…</span>
+        if (k.created_by === currentUserId) {
+          return <Badge variant="muted">me</Badge>;
+        }
+        const email = userEmails?.get(k.created_by);
+        return (
+          <span className="tabular text-xs text-muted-foreground">
+            {email ?? `${k.created_by.slice(0, 8)}…`}
+          </span>
         );
       },
     },
