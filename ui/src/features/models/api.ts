@@ -100,6 +100,38 @@ export async function setModelEnabled(
   return data;
 }
 
+/** The mutable fields the edit form collects. `name`, `provider` and
+ * `credential` are immutable via PATCH — recreate the model to change them. */
+export interface EditModel {
+  providerModelId: string;
+  maxOutputTokens: number | null;
+  apiVersion: string | null;
+  inputCostPerToken: number | null;
+  outputCostPerToken: number | null;
+}
+
+/** PATCH /teams/{id}/models/{modelId} — update mutable fields. The backend
+ * leaves any omitted/null field unchanged, so this cannot clear a cost back to
+ * "provider default"; it can only set a new value. */
+export async function updateModel(
+  teamId: string,
+  modelId: string,
+  changes: EditModel,
+): Promise<Model> {
+  const { data, error } = await api.PATCH("/teams/{team_id}/models/{model_id}", {
+    params: { path: { team_id: teamId, model_id: modelId } },
+    body: {
+      provider_model_id: changes.providerModelId,
+      max_output_tokens: changes.maxOutputTokens,
+      api_version: changes.apiVersion,
+      input_cost_per_token: changes.inputCostPerToken,
+      output_cost_per_token: changes.outputCostPerToken,
+    },
+  });
+  if (error || !data) throw fail(error, "Failed to update model");
+  return data;
+}
+
 /** DELETE /teams/{id}/models/{modelId} — remove a model. */
 export async function deleteModel(teamId: string, modelId: string): Promise<void> {
   const { error } = await api.DELETE("/teams/{team_id}/models/{model_id}", {
