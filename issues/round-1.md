@@ -1,4 +1,4 @@
-# Round 1 — Initial full-project review
+# Code Review — Round 1 (initial review)
 
 [← Index](INDEX.md)
 
@@ -16,7 +16,7 @@ that were verified as **not issues / by design**.
 
 Counts: **1 CRITICAL · 5 HIGH · 13 MEDIUM · 6 LOW**.
 
-## Resolution status (updated after remediation)
+## Resolution status
 
 **Fixed & merged to `main`:**
 

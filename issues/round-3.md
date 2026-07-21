@@ -1,4 +1,4 @@
-# Round 3 — Money & concurrency review (2026-07-03)
+# Code Review — Round 3 (2026-07-03)
 
 [← Index](INDEX.md)
 
@@ -19,7 +19,7 @@ built to provide.
 
 New counts: **0 CRITICAL · 1 HIGH · 5 MEDIUM · 8 LOW**.
 
-## Resolution status (Round 3, updated after remediation)
+## Resolution status
 
 **Fixed & merged to `main`:**
 

@@ -1,4 +1,4 @@
-# Round 5 — Graph-guided full-project review (2026-07-06)
+# Code Review — Round 5 (2026-07-06)
 
 [← Index](INDEX.md)
 
@@ -24,7 +24,7 @@ and two audit/observability gaps.
 
 New counts: **0 CRITICAL · 1 HIGH · 4 MEDIUM · 3 LOW**.
 
-## Resolution status (Round 5)
+## Resolution status
 
 **Fixed (this pass):**
 

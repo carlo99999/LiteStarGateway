@@ -1,4 +1,4 @@
-# Round 7 — Fresh-eyes full-tree review (2026-07-08)
+# Code Review — Round 7 (2026-07-08)
 
 [← Index](INDEX.md)
 

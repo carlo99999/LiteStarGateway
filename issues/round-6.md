@@ -1,4 +1,4 @@
-# Round 6 — New-feature deep review (2026-07-08)
+# Code Review — Round 6 (2026-07-08)
 
 [← Index](INDEX.md)
 
@@ -31,7 +31,7 @@ IdP.
 
 New counts: **2 CRITICAL · 6 HIGH · 12 MEDIUM · 5 LOW**.
 
-## Resolution status (2026-07-08)
+## Resolution status
 
 **All 18 actionable findings fixed and independently re-verified against source** (each fix
 re-read against the finding it claims to close; the suite re-run at 615 passed, up from 557 —
