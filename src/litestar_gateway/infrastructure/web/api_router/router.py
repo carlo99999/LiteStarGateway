@@ -20,6 +20,7 @@ from litestar_gateway.infrastructure.web.api_router.completions import (
     images,
     responses,
 )
+from litestar_gateway.infrastructure.web.api_router.models_list import list_models
 from litestar_gateway.infrastructure.web.api_router.wo_am_i import whoami
 from litestar_gateway.infrastructure.web.auth import APIKeyAuthMiddleware
 from litestar_gateway.infrastructure.web.exception_handlers import openai_error_handler
@@ -36,6 +37,7 @@ def create_api_router(config: SQLAlchemyAsyncConfig) -> Router:
         path=API_PREFIX,
         route_handlers=[
             whoami,
+            list_models,
             chat_completions,
             responses,
             embeddings,
