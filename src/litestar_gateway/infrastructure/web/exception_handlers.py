@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from litestar import Request, Response
+from litestar.exceptions import HTTPException
 from litestar.status_codes import (
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
@@ -185,3 +186,24 @@ def openai_error_handler(_: Request, exc: DomainError) -> Response:
         }
     }
     return Response(body, status_code=status, headers=_retry_after_headers(exc))
+
+
+def openai_http_exception_handler(_: Request, exc: HTTPException) -> Response:
+    """OpenAI-compatible envelope for framework `HTTPException`s on `/v1/*`.
+
+    Domain errors already flow through `openai_error_handler`, but the pieces
+    that run *before* a route handler — the API-key auth middleware (401), the
+    rate-limit middleware (429), the body-size cap (413) — raise Litestar's own
+    `HTTPException`, which would otherwise serialize as `{"status_code", "detail"}`.
+    An OpenAI SDK reads `error.message`, so the inference surface normalizes those
+    to the same `{"error": {...}}` shape. `code` is null (no domain class to name).
+    """
+    status = exc.status_code
+    body = {
+        "error": {
+            "message": exc.detail,
+            "type": _openai_error_type(status),
+            "code": None,
+        }
+    }
+    return Response(body, status_code=status, headers=exc.headers or None)
