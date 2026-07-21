@@ -103,7 +103,7 @@ flowchart TD
     Keys --> Apps["Customer applications<br/>stock OpenAI client"]
 ```
 
-Teams never see provider secrets: models _reference_ a credential, the gateway
+Teams never see provider secrets: models *reference* a credential, the gateway
 decrypts it per call, and usage is attributed back to the team and key for
 billing.
 
@@ -217,13 +217,18 @@ an 80% coverage gate + pip-audit + a Postgres migration job):
   a [framework guide](docs/agent-frameworks.md) with copy-paste config for
   Pydantic AI / LangChain / LlamaIndex / the OpenAI Agents SDK.
 - The full test suite runs on Postgres in CI (not just a subset).
+- Console: route-based code splitting (each page loads its own chunk) and
+  owner emails on the API-keys table.
 
 Next up:
 
-- **Agent framework compatibility (Level B)** — faithful Responses-API
-  streaming + tool events for the OpenAI Agents SDK's Responses path
-  ([design](docs/next-steps/agent-framework-compatibility.md)).
-- Console polish — bundle code-splitting, richer usage charts.
+- **Agent framework compatibility (Level B)** — the Responses API works
+  end to end today when the upstream provider supports it natively (the
+  gateway proxies the typed SSE events: `response.output_text.delta`,
+  `response.function_call_arguments.delta`, …). The remaining Level B work
+  is the gateway's *own* faithful Responses translation for chat-only
+  upstreams ([design](docs/next-steps/agent-framework-compatibility.md)).
+- Console: richer usage charts.
 
 ## Contributing
 
