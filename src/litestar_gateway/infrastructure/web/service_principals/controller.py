@@ -30,6 +30,7 @@ from litestar_gateway.infrastructure.web.teams.schemas import (
     CreateServicePrincipalRequest,
     ServicePrincipalResponse,
     SetServicePrincipalEnabledRequest,
+    resolve_key_expiry,
 )
 
 
@@ -159,6 +160,7 @@ class ServicePrincipalController(Controller):
             name=data.name,
             scope=scope,
             rate_limit_rpm=data.rate_limit_rpm,
+            expires_at=resolve_key_expiry(data.expires_in_days),
         )
         await record_audit(
             audit_log,

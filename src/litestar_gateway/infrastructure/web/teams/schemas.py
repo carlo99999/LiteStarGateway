@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from litestar_gateway.domain.entities import (
@@ -17,6 +17,7 @@ from litestar_gateway.domain.entities import (
     TeamRole,
     UsageAggregate,
 )
+from litestar_gateway.domain.exceptions import InvalidKeyExpiry
 
 
 @dataclass(frozen=True)
@@ -142,6 +143,19 @@ class CreateKeyRequest:
     name: str | None = None
     scope: str = "inference"  # inference | management | all
     rate_limit_rpm: int | None = None  # requests/min for this key; None = unlimited
+    # Optional TTL in days; the key stops authenticating after it. None/omitted
+    # = no expiry. Must be a positive integer when given.
+    expires_in_days: int | None = None
+
+
+def resolve_key_expiry(expires_in_days: int | None) -> datetime | None:
+    """Turn an optional TTL-in-days into an absolute expiry instant (or None).
+    Rejects a non-positive TTL as a 400 (InvalidKeyExpiry)."""
+    if expires_in_days is None:
+        return None
+    if expires_in_days <= 0:
+        raise InvalidKeyExpiry("expires_in_days must be a positive integer")
+    return datetime.now(UTC) + timedelta(days=expires_in_days)
 
 
 @dataclass(frozen=True)
@@ -156,6 +170,7 @@ class CreatedKeyResponse:
     scope: str
     created_at: datetime
     rate_limit_rpm: int | None
+    expires_at: datetime | None
 
     @classmethod
     def from_issued(cls, issued: IssuedKey) -> CreatedKeyResponse:
@@ -169,6 +184,7 @@ class CreatedKeyResponse:
             scope=k.scope.value,
             created_at=k.created_at,
             rate_limit_rpm=k.rate_limit_rpm,
+            expires_at=k.expires_at,
         )
 
 
@@ -189,6 +205,7 @@ class KeyResponse:
     last_used_at: datetime | None
     revoked_at: datetime | None
     rate_limit_rpm: int | None
+    expires_at: datetime | None
 
     @classmethod
     def from_entity(cls, key) -> KeyResponse:  # noqa: ANN001 - APIKey entity
@@ -205,6 +222,7 @@ class KeyResponse:
             last_used_at=key.last_used_at,
             revoked_at=key.revoked_at,
             rate_limit_rpm=key.rate_limit_rpm,
+            expires_at=key.expires_at,
         )
 
 

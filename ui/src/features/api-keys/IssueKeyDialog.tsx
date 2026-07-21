@@ -45,6 +45,7 @@ export function IssueKeyDialog({ teamId, open, onOpenChange }: IssueKeyDialogPro
   const [subject, setSubject] = useState<Subject>("personal");
   const [name, setName] = useState("");
   const [rpmText, setRpmText] = useState("");
+  const [expiresText, setExpiresText] = useState("");
   const [spId, setSpId] = useState("");
   const [scope, setScope] = useState<KeyScope>("inference");
   const [issued, setIssued] = useState<IssuedKey | null>(null);
@@ -56,6 +57,7 @@ export function IssueKeyDialog({ teamId, open, onOpenChange }: IssueKeyDialogPro
       setSubject("personal");
       setName("");
       setRpmText("");
+      setExpiresText("");
       setSpId("");
       setScope("inference");
       setIssued(null);
@@ -88,10 +90,13 @@ export function IssueKeyDialog({ teamId, open, onOpenChange }: IssueKeyDialogPro
   const mutation = useMutation({
     mutationFn: () => {
       const rpm = parseRpm(rpmText);
+      // parseRpm is a generic "blank → null, else positive integer" parser —
+      // the same shape the TTL-in-days field needs.
+      const expiresInDays = parseRpm(expiresText);
       const keyName = name.trim();
       return subject === "service_principal"
-        ? issueServicePrincipalKey(effectiveTeamId, spId, keyName, scope, rpm)
-        : issueTeamKey(effectiveTeamId, keyName, rpm);
+        ? issueServicePrincipalKey(effectiveTeamId, spId, keyName, scope, rpm, expiresInDays)
+        : issueTeamKey(effectiveTeamId, keyName, rpm, expiresInDays);
     },
     onSuccess: async (key) => {
       await queryClient.invalidateQueries({ queryKey: ["team-keys", effectiveTeamId] });
@@ -265,6 +270,18 @@ export function IssueKeyDialog({ teamId, open, onOpenChange }: IssueKeyDialogPro
                   value={rpmText}
                   onChange={(e) => setRpmText(e.target.value)}
                   placeholder="unlimited"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="key-expires">expires in (days)</Label>
+                <Input
+                  id="key-expires"
+                  type="number"
+                  min="1"
+                  value={expiresText}
+                  onChange={(e) => setExpiresText(e.target.value)}
+                  placeholder="never"
                   autoComplete="off"
                 />
               </div>

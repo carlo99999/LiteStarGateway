@@ -40,6 +40,7 @@ from litestar_gateway.infrastructure.web.teams.schemas import (
     TeamResponse,
     UpdateTeamRequest,
     UsageResponse,
+    resolve_key_expiry,
 )
 
 
@@ -247,6 +248,7 @@ class TeamController(Controller):
             name=data.name,
             scope=scope,
             rate_limit_rpm=data.rate_limit_rpm,
+            expires_at=resolve_key_expiry(data.expires_in_days),
         )
         await record_audit(
             audit_log,

@@ -45,10 +45,16 @@ export async function issueTeamKey(
   teamId: string,
   name: string | null,
   rateLimitRpm: number | null,
+  expiresInDays: number | null,
 ): Promise<IssuedKey> {
   const { data, error } = await api.POST("/teams/{team_id}/keys", {
     params: { path: { team_id: teamId } },
-    body: { name, scope: "inference", rate_limit_rpm: rateLimitRpm },
+    body: {
+      name,
+      scope: "inference",
+      rate_limit_rpm: rateLimitRpm,
+      expires_in_days: expiresInDays,
+    },
   });
   if (error || !data) throw fail(error, "Failed to issue API key");
   return data;
@@ -104,12 +110,13 @@ export async function issueServicePrincipalKey(
   name: string | null,
   scope: KeyScope,
   rateLimitRpm: number | null,
+  expiresInDays: number | null,
 ): Promise<IssuedKey> {
   const { data, error } = await api.POST(
     "/teams/{team_id}/service-principals/{sp_id}/keys",
     {
       params: { path: { team_id: teamId, sp_id: spId } },
-      body: { name, scope, rate_limit_rpm: rateLimitRpm },
+      body: { name, scope, rate_limit_rpm: rateLimitRpm, expires_in_days: expiresInDays },
     },
   );
   if (error || !data) throw fail(error, "Failed to issue service-principal key");

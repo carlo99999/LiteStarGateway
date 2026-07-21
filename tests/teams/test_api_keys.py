@@ -10,6 +10,7 @@ from _invite_helpers import seed_team_and_invite
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
+    HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
 )
@@ -285,3 +286,48 @@ def test_apikey_is_active_honours_grace_window() -> None:
     assert APIKey(**base, revoked_at=None).is_active
     assert APIKey(**base, revoked_at=datetime.now(UTC) + timedelta(hours=1)).is_active
     assert not APIKey(**base, revoked_at=datetime.now(UTC) - timedelta(seconds=1)).is_active
+
+
+def test_apikey_is_active_honours_expiry() -> None:
+    from datetime import UTC, datetime, timedelta
+    from uuid import uuid4
+
+    from litestar_gateway.domain.entities import APIKey
+
+    base = {
+        "id": uuid4(),
+        "team_id": uuid4(),
+        "created_by": uuid4(),
+        "name": None,
+        "prefix": "x",
+        "key_hash": "h",
+        "created_at": datetime.now(UTC),
+        "last_used_at": None,
+        "revoked_at": None,
+    }
+    assert APIKey(**base, expires_at=None).is_active
+    assert APIKey(**base, expires_at=datetime.now(UTC) + timedelta(days=1)).is_active
+    # A past expiry deactivates the key even though it was never revoked.
+    assert not APIKey(**base, expires_at=datetime.now(UTC) - timedelta(seconds=1)).is_active
+
+
+async def test_issued_key_with_ttl_reports_expiry_and_rejects_zero(
+    client: AsyncTestClient,
+) -> None:
+    token, team_id = await _setup_team(client)
+    resp = await client.post(
+        f"/teams/{team_id}/keys",
+        json={"name": "ttl", "expires_in_days": 30},
+        headers=_bearer(token),
+    )
+    assert resp.status_code in (200, 201), resp.text
+    assert resp.json()["expires_at"] is not None
+    listed = (await client.get(f"/teams/{team_id}/keys", headers=_bearer(token))).json()
+    assert any(k["name"] == "ttl" and k["expires_at"] for k in listed)
+
+    bad = await client.post(
+        f"/teams/{team_id}/keys",
+        json={"name": "bad", "expires_in_days": 0},
+        headers=_bearer(token),
+    )
+    assert bad.status_code == HTTP_400_BAD_REQUEST

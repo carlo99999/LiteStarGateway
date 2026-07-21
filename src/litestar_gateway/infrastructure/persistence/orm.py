@@ -520,6 +520,7 @@ class APIKeyModel(base.UUIDAuditBase):
         ForeignKey("service_principal.id"), default=None, index=True
     )
     rate_limit_rpm: Mapped[int | None] = mapped_column(default=None)
+    expires_at: Mapped[datetime | None] = mapped_column(default=None)
 
     def to_entity(self) -> APIKey:
         return APIKey(
@@ -532,6 +533,7 @@ class APIKeyModel(base.UUIDAuditBase):
             created_at=self.created_at,
             revoked_at=self.revoked_at,
             last_used_at=self.last_used_at,
+            expires_at=self.expires_at,
             scope=KeyScope(self.scope),
             service_principal_id=self.service_principal_id,
             rate_limit_rpm=self.rate_limit_rpm,

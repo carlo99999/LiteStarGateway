@@ -60,7 +60,12 @@ export function KeysTable({
           <span className="text-foreground">{k.name ?? "—"}</span>
           {k.is_active && k.revoked_at ? (
             <span className="text-[10px] text-[color:var(--warning)]">
-              expires {formatWhen(k.revoked_at)}
+              grace until {formatWhen(k.revoked_at)}
+            </span>
+          ) : null}
+          {k.is_active && !k.revoked_at && k.expires_at ? (
+            <span className="text-[10px] text-muted-foreground">
+              expires {formatWhen(k.expires_at)}
             </span>
           ) : null}
         </span>

@@ -97,6 +97,7 @@ class ServicePrincipalService:
         name: str | None,
         scope: KeyScope,
         rate_limit_rpm: int | None = None,
+        expires_at: datetime | None = None,
     ) -> IssuedKey:
         await self._get_in_team(team_id, sp_id)
         return await self._keys.issue(
@@ -106,4 +107,5 @@ class ServicePrincipalService:
             scope=scope,
             service_principal_id=sp_id,
             rate_limit_rpm=rate_limit_rpm,
+            expires_at=expires_at,
         )
