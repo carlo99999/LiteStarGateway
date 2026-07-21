@@ -758,6 +758,23 @@ export interface paths {
         patch: operations["TeamsTeamIdModelsModelIdUpdateModel"];
         trace?: never;
     };
+    "/teams/{team_id}/models/callable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every model the team can call (own + extended + global) */
+        get: operations["TeamsTeamIdModelsCallableListCallable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/platform/models": {
         parameters: {
             query?: never;
@@ -1280,6 +1297,13 @@ export interface components {
             spent: number;
             remaining: number;
         };
+        /** CallableModelResponse */
+        CallableModelResponse: {
+            alias: string;
+            origin: string;
+            source_team_id: string | null;
+            model: components["schemas"]["ModelResponse"];
+        };
         /** CandidateRequest */
         CandidateRequest: {
             model_name: string;
@@ -1792,12 +1816,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1818,12 +1842,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1844,12 +1868,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1870,12 +1894,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1904,12 +1928,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1951,12 +1975,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1998,12 +2022,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2047,12 +2071,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2096,12 +2120,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2145,12 +2169,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2190,12 +2214,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2235,12 +2259,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2279,12 +2303,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2322,12 +2346,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -2367,12 +2391,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2412,12 +2436,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2457,12 +2481,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -2502,12 +2526,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2549,12 +2573,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2592,12 +2616,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -2635,12 +2659,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2676,12 +2700,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -2700,12 +2724,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2726,12 +2750,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2756,12 +2780,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2797,12 +2821,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2823,12 +2847,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2852,12 +2876,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2897,12 +2921,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2944,12 +2968,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2987,12 +3011,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3030,12 +3054,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -3075,12 +3099,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3120,12 +3144,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3166,12 +3190,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3213,12 +3237,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3259,12 +3283,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3306,12 +3330,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3349,12 +3373,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3396,12 +3420,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3439,12 +3463,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -3480,12 +3504,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3523,12 +3547,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -3568,12 +3592,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3614,12 +3638,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3658,12 +3682,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3702,12 +3726,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -3748,12 +3772,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3792,12 +3816,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -3834,12 +3858,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3882,12 +3906,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3928,12 +3952,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3975,12 +3999,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4019,12 +4043,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -4065,16 +4089,59 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["ModelResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdModelsCallableListCallable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallableModelResponse"][];
                 };
             };
             /** @description Bad request syntax or unsupported method */
@@ -4109,12 +4176,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4154,12 +4221,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4197,12 +4264,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -4242,12 +4309,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4289,12 +4356,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4332,12 +4399,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4375,12 +4442,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4418,12 +4485,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -4460,12 +4527,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4503,12 +4570,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4550,12 +4617,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4598,12 +4665,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4642,12 +4709,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -4688,12 +4755,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4738,12 +4805,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4782,12 +4849,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4828,12 +4895,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4873,12 +4940,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4916,12 +4983,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4949,12 +5016,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4996,12 +5063,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5040,12 +5107,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -5086,12 +5153,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5134,12 +5201,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5178,12 +5245,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5223,12 +5290,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5266,12 +5333,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -5308,12 +5375,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5349,12 +5416,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5379,12 +5446,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5420,12 +5487,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5448,12 +5515,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5491,12 +5558,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5534,12 +5601,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -5575,12 +5642,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5616,12 +5683,12 @@ export interface operations {
             /** @description Request fulfilled, document follows */
             200: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5646,12 +5713,12 @@ export interface operations {
             /** @description Document created, URL follows */
             201: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5689,12 +5756,12 @@ export interface operations {
             /** @description Request fulfilled, nothing follows */
             204: {
                 headers: {
-                    /** @description Referrer */
-                    "Referrer-Policy"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
