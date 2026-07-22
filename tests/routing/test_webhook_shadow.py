@@ -182,6 +182,69 @@ async def test_webhook_public_hostname_passes_guard(monkeypatch: pytest.MonkeyPa
     assert decision.model_name == "m1"
 
 
+@pytest.mark.parametrize("approved_ip", ["93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"])
+async def test_webhook_connects_to_validated_ip_without_second_dns_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+    approved_ip: str,
+) -> None:
+    resolutions: list[str] = []
+    requests: list[httpx.Request] = []
+
+    async def resolver(host: str) -> list[str]:
+        resolutions.append(host)
+        return [approved_ip]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"choice": 1})
+
+    def factory(timeout_seconds: float) -> httpx.AsyncClient:
+        return httpx.AsyncClient(timeout=timeout_seconds, transport=httpx.MockTransport(handler))
+
+    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", resolver)
+    monkeypatch.setattr(webhook_module, "_client_factory", factory)
+
+    decision = await WebhookStrategy({"url": "https://picker.example:8443/route"}).select(
+        _ctx(), CANDIDATES
+    )
+
+    assert decision.model_name == "m1"
+    assert resolutions == ["picker.example"]
+    assert len(requests) == 1
+    assert requests[0].url.host == approved_ip
+    assert requests[0].headers["Host"] == "picker.example:8443"
+    assert requests[0].extensions["sni_hostname"] == "picker.example"
+
+
+async def test_webhook_failover_never_leaves_validated_address_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    approved_ips = ["93.184.216.34", "93.184.216.35"]
+    attempted_hosts: list[str] = []
+
+    async def resolver(host: str) -> list[str]:
+        return approved_ips
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempted_hosts.append(request.url.host)
+        if request.url.host == approved_ips[0]:
+            raise httpx.ConnectError("first approved address unavailable", request=request)
+        return httpx.Response(200, json={"choice": 1})
+
+    def factory(timeout_seconds: float) -> httpx.AsyncClient:
+        return httpx.AsyncClient(timeout=timeout_seconds, transport=httpx.MockTransport(handler))
+
+    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", resolver)
+    monkeypatch.setattr(webhook_module, "_client_factory", factory)
+
+    decision = await WebhookStrategy({"url": "https://picker.example/route"}).select(
+        _ctx(), CANDIDATES
+    )
+
+    assert decision.model_name == "m1"
+    assert attempted_hosts == approved_ips
+
+
 async def test_webhook_redirect_is_not_followed_and_raises(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
