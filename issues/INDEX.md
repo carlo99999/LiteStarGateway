@@ -10,6 +10,8 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 | Round | Focus | New findings (C·H·M·L) | Status |
 |---|---|---|---|
+| [Round 12](round-12.md) — 2026-07-22 | Post-R11 delta (verification of remediation PRs #313–#321: alias registry, router revisions, playground governance, downgrade contract) | 0·0·2·0 | Open |
+| [Round 11](round-11.md) — 2026-07-22 | Post-R10 delta (global/extended routers & models, Playground, credential lifecycle, reasoning params, admin console) | 0·4·6·0 | Fully remediated |
 | [Round 10](round-10.md) — 2026-07-21 | Post-R9 delta (console completa, savings/me-teams endpoints, R9-fix verification) | 0·2·4·3 | Fully remediated |
 | [Round 9](round-9.md) — 2026-07-14 | Full-tree post-R8 (admin UI, org/team CRUD, invites, RPM, API-key rotation) | 1·4·6·2 | Fully remediated |
 | [Round 8](round-8.md) — 2026-07-09 | Native provider-endpoint surface (Anthropic/Gemini passthrough, conformance, auth/error changes) | 1·3·3·3 | 1C+3H+3M+L008 fixed; L010 covered; L009 deferred |
@@ -23,7 +25,18 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 ## Overall
 
-**As of Round 10: 7.8/10** — see [round-10.md](round-10.md#category-scores-this-round) for the
+**As of Round 12: 9.1/10** — see [round-12.md](round-12.md#category-scores) for the category
+breakdown. Round 12 re-verified the entire Round 11 remediation (PRs #313–#321) against the
+current tree with six independent lenses plus an adversarial cross-feature pass: **zero new
+security findings**, all ten Round 11 issues hold, and all ten probed cross-feature combinations
+(team/global homonyms, alias tombstone/reclaim, post-grant edits, credential rotation in flight,
+playground fan-out, deletions with historical usage, webhook re-approval, candidate identity,
+promotions) verified SAFE. The two open MEDIUMs are non-uniform tails of the remediation itself:
+deleting a granted model silently cascade-revokes other teams' access where routers raise
+`RouterShared` (ISSUE-020), and the Usage/Budgets console surfaces remain unreachable for
+`billing-viewer` and platform auditors — the exact roles the backend authorizes (ISSUE-021).
+
+Previous: as of Round 10, 7.8/10 — see [round-10.md](round-10.md#category-scores-this-round) for the
 category breakdown. Round 10 produced **zero security findings**: a dedicated adversarial pass
 confirmed the Round-9 remediations hold end-to-end (webhook token masking round-trip, invite/team
 lifecycle locks, rotation ownership, per-key RPM coverage, self-scoped /me/teams). The open work
