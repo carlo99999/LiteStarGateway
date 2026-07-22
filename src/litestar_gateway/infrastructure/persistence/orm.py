@@ -38,6 +38,7 @@ from litestar_gateway.domain.routing import (
     CandidateModel,
     QualityTier,
     RouterConfig,
+    RouterGrant,
     RoutingDecisionRecord,
 )
 
@@ -169,9 +170,19 @@ class ScimTokenModel(base.UUIDAuditBase):
 
 class RouterModel(base.UUIDAuditBase):
     __tablename__ = "router"
-    __table_args__ = (UniqueConstraint("team_id", "name"),)
+    __table_args__ = (
+        UniqueConstraint("team_id", "name"),
+        Index(
+            "uq_global_router_name",
+            "name",
+            unique=True,
+            sqlite_where=text("team_id IS NULL"),
+            postgresql_where=text("team_id IS NULL"),
+        ),
+    )
 
-    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    # NULL ⇒ a global (platform) router, callable by every team.
+    team_id: Mapped[UUID | None] = mapped_column(ForeignKey("team.id"), index=True, default=None)
     name: Mapped[str] = mapped_column(index=True)
     # Candidate profiles as declared by the admin (see domain/routing.py).
     candidates: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
@@ -180,6 +191,8 @@ class RouterModel(base.UUIDAuditBase):
     strategy_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     shadow_strategy: Mapped[str | None] = mapped_column(default=None)
     enabled: Mapped[bool] = mapped_column(default=True)
+    # The originally-owning team, kept when a router is promoted to global.
+    origin_team_id: Mapped[UUID | None] = mapped_column(default=None)
 
     def to_entity(self) -> RouterConfig:
         return RouterConfig(
@@ -207,6 +220,30 @@ class RouterModel(base.UUIDAuditBase):
             enabled=self.enabled,
             created_at=self.created_at,
             shadow_strategy=self.shadow_strategy,
+            origin_team_id=self.origin_team_id,
+        )
+
+
+class RouterGrantModel(base.UUIDAuditBase):
+    """A team-owned router extended to another team, under `alias`."""
+
+    __tablename__ = "router_grant"
+    __table_args__ = (
+        UniqueConstraint("team_id", "alias"),
+        UniqueConstraint("router_id", "team_id"),
+    )
+
+    router_id: Mapped[UUID] = mapped_column(ForeignKey("router.id", ondelete="CASCADE"), index=True)
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    alias: Mapped[str] = mapped_column()
+
+    def to_entity(self) -> RouterGrant:
+        return RouterGrant(
+            id=self.id,
+            router_id=self.router_id,
+            team_id=self.team_id,
+            alias=self.alias,
+            created_at=self.created_at,
         )
 
 

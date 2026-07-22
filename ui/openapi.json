@@ -19,11 +19,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -35,11 +35,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -64,11 +64,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -80,11 +80,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -112,11 +112,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -128,11 +128,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -160,11 +160,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -176,11 +176,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -221,11 +221,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -237,11 +237,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -317,11 +317,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -333,11 +333,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -413,11 +413,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -429,11 +429,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -512,11 +512,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -528,11 +528,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -611,11 +611,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -627,11 +627,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -718,11 +718,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -734,11 +734,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -812,11 +812,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -828,11 +828,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -908,11 +908,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -924,11 +924,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1032,11 +1032,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -1048,11 +1048,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1133,11 +1133,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -1149,11 +1149,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1232,11 +1232,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -1248,11 +1248,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1328,11 +1328,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -1344,11 +1344,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1424,11 +1424,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -1440,11 +1440,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1525,11 +1525,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -1541,11 +1541,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1633,11 +1633,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -1649,11 +1649,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1731,11 +1731,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -1747,11 +1747,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1820,11 +1820,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -1836,11 +1836,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1907,11 +1907,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -1923,11 +1923,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1948,11 +1948,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -1964,11 +1964,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1996,11 +1996,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -2012,11 +2012,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2057,11 +2057,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -2073,11 +2073,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2143,11 +2143,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -2159,11 +2159,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2191,11 +2191,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -2207,11 +2207,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2277,11 +2277,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -2293,11 +2293,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2374,11 +2374,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -2390,11 +2390,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2482,11 +2482,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -2498,11 +2498,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2580,11 +2580,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -2596,11 +2596,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2676,11 +2676,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -2692,11 +2692,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2775,11 +2775,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -2791,11 +2791,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2891,11 +2891,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -2907,11 +2907,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3025,11 +3025,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -3041,11 +3041,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3134,11 +3134,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -3150,11 +3150,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3268,11 +3268,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -3284,11 +3284,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3377,11 +3377,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -3393,11 +3393,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3475,11 +3475,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -3491,11 +3491,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3581,11 +3581,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -3597,11 +3597,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3677,11 +3677,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -3693,11 +3693,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3768,11 +3768,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -3784,11 +3784,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3864,11 +3864,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -3880,11 +3880,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3963,11 +3963,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -3979,11 +3979,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4097,11 +4097,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -4113,11 +4113,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4224,11 +4224,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -4240,11 +4240,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4335,11 +4335,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -4351,11 +4351,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4444,11 +4444,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -4460,11 +4460,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4552,11 +4552,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -4568,11 +4568,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4653,11 +4653,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -4669,11 +4669,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4824,11 +4824,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -4840,11 +4840,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4961,11 +4961,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -4977,11 +4977,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5071,11 +5071,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -5087,11 +5087,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5179,11 +5179,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -5195,11 +5195,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5289,11 +5289,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -5305,11 +5305,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5387,11 +5387,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -5403,11 +5403,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5514,11 +5514,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -5530,11 +5530,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5611,11 +5611,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -5627,11 +5627,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5709,11 +5709,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -5725,11 +5725,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5808,11 +5808,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -5824,11 +5824,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5916,11 +5916,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -5932,11 +5932,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6017,11 +6017,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -6033,11 +6033,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6118,11 +6118,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -6134,11 +6134,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6216,11 +6216,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -6232,11 +6232,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6320,11 +6320,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -6336,11 +6336,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6418,11 +6418,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -6434,11 +6434,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6527,11 +6527,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -6543,11 +6543,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6645,11 +6645,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -6661,11 +6661,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6751,11 +6751,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -6767,11 +6767,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6906,11 +6906,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -6922,11 +6922,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6935,6 +6935,107 @@
                             "application/json": {
                                 "schema": {
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/teams/{team_id}/routers/callable": {
+            "get": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "Every router the team can call (own + extended + global)",
+                "operationId": "TeamsTeamIdRoutersCallableListCallableRouters",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/CallableRouterResponse"
+                                    },
+                                    "type": "array"
                                 }
                             }
                         }
@@ -7104,11 +7205,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -7120,11 +7221,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7215,11 +7316,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -7231,11 +7332,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7324,11 +7425,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -7340,11 +7441,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7423,11 +7524,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -7439,11 +7540,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7454,6 +7555,749 @@
                                     "additionalProperties": {},
                                     "type": "object"
                                 }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/platform/routers": {
+            "get": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "List global (platform) routers",
+                "operationId": "PlatformRoutersListGlobal",
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/RouterResponse"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "post": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "Create a global (platform) router callable by every team",
+                "operationId": "PlatformRoutersCreateGlobal",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RouterRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Document created, URL follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RouterResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/platform/routers/{router_id}": {
+            "put": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "Replace a global router definition",
+                "operationId": "PlatformRoutersRouterIdUpdateGlobal",
+                "parameters": [
+                    {
+                        "name": "router_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RouterRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RouterResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "delete": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "Delete a global router",
+                "operationId": "PlatformRoutersRouterIdDeleteGlobal",
+                "parameters": [
+                    {
+                        "name": "router_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Request fulfilled, nothing follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/platform/routers/{router_id}/extend": {
+            "post": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "Extend a team router to other teams",
+                "operationId": "PlatformRoutersRouterIdExtendExtend",
+                "parameters": [
+                    {
+                        "name": "router_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ExtendRouterRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Document created, URL follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/RouterGrantResponse"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/platform/routers/{router_id}/grants": {
+            "get": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "Teams a router is extended to",
+                "operationId": "PlatformRoutersRouterIdGrantsListGrants",
+                "parameters": [
+                    {
+                        "name": "router_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/RouterGrantResponse"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/platform/routers/{router_id}/make-global": {
+            "post": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "Promote a team router to global",
+                "operationId": "PlatformRoutersRouterIdMakeGlobalMakeGlobal",
+                "parameters": [
+                    {
+                        "name": "router_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Document created, URL follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RouterResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/platform/routers/grants/{grant_id}": {
+            "delete": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "Un-extend (revoke a router grant)",
+                "operationId": "PlatformRoutersGrantsGrantIdUnextend",
+                "parameters": [
+                    {
+                        "name": "grant_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Request fulfilled, nothing follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
                             }
                         }
                     },
@@ -7510,11 +8354,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -7526,11 +8370,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7607,11 +8451,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -7623,11 +8467,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7716,11 +8560,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -7732,11 +8576,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7824,11 +8668,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -7840,11 +8684,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7933,11 +8777,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -7949,11 +8793,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8051,11 +8895,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -8067,11 +8911,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8176,11 +9020,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -8192,11 +9036,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8274,11 +9118,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -8290,11 +9134,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8373,11 +9217,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -8389,11 +9233,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8473,11 +9317,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -8489,11 +9333,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8597,11 +9441,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -8613,11 +9457,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8686,11 +9530,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -8702,11 +9546,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8790,11 +9634,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -8806,11 +9650,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8874,11 +9718,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -8890,11 +9734,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8934,11 +9778,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -8950,11 +9794,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9030,11 +9874,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -9046,11 +9890,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9126,11 +9970,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -9142,11 +9986,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9215,11 +10059,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -9231,11 +10075,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9301,11 +10145,11 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -9317,11 +10161,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9360,11 +10204,11 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -9376,11 +10220,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9458,11 +10302,11 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
+                            "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "MIME sniffing",
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -9474,11 +10318,11 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
+                            "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
-                                "description": "Clickjacking",
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9724,6 +10568,38 @@
                     "source_team_id"
                 ],
                 "title": "CallableModelResponse"
+            },
+            "CallableRouterResponse": {
+                "properties": {
+                    "alias": {
+                        "type": "string"
+                    },
+                    "origin": {
+                        "type": "string"
+                    },
+                    "source_team_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "router": {
+                        "$ref": "#/components/schemas/RouterResponse"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "alias",
+                    "origin",
+                    "router",
+                    "source_team_id"
+                ],
+                "title": "CallableRouterResponse"
             },
             "CandidateRequest": {
                 "properties": {
@@ -10253,6 +11129,22 @@
                     "team_ids"
                 ],
                 "title": "ExtendModelRequest"
+            },
+            "ExtendRouterRequest": {
+                "properties": {
+                    "team_ids": {
+                        "items": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "team_ids"
+                ],
+                "title": "ExtendRouterRequest"
             },
             "GrantResponse": {
                 "properties": {
@@ -10901,6 +11793,38 @@
                 ],
                 "title": "ResetPasswordRequest"
             },
+            "RouterGrantResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "router_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "team_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "alias": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "alias",
+                    "created_at",
+                    "id",
+                    "router_id",
+                    "team_id"
+                ],
+                "title": "RouterGrantResponse"
+            },
             "RouterRequest": {
                 "properties": {
                     "name": {
@@ -10983,6 +11907,28 @@
                         "oneOf": [
                             {
                                 "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "team_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "origin_team_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
                             },
                             {
                                 "type": "null"

@@ -62,11 +62,18 @@ class CandidateModel:
 
 @dataclass(frozen=True)
 class RouterConfig:
-    """A virtual model owned by a team. `default_model` is the §4 safety net:
-    any strategy failure routes there instead of failing the request."""
+    """A virtual model owned by a team, or by the platform (`team_id is None`, a
+    "global" router callable by every team). `default_model` is the §4 safety
+    net: any strategy failure routes there instead of failing the request.
+
+    A global/extended router routes in the *calling* team's context — its
+    candidate model names resolve, and its budget/metering/decisions attribute,
+    to whoever calls it. So its candidates should be models the target team can
+    reach (global models, typically).
+    """
 
     id: UUID
-    team_id: UUID
+    team_id: UUID | None
     name: str
     candidates: tuple[CandidateModel, ...]
     default_model: str
@@ -75,6 +82,19 @@ class RouterConfig:
     enabled: bool
     created_at: datetime
     shadow_strategy: str | None = None
+    # The team that originally owned this router, kept when promoted to global.
+    origin_team_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class RouterGrant:
+    """A team-owned router extended to another team, under `alias`."""
+
+    id: UUID
+    router_id: UUID
+    team_id: UUID
+    alias: str
+    created_at: datetime
 
 
 @dataclass(frozen=True)

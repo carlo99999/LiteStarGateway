@@ -12,8 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { listAllModels } from "@/features/models/api";
-import { createRouter, type CandidateRequest } from "@/features/routing/api";
+import { listAllGlobalModels, listAllModels } from "@/features/models/api";
+import { createGlobalRouter, createRouter, type CandidateRequest } from "@/features/routing/api";
 import {
   QUALITY_TIERS,
   SHADOWABLE_STRATEGIES,
@@ -25,7 +25,10 @@ import {
 } from "@/features/routing/strategies";
 
 interface CreateRouterDialogProps {
-  teamId: string;
+  /** Owning team for a team router. Omit / ignored when `global`. */
+  teamId?: string;
+  /** Create a global (platform) router; candidates are global models. */
+  global?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -90,7 +93,12 @@ function thresholdValid(text: string): boolean {
 /** Create a smart router (virtual model). Candidates reference the team's
  * models by name; the strategy picks among them per request. Per-candidate
  * costs are omitted here — the gateway falls back to the model's own costs. */
-export function CreateRouterDialog({ teamId, open, onOpenChange }: CreateRouterDialogProps) {
+export function CreateRouterDialog({
+  teamId,
+  global = false,
+  open,
+  onOpenChange,
+}: CreateRouterDialogProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [strategy, setStrategy] = useState<StrategyId>("complexity");
@@ -127,9 +135,10 @@ export function CreateRouterDialog({ teamId, open, onOpenChange }: CreateRouterD
   }, [open]);
 
   const models = useQuery({
-    queryKey: ["team-models", teamId, "all"],
-    queryFn: ({ signal }) => listAllModels(teamId, signal),
-    enabled: open && teamId.length > 0,
+    queryKey: global ? ["global-models", "candidates"] : ["team-models", teamId, "all"],
+    queryFn: ({ signal }) =>
+      global ? listAllGlobalModels(signal) : listAllModels(teamId as string, signal),
+    enabled: open && (global || (teamId ?? "").length > 0),
   });
   const chatModels = useMemo(
     () => (models.data ?? []).filter((m) => m.type === "chat"),
@@ -208,10 +217,11 @@ export function CreateRouterDialog({ teamId, open, onOpenChange }: CreateRouterD
         enabled: true,
         shadow_strategy: shadow || null,
       };
-      return createRouter(teamId, body);
+      return global ? createGlobalRouter(body) : createRouter(teamId as string, body);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["team-routers", teamId] });
+      await queryClient.invalidateQueries({ queryKey: ["global-routers"] });
       onOpenChange(false);
     },
   });
@@ -262,10 +272,11 @@ export function CreateRouterDialog({ teamId, open, onOpenChange }: CreateRouterD
     >
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>New router</DialogTitle>
+          <DialogTitle>{global ? "New global router" : "New router"}</DialogTitle>
           <DialogDescription>
             A virtual model: clients call it by name, the strategy routes each request to one of
             the candidate models.
+            {global ? " Candidates are global models, so every team can call it." : null}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">

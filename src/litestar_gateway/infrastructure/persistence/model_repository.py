@@ -54,7 +54,7 @@ class SQLAlchemyModelRepository:
         record = await self._session.get(ModelRecord, model_id)
         return record.to_entity() if record else None
 
-    async def get_by_name(self, team_id: UUID, name: str) -> Model | None:
+    async def get_by_name(self, team_id: UUID | None, name: str) -> Model | None:
         # 1. The team's own model always wins.
         own = await self._session.scalar(
             select(ModelRecord).where(ModelRecord.team_id == team_id, ModelRecord.name == name)

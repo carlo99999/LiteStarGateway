@@ -12,21 +12,42 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { setRouterEnabled, type Router } from "@/features/routing/api";
+import {
+  setGlobalRouterEnabled,
+  setRouterEnabled,
+  type Router,
+} from "@/features/routing/api";
 
 interface RoutersTableProps {
-  teamId: string;
+  /** Owning team; unused (and detail links hidden) for the global table. */
+  teamId?: string;
   rows: Router[] | undefined;
   isLoading: boolean;
   error: Error | null;
   onDelete: (router: Router) => void;
+  /** Global (platform) routers: toggle via the platform endpoint, no team
+   * detail link. */
+  global?: boolean;
 }
 
-export function RoutersTable({ teamId, rows, isLoading, error, onDelete }: RoutersTableProps) {
+export function RoutersTable({
+  teamId,
+  rows,
+  isLoading,
+  error,
+  onDelete,
+  global = false,
+}: RoutersTableProps) {
   const queryClient = useQueryClient();
   const toggle = useMutation({
-    mutationFn: (router: Router) => setRouterEnabled(teamId, router, !router.enabled),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["team-routers", teamId] }),
+    mutationFn: (router: Router) =>
+      global
+        ? setGlobalRouterEnabled(router, !router.enabled)
+        : setRouterEnabled(teamId as string, router, !router.enabled),
+    onSettled: () =>
+      queryClient.invalidateQueries({
+        queryKey: global ? ["global-routers"] : ["team-routers", teamId],
+      }),
   });
 
   const columns: Column<Router>[] = [
@@ -44,15 +65,18 @@ export function RoutersTable({ teamId, rows, isLoading, error, onDelete }: Route
     {
       key: "name",
       header: "name",
-      cell: (r) => (
-        <Link
-          to="/routing/$teamId/$routerId"
-          params={{ teamId, routerId: r.id }}
-          className="text-foreground hover:text-primary hover:underline"
-        >
-          {r.name}
-        </Link>
-      ),
+      cell: (r) =>
+        global || !teamId ? (
+          <span className="text-foreground">{r.name}</span>
+        ) : (
+          <Link
+            to="/routing/$teamId/$routerId"
+            params={{ teamId, routerId: r.id }}
+            className="text-foreground hover:text-primary hover:underline"
+          >
+            {r.name}
+          </Link>
+        ),
     },
     {
       key: "strategy",

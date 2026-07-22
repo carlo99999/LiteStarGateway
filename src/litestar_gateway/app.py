@@ -64,6 +64,7 @@ from litestar_gateway.infrastructure.web.organizations.dependencies import (
     provide_team_service,
 )
 from litestar_gateway.infrastructure.web.routing import (
+    PlatformRouterController,
     RouterController,
     platform_routing_savings,
 )
@@ -220,6 +221,7 @@ def _build_route_handlers(database: Database) -> list:
         PlatformModelController,  # platform-admin: global models + extension grants
         ModelPricesController,  # default per-token pricing lookup (console prefill)
         RouterController,  # team-admin: smart routers (virtual models)
+        PlatformRouterController,  # platform-admin: global routers + extension grants
         platform_routing_savings,  # platform-admin: cross-team routing savings
         ServicePrincipalController,  # team-admin: service principals + their keys
         CredentialController,  # platform-admin: encrypted provider credentials

@@ -122,7 +122,8 @@ _VISION_REQUEST = {
 async def test_fallback_skips_incapable_default_model() -> None:
     """default_model lacks vision → fallback picks the first capable candidate."""
     log = RecordingDecisionLog()
-    decision = await _service(log).route(_router(default_model="text-only"), _VISION_REQUEST)
+    router = _router(default_model="text-only")
+    decision = await _service(log).route(router, _VISION_REQUEST, acting_team_id=router.team_id)
 
     assert decision.model_name == "vision-a"
     assert "fallback" in decision.signals
@@ -134,7 +135,8 @@ async def test_fallback_skips_incapable_default_model() -> None:
 async def test_fallback_keeps_capable_default_model() -> None:
     """default_model survived the filter → fallback still routes there."""
     log = RecordingDecisionLog()
-    decision = await _service(log).route(_router(default_model="vision-b"), _VISION_REQUEST)
+    router = _router(default_model="vision-b")
+    decision = await _service(log).route(router, _VISION_REQUEST, acting_team_id=router.team_id)
 
     assert decision.model_name == "vision-b"
     assert decision.signals == ("fallback",)

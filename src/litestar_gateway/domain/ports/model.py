@@ -17,11 +17,13 @@ class ModelRepository(Protocol):
 
     async def get(self, model_id: UUID) -> Model | None: ...
 
-    async def get_by_name(self, team_id: UUID, name: str) -> Model | None:
+    async def get_by_name(self, team_id: UUID | None, name: str) -> Model | None:
         """Resolve the model a team calls by `name`, in priority order:
         the team's own model → a model extended to it under that alias → a
         global model of that name → the `<base>-global` form when the team's
-        own `<base>` shadows a global. None when nothing matches."""
+        own `<base>` shadows a global. `team_id=None` resolves against global
+        models only (used to validate a global router's candidates). None when
+        nothing matches."""
         ...
 
     async def name_taken_in_team(self, team_id: UUID, name: str) -> bool:

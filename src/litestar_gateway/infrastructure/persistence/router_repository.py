@@ -16,9 +16,20 @@ from litestar_gateway.domain.exceptions import (
     RouterNotFound,
     SaltKeyMissing,
 )
-from litestar_gateway.domain.routing import BEARER_TOKEN_MASK, RouterConfig, RoutingDecisionRecord
+from litestar_gateway.domain.routing import (
+    BEARER_TOKEN_MASK,
+    RouterConfig,
+    RouterGrant,
+    RoutingDecisionRecord,
+)
 from litestar_gateway.infrastructure.keyring import Keyring
-from litestar_gateway.infrastructure.persistence.orm import RouterModel, RoutingDecisionModel
+from litestar_gateway.infrastructure.persistence.orm import (
+    RouterGrantModel,
+    RouterModel,
+    RoutingDecisionModel,
+)
+
+_GLOBAL_SUFFIX = "-global"
 
 
 def _candidates_json(router: RouterConfig) -> list[dict]:
@@ -118,6 +129,7 @@ class SQLAlchemyRouterRepository:
             strategy_config=await self._map_config(router.strategy_config, self._encrypt_section),
             shadow_strategy=router.shadow_strategy,
             enabled=router.enabled,
+            origin_team_id=router.origin_team_id,
         )
         self._session.add(model)
         try:
@@ -134,11 +146,63 @@ class SQLAlchemyRouterRepository:
             return None
         return await self._to_entity(model)
 
+    async def get_any(self, router_id: UUID) -> RouterConfig | None:
+        """Fetch a router by id regardless of owner (platform-admin paths)."""
+        model = await self._session.get(RouterModel, router_id)
+        return await self._to_entity(model) if model else None
+
     async def get_by_name(self, team_id: UUID, name: str) -> RouterConfig | None:
-        model = await self._session.scalar(
+        # Priority mirrors models: own → extended (grant alias) → global by name →
+        # `<base>-global` when the team's own `<base>` shadows a global.
+        own = await self._session.scalar(
             select(RouterModel).where(RouterModel.team_id == team_id, RouterModel.name == name)
         )
-        return await self._to_entity(model) if model else None
+        if own is not None:
+            return await self._to_entity(own)
+        grant = await self._session.scalar(
+            select(RouterGrantModel).where(
+                RouterGrantModel.team_id == team_id, RouterGrantModel.alias == name
+            )
+        )
+        if grant is not None:
+            source = await self._session.get(RouterModel, grant.router_id)
+            return await self._to_entity(source) if source else None
+        glob = await self._session.scalar(
+            select(RouterModel).where(RouterModel.team_id.is_(None), RouterModel.name == name)
+        )
+        if glob is not None:
+            return await self._to_entity(glob)
+        if name.endswith(_GLOBAL_SUFFIX):
+            base = name[: -len(_GLOBAL_SUFFIX)]
+            shadows = await self._session.scalar(
+                select(RouterModel.id)
+                .where(RouterModel.team_id == team_id, RouterModel.name == base)
+                .limit(1)
+            )
+            if shadows is not None:
+                glob = await self._session.scalar(
+                    select(RouterModel).where(
+                        RouterModel.team_id.is_(None), RouterModel.name == base
+                    )
+                )
+                if glob is not None:
+                    return await self._to_entity(glob)
+        return None
+
+    async def name_taken_in_team(self, team_id: UUID, name: str) -> bool:
+        own = await self._session.scalar(
+            select(RouterModel.id)
+            .where(RouterModel.team_id == team_id, RouterModel.name == name)
+            .limit(1)
+        )
+        if own is not None:
+            return True
+        grant = await self._session.scalar(
+            select(RouterGrantModel.id)
+            .where(RouterGrantModel.team_id == team_id, RouterGrantModel.alias == name)
+            .limit(1)
+        )
+        return grant is not None
 
     async def list_by_team(self, team_id: UUID) -> list[RouterConfig]:
         result = await self._session.scalars(
@@ -146,10 +210,22 @@ class SQLAlchemyRouterRepository:
         )
         return [await self._to_entity(model) for model in result]
 
+    async def list_global(self) -> list[RouterConfig]:
+        result = await self._session.scalars(
+            select(RouterModel).where(RouterModel.team_id.is_(None)).order_by(RouterModel.name)
+        )
+        return [await self._to_entity(model) for model in result]
+
+    async def all_global(self) -> list[RouterConfig]:
+        return await self.list_global()
+
     async def update(self, router: RouterConfig) -> RouterConfig:
         model = await self._session.get(RouterModel, router.id)
+        # Scope to the owner (team routers) — `None == None` allows global→global
+        # edits; ownership changes go through `promote_to_global`, not here.
         if model is None or model.team_id != router.team_id:
             raise RouterNotFound(str(router.id))
+        model.origin_team_id = router.origin_team_id
         model.name = router.name
         model.candidates = _candidates_json(router)
         model.default_model = router.default_model
@@ -176,6 +252,68 @@ class SQLAlchemyRouterRepository:
         )
         await self._session.commit()
         return bool(result.rowcount)
+
+    async def delete_global(self, router_id: UUID) -> bool:
+        result: Any = await self._session.execute(
+            delete(RouterModel).where(RouterModel.id == router_id, RouterModel.team_id.is_(None))
+        )
+        await self._session.commit()
+        return bool(result.rowcount)
+
+    async def promote_to_global(self, router_id: UUID) -> RouterConfig | None:
+        """Reassign a team-owned router to the platform (team_id → None),
+        keeping its origin team for provenance. Removes its extension grants."""
+        model = await self._session.get(RouterModel, router_id)
+        if model is None:
+            return None
+        if model.team_id is not None:
+            model.origin_team_id = model.team_id
+            model.team_id = None
+            await self._session.execute(
+                delete(RouterGrantModel).where(RouterGrantModel.router_id == router_id)
+            )
+        await self._session.commit()
+        await self._session.refresh(model)
+        return await self._to_entity(model)
+
+    # Grants (extending a team router to other teams).
+
+    async def add_grant(self, grant: RouterGrant) -> RouterGrant:
+        record = RouterGrantModel(
+            id=grant.id, router_id=grant.router_id, team_id=grant.team_id, alias=grant.alias
+        )
+        self._session.add(record)
+        try:
+            await self._session.commit()
+        except IntegrityError as exc:
+            await self._session.rollback()
+            raise RouterNameExists(grant.alias) from exc
+        await self._session.refresh(record)
+        return record.to_entity()
+
+    async def get_grant(self, grant_id: UUID) -> RouterGrant | None:
+        record = await self._session.get(RouterGrantModel, grant_id)
+        return record.to_entity() if record else None
+
+    async def remove_grant(self, grant_id: UUID) -> None:
+        await self._session.execute(delete(RouterGrantModel).where(RouterGrantModel.id == grant_id))
+        await self._session.commit()
+
+    async def list_grants_for_router(self, router_id: UUID) -> list[RouterGrant]:
+        records = await self._session.scalars(
+            select(RouterGrantModel)
+            .where(RouterGrantModel.router_id == router_id)
+            .order_by(RouterGrantModel.created_at, RouterGrantModel.id)
+        )
+        return [r.to_entity() for r in records]
+
+    async def list_grants_for_team(self, team_id: UUID) -> list[RouterGrant]:
+        records = await self._session.scalars(
+            select(RouterGrantModel)
+            .where(RouterGrantModel.team_id == team_id)
+            .order_by(RouterGrantModel.created_at, RouterGrantModel.id)
+        )
+        return [r.to_entity() for r in records]
 
 
 class SQLAlchemyRoutingDecisionLog:

@@ -8,10 +8,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { deleteRouter, type Router } from "@/features/routing/api";
+import { deleteGlobalRouter, deleteRouter, type Router } from "@/features/routing/api";
 
 interface DeleteRouterDialogProps {
-  teamId: string;
+  /** Owning team for a team router; ignored for a global one (team_id null). */
+  teamId?: string;
   /** The router pending deletion, or null when the dialog is closed. */
   router: Router | null;
   onOpenChange: (open: boolean) => void;
@@ -22,9 +23,11 @@ interface DeleteRouterDialogProps {
 export function DeleteRouterDialog({ teamId, router, onOpenChange }: DeleteRouterDialogProps) {
   const queryClient = useQueryClient();
   const mutation = useMutation({
-    mutationFn: (r: Router) => deleteRouter(teamId, r.id),
+    mutationFn: (r: Router) =>
+      r.team_id === null ? deleteGlobalRouter(r.id) : deleteRouter(r.team_id as string, r.id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["team-routers", teamId] });
+      await queryClient.invalidateQueries({ queryKey: ["global-routers"] });
       onOpenChange(false);
     },
   });

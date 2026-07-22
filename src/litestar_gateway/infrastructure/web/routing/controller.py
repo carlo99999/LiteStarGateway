@@ -82,7 +82,13 @@ class RouterRequest:
     # config lives under strategy_config["shadow"].
     shadow_strategy: str | None = None
 
-    def to_entity(self, team_id: UUID, router_id: UUID | None = None) -> RouterConfig:
+    def to_entity(
+        self,
+        team_id: UUID | None,
+        router_id: UUID | None = None,
+        *,
+        origin_team_id: UUID | None = None,
+    ) -> RouterConfig:
         return RouterConfig(
             id=router_id or uuid4(),
             team_id=team_id,
@@ -94,6 +100,7 @@ class RouterRequest:
             enabled=self.enabled,
             created_at=datetime.now(UTC),
             shadow_strategy=self.shadow_strategy,
+            origin_team_id=origin_team_id,
         )
 
 
@@ -121,6 +128,8 @@ class RouterResponse:
     enabled: bool
     created_at: datetime
     shadow_strategy: str | None
+    team_id: UUID | None = None  # None ⇒ a global (platform) router
+    origin_team_id: UUID | None = None  # team a global router was promoted from
 
     @classmethod
     def from_entity(cls, router: RouterConfig) -> RouterResponse:
@@ -136,6 +145,49 @@ class RouterResponse:
             enabled=router.enabled,
             created_at=router.created_at,
             shadow_strategy=router.shadow_strategy,
+            team_id=router.team_id,
+            origin_team_id=router.origin_team_id,
+        )
+
+
+@dataclass(frozen=True)
+class RouterGrantResponse:
+    id: UUID
+    router_id: UUID
+    team_id: UUID
+    alias: str
+    created_at: datetime
+
+    @classmethod
+    def from_entity(cls, grant) -> RouterGrantResponse:
+        return cls(
+            id=grant.id,
+            router_id=grant.router_id,
+            team_id=grant.team_id,
+            alias=grant.alias,
+            created_at=grant.created_at,
+        )
+
+
+@dataclass(frozen=True)
+class ExtendRouterRequest:
+    team_ids: list[UUID]
+
+
+@dataclass(frozen=True)
+class CallableRouterResponse:
+    alias: str
+    origin: str  # own | extended | global
+    source_team_id: UUID | None
+    router: RouterResponse
+
+    @classmethod
+    def from_entity(cls, callable_router) -> CallableRouterResponse:
+        return cls(
+            alias=callable_router.alias,
+            origin=callable_router.origin,
+            source_team_id=callable_router.source_team_id,
+            router=RouterResponse.from_entity(callable_router.router),
         )
 
 
@@ -212,6 +264,21 @@ class RouterController(Controller):
         await team_service.ensure_team_permission(current_user, team_id, Permission.MODELS_READ)
         routers = await router_service.list_by_team(team_id)
         return [RouterResponse.from_entity(router) for router in routers]
+
+    @get(
+        "/{team_id:uuid}/routers/callable",
+        summary="Every router the team can call (own + extended + global)",
+    )
+    async def list_callable_routers(
+        self,
+        team_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        router_service: NamedDependency[RouterService],
+    ) -> list[CallableRouterResponse]:
+        await team_service.ensure_team_permission(current_user, team_id, Permission.MODELS_READ)
+        callable_routers = await router_service.list_callable(team_id)
+        return [CallableRouterResponse.from_entity(c) for c in callable_routers]
 
     @put("/{team_id:uuid}/routers/{router_id:uuid}", summary="Replace a router definition")
     async def update_router(

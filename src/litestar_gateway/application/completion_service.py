@@ -446,7 +446,9 @@ class CompletionService:
             # (clamping, budget admission, metering) runs on the chosen model.
             router = await self._router_service.get_enabled_by_name(team_id, alias)
             if router is not None:
-                decision = await self._router_service.route(router, request, api_key_id=api_key_id)
+                decision = await self._router_service.route(
+                    router, request, acting_team_id=team_id, api_key_id=api_key_id
+                )
                 model = await self._models.get_by_name(team_id, decision.model_name)
         model = self._ensure_usable(model, alias, expected_type)
         _reject_unsupported_n(operation, model, request)

@@ -33,14 +33,18 @@ async def list_models(
 ) -> dict[str, Any]:
     team_id = UUID(request.user)
 
-    # Every callable model, by its effective alias (own + extended + global).
+    # Every callable model + router, by effective alias (own + extended + global).
     callable_models = await model_service.list_callable(team_id)
-    routers = await router_service.list_by_team(team_id)
+    callable_routers = await router_service.list_callable(team_id)
 
     data = [
         _entry(c.alias, int(c.model.created_at.timestamp()))
         for c in callable_models
         if c.model.enabled
-    ] + [_entry(r.name, int(r.created_at.timestamp())) for r in routers if r.enabled]
+    ] + [
+        _entry(c.alias, int(c.router.created_at.timestamp()))
+        for c in callable_routers
+        if c.router.enabled
+    ]
     data.sort(key=lambda entry: entry["id"])
     return {"object": "list", "data": data}
