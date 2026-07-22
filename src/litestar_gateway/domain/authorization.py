@@ -21,6 +21,7 @@ class Permission(StrEnum):
     MEMBERS_MANAGE = "members:manage"
     MODELS_READ = "models:read"
     MODELS_MANAGE = "models:manage"
+    PLAYGROUND_EXECUTE = "playground:execute"
     KEYS_READ = "keys:read"
     KEYS_ISSUE = "keys:issue"
     SERVICE_PRINCIPALS_MANAGE = "service-principals:manage"
@@ -39,7 +40,12 @@ ROLE_PERMISSIONS: dict[TeamRole, frozenset[Permission]] = {
     TeamRole.ADMIN: frozenset(Permission),
     TeamRole.MEMBER: frozenset(),
     TeamRole.MODEL_MANAGER: frozenset(
-        {Permission.MODELS_READ, Permission.MODELS_MANAGE, Permission.DECISIONS_READ}
+        {
+            Permission.MODELS_READ,
+            Permission.MODELS_MANAGE,
+            Permission.PLAYGROUND_EXECUTE,
+            Permission.DECISIONS_READ,
+        }
     ),
     TeamRole.KEY_ISSUER: frozenset({Permission.KEYS_READ, Permission.KEYS_ISSUE}),
     TeamRole.BILLING_VIEWER: frozenset({Permission.USAGE_READ, Permission.BUDGET_READ}),

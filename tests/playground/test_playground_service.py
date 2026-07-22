@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 
 from litestar_gateway.application.playground_service import PlaygroundService
 from litestar_gateway.domain.entities import Model, ModelType, Provider
-from litestar_gateway.domain.ports import CredentialRepository, LLMGateway, ModelRepository
+from litestar_gateway.domain.ports import ModelRepository
 
 TEAM = uuid4()
 
@@ -45,22 +45,18 @@ class _Models:
         return self._models.get(name)
 
 
-class _Credentials:
-    async def get_values(self, credential_id: UUID) -> dict[str, str]:
-        return {"api_key": "x"}  # pragma: allowlist secret
-
-
-class _Gateway:
+class _Completion:
     def __init__(self, fail_for: set[str] | None = None) -> None:
         self._fail_for = fail_for or set()
 
-    async def achat_completion(
-        self, request: dict[str, Any], model: Model, credentials: dict[str, str]
+    async def chat_completion(
+        self, team_id: UUID, api_key_id: UUID | None, request: dict[str, Any]
     ) -> dict[str, Any]:
-        if model.name in self._fail_for:
+        model_name = str(request["model"])
+        if model_name in self._fail_for:
             raise RuntimeError("upstream boom")
         return {
-            "choices": [{"message": {"content": f"hi from {model.name}"}}],
+            "choices": [{"message": {"content": f"hi from {model_name}"}}],
             "usage": {"prompt_tokens": 10, "completion_tokens": 5},
         }
 
@@ -68,8 +64,7 @@ class _Gateway:
 def _service(models: dict[str, Model], fail_for: set[str] | None = None) -> PlaygroundService:
     return PlaygroundService(
         models=cast("ModelRepository", _Models(models)),
-        credentials=cast("CredentialRepository", _Credentials()),
-        gateway=cast("LLMGateway", _Gateway(fail_for)),
+        completion_service=cast("Any", _Completion(fail_for)),
     )
 
 
@@ -135,8 +130,7 @@ async def test_router_is_previewed_and_labelled() -> None:
 
     svc = PlaygroundService(
         models=cast("ModelRepository", _Models({"a": _model("a")})),
-        credentials=cast("CredentialRepository", _Credentials()),
-        gateway=cast("LLMGateway", _Gateway()),
+        completion_service=cast("Any", _Completion()),
         routers=cast("Any", _RS()),
     )
     [res] = await svc.compare(TEAM, ["smart"], [{"role": "user", "content": "hi"}])

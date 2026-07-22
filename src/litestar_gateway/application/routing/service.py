@@ -83,6 +83,7 @@ STRATEGIES: dict[str, type] = {
 # sub-millisecond; the budget exists so future network strategies (webhook,
 # LLM judge) can never stall the request path.
 DEFAULT_TIME_BUDGET_MS = 2000
+_EXTERNAL_PREVIEW_STRATEGIES = frozenset({"embeddings", "judge", "webhook", "hybrid"})
 
 
 def _now() -> datetime:
@@ -361,8 +362,8 @@ class RouterService:
     ) -> RoutingDecision:
         """Pick a candidate WITHOUT persisting a decision or running shadow — for
         the playground, which shows which candidate a router would choose without
-        recording it. Judge/embeddings strategies (which need a wired meter) fall
-        back to `default_model` here, since the preview service isn't metered."""
+        recording it. Strategies with provider or webhook side effects fall back
+        to `default_model` here, since a preview has no billable caller identity."""
         ctx = build_routing_context(request, team_id=acting_team_id, api_key_id=None)
         ctx = dataclasses.replace(ctx, default_model=router.default_model)
         capable = filter_candidates(ctx, router.candidates)
@@ -375,6 +376,27 @@ class RouterService:
                 tier=None,
                 score=None,
                 signals=("single capable candidate",),
+                decision_ms=0.0,
+            )
+        # Preview must never create a hidden provider/webhook side effect. The
+        # governed completion immediately following this preview accounts for
+        # the selected model call; external routing strategies are reserved for
+        # the normal route(), where a request-scoped meter is available.
+        if router.strategy in _EXTERNAL_PREVIEW_STRATEGIES:
+            selected = next(
+                (
+                    candidate
+                    for candidate in capable
+                    if candidate.model_name == router.default_model
+                ),
+                capable[0],
+            )
+            return RoutingDecision(
+                model_name=selected.model_name,
+                strategy=router.strategy,
+                tier=None,
+                score=None,
+                signals=("preview: external strategy skipped",),
                 decision_ms=0.0,
             )
         decision, _ = await self._run_strategy(router, ctx, capable)

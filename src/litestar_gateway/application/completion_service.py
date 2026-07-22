@@ -131,7 +131,7 @@ class CompletionService:
     async def _dispatch(
         self,
         team_id: UUID,
-        api_key_id: UUID,
+        api_key_id: UUID | None,
         model: Model,
         operation: str,
         request: dict[str, Any],
@@ -426,7 +426,7 @@ class CompletionService:
         operation: str,
         request: dict[str, Any],
         expected_type: ModelType,
-        api_key_id: UUID,
+        api_key_id: UUID | None,
     ) -> tuple[Model, dict[str, str], float, dict[str, Any]]:
         # Gate the caller before router strategies: judge/embedding strategies
         # may make billable provider calls while resolving a virtual model.
@@ -466,7 +466,7 @@ class CompletionService:
         return model, values, reservation, clean
 
     async def chat_completion(
-        self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
+        self, team_id: UUID, api_key_id: UUID | None, request: dict[str, Any]
     ) -> dict[str, Any]:
         clean = sanitize_request("chat.completions", request)
         model, values, reservation, clean = await self._prepare(

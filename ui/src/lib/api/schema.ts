@@ -910,7 +910,7 @@ export interface paths {
         put?: never;
         /**
          * Run one prompt against several of a team's models and compare
-         * @description Sends the same messages to each model concurrently and returns the response, latency, token counts and estimated cost for each. Real provider calls, but not metered/billed.
+         * @description Sends the same messages to each model and returns the response, latency, token counts and estimated cost for each. Real provider calls consume the team's rate limit and budget and are recorded in usage and audit logs.
          */
         post: operations["PlaygroundCompareCompare"];
         delete?: never;
