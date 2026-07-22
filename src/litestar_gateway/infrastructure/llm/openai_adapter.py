@@ -11,11 +11,50 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
-from openai import AsyncOpenAI, OpenAI
+from openai import AsyncOpenAI, BadRequestError, OpenAI
 
 from litestar_gateway.domain.entities import Model
 from litestar_gateway.domain.exceptions import CredentialMisconfigured
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
+
+
+def _swap_max_tokens(kwargs: dict[str, Any]) -> dict[str, Any] | None:
+    """Reasoning models (o1/gpt-5-family) reject `max_tokens` and require
+    `max_completion_tokens`. Return a copy with the swap, or None if there's
+    nothing to swap (already using the new field, or neither present)."""
+    if "max_tokens" in kwargs and "max_completion_tokens" not in kwargs:
+        swapped = dict(kwargs)
+        swapped["max_completion_tokens"] = swapped.pop("max_tokens")
+        return swapped
+    return None
+
+
+def _is_max_tokens_error(exc: BadRequestError) -> bool:
+    message = str(getattr(exc, "message", "") or exc).lower()
+    return "max_tokens" in message and "max_completion_tokens" in message
+
+
+def _chat_create(client: Any, kwargs: dict[str, Any]) -> Any:
+    """chat.completions.create, retrying once with max_completion_tokens when the
+    provider rejects max_tokens (reasoning models). Non-reasoning models and
+    other providers never hit the retry."""
+    try:
+        return client.chat.completions.create(**kwargs)
+    except BadRequestError as exc:
+        swapped = _swap_max_tokens(kwargs)
+        if swapped is None or not _is_max_tokens_error(exc):
+            raise
+        return client.chat.completions.create(**swapped)
+
+
+async def _achat_create(client: Any, kwargs: dict[str, Any]) -> Any:
+    try:
+        return await client.chat.completions.create(**kwargs)
+    except BadRequestError as exc:
+        swapped = _swap_max_tokens(kwargs)
+        if swapped is None or not _is_max_tokens_error(exc):
+            raise
+        return await client.chat.completions.create(**swapped)
 
 
 def require_api_key(credentials: dict[str, str]) -> str:
@@ -79,15 +118,13 @@ class OpenAICompatibleAdapter:
     def chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        return self._run(
-            model, credentials, lambda c: c.chat.completions.create(**_kwargs(request, model))
-        )
+        return self._run(model, credentials, lambda c: _chat_create(c, _kwargs(request, model)))
 
     async def achat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
         return await self._arun(
-            model, credentials, lambda c: c.chat.completions.create(**_kwargs(request, model))
+            model, credentials, lambda c: _achat_create(c, _kwargs(request, model))
         )
 
     def responses(
@@ -119,7 +156,7 @@ class OpenAICompatibleAdapter:
         try:
             # Any: with stream=True the SDK returns AsyncStream (no model_dump itself);
             # each yielded chunk is a ChatCompletionChunk that does have model_dump.
-            stream: Any = await client.chat.completions.create(**kwargs)
+            stream: Any = await _achat_create(client, kwargs)
             async for chunk in stream:
                 yield chunk.model_dump()
         finally:
