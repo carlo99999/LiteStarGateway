@@ -745,29 +745,12 @@ Ogni PR di implementazione deve rispettare lo stesso gate:
 6. review sicurezza obbligatoria per PR 1, 2, 5 e 6;
 7. commit convenzionali e descrizione PR con mapping agli ISSUE chiusi.
 
-## Resolution status — IMPLEMENTED IN OPEN PR STACK
+## Resolution status — MERGED
 
-ISSUE-010–ISSUE-019 hanno una remediation implementata con test di regressione
-e sono chiusi sull'HEAD integrato `6a4defd`. Restano aperti dal punto di vista
-del prodotto finché le PR #313–#320 non vengono mergiate e distribuite: `main`
-non contiene ancora le correzioni.
-
-Ordine operativo di merge:
-
-1. mergiare le PR indipendenti #313, #314, #315 e #316;
-2. retargettare #317 da `stack/r11-playground-persistence` a `main` dopo
-   l'ingresso di #314/#316 e verificare che il diff residuo contenga soltanto il
-   registro alias e i relativi test;
-3. mergiare in sequenza #317 → #318 → #319 → #320, aggiornando ogni base al
-   branch appena entrato;
-4. applicare le migrazioni con write freeze come descritto in
-   `docs/db-migrations.md`, quindi eseguire smoke test e osservare error rate,
-   usage ledger, router decisions e webhook egress;
-5. mergiare questo aggiornamento documentale per ultimo.
-
-Non è necessario squashare lo stack in una mega-PR: i confini attuali sono
-coerenti con rollback e responsabilità. Le PR #317–#320 devono però rimanere
-seriali perché condividono resolver, revisioni router e catena Alembic.
+ISSUE-010–ISSUE-019 sono chiusi con test di regressione e le relative
+correzioni sono integrate in `main` tramite le PR #313–#320. Le PR #321 e #322
+hanno consolidato il report e lo stato finale della remediation. La
+distribuzione negli ambienti resta un'attività operativa distinta dal merge.
 
 ## Deferred / product decision
 
@@ -831,5 +814,5 @@ seriali perché condividono resolver, revisioni router e catena Alembic.
 **Overall sull'HEAD di remediation: 9.2/10.** Il codice passa da 6,4 a 9,2:
 gli invarianti economici, di identità, tenancy, transazione e rollback ora sono
 applicati anche alle superfici globali, condivise e Playground. Il margine fino
-al 10 non è un finding aperto di Round 11: rappresenta soprattutto merge/deploy
-non ancora eseguiti, soak operativo e copertura browser E2E ancora espandibile.
+al 10 non è un finding aperto di Round 11: rappresenta soprattutto soak
+operativo e copertura browser E2E ancora espandibile.
