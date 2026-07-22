@@ -13,8 +13,8 @@ from advanced_alchemy.alembic.commands import AlembicCommandConfig
 from alembic import command
 from sqlalchemy.ext.asyncio import create_async_engine
 
-PARENT = "f52a1c9d0b34"
-HEAD = "a61d7e3c9b20"
+PARENT = "f52a1c9d0b34"  # pragma: allowlist secret
+HEAD = "a61d7e3c9b20"  # pragma: allowlist secret
 
 
 def _config(path: Path) -> AlembicCommandConfig:
