@@ -341,6 +341,50 @@ async def test_rename_to_existing_name_conflicts(client: AsyncTestClient) -> Non
     assert resp.status_code == HTTP_409_CONFLICT
 
 
+async def test_combined_update_conflict_preserves_secret_and_audit(
+    client: AsyncTestClient, database_url: str
+) -> None:
+    """A rejected rename must not partially commit the secret rotation."""
+    from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+
+    from litestar_gateway.infrastructure.crypto import DataCipher, MasterCipher
+    from litestar_gateway.infrastructure.persistence.orm import CredentialModel, SecretKeyModel
+
+    admin = await _admin_token(client)
+    await _create_openai_cred(client, admin, "taken")
+    credential_id = await _create_openai_cred(client, admin, "original")
+
+    response = await client.patch(
+        f"/credentials/{credential_id}",
+        json={"name": "taken", "values": {"api_key": "sk-new"}},  # pragma: allowlist secret
+        headers=_bearer(admin),
+    )
+
+    assert response.status_code == HTTP_409_CONFLICT
+
+    engine = create_async_engine(database_url)
+    try:
+        async with AsyncSession(engine) as session:
+            credential = await session.get(CredentialModel, UUID(credential_id))
+            assert credential is not None
+            key = await session.get(SecretKeyModel, credential.key_id)
+            assert key is not None
+            data_key = MasterCipher(SALT_KEY).unwrap(key.material)
+            stored_values = DataCipher(data_key).decrypt(credential.encrypted_values)
+    finally:
+        await engine.dispose()
+
+    assert credential.name == "original"
+    assert stored_values == {"api_key": "sk-old"}
+    audit_events = (await client.get("/audit", headers=_bearer(admin))).json()
+    assert not any(
+        event["action"] == "credential.update" and event["target_id"] == credential_id
+        for event in audit_events
+    )
+
+
 async def test_update_requires_platform_admin(client: AsyncTestClient) -> None:
     admin = await _admin_token(client)
     cid = await _create_openai_cred(client, admin, "guarded")

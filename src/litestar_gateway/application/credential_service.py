@@ -63,15 +63,14 @@ class CredentialService:
             raise CredentialNotFound(str(credential_id))
         if values is not None:
             validate_credential_values(existing.provider, values)
-            await self._repo.replace_values(credential_id, values)
-        if name is not None and name != existing.name:
-            clash = await self._repo.get_by_name(name)
+        new_name = name if name is not None and name != existing.name else None
+        if new_name is not None:
+            clash = await self._repo.get_by_name(new_name)
             if clash is not None and clash.id != credential_id:
-                raise CredentialNameExists(name)
-            return await self._repo.rename(credential_id, name)
-        refreshed = await self._repo.get(credential_id)
-        assert refreshed is not None  # just fetched under the same session
-        return refreshed
+                raise CredentialNameExists(new_name)
+        if new_name is None and values is None:
+            return existing
+        return await self._repo.update(credential_id, name=new_name, values=values)
 
     async def list(
         self, actor: User, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0

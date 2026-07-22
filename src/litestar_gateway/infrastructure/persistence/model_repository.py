@@ -54,6 +54,12 @@ class SQLAlchemyModelRepository:
         record = await self._session.get(ModelRecord, model_id)
         return record.to_entity() if record else None
 
+    async def get_global(self, model_id: UUID) -> Model | None:
+        record = await self._session.scalar(
+            select(ModelRecord).where(ModelRecord.id == model_id, ModelRecord.team_id.is_(None))
+        )
+        return record.to_entity() if record else None
+
     async def get_by_name(self, team_id: UUID | None, name: str) -> Model | None:
         # 1. The team's own model always wins.
         own = await self._session.scalar(
@@ -145,9 +151,13 @@ class SQLAlchemyModelRepository:
         record = await self._session.get(ModelRecord, model.id)
         if record is None:  # pragma: no cover - guarded by callers
             raise LookupError(f"Model {model.id} disappeared")
-        # team_id/origin_team_id are unchanged by a normal edit, but writing them
-        # back lets `make_global` (which flips team_id → None) persist through the
-        # same path.
+        self._apply_update(record, model)
+        await self._session.commit()
+        await self._session.refresh(record)
+        return record.to_entity()
+
+    @staticmethod
+    def _apply_update(record: ModelRecord, model: Model) -> None:
         record.team_id = model.team_id
         record.origin_team_id = model.origin_team_id
         record.name = model.name
@@ -160,6 +170,14 @@ class SQLAlchemyModelRepository:
         record.input_cost_per_token = model.input_cost_per_token
         record.output_cost_per_token = model.output_cost_per_token
         record.enabled = model.enabled
+
+    async def update_global(self, model: Model) -> Model | None:
+        record = await self._session.scalar(
+            select(ModelRecord).where(ModelRecord.id == model.id, ModelRecord.team_id.is_(None))
+        )
+        if record is None:
+            return None
+        self._apply_update(record, model)
         await self._session.commit()
         await self._session.refresh(record)
         return record.to_entity()
@@ -167,6 +185,36 @@ class SQLAlchemyModelRepository:
     async def remove(self, model_id: UUID) -> None:
         await self._session.execute(delete(ModelRecord).where(ModelRecord.id == model_id))
         await self._session.commit()
+
+    async def remove_global(self, model_id: UUID) -> bool:
+        removed_id = await self._session.scalar(
+            delete(ModelRecord)
+            .where(ModelRecord.id == model_id, ModelRecord.team_id.is_(None))
+            .returning(ModelRecord.id)
+        )
+        await self._session.commit()
+        return removed_id is not None
+
+    async def promote_to_global(self, model: Model) -> Model:
+        """Promote ownership and remove all grants in one transaction."""
+        record = await self._session.get(ModelRecord, model.id)
+        if record is None:  # pragma: no cover - guarded by the service
+            raise LookupError(f"Model {model.id} disappeared")
+        if record.team_id is None:
+            return record.to_entity()
+        origin_team_id = record.team_id
+        try:
+            await self._session.execute(
+                delete(ModelGrantRecord).where(ModelGrantRecord.model_id == model.id)
+            )
+            record.team_id = None
+            record.origin_team_id = origin_team_id
+            await self._session.commit()
+        except IntegrityError as exc:
+            await self._session.rollback()
+            raise ModelNameExists(model.name) from exc
+        await self._session.refresh(record)
+        return record.to_entity()
 
     async def exists_for_credential(self, credential_id: UUID) -> bool:
         record = await self._session.scalar(
