@@ -27,19 +27,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -72,19 +72,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -120,19 +120,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -168,19 +168,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -229,19 +229,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -325,19 +325,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -421,19 +421,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -520,19 +520,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -619,19 +619,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -726,19 +726,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -820,19 +820,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -916,19 +916,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1040,19 +1040,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1141,19 +1141,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1240,19 +1240,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1336,19 +1336,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1432,19 +1432,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1533,19 +1533,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1641,19 +1641,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1739,19 +1739,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1828,19 +1828,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1915,19 +1915,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1956,19 +1956,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2004,19 +2004,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2065,19 +2065,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2151,19 +2151,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2199,19 +2199,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2285,19 +2285,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2382,19 +2382,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2490,19 +2490,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2588,19 +2588,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2684,19 +2684,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2783,19 +2783,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2899,19 +2899,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3033,19 +3033,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3142,19 +3142,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3276,19 +3276,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3385,19 +3385,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3483,19 +3483,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3589,19 +3589,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3685,19 +3685,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3776,19 +3776,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3872,19 +3872,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3971,19 +3971,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4105,19 +4105,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4232,19 +4232,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4343,19 +4343,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4452,19 +4452,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4560,19 +4560,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4661,19 +4661,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4832,19 +4832,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4969,19 +4969,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5079,19 +5079,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5187,19 +5187,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5297,19 +5297,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5395,19 +5395,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5522,19 +5522,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5619,19 +5619,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5717,19 +5717,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5816,19 +5816,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5924,19 +5924,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6025,19 +6025,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6126,19 +6126,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6224,19 +6224,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6328,11 +6328,100 @@
                                 "required": false,
                                 "deprecated": false
                             },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ModelPriceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/playground/compare": {
+            "post": {
+                "tags": [
+                    "playground"
+                ],
+                "summary": "Run one prompt against several of a team's models and compare",
+                "description": "Sends the same messages to each model concurrently and returns the response, latency, token counts and estimated cost for each. Real provider calls, but not metered/billed.",
+                "operationId": "PlaygroundCompareCompare",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompareRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Document created, URL follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -6343,12 +6432,23 @@
                                 "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
                             }
                         },
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ModelPriceResponse"
+                                    "items": {
+                                        "$ref": "#/components/schemas/PlaygroundResultResponse"
+                                    },
+                                    "type": "array"
                                 }
                             }
                         }
@@ -6426,19 +6526,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6535,19 +6635,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6653,19 +6753,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6759,19 +6859,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6914,19 +7014,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7012,19 +7112,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7213,19 +7313,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7324,19 +7424,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7433,19 +7533,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7532,19 +7632,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7619,19 +7719,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7678,19 +7778,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7786,19 +7886,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7882,19 +7982,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7983,19 +8083,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8084,19 +8184,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8185,19 +8285,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8283,19 +8383,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8362,19 +8462,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8459,19 +8559,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8568,19 +8668,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8676,19 +8776,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8785,19 +8885,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8903,19 +9003,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9028,19 +9128,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9126,19 +9226,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9225,19 +9325,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9325,19 +9425,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9449,19 +9549,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9538,19 +9638,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9642,19 +9742,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9726,19 +9826,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9786,19 +9886,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9882,19 +9982,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9978,19 +10078,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10067,19 +10167,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10153,19 +10253,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10212,19 +10312,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10310,19 +10410,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "Referrer-Policy": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Referrer",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Content-Type-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10672,6 +10772,44 @@
                     "quality_tier"
                 ],
                 "title": "CandidateRequest"
+            },
+            "CompareRequest": {
+                "properties": {
+                    "team_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "model_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "messages": {
+                        "items": {
+                            "additionalProperties": {},
+                            "type": "object"
+                        },
+                        "type": "array"
+                    },
+                    "max_completion_tokens": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "messages",
+                    "model_names",
+                    "team_id"
+                ],
+                "title": "CompareRequest"
             },
             "CreateCredentialRequest": {
                 "properties": {
@@ -11763,6 +11901,88 @@
                     "token"
                 ],
                 "title": "PasswordResetResponse"
+            },
+            "PlaygroundResultResponse": {
+                "properties": {
+                    "model_name": {
+                        "type": "string"
+                    },
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "content": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "latency_ms": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "prompt_tokens": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "completion_tokens": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "cost": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "error": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "completion_tokens",
+                    "content",
+                    "cost",
+                    "error",
+                    "latency_ms",
+                    "model_name",
+                    "ok",
+                    "prompt_tokens"
+                ],
+                "title": "PlaygroundResultResponse"
             },
             "Provider": {
                 "type": "string",

@@ -48,6 +48,9 @@ const ModelsPage = lazy(() =>
 const RoutingPage = lazy(() =>
   import("@/features/routing/RoutingPage").then((m) => ({ default: m.RoutingPage })),
 );
+const PlaygroundPage = lazy(() =>
+  import("@/features/playground/PlaygroundPage").then((m) => ({ default: m.PlaygroundPage })),
+);
 const RouterDetailPage = lazy(() =>
   import("@/features/routing/RouterDetailPage").then((m) => ({ default: m.RouterDetailPage })),
 );
@@ -164,6 +167,12 @@ const routingRoute = createRoute({
   component: RoutingPage,
 });
 
+const playgroundRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/playground",
+  component: PlaygroundPage,
+});
+
 const routerDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/routing/$teamId/$routerId",
@@ -203,6 +212,7 @@ const routeTree = rootRoute.addChildren([
     credentialsRoute,
     modelsRoute,
     routingRoute,
+    playgroundRoute,
     routerDetailRoute,
     usageRoute,
     budgetsRoute,
