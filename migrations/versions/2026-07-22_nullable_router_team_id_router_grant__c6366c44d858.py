@@ -10,7 +10,7 @@ import warnings
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 from advanced_alchemy.types import (
     Bool,
     EncryptedString,
@@ -66,6 +66,35 @@ revision = "c6366c44d858"
 down_revision = "b213468f39d2"
 branch_labels = None
 depends_on = None
+
+_MODEL_ORIGIN_REVISION = "b213468f39d2"
+
+
+def _downgrade_includes_model_provenance() -> bool:
+    """Whether this Alembic invocation will also downgrade b213468f39d2.
+
+    ``get_revision_argument`` is Alembic's public destination API.  Traversing
+    from this revision to that destination also resolves the common relative
+    ``-1`` form.  Any missing/ambiguous context fails closed: an unnecessary
+    preflight is safer than applying router DDL before discovering unsafe model
+    data in the following revision.
+    """
+    migration_context = context.get_context()
+    script = migration_context.script
+    if script is None:
+        return True
+    destination = context.get_revision_argument()
+    # If this migration is running for a one-step relative downgrade, the
+    # destination is its direct parent: model provenance remains intact.
+    if destination == "-1":
+        return False
+    try:
+        return any(
+            item.revision == _MODEL_ORIGIN_REVISION
+            for item in script.iterate_revisions(revision, destination)
+        )
+    except Exception:
+        return True
 
 
 def upgrade() -> None:
@@ -165,4 +194,76 @@ def data_upgrades() -> None:
 
 
 def data_downgrades() -> None:
-    """Add any optional data downgrade migrations here!"""
+    """Preflight the whole global-resource rollback, then restore ownership.
+
+    Model checks belong here as well as in the earlier model revisions.  Without
+    them a downgrade from head could apply the router DDL first and only then
+    discover an unsafe native global model while traversing b213468f39d2.
+    """
+    bind = op.get_bind()
+    blockers: list[str] = []
+
+    resources = [("router", "router")]
+    if _downgrade_includes_model_provenance():
+        resources.insert(0, ("model", "model"))
+
+    for table, singular in resources:
+        native = list(
+            bind.execute(
+                sa.text(
+                    f"SELECT name FROM {table} "
+                    "WHERE team_id IS NULL AND origin_team_id IS NULL "
+                    "ORDER BY name LIMIT 5"
+                )
+            ).scalars()
+        )
+        missing_origins = list(
+            bind.execute(
+                sa.text(
+                    f"SELECT resource.name FROM {table} AS resource "
+                    "LEFT JOIN team ON team.id = resource.origin_team_id "
+                    "WHERE resource.team_id IS NULL AND resource.origin_team_id IS NOT NULL "
+                    "AND team.id IS NULL ORDER BY resource.name LIMIT 5"
+                )
+            ).scalars()
+        )
+        collisions = list(
+            bind.execute(
+                sa.text(
+                    f"SELECT global_resource.name FROM {table} AS global_resource "
+                    f"JOIN {table} AS local_resource "
+                    "ON local_resource.team_id = global_resource.origin_team_id "
+                    "AND local_resource.name = global_resource.name "
+                    "AND local_resource.id <> global_resource.id "
+                    "WHERE global_resource.team_id IS NULL "
+                    "ORDER BY global_resource.name LIMIT 5"
+                )
+            ).scalars()
+        )
+        if native:
+            blockers.append(f"native global {singular} without origin_team_id: {native!r}")
+        if missing_origins:
+            blockers.append(
+                f"{singular} origin_team_id does not reference an existing team: "
+                f"{missing_origins!r}"
+            )
+        if collisions:
+            blockers.append(
+                f"{singular} name already exists in its origin team: {collisions!r}"
+            )
+
+    if blockers:
+        raise RuntimeError(
+            "Cannot downgrade global resources safely: "
+            + "; ".join(blockers)
+            + ". Reassign or intentionally delete each blocked resource, then retry. "
+            "See docs/db-migrations.md#downgrading-global-resources. "
+            "No schema DDL from revision c6366c44d858 was applied."
+        )
+
+    bind.execute(
+        sa.text(
+            "UPDATE router SET team_id = origin_team_id "
+            "WHERE team_id IS NULL AND origin_team_id IS NOT NULL"
+        )
+    )

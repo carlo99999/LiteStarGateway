@@ -113,4 +113,59 @@ def data_upgrades() -> None:
 
 
 def data_downgrades() -> None:
-    """Add any optional data downgrade migrations here!"""
+    """Restore promoted models to their origin before dropping provenance."""
+    bind = op.get_bind()
+    native = list(
+        bind.execute(
+            sa.text(
+                "SELECT name FROM model "
+                "WHERE team_id IS NULL AND origin_team_id IS NULL "
+                "ORDER BY name LIMIT 5"
+            )
+        ).scalars()
+    )
+    missing_origins = list(
+        bind.execute(
+            sa.text(
+                "SELECT model.name FROM model "
+                "LEFT JOIN team ON team.id = model.origin_team_id "
+                "WHERE model.team_id IS NULL AND model.origin_team_id IS NOT NULL "
+                "AND team.id IS NULL ORDER BY model.name LIMIT 5"
+            )
+        ).scalars()
+    )
+    collisions = list(
+        bind.execute(
+            sa.text(
+                "SELECT global_model.name FROM model AS global_model "
+                "JOIN model AS local_model "
+                "ON local_model.team_id = global_model.origin_team_id "
+                "AND local_model.name = global_model.name "
+                "AND local_model.id <> global_model.id "
+                "WHERE global_model.team_id IS NULL "
+                "ORDER BY global_model.name LIMIT 5"
+            )
+        ).scalars()
+    )
+    blockers: list[str] = []
+    if native:
+        blockers.append(f"native global model without origin_team_id: {native!r}")
+    if missing_origins:
+        blockers.append(f"model origin_team_id does not reference an existing team: {missing_origins!r}")
+    if collisions:
+        blockers.append(f"model name already exists in its origin team: {collisions!r}")
+    if blockers:
+        raise RuntimeError(
+            "Cannot downgrade global models safely: "
+            + "; ".join(blockers)
+            + ". Reassign or intentionally delete each blocked resource, then retry. "
+            "See docs/db-migrations.md#downgrading-global-resources. "
+            "No schema DDL from revision b213468f39d2 was applied."
+        )
+
+    bind.execute(
+        sa.text(
+            "UPDATE model SET team_id = origin_team_id "
+            "WHERE team_id IS NULL AND origin_team_id IS NOT NULL"
+        )
+    )

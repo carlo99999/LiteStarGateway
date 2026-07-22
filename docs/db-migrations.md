@@ -104,3 +104,57 @@ Downgrade is intentionally blocked once any router has more than one revision,
 or any grant is pinned away from the current head: the legacy schema cannot
 represent that history without data loss. Development `create_all` likewise
 refuses a registry-era schema that has not yet been upgraded to revisions.
+
+## 9. Downgrading global resources
+
+Revisions `90e784ecd46b`, `b213468f39d2`, and `c6366c44d858` change model and
+router ownership so `team_id` may be NULL. Before downgrading through those
+revisions, stop application writers, take a tested database backup, and run the
+read-only safety gate against the same database:
+
+```bash
+just migration-global-downgrade-preflight
+```
+
+The command exits `0` only when every global resource can be restored without
+guessing or deleting data. Promoted resources with a valid `origin_team_id` are
+reassigned to that team automatically before the migration restores the NOT
+NULL constraint. The preflight blocks when it finds any of these cases:
+
+- a native global resource with no origin;
+- an `origin_team_id` that no longer references an existing team;
+- a resource with the same name already present in its origin team;
+- a model at revision `90e784ecd46b`, where the provenance column did not yet
+  exist.
+
+For each blocker, choose an explicit owner or intentionally remove the resource.
+Do not invent a placeholder team. On revisions containing `origin_team_id`, an
+ownership repair has this shape; substitute reviewed resource and team IDs and
+run it in an operator-controlled transaction:
+
+```sql
+UPDATE model
+SET team_id = '<existing-team-id>', origin_team_id = '<existing-team-id>'
+WHERE id = '<reviewed-model-id>' AND team_id IS NULL;
+
+UPDATE router
+SET team_id = '<existing-team-id>', origin_team_id = '<existing-team-id>'
+WHERE id = '<reviewed-router-id>' AND team_id IS NULL;
+```
+
+At revision `90e784ecd46b`, set only `model.team_id` because
+`origin_team_id` is not present. If the resource must not survive rollback,
+delete it deliberately through the supported administration API, including any
+dependent grants, rather than adding deletion to the migration.
+
+Rerun the preflight until it reports `SAFE`, then downgrade to the reviewed
+target and verify the applied revision:
+
+```bash
+just downgrade 79fc50bbd1a4
+just migration-current
+```
+
+Keep writers stopped until post-downgrade checks finish. If a blocker is found
+during the Alembic command despite the external preflight, the migration raises
+before its schema DDL and prints this runbook location; remediate and retry.
