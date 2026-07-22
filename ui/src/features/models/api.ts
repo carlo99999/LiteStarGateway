@@ -13,6 +13,7 @@ export type ModelType = components["schemas"]["ModelType"];
 export type Provider = components["schemas"]["Provider"];
 export type Grant = components["schemas"]["GrantResponse"];
 export type CallableModel = components["schemas"]["CallableModelResponse"];
+export type ModelCredential = components["schemas"]["ModelCredentialResponse"];
 
 /** The fields the create form collects. Costs and ceilings are optional. */
 export interface NewModel {
@@ -43,6 +44,25 @@ async function requestModels(teamId: string, request: PageRequest): Promise<Mode
   });
   if (error || !data) throw fail(error, "Failed to load models");
   return data;
+}
+
+/** Credential metadata a model manager may use for bindings. Secret values are
+ * not part of this response. */
+export async function listModelCredentials(
+  teamId: string,
+  signal?: AbortSignal,
+): Promise<ModelCredential[]> {
+  return fetchAllPages(
+    async (request) => {
+      const { data, error } = await api.GET("/teams/{team_id}/model-credentials", {
+        params: { path: { team_id: teamId }, query: request },
+        signal,
+      });
+      if (error || !data) throw fail(error, "Failed to load model credentials");
+      return data;
+    },
+    { keyOf: (credential) => credential.id },
+  );
 }
 
 /** GET /teams/{id}/models — one table page. */

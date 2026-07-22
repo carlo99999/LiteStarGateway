@@ -23,6 +23,8 @@ interface CallableRoutersTableProps {
   teamNames: Map<string, string>;
   onDelete: (router: Router) => void;
   onExtend: (router: Router) => void;
+  canManage: boolean;
+  canExtend: boolean;
 }
 
 /** Routers a team can call — its own (full actions + detail link), plus the
@@ -35,6 +37,8 @@ export function CallableRoutersTable({
   teamNames,
   onDelete,
   onExtend,
+  canManage,
+  canExtend,
 }: CallableRoutersTableProps) {
   const queryClient = useQueryClient();
   const toggle = useMutation({
@@ -100,7 +104,7 @@ export function CallableRoutersTable({
       className: "w-12",
       numeric: true,
       cell: (c) =>
-        c.origin !== "own" ? (
+        c.origin !== "own" || !canManage ? (
           <span className="pr-2 text-[10px] text-muted-foreground/60">read-only</span>
         ) : (
           <DropdownMenu>
@@ -116,7 +120,9 @@ export function CallableRoutersTable({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => onExtend(c.router)}>extend…</DropdownMenuItem>
+              {canExtend ? (
+                <DropdownMenuItem onSelect={() => onExtend(c.router)}>extend…</DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onSelect={() => toggle.mutate(c.router)}>
                 {c.router.enabled ? "disable" : "enable"}
               </DropdownMenuItem>

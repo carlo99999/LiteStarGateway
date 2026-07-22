@@ -16,6 +16,7 @@ import { PROVIDER_LABELS, PROVIDERS } from "@/features/credentials/providerField
 import {
   createGlobalModel,
   createModel,
+  listModelCredentials,
   lookupModelPrice,
   type ModelType,
   type Provider,
@@ -115,9 +116,12 @@ export function CreateModelDialog({
     enabled: open && !teamId && !global,
   });
   const credentials = useQuery({
-    queryKey: ["credentials", "all"],
-    queryFn: ({ signal }) => listAllCredentials(signal),
-    enabled: open,
+    queryKey: global
+      ? ["credentials", "all"]
+      : ["teams", effectiveTeamId, "model-credentials"],
+    queryFn: ({ signal }) =>
+      global ? listAllCredentials(signal) : listModelCredentials(effectiveTeamId, signal),
+    enabled: open && (global || effectiveTeamId.length > 0),
   });
   const providerCredentials = useMemo(
     () => (credentials.data ?? []).filter((c) => c.provider === provider),
@@ -234,7 +238,7 @@ export function CreateModelDialog({
                 {credentials.isLoading
                   ? "loading…"
                   : providerCredentials.length === 0
-                    ? `no ${PROVIDER_LABELS[provider]} credentials — add one first`
+                    ? `no ${PROVIDER_LABELS[provider]} credentials available`
                     : "select a credential"}
               </option>
               {providerCredentials.map((c) => (

@@ -5465,6 +5465,144 @@
                 "deprecated": false
             }
         },
+        "/teams/{team_id}/model-credentials": {
+            "get": {
+                "tags": [
+                    "models"
+                ],
+                "summary": "List credentials available for model bindings",
+                "description": "Returns provider credential identifiers and names for model management. Secret values are never returned.",
+                "operationId": "TeamsTeamIdModelCredentialsListModelCredentials",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ]
+                        },
+                        "required": false,
+                        "deprecated": false,
+                        "allowEmptyValue": false,
+                        "allowReserved": false
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ]
+                        },
+                        "required": false,
+                        "deprecated": false,
+                        "allowEmptyValue": false,
+                        "allowReserved": false
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/ModelCredentialResponse"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/platform/models": {
             "get": {
                 "tags": [
@@ -11629,6 +11767,27 @@
                     "user_id"
                 ],
                 "title": "MembershipResponse"
+            },
+            "ModelCredentialResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "provider": {
+                        "$ref": "#/components/schemas/Provider"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "provider"
+                ],
+                "title": "ModelCredentialResponse"
             },
             "ModelPriceResponse": {
                 "properties": {

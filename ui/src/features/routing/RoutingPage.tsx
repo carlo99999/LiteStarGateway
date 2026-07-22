@@ -4,13 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/features/auth/use-auth";
 import { CallableRoutersTable } from "@/features/routing/CallableRoutersTable";
 import { CreateRouterDialog } from "@/features/routing/CreateRouterDialog";
 import { DeleteRouterDialog } from "@/features/routing/DeleteRouterDialog";
 import { ExtendRouterDialog } from "@/features/routing/ExtendRouterDialog";
 import { RoutersTable } from "@/features/routing/RoutersTable";
 import { listCallableRouters, listGlobalRouters, type Router } from "@/features/routing/api";
-import { listAllTeams } from "@/features/teams/api";
+import { canManageModels } from "@/features/teams/access";
+import { useAccessibleTeams } from "@/features/teams/useAccessibleTeams";
 import { toError } from "@/lib/toError";
 
 const SELECT_CLASS =
@@ -23,14 +25,13 @@ const SECTION_LABEL = "font-mono text-[10px] uppercase tracking-widest text-mute
 /** Smart routers: global (platform) routers callable by every team, plus a
  * per-team section showing what each team can call (own + extended + global). */
 export function RoutingPage() {
-  const teams = useQuery({
-    queryKey: ["teams", "all"],
-    queryFn: ({ signal }) => listAllTeams(signal),
-    retry: false,
-  });
+  const { user } = useAuth();
+  const teams = useAccessibleTeams();
+  const isPlatformAdmin = Boolean(user?.is_admin);
   const globalRouters = useQuery({
     queryKey: ["global-routers"],
     queryFn: () => listGlobalRouters(),
+    enabled: isPlatformAdmin,
     retry: false,
   });
   const teamNames = useMemo(
@@ -39,6 +40,8 @@ export function RoutingPage() {
   );
 
   const [teamId, setTeamId] = useState("");
+  const selectedTeam = teams.data?.find((team) => team.id === teamId);
+  const canManageSelectedTeam = selectedTeam ? canManageModels(selectedTeam.role) : false;
   const routers = useQuery({
     queryKey: ["team-routers", teamId, "callable"],
     queryFn: () => listCallableRouters(teamId),
@@ -60,24 +63,28 @@ export function RoutingPage() {
         command="routing inspect"
         title="Routing"
         description="Smart routers — virtual models that pick the best candidate per request. Global routers are callable by every team; team routers can be extended to others."
-        actions={
+        actions={isPlatformAdmin ? (
           <Button size="sm" onClick={() => setCreateGlobalOpen(true)}>
             <Globe className="h-4 w-4" />
             New global router
           </Button>
-        }
+        ) : undefined}
       />
 
-      <p className={`mb-2 ${SECTION_LABEL}`}>// global routers · every team</p>
-      <RoutersTable
-        global
-        rows={globalRouters.data}
-        isLoading={globalRouters.isLoading}
-        error={toError(globalRouters.error)}
-        onDelete={setDeleting}
-      />
+      {isPlatformAdmin ? (
+        <>
+          <p className={`mb-2 ${SECTION_LABEL}`}>// global routers · every team</p>
+          <RoutersTable
+            global
+            rows={globalRouters.data}
+            isLoading={globalRouters.isLoading}
+            error={toError(globalRouters.error)}
+            onDelete={setDeleting}
+          />
+        </>
+      ) : null}
 
-      <div className="mb-2 mt-8 flex items-center justify-between gap-3">
+      <div className={`${isPlatformAdmin ? "mt-8" : ""} mb-2 flex items-center justify-between gap-3`}>
         <div className="flex items-center gap-3">
           <p className={SECTION_LABEL}>// team routers</p>
           <Label htmlFor="routing-team" className="sr-only">
@@ -104,10 +111,17 @@ export function RoutingPage() {
             ))}
           </select>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setCreateTeamOpen(true)} disabled={!teamId}>
-          <Plus className="h-4 w-4" />
-          New team router
-        </Button>
+        {canManageSelectedTeam ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setCreateTeamOpen(true)}
+            disabled={!teamId}
+          >
+            <Plus className="h-4 w-4" />
+            New team router
+          </Button>
+        ) : null}
       </div>
       <CallableRoutersTable
         teamId={teamId}
@@ -117,16 +131,28 @@ export function RoutingPage() {
         teamNames={teamNames}
         onDelete={setDeleting}
         onExtend={setExtending}
+        canManage={canManageSelectedTeam}
+        canExtend={isPlatformAdmin}
       />
 
-      <CreateRouterDialog teamId={teamId} open={createTeamOpen} onOpenChange={setCreateTeamOpen} />
-      <CreateRouterDialog global open={createGlobalOpen} onOpenChange={setCreateGlobalOpen} />
-      <ExtendRouterDialog
-        router={extending}
-        onOpenChange={(open) => {
-          if (!open) setExtending(null);
-        }}
-      />
+      {canManageSelectedTeam ? (
+        <CreateRouterDialog
+          teamId={teamId}
+          open={createTeamOpen}
+          onOpenChange={setCreateTeamOpen}
+        />
+      ) : null}
+      {isPlatformAdmin ? (
+        <>
+          <CreateRouterDialog global open={createGlobalOpen} onOpenChange={setCreateGlobalOpen} />
+          <ExtendRouterDialog
+            router={extending}
+            onOpenChange={(open) => {
+              if (!open) setExtending(null);
+            }}
+          />
+        </>
+      ) : null}
       <DeleteRouterDialog
         teamId={teamId}
         router={deleting}

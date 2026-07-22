@@ -775,6 +775,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/model-credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List credentials available for model bindings
+         * @description Returns provider credential identifiers and names for model management. Secret values are never returned.
+         */
+        get: operations["TeamsTeamIdModelCredentialsListModelCredentials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/platform/models": {
         parameters: {
             query?: never;
@@ -1697,6 +1717,13 @@ export interface components {
             role: components["schemas"]["TeamRole"];
             /** Format: date-time */
             created_at: string;
+        };
+        /** ModelCredentialResponse */
+        ModelCredentialResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            provider: components["schemas"]["Provider"];
         };
         /** ModelPriceResponse */
         ModelPriceResponse: {
@@ -4344,6 +4371,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CallableModelResponse"][];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdModelCredentialsListModelCredentials: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                offset?: number | null;
+            };
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCredentialResponse"][];
                 };
             };
             /** @description Bad request syntax or unsupported method */

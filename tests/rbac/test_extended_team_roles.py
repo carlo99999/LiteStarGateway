@@ -31,6 +31,17 @@ async def test_model_manager_manages_models_and_nothing_else(client: AsyncTestCl
     cred = await _credential(client, admin)
     token = await _member_token(client, admin, team, "mm@corp.com", "model-manager")
 
+    catalog = await client.get(f"/teams/{team}/model-credentials", headers=_bearer(token))
+    assert catalog.status_code == HTTP_200_OK, catalog.text
+    assert catalog.json() == [
+        {
+            "id": cred,
+            "name": "cred-openai",
+            "provider": "openai",
+        }
+    ]
+    assert "values" not in catalog.text
+
     created = await client.post(
         f"/teams/{team}/models", json=_model_payload(cred), headers=_bearer(token)
     )
@@ -198,6 +209,7 @@ async def test_plain_member_is_still_denied_all_management(client: AsyncTestClie
     for request in (
         client.get(f"/teams/{team}/members", headers=_bearer(token)),
         client.get(f"/teams/{team}/models", headers=_bearer(token)),
+        client.get(f"/teams/{team}/model-credentials", headers=_bearer(token)),
         client.get(f"/teams/{team}/keys", headers=_bearer(token)),
         client.get(f"/teams/{team}/usage", headers=_bearer(token)),
         client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(token)),

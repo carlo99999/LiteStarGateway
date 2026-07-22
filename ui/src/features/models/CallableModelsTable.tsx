@@ -24,6 +24,8 @@ interface CallableModelsTableProps {
   onEdit: (model: Model) => void;
   onDelete: (model: Model) => void;
   onExtend: (model: Model) => void;
+  canManage: boolean;
+  canExtend: boolean;
 }
 
 function formatCost(perToken: number | null): string {
@@ -43,6 +45,8 @@ export function CallableModelsTable({
   onEdit,
   onDelete,
   onExtend,
+  canManage,
+  canExtend,
 }: CallableModelsTableProps) {
   const queryClient = useQueryClient();
   const toggle = useMutation({
@@ -119,7 +123,7 @@ export function CallableModelsTable({
       numeric: true,
       cell: (c) =>
         // Extended/global models are managed from their source, not here.
-        c.origin !== "own" ? (
+        c.origin !== "own" || !canManage ? (
           <span className="pr-2 text-[10px] text-muted-foreground/60">read-only</span>
         ) : (
           <DropdownMenu>
@@ -136,7 +140,9 @@ export function CallableModelsTable({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => onEdit(c.model)}>edit</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onExtend(c.model)}>extend…</DropdownMenuItem>
+              {canExtend ? (
+                <DropdownMenuItem onSelect={() => onExtend(c.model)}>extend…</DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onSelect={() => toggle.mutate(c.model)}>
                 {c.model.enabled ? "disable" : "enable"}
               </DropdownMenuItem>

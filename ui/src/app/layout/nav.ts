@@ -14,6 +14,7 @@ import {
   ScrollText,
   type LucideIcon,
 } from "lucide-react";
+import type { ConsoleSurface } from "@/features/teams/access";
 
 export interface NavItem {
   /** Router path (relative to the `/ui` basepath). */
@@ -21,6 +22,7 @@ export interface NavItem {
   /** Mono label, shown prefixed with `/`. */
   label: string;
   icon: LucideIcon;
+  surface: ConsoleSurface;
   /** Implemented? Others render a "planned" placeholder and show a "soon" tag. */
   ready?: boolean;
 }
@@ -38,33 +40,57 @@ export interface NavGroup {
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "overview",
-    items: [{ to: "/", label: "dashboard", icon: LayoutDashboard }],
+    items: [{ to: "/", label: "dashboard", icon: LayoutDashboard, surface: "dashboard" }],
   },
   {
     label: "gateway",
     items: [
-      { to: "/models", label: "models", icon: Boxes, ready: true },
-      { to: "/routing", label: "routing", icon: Route, ready: true },
-      { to: "/playground", label: "playground", icon: FlaskConical, ready: true },
-      { to: "/credentials", label: "credentials", icon: ShieldCheck, ready: true },
-      { to: "/api-keys", label: "api-keys", icon: KeyRound, ready: true },
+      { to: "/models", label: "models", icon: Boxes, surface: "models", ready: true },
+      { to: "/routing", label: "routing", icon: Route, surface: "routing", ready: true },
+      {
+        to: "/playground",
+        label: "playground",
+        icon: FlaskConical,
+        surface: "playground",
+        ready: true,
+      },
+      {
+        to: "/credentials",
+        label: "credentials",
+        icon: ShieldCheck,
+        surface: "credentials",
+        ready: true,
+      },
+      { to: "/api-keys", label: "api-keys", icon: KeyRound, surface: "api-keys", ready: true },
     ],
   },
   {
     label: "governance",
     items: [
-      { to: "/organizations", label: "organizations", icon: Building2, ready: true },
-      { to: "/teams", label: "teams", icon: Users, ready: true },
-      { to: "/users", label: "users", icon: UserRound, ready: true },
-      { to: "/service-principals", label: "service-principals", icon: Bot, ready: true },
+      {
+        to: "/organizations",
+        label: "organizations",
+        icon: Building2,
+        surface: "organizations",
+        ready: true,
+      },
+      { to: "/teams", label: "teams", icon: Users, surface: "teams", ready: true },
+      { to: "/users", label: "users", icon: UserRound, surface: "users", ready: true },
+      {
+        to: "/service-principals",
+        label: "service-principals",
+        icon: Bot,
+        surface: "service-principals",
+        ready: true,
+      },
     ],
   },
   {
     label: "observability",
     items: [
-      { to: "/usage", label: "usage", icon: BarChart3, ready: true },
-      { to: "/budgets", label: "budgets", icon: Wallet, ready: true },
-      { to: "/audit", label: "audit", icon: ScrollText, ready: true },
+      { to: "/usage", label: "usage", icon: BarChart3, surface: "usage", ready: true },
+      { to: "/budgets", label: "budgets", icon: Wallet, surface: "budgets", ready: true },
+      { to: "/audit", label: "audit", icon: ScrollText, surface: "audit", ready: true },
     ],
   },
 ];
