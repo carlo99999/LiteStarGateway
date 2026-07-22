@@ -1,11 +1,9 @@
 """Playground: run one prompt against several models and compare the results.
 
-Real provider calls (so latency and outputs are truthful), governed by the same
-request sanitizing/clamping as the inference path — but deliberately *not*
-metered or billed: it's an admin comparison tool, not customer traffic, and
-shouldn't drain a team's budget. Cost is computed from each model's per-token
-costs for display only. Each model runs concurrently and isolates its own
-error, so one failure never sinks the comparison.
+Real provider calls (so latency and outputs are truthful) delegated to the
+normal completion path.  They therefore share its request policy, budget,
+rate-limit, usage-ledger, and trace guarantees.  The batch is bounded and
+deduplicated before any provider work starts.
 """
 
 from __future__ import annotations
@@ -16,10 +14,18 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID
 
+from litestar_gateway.application.completion_service import CompletionService
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.domain.entities import Model, ModelType
-from litestar_gateway.domain.ports import CredentialRepository, LLMGateway, ModelRepository
-from litestar_gateway.domain.request_policy import clamp_output_tokens, sanitize_request
+from litestar_gateway.domain.exceptions import (
+    BudgetExceeded,
+    InvalidPlaygroundRequest,
+    RateLimited,
+)
+from litestar_gateway.domain.ports import ModelRepository
+
+DEFAULT_MAX_MODELS = 5
+DEFAULT_MAX_CONCURRENCY = 1
 
 
 @dataclass(frozen=True)
@@ -47,14 +53,17 @@ class PlaygroundService:
     def __init__(
         self,
         models: ModelRepository,
-        credentials: CredentialRepository,
-        gateway: LLMGateway,
+        completion_service: CompletionService,
         routers: RouterService | None = None,
+        *,
+        max_models: int = DEFAULT_MAX_MODELS,
+        max_concurrency: int = DEFAULT_MAX_CONCURRENCY,
     ) -> None:
         self._models = models
-        self._credentials = credentials
-        self._gateway = gateway
+        self._completion_service = completion_service
         self._routers = routers
+        self._max_models = max_models
+        self._max_concurrency = max_concurrency
 
     async def compare(
         self,
@@ -63,11 +72,29 @@ class PlaygroundService:
         messages: list[dict[str, Any]],
         max_completion_tokens: int | None = None,
     ) -> list[PlaygroundResult]:
-        """Send the same messages to each model concurrently; return one result
-        each, in the requested order."""
-        results = await asyncio.gather(
-            *(self._run_one(team_id, name, messages, max_completion_tokens) for name in model_names)
-        )
+        """Run one governed call per unique alias, preserving request order."""
+        if not model_names:
+            raise InvalidPlaygroundRequest("select at least one model")
+        if len(model_names) > self._max_models:
+            raise InvalidPlaygroundRequest(f"select at most {self._max_models} models")
+        if any(not name or len(name) > 200 for name in model_names):
+            raise InvalidPlaygroundRequest("model aliases must contain 1 to 200 characters")
+        if not messages or len(messages) > 100:
+            raise InvalidPlaygroundRequest("send between 1 and 100 messages")
+        if max_completion_tokens is not None and (
+            isinstance(max_completion_tokens, bool)
+            or max_completion_tokens < 1
+            or max_completion_tokens > 1_000_000
+        ):
+            raise InvalidPlaygroundRequest("max_completion_tokens must be between 1 and 1000000")
+        unique_names = list(dict.fromkeys(model_names))
+        semaphore = asyncio.Semaphore(self._max_concurrency)
+
+        async def run_bounded(name: str) -> PlaygroundResult:
+            async with semaphore:
+                return await self._run_one(team_id, name, messages, max_completion_tokens)
+
+        results = await asyncio.gather(*(run_bounded(name) for name in unique_names))
         return list(results)
 
     async def _run_one(
@@ -105,7 +132,12 @@ class PlaygroundService:
                         name, ok=False, error=f"router chose unknown model '{decision.model_name}'"
                     )
                 result = await self._call_model(
-                    team_id, name, chosen, messages, max_completion_tokens
+                    team_id,
+                    name,
+                    chosen,
+                    messages,
+                    max_completion_tokens,
+                    call_alias=decision.model_name,
                 )
                 return replace(result, chosen_model=decision.model_name)
 
@@ -118,20 +150,20 @@ class PlaygroundService:
         model: Model,
         messages: list[dict[str, Any]],
         max_completion_tokens: int | None,
+        *,
+        call_alias: str | None = None,
     ) -> PlaygroundResult:
-        request: dict[str, Any] = {"model": model.name, "messages": messages}
+        request: dict[str, Any] = {"model": call_alias or label, "messages": messages}
         if max_completion_tokens is not None:
             request["max_completion_tokens"] = max_completion_tokens
-        clean = sanitize_request("chat.completions", request)
-        clean = clamp_output_tokens("chat.completions", clean, model.max_output_tokens)
-
         try:
-            values = await self._credentials.get_values(model.credential_id)
-            if values is None:
-                return PlaygroundResult(label, ok=False, error="credential missing")
             start = perf_counter()
-            response = await self._gateway.achat_completion(clean, model, values)
+            response = await self._completion_service.chat_completion(team_id, None, request)
             latency_ms = (perf_counter() - start) * 1000
+        except BudgetExceeded, RateLimited:
+            # Governance failures apply to the whole HTTP request and retain
+            # their normal 402/429 mapping instead of being hidden in a 201 row.
+            raise
         except Exception as exc:  # per-model isolation — never sink the batch
             return PlaygroundResult(label, ok=False, error=str(exc) or exc.__class__.__name__)
 

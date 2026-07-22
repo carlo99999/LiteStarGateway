@@ -159,6 +159,16 @@ decision distribution (by model / tier / shadow), the **estimated savings** vs
 the most expensive capable candidate, the recent decision log, and a **JSONL
 export** of judge decisions for distilling a local classifier.
 
+### Playground
+
+Team admins and model managers can compare up to five unique chat-model or
+router aliases per request. These are real provider calls: each selected alias
+consumes the team's RPM and budget and creates its own usage record and trace.
+The batch is also audit-logged against the signed-in user. External router
+strategies (webhook, judge, embeddings, and hybrid escalation) are not executed
+during preview; the preview uses the router's default capable model so it cannot
+create a hidden, unmetered side effect.
+
 ## Observability
 
 - **Usage** — per-model token and cost totals per team.

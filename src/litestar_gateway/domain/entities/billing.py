@@ -27,11 +27,12 @@ class Budget:
 @dataclass(frozen=True)
 class UsageEvent:
     """One recorded model call: token counts and estimated cost, tagged with the
-    API key and model so usage can be broken down by either."""
+    API key (when the caller used one) and model so usage can be broken down by
+    either. Session-authenticated internal surfaces deliberately use ``None``."""
 
     id: UUID
     team_id: UUID
-    api_key_id: UUID
+    api_key_id: UUID | None
     model_id: UUID
     model_name: str
     operation: str
@@ -69,7 +70,7 @@ class TraceRecord:
     """One observability trace for a model call (metadata; no payload in v1)."""
 
     team_id: UUID
-    api_key_id: UUID
+    api_key_id: UUID | None
     model_name: str
     provider: str
     operation: str

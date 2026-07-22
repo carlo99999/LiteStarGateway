@@ -98,7 +98,10 @@ class SQLAlchemyUsageRepository:
                 func.coalesce(func.sum(UsageEventModel.cost), 0.0),
                 func.count(),
             )
-            .where(UsageEventModel.team_id == team_id)
+            .where(
+                UsageEventModel.team_id == team_id,
+                UsageEventModel.api_key_id.is_not(None),
+            )
             .group_by(UsageEventModel.api_key_id)
         )
         rows = (await self._session.execute(query)).all()
