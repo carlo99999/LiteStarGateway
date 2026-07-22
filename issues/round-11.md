@@ -26,9 +26,47 @@ Baseline eseguita:
 - Alembic ha una sola head (`c6366c44d858`) e il controllo di drift dopo
   l'upgrade non rileva nuove operazioni.
 
+## Remediation update — 2026-07-22
+
+Tutti i finding sono stati implementati e verificati in uno stack di otto PR
+ancora **open**. Quindi lo stato corretto è “fixed nello stack”, non ancora
+“rilasciato su `main`”. L'HEAD integrato è `6a4defd`.
+
+| PR | Branch | Issue | Commit | Stato al 2026-07-22 |
+|---|---|---|---|---|
+| [#313](https://github.com/carlo99999/LiteStarGateway/pull/313) | `fix/r11-013-webhook-ip-pinning` | ISSUE-013 | `1adef23` | Open, mergeable |
+| [#314](https://github.com/carlo99999/LiteStarGateway/pull/314) | `fix/r11-persistence-integrity` | ISSUE-014/017/018 | `8953952` | Open, mergeable |
+| [#315](https://github.com/carlo99999/LiteStarGateway/pull/315) | `fix/r11-016-role-aware-console` | ISSUE-016 | `bbba66a` | Open, mergeable |
+| [#316](https://github.com/carlo99999/LiteStarGateway/pull/316) | `fix/r11-010-playground-governance` | ISSUE-010 | `2bff783` | Open, mergeable |
+| [#317](https://github.com/carlo99999/LiteStarGateway/pull/317) | `refactor/r11-012-callable-alias-registry` | ISSUE-012 (namespace) | `cf16940` | Open, mergeable |
+| [#318](https://github.com/carlo99999/LiteStarGateway/pull/318) | `fix/r11-router-revisions` | ISSUE-011 + ISSUE-012 (identity) | `b05ca26` | Open, mergeable |
+| [#319](https://github.com/carlo99999/LiteStarGateway/pull/319) | `fix/r11-015-usage-attribution` | ISSUE-015 | `28a5a9e` | Open, mergeable |
+| [#320](https://github.com/carlo99999/LiteStarGateway/pull/320) | `fix/r11-019-migration-rollback-contract` | ISSUE-019 | `6a4defd` | Open, mergeable |
+
+Gate finali eseguiti sull'HEAD integrato:
+
+- **997 passed, 6 skipped** su SQLite; il pre-push ha ripetuto la suite su ogni
+  aggiornamento dello stack;
+- migrazione completa e **1003 passed** su PostgreSQL 17;
+- coverage **92,79%**, sopra il gate 80%; i file di billing aggiunti arrivano
+  al 91–100%;
+- frontend: TypeScript, ESLint, **24 test** e build Vite verdi;
+- Ruff, Pyrefly, `pre-commit --all-files`, secret scan, `git diff --check` e
+  `pip-audit` verdi; nessuna vulnerabilità nota tra le dipendenze auditabili;
+- una sola Alembic head: `c83e4a1b7d52`.
+
+Il job remoto `checks` era inizialmente rosso da PR #317 per falsi positivi
+`detect-secrets` su ID di migrazione deterministici e per una baseline con line
+number obsoleto. Le fixture sono ora annotate esplicitamente, la baseline è
+riallineata e l'intero `pre-commit --all-files` passa localmente; i check GitHub
+sono stati riavviati dai branch aggiornati.
+
 ## Executive summary
 
 Counts: **0 CRITICAL · 4 HIGH · 6 MEDIUM · 0 LOW**.
+
+Questa è la fotografia pre-remediation che ha motivato le PR elencate sopra;
+lo stato corrente dello stack è riportato nella sezione “Remediation update”.
 
 Il nucleo di autenticazione, metering e streaming standard rimane solido, ma le
 nuove superfici che effettuano o dirigono chiamate provider non conservano
@@ -53,16 +91,16 @@ i finding MEDIUM.
 
 | ID | Title | Severity | Files | Status |
 |---|---|---|---|---|
-| ISSUE-010 | Playground: chiamate provider reali fuori da budget, rate limit e ledger, con fan-out illimitato | HIGH | `web/playground/controller.py`; `application/playground_service.py`; `domain/authorization.py` | Open |
-| ISSUE-011 | Un tenant sorgente può trasformare un router già condiviso in un sink dei prompt del tenant target | HIGH | `web/routing/controller.py`; `web/routing/platform_controller.py`; `persistence/router_repository.py`; `application/routing/{service,webhook}.py` | Open |
-| ISSUE-012 | Alias e candidati dei router non hanno un'identità unificata: policy bypassate o modello sbagliato | HIGH | `application/{model_service,completion_service}.py`; `application/routing/service.py`; `web/api_router/models_list.py` | Open |
-| ISSUE-013 | R6-H18 riaperto: l'IP validato dal guard SSRF non è quello vincolato alla connessione | HIGH | `application/routing/webhook.py` | Open |
-| ISSUE-014 | PATCH credenziale non atomica: un 409 può comunque sostituire il secret senza audit | MEDIUM | `application/credential_service.py`; `persistence/credential_repository.py`; `web/credentials/controller.py` | Open |
-| ISSUE-015 | L'alias `<base>-global` produce righe usage indistinguibili e un filtro che non trova i dati | MEDIUM | `persistence/usage_repository.py`; `web/teams/schemas.py`; `ui/src/features/usage/UsagePage.tsx` | Open |
-| ISSUE-016 | Models, Routing e Playground della console non funzionano per i ruoli team dichiarati supportati | MEDIUM | `ui/src/features/{teams,models,routing,playground}`; `web/teams/controller.py`; `web/session/me.py` | Open |
-| ISSUE-017 | PATCH/DELETE `/platform/models/{id}` accettano anche modelli team-owned e li auditano come globali | MEDIUM | `web/models/platform_controller.py`; `application/model_service.py`; `persistence/model_repository.py` | Open |
-| ISSUE-018 | La promozione di un modello globale elimina i grant in transazioni separate | MEDIUM | `application/model_service.py`; `persistence/model_repository.py` | Open |
-| ISSUE-019 | Il downgrade delle migrazioni global model/router fallisce in presenza di dati globali legittimi | MEDIUM | `migrations/versions/*90e784ecd46b.py`; `migrations/versions/*c6366c44d858.py` | Open |
+| ISSUE-010 | Playground: chiamate provider reali fuori da budget, rate limit e ledger, con fan-out illimitato | HIGH | `web/playground/controller.py`; `application/playground_service.py`; `domain/authorization.py` | Fixed in [#316](https://github.com/carlo99999/LiteStarGateway/pull/316) |
+| ISSUE-011 | Un tenant sorgente può trasformare un router già condiviso in un sink dei prompt del tenant target | HIGH | `web/routing/controller.py`; `web/routing/platform_controller.py`; `persistence/router_repository.py`; `application/routing/{service,webhook}.py` | Fixed in [#318](https://github.com/carlo99999/LiteStarGateway/pull/318) |
+| ISSUE-012 | Alias e candidati dei router non hanno un'identità unificata: policy bypassate o modello sbagliato | HIGH | `application/{model_service,completion_service}.py`; `application/routing/service.py`; `web/api_router/models_list.py` | Fixed in [#317](https://github.com/carlo99999/LiteStarGateway/pull/317) + [#318](https://github.com/carlo99999/LiteStarGateway/pull/318) |
+| ISSUE-013 | R6-H18 riaperto: l'IP validato dal guard SSRF non è quello vincolato alla connessione | HIGH | `application/routing/webhook.py` | Fixed in [#313](https://github.com/carlo99999/LiteStarGateway/pull/313) |
+| ISSUE-014 | PATCH credenziale non atomica: un 409 può comunque sostituire il secret senza audit | MEDIUM | `application/credential_service.py`; `persistence/credential_repository.py`; `web/credentials/controller.py` | Fixed in [#314](https://github.com/carlo99999/LiteStarGateway/pull/314) |
+| ISSUE-015 | L'alias `<base>-global` produce righe usage indistinguibili e un filtro che non trova i dati | MEDIUM | `persistence/usage_repository.py`; `web/teams/schemas.py`; `ui/src/features/usage/UsagePage.tsx` | Fixed in [#319](https://github.com/carlo99999/LiteStarGateway/pull/319) |
+| ISSUE-016 | Models, Routing e Playground della console non funzionano per i ruoli team dichiarati supportati | MEDIUM | `ui/src/features/{teams,models,routing,playground}`; `web/teams/controller.py`; `web/session/me.py` | Fixed in [#315](https://github.com/carlo99999/LiteStarGateway/pull/315) |
+| ISSUE-017 | PATCH/DELETE `/platform/models/{id}` accettano anche modelli team-owned e li auditano come globali | MEDIUM | `web/models/platform_controller.py`; `application/model_service.py`; `persistence/model_repository.py` | Fixed in [#314](https://github.com/carlo99999/LiteStarGateway/pull/314) |
+| ISSUE-018 | La promozione di un modello globale elimina i grant in transazioni separate | MEDIUM | `application/model_service.py`; `persistence/model_repository.py` | Fixed in [#314](https://github.com/carlo99999/LiteStarGateway/pull/314) |
+| ISSUE-019 | Il downgrade delle migrazioni global model/router fallisce in presenza di dati globali legittimi | MEDIUM | `migrations/versions/*90e784ecd46b.py`; `migrations/versions/*c6366c44d858.py` | Fixed in [#320](https://github.com/carlo99999/LiteStarGateway/pull/320) |
 
 ## Findings
 
@@ -704,21 +742,29 @@ Ogni PR di implementazione deve rispettare lo stesso gate:
 6. review sicurezza obbligatoria per PR 1, 2, 5 e 6;
 7. commit convenzionali e descrizione PR con mapping agli ISSUE chiusi.
 
-## Resolution status — OPEN
+## Resolution status — IMPLEMENTED IN OPEN PR STACK
 
-La revisione è stata eseguita in sola lettura sul codice prodotto. Nessuno dei
-finding ISSUE-010–ISSUE-019 è stato corretto in questo round e non sono stati
-creati commit. La sola modifica preesistente nel worktree è `.DS_Store`.
+ISSUE-010–ISSUE-019 hanno una remediation implementata con test di regressione
+e sono chiusi sull'HEAD integrato `6a4defd`. Restano aperti dal punto di vista
+del prodotto finché le PR #313–#320 non vengono mergiate e distribuite: `main`
+non contiene ancora le correzioni.
 
-Ordine raccomandato:
+Ordine operativo di merge:
 
-1. chiudere immediatamente ISSUE-010 e ISSUE-013, perché espongono chiamate di
-   rete/spesa fuori dagli invarianti dichiarati;
-2. congelare o riapprovare i router condivisi (ISSUE-011) e introdurre identità
-   stabili/namespace unificato (ISSUE-012);
-3. rendere atomici credential update e model promotion (ISSUE-014/018);
-4. correggere attribution, UI, scope API e strategia downgrade
-   (ISSUE-015/016/017/019).
+1. mergiare le PR indipendenti #313, #314, #315 e #316;
+2. retargettare #317 da `stack/r11-playground-persistence` a `main` dopo
+   l'ingresso di #314/#316 e verificare che il diff residuo contenga soltanto il
+   registro alias e i relativi test;
+3. mergiare in sequenza #317 → #318 → #319 → #320, aggiornando ogni base al
+   branch appena entrato;
+4. applicare le migrazioni con write freeze come descritto in
+   `docs/db-migrations.md`, quindi eseguire smoke test e osservare error rate,
+   usage ledger, router decisions e webhook egress;
+5. mergiare questo aggiornamento documentale per ultimo.
+
+Non è necessario squashare lo stack in una mega-PR: i confini attuali sono
+coerenti con rollback e responsabilità. Le PR #317–#320 devono però rimanere
+seriali perché condividono resolver, revisioni router e catena Alembic.
 
 ## Deferred / product decision
 
@@ -742,14 +788,14 @@ Ordine raccomandato:
 - **Adapter reasoning:** il retry OpenAI `max_tokens` →
   `max_completion_tokens` è immutabile, ristretto al relativo bad request e
   coperto sia stream sia non-stream.
-- **Persistenza:** una sola head Alembic; upgrade completo e drift check verdi su
-  SQLite, upgrade + suite completa verdi su PostgreSQL; promozione router
-  atomica a livello DB.
+- **Persistenza:** una sola head Alembic; upgrade completo e suite integrata
+  verdi su SQLite e PostgreSQL; promozioni atomiche, revisioni router e
+  downgrade global-resource verificati con dati reali.
 - **Supply chain / CI:** `pip-audit` non rileva vulnerabilità note nelle
   dipendenze risolvibili; pre-commit, type-check, docs strict e build UI sono
   verdi.
-- **Qualità test:** 924 test backend con 94,13% di coverage, 930 su PostgreSQL e
-  24 test UI passano.
+- **Qualità test:** 997 test backend con 92,79% di coverage, 1003 su PostgreSQL
+  e 24 test UI passano sull'HEAD di remediation.
 
 ## Verified and refuted
 
@@ -772,13 +818,15 @@ Ordine raccomandato:
 
 | Category | Score | Summary |
 |---|---:|---|
-| Security / tenancy | **5.5/10** | Auth core solido, ma router condivisi e guard SSRF aprono due confini cross-tenant/rete ad alto impatto. |
-| Money / rate limiting | **6/10** | Inference standard corretta; il Playground aggira l'intero piano di governance e l'attribution degli alias è ambigua. |
-| Routing / model identity | **5.5/10** | Feature ricca ma alias separati e late binding dei candidati possono saltare policy o scegliere il modello sbagliato. |
-| Persistence / migrations | **6.5/10** | Upgrade e PostgreSQL verdi; restano due UoW parziali e un downgrade senza policy dati. |
-| Admin UI / API | **6.5/10** | Build pulita e pagine complete, ma i ruoli team non possono usare tre superfici dichiarate accessibili e lo scope global-model è lasco. |
-| Test / CI | **9/10** | Coverage 94,13%, suite PostgreSQL e gate completi; mancano test sugli invarianti cross-feature introdotti dalla delta. |
+| Security / tenancy | **9.2/10** | Webhook IP-pinned, revisioni condivise immutabili e riapprovazione esplicita chiudono i confini cross-tenant/rete trovati. |
+| Money / rate limiting | **9.3/10** | Playground e router interni ereditano admission, RPM, settlement e ledger; attribution richiesta/risolta è conservata end-to-end. |
+| Routing / model identity | **9.2/10** | Namespace callable unico, ID candidati stabili, revisioni pin e lookup exact-ID eliminano shadowing e late binding ambiguo. |
+| Persistence / migrations | **9.3/10** | UoW atomiche, scope global esplicito, una sola head e rollback data-safe verificato su SQLite/PostgreSQL. |
+| Admin UI / API | **8.9/10** | Console role-aware, righe usage stabili e consenso webhook esplicito; resta utile ampliare la copertura browser E2E dei dialog complessi. |
+| Test / CI | **9.5/10** | 997 test SQLite, 1003 PostgreSQL, coverage 92,79%, UI/Docker/type/lint/security gate completi e nuove regressioni cross-feature. |
 
-**Overall: 6.4/10.** La qualità meccanica e la copertura sono alte, ma le nuove
-funzioni globali/condivise hanno introdotto percorsi che non ereditano ancora le
-garanzie economiche, di identità e di tenancy del gateway principale.
+**Overall sull'HEAD di remediation: 9.2/10.** Il codice passa da 6,4 a 9,2:
+gli invarianti economici, di identità, tenancy, transazione e rollback ora sono
+applicati anche alle superfici globali, condivise e Playground. Il margine fino
+al 10 non è un finding aperto di Round 11: rappresenta soprattutto merge/deploy
+non ancora eseguiti, soak operativo e copertura browser E2E ancora espandibile.
