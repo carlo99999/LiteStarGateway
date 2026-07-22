@@ -48,6 +48,10 @@ class CallableAliasResolver:
     async def _load(self, binding: CallableAliasBinding) -> CallableResource | None:
         if binding.kind is CallableKind.MODEL:
             return await self._models.get(binding.resource_id)
+        if binding.router_grant_id is not None:
+            return await self._routers.get_for_grant(binding.router_grant_id, binding.team_id)
+        if binding.router_revision_id is not None:
+            return await self._routers.get_revision(binding.resource_id, binding.router_revision_id)
         return await self._routers.get_any(binding.resource_id)
 
     @staticmethod
@@ -109,6 +113,20 @@ class CallableAliasResolver:
             return None
         assert isinstance(resolved.resource, Model)
         return resolved.resource
+
+    async def resolve_model_id(self, team_id: UUID | None, model_id: UUID) -> Model | None:
+        """Load an exact model identity only when it is callable in this scope.
+
+        Router revisions use this path so a later alias rename or a target-team
+        homonym can never redirect an already-approved candidate.
+        """
+        explicit, _ = await self._aliases.snapshot(team_id)
+        if not any(
+            binding.kind is CallableKind.MODEL and binding.resource_id == model_id
+            for binding in explicit
+        ):
+            return None
+        return await self._models.get(model_id)
 
     async def explicit_taken(self, team_id: UUID | None, alias: str) -> bool:
         rows = await self._aliases.list_explicit(team_id)

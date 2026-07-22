@@ -164,7 +164,7 @@ async def test_shadow_judge_lookups_use_their_own_repositories() -> None:
 
     @asynccontextmanager
     async def shadow_repos() -> AsyncIterator[
-        tuple[RecordingModels, RecordingCredentials, RecordingResolver]
+        tuple[RecordingModels, RecordingCredentials, RecordingResolver, SimpleNamespace]
     ]:
         repos_lifecycle.append("opened")
         try:
@@ -172,6 +172,7 @@ async def test_shadow_judge_lookups_use_their_own_repositories() -> None:
                 RecordingModels("shadow", calls),
                 RecordingCredentials("shadow", calls),
                 RecordingResolver("shadow", calls, judge),
+                SimpleNamespace(),
             )
         finally:
             repos_lifecycle.append("closed")
@@ -196,7 +197,7 @@ async def test_shadow_judge_lookups_use_their_own_repositories() -> None:
     # The judge's model/credential lookups ran on the shadow task's own
     # repositories (own session), never on the request-scoped ones.
     assert ("shadow", "resolver", "judge-model") in calls
-    assert not [call for call in calls if call[1] == "models"]
+    assert not [call for call in calls if call[0] == "shadow" and call[1] == "models"]
     assert any(label == "shadow" and port == "credentials" for label, port, _ in calls)
     assert not [call for call in calls if call[0] == "request"]
     assert repos_lifecycle == ["opened", "closed"]
@@ -228,12 +229,13 @@ async def test_shadow_tombstone_never_falls_through_to_legacy_lookup_or_provider
 
     @asynccontextmanager
     async def shadow_repos() -> AsyncIterator[
-        tuple[RecordingModels, RecordingCredentials, RecordingResolver]
+        tuple[RecordingModels, RecordingCredentials, RecordingResolver, SimpleNamespace]
     ]:
         yield (
             RecordingModels("shadow", calls),
             RecordingCredentials("shadow", calls),
             RecordingResolver("shadow", calls, None),
+            SimpleNamespace(),
         )
 
     service = RouterService(
@@ -255,6 +257,8 @@ async def test_shadow_tombstone_never_falls_through_to_legacy_lookup_or_provider
 
     assert decision.model_name == "cheap"
     assert ("shadow", "resolver", alias) in calls
-    assert not [call for call in calls if call[1] in {"models", "credentials"}]
+    assert not [
+        call for call in calls if call[0] == "shadow" and call[1] in {"models", "credentials"}
+    ]
     assert gateway.chat_calls == gateway.embedding_calls == 0
     assert shadow_records == []

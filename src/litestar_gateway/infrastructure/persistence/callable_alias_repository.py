@@ -15,6 +15,7 @@ from litestar_gateway.domain.callable_alias import (
 from litestar_gateway.infrastructure.persistence.orm import (
     CallableAliasRecord,
     ModelRecord,
+    RouterGrantModel,
     RouterModel,
 )
 
@@ -36,15 +37,26 @@ class SQLAlchemyCallableAliasRepository:
                 ModelRecord.origin_team_id,
                 RouterModel.team_id,
                 RouterModel.origin_team_id,
+                RouterModel.current_revision_id,
+                RouterGrantModel.revision_id,
             )
             .outerjoin(ModelRecord, ModelRecord.id == CallableAliasRecord.model_id)
             .outerjoin(RouterModel, RouterModel.id == CallableAliasRecord.router_id)
+            .outerjoin(RouterGrantModel, RouterGrantModel.id == CallableAliasRecord.router_grant_id)
             .where(scope)
             .order_by(CallableAliasRecord.alias, CallableAliasRecord.id)
         )
         bindings: list[CallableAliasBinding] = []
         reserved: set[str] = set()
-        for row, model_team_id, model_origin_team_id, router_team_id, router_origin_team_id in rows:
+        for (
+            row,
+            model_team_id,
+            model_origin_team_id,
+            router_team_id,
+            router_origin_team_id,
+            router_head_revision_id,
+            router_grant_revision_id,
+        ) in rows:
             if row.unavailable:
                 reserved.add(row.alias)
                 continue
@@ -80,6 +92,12 @@ class SQLAlchemyCallableAliasRepository:
                     resource_id=resource_id,
                     origin=origin,
                     source_team_id=source_team_id,
+                    router_grant_id=row.router_grant_id,
+                    router_revision_id=(
+                        router_grant_revision_id
+                        if row.router_grant_id is not None
+                        else router_head_revision_id
+                    ),
                 )
             )
         return bindings, reserved

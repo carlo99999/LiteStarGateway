@@ -193,6 +193,10 @@ class RouterModel(base.UUIDAuditBase):
     enabled: Mapped[bool] = mapped_column(default=True)
     # The originally-owning team, kept when a router is promoted to global.
     origin_team_id: Mapped[UUID | None] = mapped_column(default=None)
+    # Pointer to the immutable snapshot used by direct/global callers. Kept
+    # nullable so router identity and its first revision can be inserted in one
+    # transaction without a circular FK dependency.
+    current_revision_id: Mapped[UUID | None] = mapped_column(default=None, index=True)
 
     def to_entity(self) -> RouterConfig:
         return RouterConfig(
@@ -224,6 +228,70 @@ class RouterModel(base.UUIDAuditBase):
         )
 
 
+class RouterRevisionModel(base.UUIDAuditBase):
+    """Append-only router configuration snapshot."""
+
+    __tablename__ = "router_revision"
+    __table_args__ = (UniqueConstraint("router_id", "revision_number"),)
+
+    router_id: Mapped[UUID] = mapped_column(ForeignKey("router.id", ondelete="CASCADE"), index=True)
+    revision_number: Mapped[int] = mapped_column()
+    candidates: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    default_model_id: Mapped[UUID] = mapped_column()
+    default_model_name: Mapped[str] = mapped_column()
+    strategy: Mapped[str] = mapped_column()
+    strategy_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    shadow_strategy: Mapped[str | None] = mapped_column(default=None)
+    enabled: Mapped[bool] = mapped_column(default=True)
+
+    def to_entity(
+        self,
+        router: RouterModel,
+        *,
+        grant_id: UUID | None = None,
+        ack_active_prompt_egress: bool = False,
+        ack_shadow_prompt_egress: bool = False,
+    ) -> RouterConfig:
+        return RouterConfig(
+            id=router.id,
+            team_id=router.team_id,
+            name=router.name,
+            candidates=tuple(
+                CandidateModel(
+                    model_name=c["model_name"],
+                    description=c.get("description", ""),
+                    quality_tier=QualityTier(c["quality_tier"]),
+                    model_id=UUID(str(c["model_id"])),
+                    model_origin=c.get("model_origin"),
+                    source_team_id=(
+                        UUID(str(c["source_team_id"])) if c.get("source_team_id") else None
+                    ),
+                    supports_vision=c.get("supports_vision", False),
+                    supports_tools=c.get("supports_tools", False),
+                    supports_json_schema=c.get("supports_json_schema", False),
+                    context_window_tokens=c.get("context_window_tokens"),
+                    input_cost_per_token=c.get("input_cost_per_token"),
+                    output_cost_per_token=c.get("output_cost_per_token"),
+                    weight=c.get("weight"),
+                )
+                for c in self.candidates
+            ),
+            default_model=self.default_model_name,
+            strategy=self.strategy,
+            strategy_config=self.strategy_config,
+            enabled=self.enabled,
+            created_at=router.created_at,
+            shadow_strategy=self.shadow_strategy,
+            origin_team_id=router.origin_team_id,
+            revision_id=self.id,
+            revision_number=self.revision_number,
+            default_model_id=self.default_model_id,
+            grant_id=grant_id,
+            ack_active_prompt_egress=ack_active_prompt_egress,
+            ack_shadow_prompt_egress=ack_shadow_prompt_egress,
+        )
+
+
 class RouterGrantModel(base.UUIDAuditBase):
     """A team-owned router extended to another team, under `alias`."""
 
@@ -233,17 +301,27 @@ class RouterGrantModel(base.UUIDAuditBase):
         UniqueConstraint("router_id", "team_id"),
     )
 
-    router_id: Mapped[UUID] = mapped_column(ForeignKey("router.id", ondelete="CASCADE"), index=True)
+    # A source router with an approved grant cannot be deleted implicitly.
+    router_id: Mapped[UUID] = mapped_column(ForeignKey("router.id"), index=True)
     team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
     alias: Mapped[str] = mapped_column()
+    revision_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("router_revision.id"), index=True, default=None
+    )
+    ack_active_prompt_egress: Mapped[bool] = mapped_column(default=False)
+    ack_shadow_prompt_egress: Mapped[bool] = mapped_column(default=False)
 
-    def to_entity(self) -> RouterGrant:
+    def to_entity(self, revision_number: int | None = None) -> RouterGrant:
         return RouterGrant(
             id=self.id,
             router_id=self.router_id,
             team_id=self.team_id,
             alias=self.alias,
             created_at=self.created_at,
+            revision_id=self.revision_id,
+            revision_number=revision_number,
+            ack_active_prompt_egress=self.ack_active_prompt_egress,
+            ack_shadow_prompt_egress=self.ack_shadow_prompt_egress,
         )
 
 
@@ -287,6 +365,8 @@ class RoutingDecisionModel(base.UUIDAuditBase):
     completion_tokens: Mapped[int | None] = mapped_column(default=None)
     user_text: Mapped[str | None] = mapped_column(default=None)
     system_prompt: Mapped[str | None] = mapped_column(default=None)
+    router_revision_id: Mapped[UUID | None] = mapped_column(default=None, index=True)
+    chosen_model_id: Mapped[UUID | None] = mapped_column(default=None, index=True)
 
     def to_entity(self) -> RoutingDecisionRecord:
         return RoutingDecisionRecord(
@@ -312,6 +392,8 @@ class RoutingDecisionModel(base.UUIDAuditBase):
             completion_tokens=self.completion_tokens,
             user_text=self.user_text,
             system_prompt=self.system_prompt,
+            router_revision_id=self.router_revision_id,
+            chosen_model_id=self.chosen_model_id,
         )
 
 

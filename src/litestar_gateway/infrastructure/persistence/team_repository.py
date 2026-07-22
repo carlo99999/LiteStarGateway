@@ -21,6 +21,7 @@ from litestar_gateway.infrastructure.persistence.callable_alias_slots import (
 from litestar_gateway.infrastructure.persistence.orm import (
     InviteModel,
     PendingUsageEventModel,
+    RouterGrantModel,
     RouterModel,
     ServicePrincipalModel,
     TeamBudgetModel,
@@ -133,6 +134,12 @@ class SQLAlchemyTeamRepository:
                 )
                 if not isinstance(router, RouterModel) or router.team_id != team_id:
                     continue
+                if await self._session.scalar(
+                    select(RouterGrantModel.id)
+                    .where(RouterGrantModel.router_id == router_id)
+                    .limit(1)
+                ):
+                    raise TeamNotEmpty("team owns a shared router; revoke every router grant first")
                 await tombstone_resource(self._session, CallableKind.ROUTER, router_id)
             for child in (
                 InviteModel,

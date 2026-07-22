@@ -473,10 +473,15 @@ class CompletionService:
                     router, request, acting_team_id=team_id, api_key_id=api_key_id
                 )
                 assert self._callable_resolver is not None
-                chosen = await self._callable_resolver.resolve(team_id, decision.model_name)
-                if chosen is not None and chosen.kind is CallableKind.MODEL:
-                    assert isinstance(chosen.resource, Model)
-                    model = chosen.resource
+                if decision.model_id is not None:
+                    model = await self._callable_resolver.resolve_model_id(
+                        team_id, decision.model_id
+                    )
+                else:  # compatibility for in-memory/legacy router definitions
+                    chosen = await self._callable_resolver.resolve(team_id, decision.model_name)
+                    if chosen is not None and chosen.kind is CallableKind.MODEL:
+                        assert isinstance(chosen.resource, Model)
+                        model = chosen.resource
         elif self._callable_resolver is None:
             model = await self._models.get_by_name(team_id, alias) if alias else None
         if (

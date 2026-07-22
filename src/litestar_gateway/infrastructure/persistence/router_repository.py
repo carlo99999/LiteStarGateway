@@ -13,8 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from litestar_gateway.domain.callable_alias import CallableKind
 from litestar_gateway.domain.exceptions import (
     CredentialMisconfigured,
+    InvalidRouterConfig,
+    RouterGrantNotFound,
     RouterNameExists,
     RouterNotFound,
+    RouterRevisionConflict,
+    RouterShared,
     SaltKeyMissing,
 )
 from litestar_gateway.domain.routing import (
@@ -31,12 +35,12 @@ from litestar_gateway.infrastructure.persistence.callable_alias_slots import (
     rename_direct,
     tombstone_grant,
     tombstone_resource,
-    tombstone_resource_grants,
 )
 from litestar_gateway.infrastructure.persistence.orm import (
     CallableAliasRecord,
     RouterGrantModel,
     RouterModel,
+    RouterRevisionModel,
     RoutingDecisionModel,
 )
 
@@ -44,7 +48,18 @@ _GLOBAL_SUFFIX = "-global"
 
 
 def _candidates_json(router: RouterConfig) -> list[dict]:
-    return [dataclasses.asdict(candidate) for candidate in router.candidates]
+    rows: list[dict] = []
+    for candidate in router.candidates:
+        row: dict[str, Any] = dict(dataclasses.asdict(candidate))
+        if candidate.model_id is None:
+            raise InvalidRouterConfig(
+                f"Candidate '{candidate.model_name}' is missing its stable model identity"
+            )
+        row["model_id"] = str(candidate.model_id)
+        if candidate.source_team_id is not None:
+            row["source_team_id"] = str(candidate.source_team_id)
+        rows.append(row)
+    return rows
 
 
 # The webhook strategy's `bearer_token` is a secret. At rest it is replaced by
@@ -120,12 +135,72 @@ class SQLAlchemyRouterRepository:
                 result = {**result, "shadow": new_shadow}
         return result
 
-    async def _to_entity(self, model: RouterModel) -> RouterConfig:
-        entity = model.to_entity()
+    async def _to_entity(
+        self,
+        model: RouterModel,
+        revision: RouterRevisionModel | None = None,
+        grant: RouterGrantModel | None = None,
+    ) -> RouterConfig:
+        if revision is None and model.current_revision_id is not None:
+            revision = await self._session.get(RouterRevisionModel, model.current_revision_id)
+        entity = (
+            revision.to_entity(
+                model,
+                grant_id=grant.id if grant is not None else None,
+                ack_active_prompt_egress=(
+                    grant.ack_active_prompt_egress if grant is not None else False
+                ),
+                ack_shadow_prompt_egress=(
+                    grant.ack_shadow_prompt_egress if grant is not None else False
+                ),
+            )
+            if revision is not None
+            else model.to_entity()
+        )
         config = await self._map_config(entity.strategy_config, self._decrypt_section)
         if config is entity.strategy_config:
             return entity
         return dataclasses.replace(entity, strategy_config=config)
+
+    async def _new_revision(
+        self,
+        model: RouterModel,
+        router: RouterConfig,
+        revision_number: int,
+        *,
+        stored_config: dict | None = None,
+    ) -> RouterRevisionModel:
+        if router.default_model_id is None:
+            raise InvalidRouterConfig("default_model is missing its stable model identity")
+        config = router.strategy_config
+        if stored_config is not None:
+            config = self._preserve_masked_tokens(config, stored_config)
+        revision = RouterRevisionModel(
+            id=uuid4(),
+            router_id=model.id,
+            revision_number=revision_number,
+            candidates=_candidates_json(router),
+            default_model_id=router.default_model_id,
+            default_model_name=router.default_model,
+            strategy=router.strategy,
+            strategy_config=await self._map_config(config, self._encrypt_section),
+            shadow_strategy=router.shadow_strategy,
+            enabled=router.enabled,
+        )
+        self._session.add(revision)
+        await self._session.flush()
+        return revision
+
+    @staticmethod
+    def _sync_projection(model: RouterModel, revision: RouterRevisionModel) -> None:
+        """Keep the legacy columns as an exact projection of the current head."""
+        model.candidates = revision.candidates
+        model.default_model = revision.default_model_name
+        model.strategy = revision.strategy
+        model.strategy_config = revision.strategy_config
+        model.shadow_strategy = revision.shadow_strategy
+        model.enabled = revision.enabled
+        model.current_revision_id = revision.id
 
     # --- CRUD ---
 
@@ -137,7 +212,7 @@ class SQLAlchemyRouterRepository:
             candidates=_candidates_json(router),
             default_model=router.default_model,
             strategy=router.strategy,
-            strategy_config=await self._map_config(router.strategy_config, self._encrypt_section),
+            strategy_config={},
             shadow_strategy=router.shadow_strategy,
             enabled=router.enabled,
             origin_team_id=router.origin_team_id,
@@ -145,6 +220,8 @@ class SQLAlchemyRouterRepository:
         try:
             self._session.add(model)
             await self._session.flush()
+            revision = await self._new_revision(model, router, 1)
+            self._sync_projection(model, revision)
             await claim_direct(
                 self._session, CallableKind.ROUTER, router.id, router.team_id, router.name
             )
@@ -153,7 +230,8 @@ class SQLAlchemyRouterRepository:
             await self._session.rollback()
             raise RouterNameExists(router.name) from exc
         await self._session.refresh(model)
-        return await self._to_entity(model)
+        await self._session.refresh(revision)
+        return await self._to_entity(model, revision)
 
     async def get(self, team_id: UUID, router_id: UUID) -> RouterConfig | None:
         model = await self._session.get(RouterModel, router_id)
@@ -165,6 +243,40 @@ class SQLAlchemyRouterRepository:
         """Fetch a router by id regardless of owner (platform-admin paths)."""
         model = await self._session.get(RouterModel, router_id)
         return await self._to_entity(model) if model else None
+
+    async def get_revision(self, router_id: UUID, revision_id: UUID) -> RouterConfig | None:
+        model = await self._session.get(RouterModel, router_id)
+        revision = await self._session.get(RouterRevisionModel, revision_id)
+        if model is None or revision is None or revision.router_id != router_id:
+            return None
+        return await self._to_entity(model, revision)
+
+    async def get_for_grant(
+        self, grant_id: UUID, team_id: UUID | None = None
+    ) -> RouterConfig | None:
+        grant = await self._session.get(RouterGrantModel, grant_id)
+        if grant is None or (team_id is not None and grant.team_id != team_id):
+            return None
+        model = await self._session.get(RouterModel, grant.router_id)
+        revision = (
+            await self._session.get(RouterRevisionModel, grant.revision_id)
+            if grant.revision_id is not None
+            else None
+        )
+        if model is None or revision is None or revision.router_id != model.id:
+            return None
+        return await self._to_entity(model, revision, grant)
+
+    async def list_revisions(self, router_id: UUID) -> list[RouterConfig]:
+        model = await self._session.get(RouterModel, router_id)
+        if model is None:
+            return []
+        revisions = await self._session.scalars(
+            select(RouterRevisionModel)
+            .where(RouterRevisionModel.router_id == router_id)
+            .order_by(RouterRevisionModel.revision_number.desc())
+        )
+        return [await self._to_entity(model, revision) for revision in revisions]
 
     async def get_by_name(self, team_id: UUID, name: str) -> RouterConfig | None:
         # Priority mirrors models: own → extended (grant alias) → global by name →
@@ -180,8 +292,7 @@ class SQLAlchemyRouterRepository:
             )
         )
         if grant is not None:
-            source = await self._session.get(RouterModel, grant.router_id)
-            return await self._to_entity(source) if source else None
+            return await self.get_for_grant(grant.id, team_id)
         glob = await self._session.scalar(
             select(RouterModel).where(RouterModel.team_id.is_(None), RouterModel.name == name)
         )
@@ -240,19 +351,27 @@ class SQLAlchemyRouterRepository:
         # edits; ownership changes go through `promote_to_global`, not here.
         if not isinstance(model, RouterModel) or model.team_id != router.team_id:
             raise RouterNotFound(str(router.id))
+        if model.current_revision_id is None:
+            raise RouterRevisionConflict("router has no active revision")
+        if router.revision_id is not None and router.revision_id != model.current_revision_id:
+            raise RouterRevisionConflict(
+                f"router head changed: expected {router.revision_id}, "
+                f"found {model.current_revision_id}"
+            )
+        head = await self._session.get(RouterRevisionModel, model.current_revision_id)
+        if head is None:
+            raise RouterRevisionConflict("router head revision is missing")
         old_name = model.name
         try:
             model.origin_team_id = router.origin_team_id
             model.name = router.name
-            model.candidates = _candidates_json(router)
-            model.default_model = router.default_model
-            model.strategy = router.strategy
-            model.strategy_config = await self._map_config(
-                self._preserve_masked_tokens(router.strategy_config, model.strategy_config),
-                self._encrypt_section,
+            revision = await self._new_revision(
+                model,
+                router,
+                head.revision_number + 1,
+                stored_config=head.strategy_config,
             )
-            model.shadow_strategy = router.shadow_strategy
-            model.enabled = router.enabled
+            self._sync_projection(model, revision)
             if old_name != router.name:
                 await rename_direct(
                     self._session,
@@ -267,7 +386,8 @@ class SQLAlchemyRouterRepository:
             await self._session.rollback()
             raise RouterNameExists(router.name) from exc
         await self._session.refresh(model)
-        return await self._to_entity(model)
+        await self._session.refresh(revision)
+        return await self._to_entity(model, revision)
 
     async def delete(self, team_id: UUID, router_id: UUID) -> bool:
         # Any: the async execute() is typed Result, but at runtime it is a
@@ -275,6 +395,10 @@ class SQLAlchemyRouterRepository:
         model = await lock_resource_lifecycle(self._session, CallableKind.ROUTER, router_id)
         if not isinstance(model, RouterModel) or model.team_id != team_id:
             return False
+        if await self._session.scalar(
+            select(RouterGrantModel.id).where(RouterGrantModel.router_id == router_id).limit(1)
+        ):
+            raise RouterShared("revoke every router grant before deleting the source router")
         await tombstone_resource(self._session, CallableKind.ROUTER, router_id)
         result: Any = await self._session.execute(
             delete(RouterModel).where(RouterModel.id == router_id, RouterModel.team_id == team_id)
@@ -301,14 +425,16 @@ class SQLAlchemyRouterRepository:
             return None
         try:
             if model.team_id is not None:
+                if await self._session.scalar(
+                    select(RouterGrantModel.id)
+                    .where(RouterGrantModel.router_id == router_id)
+                    .limit(1)
+                ):
+                    raise RouterShared(
+                        "revoke every router grant before promoting the source router"
+                    )
                 model.origin_team_id = model.team_id
                 model.team_id = None
-                await tombstone_resource_grants(
-                    self._session, CallableKind.ROUTER, router_id, model.name
-                )
-                await self._session.execute(
-                    delete(RouterGrantModel).where(RouterGrantModel.router_id == router_id)
-                )
                 await promote_direct(self._session, CallableKind.ROUTER, router_id, model.name)
             await self._session.commit()
         except IntegrityError as exc:
@@ -332,12 +458,23 @@ class SQLAlchemyRouterRepository:
         source = await lock_resource_lifecycle(self._session, CallableKind.ROUTER, router_id)
         if not isinstance(source, RouterModel) or source.team_id is None:
             raise RouterNameExists(grants[0].alias)
+        if source.current_revision_id is None:
+            raise RouterRevisionConflict("source router has no active revision")
+        if any(
+            grant.revision_id is not None and grant.revision_id != source.current_revision_id
+            for grant in grants
+        ):
+            raise RouterRevisionConflict("extension must pin the current router revision")
+        revision_id = source.current_revision_id
         records = [
             RouterGrantModel(
                 id=grant.id,
                 router_id=grant.router_id,
                 team_id=grant.team_id,
                 alias=grant.alias,
+                revision_id=revision_id,
+                ack_active_prompt_egress=grant.ack_active_prompt_egress,
+                ack_shadow_prompt_egress=grant.ack_shadow_prompt_egress,
             )
             for grant in grants
         ]
@@ -362,11 +499,58 @@ class SQLAlchemyRouterRepository:
             raise RouterNameExists(grants[0].alias) from exc
         for record in records:
             await self._session.refresh(record)
-        return [record.to_entity() for record in records]
+        revision = await self._session.get(RouterRevisionModel, revision_id)
+        return [
+            record.to_entity(revision.revision_number if revision is not None else None)
+            for record in records
+        ]
 
     async def get_grant(self, grant_id: UUID) -> RouterGrant | None:
         record = await self._session.get(RouterGrantModel, grant_id)
-        return record.to_entity() if record else None
+        if record is None:
+            return None
+        revision = (
+            await self._session.get(RouterRevisionModel, record.revision_id)
+            if record.revision_id is not None
+            else None
+        )
+        return record.to_entity(revision.revision_number if revision is not None else None)
+
+    async def stage_grant_upgrade(
+        self,
+        grant_id: UUID,
+        target_revision_id: UUID,
+        expected_revision_id: UUID,
+        *,
+        ack_active_prompt_egress: bool,
+        ack_shadow_prompt_egress: bool,
+    ) -> RouterGrant:
+        if self._session.get_bind().dialect.name == "sqlite":
+            # Acquire SQLite's writer lock before the compare-and-swap read.
+            await self._session.execute(
+                update(RouterGrantModel)
+                .where(RouterGrantModel.id == grant_id)
+                .values(alias=RouterGrantModel.alias)
+            )
+        statement = select(RouterGrantModel).where(RouterGrantModel.id == grant_id)
+        if self._session.get_bind().dialect.name != "sqlite":
+            statement = statement.with_for_update()
+        grant = await self._session.scalar(statement)
+        if grant is None:
+            raise RouterGrantNotFound(str(grant_id))
+        if grant.revision_id != expected_revision_id:
+            raise RouterRevisionConflict(
+                f"grant revision changed: expected {expected_revision_id}, "
+                f"found {grant.revision_id}"
+            )
+        revision = await self._session.get(RouterRevisionModel, target_revision_id)
+        if revision is None or revision.router_id != grant.router_id:
+            raise RouterRevisionConflict("target revision does not belong to the granted router")
+        grant.revision_id = revision.id
+        grant.ack_active_prompt_egress = ack_active_prompt_egress
+        grant.ack_shadow_prompt_egress = ack_shadow_prompt_egress
+        await self._session.flush()
+        return grant.to_entity(revision.revision_number)
 
     async def remove_grant(self, grant_id: UUID) -> None:
         grant = await self._session.scalar(
@@ -389,7 +573,7 @@ class SQLAlchemyRouterRepository:
             .where(RouterGrantModel.router_id == router_id)
             .order_by(RouterGrantModel.created_at, RouterGrantModel.id)
         )
-        return [r.to_entity() for r in records]
+        return [await self._grant_entity(record) for record in records]
 
     async def list_grants_for_team(self, team_id: UUID) -> list[RouterGrant]:
         records = await self._session.scalars(
@@ -397,7 +581,15 @@ class SQLAlchemyRouterRepository:
             .where(RouterGrantModel.team_id == team_id)
             .order_by(RouterGrantModel.created_at, RouterGrantModel.id)
         )
-        return [r.to_entity() for r in records]
+        return [await self._grant_entity(record) for record in records]
+
+    async def _grant_entity(self, record: RouterGrantModel) -> RouterGrant:
+        revision = (
+            await self._session.get(RouterRevisionModel, record.revision_id)
+            if record.revision_id is not None
+            else None
+        )
+        return record.to_entity(revision.revision_number if revision is not None else None)
 
 
 class SQLAlchemyRoutingDecisionLog:
@@ -428,6 +620,8 @@ class SQLAlchemyRoutingDecisionLog:
                 completion_tokens=decision.completion_tokens,
                 user_text=decision.user_text,
                 system_prompt=decision.system_prompt,
+                router_revision_id=decision.router_revision_id,
+                chosen_model_id=decision.chosen_model_id,
             )
         )
         await self._session.commit()

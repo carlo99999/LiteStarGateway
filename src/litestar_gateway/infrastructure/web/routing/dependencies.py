@@ -20,6 +20,7 @@ from litestar_gateway.domain.ports import (
     RoutingRepositoryFactory,
 )
 from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.persistence.audit_repository import SQLAlchemyAuditLog
 from litestar_gateway.infrastructure.persistence.callable_alias_repository import (
     SQLAlchemyCallableAliasRepository,
 )
@@ -47,6 +48,8 @@ def provide_router_service(
         models=models,
         decisions=SQLAlchemyRoutingDecisionLog(db_session),
         callable_resolver=callable_resolver,
+        transaction=db_session,
+        audit_log=SQLAlchemyAuditLog(db_session),
     )
 
 
@@ -71,19 +74,26 @@ def make_shadow_repos_factory(
 
     @asynccontextmanager
     async def open_repos() -> AsyncIterator[
-        tuple[ModelRepository, CredentialRepository, CallableModelResolver]
+        tuple[
+            ModelRepository,
+            CredentialRepository,
+            CallableModelResolver,
+            SQLAlchemyRouterRepository,
+        ]
     ]:
         async with session_maker() as session:
             models = SQLAlchemyModelRepository(session)
             keyring = keyring_factory(session)
+            routers = SQLAlchemyRouterRepository(session, keyring)
             yield (
                 models,
                 SQLAlchemyCredentialRepository(session, keyring),
                 CallableAliasResolver(
                     SQLAlchemyCallableAliasRepository(session),
                     models,
-                    SQLAlchemyRouterRepository(session, keyring),
+                    routers,
                 ),
+                routers,
             )
 
     return open_repos

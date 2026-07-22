@@ -27,3 +27,5 @@ class CallableAliasBinding:
     resource_id: UUID
     origin: CallableOrigin
     source_team_id: UUID | None
+    router_grant_id: UUID | None = None
+    router_revision_id: UUID | None = None

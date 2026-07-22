@@ -176,6 +176,18 @@ class RouterNameExists(DomainError):
     """A router or model with this name already exists in the team."""
 
 
+class RouterShared(DomainError):
+    """The router still has extension grants and cannot be deleted or promoted."""
+
+
+class RouterGrantNotFound(DomainError):
+    """No active router grant exists for the requested identifier."""
+
+
+class RouterRevisionConflict(DomainError):
+    """A router or grant revision changed since the caller last read it."""
+
+
 class InvalidRouterConfig(DomainError):
     """The router definition is invalid (unknown strategy, bad candidates,
     default_model not among candidates, ...)."""

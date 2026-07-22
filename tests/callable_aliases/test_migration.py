@@ -221,6 +221,10 @@ def test_dev_create_all_refuses_unmigrated_legacy_schema(tmp_path: Path) -> None
         assert "callable_alias" not in _tables(connection)
 
     _upgrade(path, HEAD)
+    with pytest.raises(RuntimeError, match="immutable revisions"):
+        asyncio.run(create_schema())
+
+    _upgrade(path, "head")
     asyncio.run(create_schema())
     with sqlite3.connect(path) as connection:
         assert (

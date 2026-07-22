@@ -49,6 +49,11 @@ class CandidateModel:
     model_name: str
     description: str
     quality_tier: QualityTier
+    # Stable identity bound when the revision is validated. ``model_name`` is
+    # retained as an immutable display snapshot for strategy prompts only.
+    model_id: UUID | None = None
+    model_origin: str | None = None
+    source_team_id: UUID | None = None
     supports_vision: bool = False
     supports_tools: bool = False
     supports_json_schema: bool = False
@@ -84,6 +89,14 @@ class RouterConfig:
     shadow_strategy: str | None = None
     # The team that originally owned this router, kept when promoted to global.
     origin_team_id: UUID | None = None
+    # Immutable configuration snapshot selected for this call. Direct/global
+    # aliases use the router head; extension grants use their approved pin.
+    revision_id: UUID | None = None
+    revision_number: int | None = None
+    default_model_id: UUID | None = None
+    grant_id: UUID | None = None
+    ack_active_prompt_egress: bool = False
+    ack_shadow_prompt_egress: bool = False
 
 
 @dataclass(frozen=True)
@@ -95,6 +108,10 @@ class RouterGrant:
     team_id: UUID
     alias: str
     created_at: datetime
+    revision_id: UUID | None = None
+    revision_number: int | None = None
+    ack_active_prompt_egress: bool = False
+    ack_shadow_prompt_egress: bool = False
 
 
 @dataclass(frozen=True)
@@ -125,6 +142,9 @@ class RoutingDecision:
     score: float | None
     signals: tuple[str, ...]
     decision_ms: float
+    # Filled by RouterService from the selected revision candidate. Strategies
+    # may choose by snapshot name, but dispatch always uses this identity.
+    model_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -161,6 +181,8 @@ class RoutingDecisionRecord:
     # escalations, so the judge's calls can train a cheap classifier offline.
     user_text: str | None = None
     system_prompt: str | None = None
+    router_revision_id: UUID | None = None
+    chosen_model_id: UUID | None = None
 
 
 class RoutingStrategy(Protocol):

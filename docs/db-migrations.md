@@ -87,3 +87,20 @@ Deploy this revision with an offline write freeze:
 Development auto-schema creation also fails fast when it detects a legacy
 application schema without `callable_alias`; run `database upgrade` instead of
 letting `create_all` create an empty registry that would hide legacy rows.
+
+## 8. Immutable router revisions rollout (`a61d7e3c9b20`)
+
+This migration also requires an offline write freeze. It resolves every router
+dependency to a stable model ID, creates revision 1, and pins every existing
+grant to that revision. Ambiguous or inaccessible dependencies abort before any
+revision DDL is applied.
+
+1. Drain writers that mutate routers, models, or grants.
+2. Run `database upgrade` and remediate every preflight error before retrying.
+3. Deploy only application instances that write immutable router revisions.
+4. Resume writers after the new fleet is healthy.
+
+Downgrade is intentionally blocked once any router has more than one revision,
+or any grant is pinned away from the current head: the legacy schema cannot
+represent that history without data loss. Development `create_all` likewise
+refuses a registry-era schema that has not yet been upgraded to revisions.
