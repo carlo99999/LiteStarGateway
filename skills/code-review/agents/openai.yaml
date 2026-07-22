@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verified Code Review"
+  short_description: "Adversarial, evidence-backed repository review"
+  default_prompt: "Use $code-review to perform a verified adversarial review of this repository, save the next report, and return it here."
