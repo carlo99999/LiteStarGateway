@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.callable_alias import CallableKind
 from litestar_gateway.domain.entities import Model, ModelGrant
-from litestar_gateway.domain.exceptions import ModelNameExists, ModelNotFound
+from litestar_gateway.domain.exceptions import ModelNameExists, ModelNotFound, ModelShared
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.infrastructure.persistence.callable_alias_slots import (
     claim_direct,
@@ -242,6 +242,10 @@ class SQLAlchemyModelRepository:
         record = await lock_resource_lifecycle(self._session, CallableKind.MODEL, model_id)
         if not isinstance(record, ModelRecord) or record.team_id is None:
             raise ModelNotFound(str(model_id))
+        if await self._session.scalar(
+            select(ModelGrantRecord.id).where(ModelGrantRecord.model_id == model_id).limit(1)
+        ):
+            raise ModelShared("revoke every model grant before deleting the source model")
         await tombstone_resource(self._session, CallableKind.MODEL, model_id)
         await self._session.execute(delete(ModelRecord).where(ModelRecord.id == model_id))
         await self._session.commit()
@@ -250,6 +254,10 @@ class SQLAlchemyModelRepository:
         record = await lock_resource_lifecycle(self._session, CallableKind.MODEL, model_id)
         if not isinstance(record, ModelRecord) or record.team_id is not None:
             return False
+        if await self._session.scalar(
+            select(ModelGrantRecord.id).where(ModelGrantRecord.model_id == model_id).limit(1)
+        ):
+            raise ModelShared("revoke every model grant before deleting the global model")
         await tombstone_resource(self._session, CallableKind.MODEL, model_id)
         removed_id = await self._session.scalar(
             delete(ModelRecord)

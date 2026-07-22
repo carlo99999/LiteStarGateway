@@ -14,7 +14,9 @@ import pytest
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_201_CREATED,
+    HTTP_204_NO_CONTENT,
     HTTP_401_UNAUTHORIZED,
+    HTTP_409_CONFLICT,
 )
 from litestar.testing import AsyncTestClient
 
@@ -171,6 +173,50 @@ async def test_extend_collision_suffixes_with_source_team(client: AsyncTestClien
     catalog = await _catalog(client, blue_key)
     assert "gpt-4o" in catalog  # Blue's own
     assert "gpt-4o-core" in catalog  # the extended one
+
+
+async def test_delete_team_model_with_active_grant_is_rejected(client: AsyncTestClient) -> None:
+    """ISSUE-020: deleting a source model with live extension grants must not
+    silently cascade-revoke other teams' access, mirroring the RouterShared
+    guard on the router side."""
+    admin = await _admin(client)
+    cred = await _credential(client, admin)
+    org = await _org(client, admin)
+    core = await _team(client, admin, org, "Core")
+    blue = await _team(client, admin, org, "Blue")
+    model_id = await _team_model(client, admin, core, cred, "gpt-4o")
+    await client.post(
+        f"/platform/models/{model_id}/extend",
+        json={"team_ids": [blue]},
+        headers=_bearer(admin),
+    )
+
+    resp = await client.delete(f"/teams/{core}/models/{model_id}", headers=_bearer(admin))
+    assert resp.status_code == HTTP_409_CONFLICT, resp.text
+
+    blue_key = await _team_key(client, admin, blue)
+    assert "gpt-4o" in await _catalog(client, blue_key)  # grant survives the rejected delete
+
+
+async def test_delete_team_model_after_revoking_grants_succeeds(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    cred = await _credential(client, admin)
+    org = await _org(client, admin)
+    core = await _team(client, admin, org, "Core")
+    blue = await _team(client, admin, org, "Blue")
+    model_id = await _team_model(client, admin, core, cred, "gpt-4o")
+    grant_id = (
+        await client.post(
+            f"/platform/models/{model_id}/extend",
+            json={"team_ids": [blue]},
+            headers=_bearer(admin),
+        )
+    ).json()[0]["id"]
+
+    await client.delete(f"/platform/models/grants/{grant_id}", headers=_bearer(admin))
+
+    resp = await client.delete(f"/teams/{core}/models/{model_id}", headers=_bearer(admin))
+    assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
 
 
 async def test_global_collision_exposes_dash_global(client: AsyncTestClient) -> None:

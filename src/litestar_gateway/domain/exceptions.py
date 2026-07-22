@@ -144,6 +144,10 @@ class ModelNameExists(DomainError):
     """A model with this name already exists in the team."""
 
 
+class ModelShared(DomainError):
+    """The model still has extension grants and cannot be deleted."""
+
+
 class ProviderMismatch(DomainError):
     """The model's provider does not match the referenced credential's provider."""
 
