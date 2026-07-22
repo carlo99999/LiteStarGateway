@@ -12,6 +12,10 @@ from __future__ import annotations
 from litestar_gateway.domain.ports.api_key import APIKeyRepository
 from litestar_gateway.domain.ports.audit import AuditLog
 from litestar_gateway.domain.ports.budget import BudgetRepository
+from litestar_gateway.domain.ports.callable_alias import (
+    CallableAliasRepository,
+    CallableModelResolver,
+)
 from litestar_gateway.domain.ports.credential import CredentialRepository
 from litestar_gateway.domain.ports.identity import IdentityProvider
 from litestar_gateway.domain.ports.invite import InviteRepository, PasswordResetRepository
@@ -43,6 +47,8 @@ __all__ = [
     "APIKeyRepository",
     "AuditLog",
     "BudgetRepository",
+    "CallableAliasRepository",
+    "CallableModelResolver",
     "CredentialRepository",
     "DistributedLock",
     "IdentityProvider",

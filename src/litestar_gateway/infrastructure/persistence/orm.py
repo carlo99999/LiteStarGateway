@@ -7,7 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from advanced_alchemy.extensions.litestar import base
-from sqlalchemy import JSON, ForeignKey, Index, UniqueConstraint, text
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from litestar_gateway.domain.entities import (
@@ -566,6 +566,77 @@ class ModelGrantRecord(base.UUIDAuditBase):
             alias=self.alias,
             created_at=self.created_at,
         )
+
+
+class CallableAliasRecord(base.UUIDAuditBase):
+    """One explicit callable binding shared by models and routers.
+
+    Effective ``-global`` aliases are derived by the resolver from one snapshot;
+    only user/admin-declared names and grant aliases are persisted here.
+    """
+
+    __tablename__ = "callable_alias"
+    __table_args__ = (
+        UniqueConstraint("team_id", "alias"),
+        Index(
+            "uq_global_callable_alias",
+            "alias",
+            unique=True,
+            sqlite_where=text("team_id IS NULL"),
+            postgresql_where=text("team_id IS NULL"),
+        ),
+        Index(
+            "uq_callable_alias_direct_model",
+            "model_id",
+            unique=True,
+            sqlite_where=text("model_id IS NOT NULL AND model_grant_id IS NULL"),
+            postgresql_where=text("model_id IS NOT NULL AND model_grant_id IS NULL"),
+        ),
+        Index(
+            "uq_callable_alias_direct_router",
+            "router_id",
+            unique=True,
+            sqlite_where=text("router_id IS NOT NULL AND router_grant_id IS NULL"),
+            postgresql_where=text("router_id IS NOT NULL AND router_grant_id IS NULL"),
+        ),
+        CheckConstraint(
+            "(unavailable AND model_id IS NULL AND router_id IS NULL "
+            "AND model_grant_id IS NULL AND router_grant_id IS NULL) OR "
+            "(NOT unavailable AND ((model_id IS NOT NULL AND router_id IS NULL) OR "
+            "(model_id IS NULL AND router_id IS NOT NULL)))",
+            name="ck_callable_alias_state",
+        ),
+        CheckConstraint(
+            "model_grant_id IS NULL OR (model_id IS NOT NULL AND router_grant_id IS NULL)",
+            name="ck_callable_alias_model_grant_target",
+        ),
+        CheckConstraint(
+            "router_grant_id IS NULL OR (router_id IS NOT NULL AND model_grant_id IS NULL)",
+            name="ck_callable_alias_router_grant_target",
+        ),
+        CheckConstraint(
+            "(model_grant_id IS NULL AND router_grant_id IS NULL) OR team_id IS NOT NULL",
+            name="ck_callable_alias_grant_team_scope",
+        ),
+    )
+
+    team_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("team.id", ondelete="CASCADE"), index=True
+    )
+    alias: Mapped[str] = mapped_column(index=True)
+    unavailable: Mapped[bool] = mapped_column(default=False)
+    model_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("model.id", ondelete="CASCADE"), index=True, default=None
+    )
+    router_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("router.id", ondelete="CASCADE"), index=True, default=None
+    )
+    model_grant_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("model_grant.id", ondelete="CASCADE"), unique=True, default=None
+    )
+    router_grant_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("router_grant.id", ondelete="CASCADE"), unique=True, default=None
+    )
 
 
 class ServicePrincipalModel(base.UUIDAuditBase):

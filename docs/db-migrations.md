@@ -65,3 +65,25 @@ Still open:
 1. `feat/alembic-setup` — Alembic env + baseline migration + README workflow +
    prod `create_all` gating.
 2. `feat/migration-ci-check` — autogenerate-diff guard in CI.
+
+## 7. Callable-alias registry rollout (`f52a1c9d0b34`)
+
+This migration is deliberately **not rolling-deploy safe**. It takes a
+PostgreSQL `SHARE` lock on `model`, `router`, `model_grant`, and `router_grant`
+for a consistent collision preflight and backfill, but that lock ends when the
+migration transaction commits. An old application pod could then write a
+legacy row without its required `callable_alias` row.
+
+Deploy this revision with an offline write freeze:
+
+1. Stop or drain every old-version writer and disable jobs that mutate models,
+   routers, or their grants.
+2. Run `database upgrade` through `f52a1c9d0b34` while the freeze remains in
+   force. Resolve any preflight collision and rerun before proceeding.
+3. Roll out only application versions that write the alias registry.
+4. Resume traffic and background writers after every old-version process has
+   terminated and the new rollout is healthy.
+
+Development auto-schema creation also fails fast when it detects a legacy
+application schema without `callable_alias`; run `database upgrade` instead of
+letting `create_all` create an empty registry that would hide legacy rows.

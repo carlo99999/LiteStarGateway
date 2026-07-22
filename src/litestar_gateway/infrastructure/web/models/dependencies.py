@@ -9,6 +9,7 @@ from __future__ import annotations
 from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from litestar_gateway.application.callable_aliases import CallableAliasResolver
 from litestar_gateway.application.model_service import ModelService
 from litestar_gateway.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
@@ -18,8 +19,13 @@ from litestar_gateway.infrastructure.persistence.model_repository import (
 )
 
 
-def provide_model_service(db_session: NamedDependency[AsyncSession]) -> ModelService:
+def provide_model_service(
+    db_session: NamedDependency[AsyncSession],
+    callable_resolver: NamedDependency[CallableAliasResolver],
+) -> ModelService:
+    models = SQLAlchemyModelRepository(db_session)
     return ModelService(
-        models=SQLAlchemyModelRepository(db_session),
+        models=models,
         credentials=SQLAlchemyCredentialRepository(db_session),
+        callable_resolver=callable_resolver,
     )

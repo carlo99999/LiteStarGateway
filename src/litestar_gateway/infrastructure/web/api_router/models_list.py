@@ -15,36 +15,43 @@ from uuid import UUID
 from litestar import Request, get
 from litestar.di import NamedDependency
 
-from litestar_gateway.application.model_service import ModelService
-from litestar_gateway.application.routing.service import RouterService
+from litestar_gateway.application.callable_aliases import CallableAliasResolver
 
 _OWNER = "litestar-gateway"
 
 
-def _entry(alias: str, created: int) -> dict[str, Any]:
-    return {"id": alias, "object": "model", "created": created, "owned_by": _OWNER}
+def _entry(
+    alias: str, created: int, resource_type: str, resource_id: UUID, binding_id: UUID
+) -> dict[str, Any]:
+    return {
+        "id": alias,
+        "object": "model",
+        "created": created,
+        "owned_by": _OWNER,
+        "type": resource_type,
+        "resource_type": resource_type,
+        "resource_id": str(resource_id),
+        "binding_id": str(binding_id),
+    }
 
 
 @get("/v1/models", summary="OpenAI-compatible list of the team's callable models")
 async def list_models(
     request: Request,
-    model_service: NamedDependency[ModelService],
-    router_service: NamedDependency[RouterService],
+    callable_resolver: NamedDependency[CallableAliasResolver],
 ) -> dict[str, Any]:
     team_id = UUID(request.user)
 
-    # Every callable model + router, by effective alias (own + extended + global).
-    callable_models = await model_service.list_callable(team_id)
-    callable_routers = await router_service.list_callable(team_id)
-
+    resolved = await callable_resolver.list_callable(team_id)
     data = [
-        _entry(c.alias, int(c.model.created_at.timestamp()))
-        for c in callable_models
-        if c.model.enabled
-    ] + [
-        _entry(c.alias, int(c.router.created_at.timestamp()))
-        for c in callable_routers
-        if c.router.enabled
+        _entry(
+            item.effective_alias,
+            int(item.resource.created_at.timestamp()),
+            item.kind.value,
+            item.resource_id,
+            item.binding.id,
+        )
+        for item in resolved
+        if item.resource.enabled
     ]
-    data.sort(key=lambda entry: entry["id"])
     return {"object": "list", "data": data}

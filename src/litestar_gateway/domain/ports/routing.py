@@ -6,6 +6,7 @@ from contextlib import AbstractAsyncContextManager
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
+from litestar_gateway.domain.ports.callable_alias import CallableModelResolver
 from litestar_gateway.domain.ports.credential import CredentialRepository
 from litestar_gateway.domain.ports.model import ModelRepository
 from litestar_gateway.domain.routing import RouterConfig, RouterGrant, RoutingDecisionRecord
@@ -42,6 +43,8 @@ class RouterRepository(Protocol):
     async def promote_to_global(self, router_id: UUID) -> RouterConfig | None: ...
 
     async def add_grant(self, grant: RouterGrant) -> RouterGrant: ...
+
+    async def add_grants(self, grants: list[RouterGrant]) -> list[RouterGrant]: ...
 
     async def get_grant(self, grant_id: UUID) -> RouterGrant | None: ...
 
@@ -116,4 +119,6 @@ class RoutingRepositoryFactory(Protocol):
 
     def __call__(
         self,
-    ) -> AbstractAsyncContextManager[tuple[ModelRepository, CredentialRepository]]: ...
+    ) -> AbstractAsyncContextManager[
+        tuple[ModelRepository, CredentialRepository, CallableModelResolver]
+    ]: ...
