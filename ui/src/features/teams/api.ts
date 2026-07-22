@@ -13,6 +13,7 @@ export type Team = components["schemas"]["TeamResponse"];
 export type TeamMember = components["schemas"]["MembershipResponse"];
 export type TeamBudget = components["schemas"]["BudgetResponse"];
 export type TeamUsage = components["schemas"]["UsageResponse"];
+export type MyTeamMembership = components["schemas"]["MyTeamResponse"];
 
 function fail(error: unknown, fallback: string): Error {
   if (error && typeof error === "object") {
@@ -38,6 +39,13 @@ export async function listAllTeams(signal?: AbortSignal): Promise<Team[]> {
   return fetchAllPages((request) => requestTeams(request, signal), {
     keyOf: (team) => team.id,
   });
+}
+
+/** GET /me/teams — self-scoped memberships for a non-platform user. */
+export async function listMyTeamMemberships(signal?: AbortSignal): Promise<MyTeamMembership[]> {
+  const { data, error } = await api.GET("/me/teams", { signal });
+  if (error || !data) throw fail(error, "Failed to load your teams");
+  return data;
 }
 
 /** GET /teams/{id} — one team. */

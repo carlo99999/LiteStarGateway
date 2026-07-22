@@ -15,6 +15,12 @@ import {
   routerStats,
   type Decision,
 } from "@/features/routing/api";
+import {
+  canReadDecisions,
+  canReadModels,
+  canReadUsage,
+} from "@/features/teams/access";
+import { useAccessibleTeams } from "@/features/teams/useAccessibleTeams";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
 import { toError } from "@/lib/toError";
 
@@ -125,25 +131,34 @@ const DECISION_COLUMNS: Column<Decision>[] = [
 export function RouterDetailPage() {
   const { teamId, routerId } = route.useParams();
   const [offset, setOffset] = useState(0);
+  const teams = useAccessibleTeams();
+  const selectedTeam = teams.data?.find((team) => team.id === teamId);
+  const canReadRouter = selectedTeam ? canReadModels(selectedTeam.role) : false;
+  const canReadRouterUsage = selectedTeam ? canReadUsage(selectedTeam.role) : false;
+  const canExportDecisions = selectedTeam ? canReadDecisions(selectedTeam.role) : false;
 
   // The list endpoint is the only definition read; find this router within it.
   const routers = useQuery({
     queryKey: ["team-routers", teamId],
     queryFn: () => listRouters(teamId),
+    enabled: canReadRouter,
   });
   const router = routers.data?.find((r) => r.id === routerId);
 
   const stats = useQuery({
     queryKey: ["team-routers", teamId, routerId, "stats"],
     queryFn: () => routerStats(teamId, routerId),
+    enabled: canReadRouterUsage,
   });
   const savings = useQuery({
     queryKey: ["team-routers", teamId, routerId, "savings"],
     queryFn: () => routerSavings(teamId, routerId),
+    enabled: canReadRouterUsage,
   });
   const decisions = useQuery({
     queryKey: ["team-routers", teamId, routerId, "decisions", offset],
     queryFn: () => listDecisionsPage(teamId, routerId, offset),
+    enabled: canReadRouterUsage,
   });
 
   // Stats and savings share a scope (USAGE_READ); surface either failure.
@@ -168,12 +183,14 @@ export function RouterDetailPage() {
         }
         actions={
           <>
-            <Button variant="outline" size="sm" asChild>
-              <a href={decisionsExportHref(teamId, routerId)} download>
-                <Download className="h-4 w-4" />
-                export jsonl
-              </a>
-            </Button>
+            {canExportDecisions ? (
+              <Button variant="outline" size="sm" asChild>
+                <a href={decisionsExportHref(teamId, routerId)} download>
+                  <Download className="h-4 w-4" />
+                  export jsonl
+                </a>
+              </Button>
+            ) : null}
             <Button variant="ghost" size="sm" asChild>
               <Link to="/routing">
                 <ArrowLeft className="h-4 w-4" />
@@ -184,7 +201,7 @@ export function RouterDetailPage() {
         }
       />
 
-      {statsError ? (
+      {!canReadRouterUsage ? null : statsError ? (
         <p className="mb-6 font-mono text-xs text-destructive">
           ! couldn&apos;t load router metrics — {statsError.message}
         </p>
@@ -209,27 +226,31 @@ export function RouterDetailPage() {
         </>
       )}
 
-      <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-        // recent decisions
-      </p>
-      <DataTable
-        columns={DECISION_COLUMNS}
-        rows={decisions.data?.items}
-        rowKey={(d) => d.id}
-        isLoading={decisions.isLoading}
-        error={toError(decisions.error)}
-        emptyTitle="no decisions yet"
-        emptyDescription="Decisions appear once clients start calling this router."
-      />
-      {decisions.data ? (
-        <PaginationControls
-          offset={decisions.data.offset}
-          pageSize={TABLE_PAGE_SIZE}
-          itemCount={decisions.data.items.length}
-          hasNext={decisions.data.hasNext}
-          isFetching={decisions.isFetching}
-          onOffsetChange={setOffset}
-        />
+      {canReadRouterUsage ? (
+        <>
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            // recent decisions
+          </p>
+          <DataTable
+            columns={DECISION_COLUMNS}
+            rows={decisions.data?.items}
+            rowKey={(d) => d.id}
+            isLoading={decisions.isLoading}
+            error={toError(decisions.error)}
+            emptyTitle="no decisions yet"
+            emptyDescription="Decisions appear once clients start calling this router."
+          />
+          {decisions.data ? (
+            <PaginationControls
+              offset={decisions.data.offset}
+              pageSize={TABLE_PAGE_SIZE}
+              itemCount={decisions.data.items.length}
+              hasNext={decisions.data.hasNext}
+              isFetching={decisions.isFetching}
+              onOffsetChange={setOffset}
+            />
+          ) : null}
+        </>
       ) : null}
     </>
   );

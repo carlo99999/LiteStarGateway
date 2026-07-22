@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from litestar_gateway.domain.entities import Model, ModelGrant, ModelType, Provider
+from litestar_gateway.domain.entities import Credential, Model, ModelGrant, ModelType, Provider
 from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
     ModelNameExists,
@@ -115,6 +115,12 @@ class ModelService:
     ) -> list[Model]:
         """The team's OWN models (management view)."""
         return await self._models.list_by_team(team_id, limit=limit, offset=offset)
+
+    async def list_credential_catalog(
+        self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[Credential]:
+        """Return model-binding metadata without exposing credential values."""
+        return await self._credentials.list(limit=limit, offset=offset)
 
     async def list_global(self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0) -> list[Model]:
         return await self._models.list_global(limit=limit, offset=offset)

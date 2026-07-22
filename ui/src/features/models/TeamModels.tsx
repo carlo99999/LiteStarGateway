@@ -58,6 +58,8 @@ export function TeamModels({ teamId }: TeamModelsProps) {
         onEdit={setEditing}
         onDelete={setDeleting}
         onExtend={setExtending}
+        canManage
+        canExtend
       />
 
       <CreateModelDialog teamId={teamId} open={createOpen} onOpenChange={setCreateOpen} />

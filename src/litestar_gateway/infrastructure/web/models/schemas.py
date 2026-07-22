@@ -8,7 +8,20 @@ from typing import Any
 from uuid import UUID
 
 from litestar_gateway.application.model_service import CallableModel
-from litestar_gateway.domain.entities import Model, ModelGrant, ModelType, Provider
+from litestar_gateway.domain.entities import Credential, Model, ModelGrant, ModelType, Provider
+
+
+@dataclass(frozen=True)
+class ModelCredentialResponse:
+    """Non-secret provider metadata available to team model managers."""
+
+    id: UUID
+    name: str
+    provider: Provider
+
+    @classmethod
+    def from_entity(cls, credential: Credential) -> ModelCredentialResponse:
+        return cls(id=credential.id, name=credential.name, provider=credential.provider)
 
 
 @dataclass(frozen=True)

@@ -23,6 +23,7 @@ from litestar_gateway.infrastructure.web.audit.recorder import record_audit
 from litestar_gateway.infrastructure.web.models.schemas import (
     CallableModelResponse,
     CreateModelRequest,
+    ModelCredentialResponse,
     ModelResponse,
     UpdateModelRequest,
 )
@@ -34,6 +35,32 @@ class ModelController(Controller):
     tags = ["models"]
     # JWT (human) or API key with management scope (team service principal).
     dependencies = {"principal": Provide(provide_principal)}
+
+    @get(
+        "/{team_id:uuid}/model-credentials",
+        summary="List credentials available for model bindings",
+        description=(
+            "Returns provider credential identifiers and names for model management. "
+            "Secret values are never returned."
+        ),
+    )
+    async def list_model_credentials(
+        self,
+        team_id: FromPath[UUID],
+        principal: NamedDependency[Principal],
+        team_service: NamedDependency[TeamService],
+        model_service: NamedDependency[ModelService],
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
+    ) -> list[ModelCredentialResponse]:
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.MODELS_MANAGE
+        )
+        page_limit, page_offset = resolve_page(limit, offset)
+        credentials = await model_service.list_credential_catalog(
+            limit=page_limit, offset=page_offset
+        )
+        return [ModelCredentialResponse.from_entity(credential) for credential in credentials]
 
     @post(
         "/{team_id:uuid}/models",

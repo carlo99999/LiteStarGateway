@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { listCallableModels } from "@/features/models/api";
 import { comparePrompt } from "@/features/playground/api";
 import { listCallableRouters } from "@/features/routing/api";
-import { listAllTeams } from "@/features/teams/api";
+import { useAccessibleTeams } from "@/features/teams/useAccessibleTeams";
 import { toError } from "@/lib/toError";
 
 const SELECT_CLASS =
@@ -25,11 +25,7 @@ function formatCost(cost: number | null | undefined): string {
 /** Compare one prompt across several of a team's chat models: response,
  * latency, tokens and estimated cost, side by side. Real (unmetered) calls. */
 export function PlaygroundPage() {
-  const teams = useQuery({
-    queryKey: ["teams", "all"],
-    queryFn: ({ signal }) => listAllTeams(signal),
-    retry: false,
-  });
+  const teams = useAccessibleTeams();
   const [teamId, setTeamId] = useState("");
   const models = useQuery({
     queryKey: ["team-models", teamId, "callable"],
