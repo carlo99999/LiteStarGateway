@@ -5,11 +5,10 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
-from uuid import UUID
 
 from dotenv import load_dotenv
 
-from litestar_gateway.domain.entities import TeamRole
+from litestar_gateway.domain.entities import TeamGrant, parse_team_mapping
 
 DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///gateway.db"
 DEFAULT_ADMIN_EMAIL = "admin@example.com"
@@ -62,18 +61,9 @@ class InsecureConfigurationError(RuntimeError):
     """Raised at startup when a non-local deploy uses an insecure default."""
 
 
-@dataclass(frozen=True)
-class TeamGrant:
-    """One (team, role) an IdP group confers via SSO_TEAM_MAPPING."""
-
-    team_id: UUID
-    role: TeamRole
-
-
 def _env_team_mapping(name: str) -> dict[str, tuple[TeamGrant, ...]]:
-    """Parse SSO_TEAM_MAPPING: a JSON object mapping each IdP group to a list of
-    ``{"team": "<team-uuid>", "role": "admin"|"member"}`` grants (role defaults
-    to member). Absent/empty ⇒ no mapping (SSO sets only the platform-admin
+    """Parse SSO_TEAM_MAPPING: see `domain.entities.parse_team_mapping` for the
+    grant shape. Absent/empty ⇒ no mapping (SSO sets only the platform-admin
     flag). Malformed input fails fast at startup rather than silently dropping
     grants."""
     raw = os.environ.get(name)
@@ -85,38 +75,10 @@ def _env_team_mapping(name: str) -> dict[str, tuple[TeamGrant, ...]]:
         raise InsecureConfigurationError(f"{name} must be valid JSON") from exc
     if not isinstance(data, dict):
         raise InsecureConfigurationError(f"{name} must be a JSON object of group -> grants")
-    mapping: dict[str, tuple[TeamGrant, ...]] = {}
-    for group, grants in data.items():
-        if not isinstance(grants, list):
-            raise InsecureConfigurationError(f"{name}[{group!r}] must be a list of grants")
-        parsed: list[TeamGrant] = []
-        for grant in grants:
-            if not isinstance(grant, dict) or "team" not in grant:
-                raise InsecureConfigurationError(f"{name}[{group!r}] entries need a 'team' UUID")
-            try:
-                team_id = UUID(str(grant["team"]))
-                role = TeamRole(grant.get("role", TeamRole.MEMBER))
-            except ValueError as exc:
-                raise InsecureConfigurationError(
-                    f"{name}[{group!r}] has an invalid team or role: {exc}"
-                ) from exc
-            parsed.append(TeamGrant(team_id=team_id, role=role))
-        mapping[group] = tuple(parsed)
-    # Two different non-admin roles for one team would make the resolved role
-    # depend on the IdP's group ordering (ADMIN always wins, so pairing it with
-    # another role stays deterministic). Reject the ambiguity at startup.
-    non_admin_roles: dict[UUID, TeamRole] = {}
-    for grants_ in mapping.values():
-        for grant_ in grants_:
-            if grant_.role is TeamRole.ADMIN:
-                continue
-            seen = non_admin_roles.setdefault(grant_.team_id, grant_.role)
-            if seen is not grant_.role:
-                raise InsecureConfigurationError(
-                    f"{name} maps team {grant_.team_id} to conflicting roles "
-                    f"'{seen}' and '{grant_.role}'; grant one non-admin role per team"
-                )
-    return mapping
+    try:
+        return parse_team_mapping(data)
+    except ValueError as exc:
+        raise InsecureConfigurationError(f"{name}: {exc}") from exc
 
 
 def _env_int(name: str, default: int, *, minimum: int) -> int:

@@ -28,8 +28,9 @@ from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.application.user_service import UserService
 from litestar_gateway.config import TeamGrant
 from litestar_gateway.domain.entities import AuditEvent, TeamRole, User
-from litestar_gateway.domain.ports import AuditLog, IdentityProvider
+from litestar_gateway.domain.ports import AuditLog
 from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.sso.dynamic import ResolvedSsoConfig
 from litestar_gateway.infrastructure.web.rate_limit import build_auth_rate_limit
 from litestar_gateway.infrastructure.web.session.jwt import issue_access_token
 from litestar_gateway.infrastructure.web.session.schemas import TokenResponse
@@ -103,16 +104,15 @@ def _redirect_uri(request: Request, configured: str | None) -> str:
 @get("/sso/login", middleware=[build_auth_rate_limit().middleware])
 async def sso_login(
     request: Request,
-    identity_provider: NamedDependency[IdentityProvider],
-    sso_redirect_uri: NamedDependency[str | None],
+    sso_config: NamedDependency[ResolvedSsoConfig],
     sso_cookie_secure: NamedDependency[bool],
 ) -> Redirect:
     state = secrets.token_urlsafe(32)
     nonce = secrets.token_urlsafe(32)
     code_verifier = secrets.token_urlsafe(48)  # PKCE: 43-128 chars after encoding
-    url = await identity_provider.authorization_url(
+    url = await sso_config.identity_provider.authorization_url(
         state,
-        _redirect_uri(request, sso_redirect_uri),
+        _redirect_uri(request, sso_config.redirect_uri),
         nonce=nonce,
         code_verifier=code_verifier,
     )
@@ -148,14 +148,10 @@ async def sso_login(
 )
 async def sso_callback(
     request: Request,
-    identity_provider: NamedDependency[IdentityProvider],
+    sso_config: NamedDependency[ResolvedSsoConfig],
     user_service: NamedDependency[UserService],
     team_service: NamedDependency[TeamService],
     keyring: NamedDependency[Keyring],
-    sso_admin_groups: NamedDependency[tuple[str, ...]],
-    sso_default_admin: NamedDependency[bool],
-    sso_team_mapping: NamedDependency[dict[str, tuple[TeamGrant, ...]]],
-    sso_redirect_uri: NamedDependency[str | None],
     audit_log: NamedDependency[AuditLog],
     code: FromQuery[str | None] = None,
     # `state` is a reserved kwarg in Litestar (the app State), so alias the query.
@@ -171,18 +167,18 @@ async def sso_callback(
     code_verifier = request.cookies.get(_VERIFIER_COOKIE)
     if not nonce or not code_verifier:
         raise NotAuthorizedException("SSO login flow expired; retry from /sso/login")
-    identity = await identity_provider.exchange(
+    identity = await sso_config.identity_provider.exchange(
         code,
-        _redirect_uri(request, sso_redirect_uri),
+        _redirect_uri(request, sso_config.redirect_uri),
         nonce=nonce,
         code_verifier=code_verifier,
     )
 
-    group_admin = bool(set(identity.groups) & set(sso_admin_groups))
+    group_admin = bool(set(identity.groups) & set(sso_config.admin_groups))
     # Email/verification, subject binding, and the upgrade-only admin sync live in
     # the service; DEFAULT_ROLE seeds only a brand-new account's platform role.
     result = await user_service.upsert_sso_user(
-        identity, group_admin=group_admin, default_admin=sso_default_admin
+        identity, group_admin=group_admin, default_admin=sso_config.default_admin
     )
     user = result.user
     # Audit what this login actually changed (R6-H20): JIT creation and admin
@@ -203,7 +199,7 @@ async def sso_callback(
         )
     # Group → team/role mapping: reconcile the user's memberships in SSO-governed
     # teams to their current IdP groups (add/update/remove); a no-op when unset.
-    desired, governed = _resolve_team_grants(identity.groups, sso_team_mapping)
+    desired, governed = _resolve_team_grants(identity.groups, sso_config.team_mapping)
     if governed:
         changes = await team_service.reconcile_sso_memberships(user.id, desired, governed)
         for change in changes:

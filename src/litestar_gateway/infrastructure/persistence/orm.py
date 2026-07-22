@@ -28,11 +28,13 @@ from litestar_gateway.domain.entities import (
     ScimToken,
     SecretKey,
     ServicePrincipal,
+    SsoSettings,
     Team,
     TeamMembership,
     TeamRole,
     UsageEvent,
     User,
+    parse_team_mapping,
 )
 from litestar_gateway.domain.routing import (
     CandidateModel,
@@ -579,6 +581,42 @@ class CredentialModel(base.UUIDAuditBase):
             name=self.name,
             provider=Provider(self.provider),
             created_at=self.created_at,
+        )
+
+
+class SsoSettingsModel(base.UUIDAuditBase):
+    """The single OIDC identity provider configured for this deployment — at
+    most one row (enforced by the repository, not the schema)."""
+
+    __tablename__ = "sso_settings"
+
+    enabled: Mapped[bool] = mapped_column(default=False)
+    discovery_url: Mapped[str | None] = mapped_column(default=None)
+    client_id: Mapped[str | None] = mapped_column(default=None)
+    # Data-key Fernet ciphertext of the client secret (same envelope scheme as
+    # CredentialModel.encrypted_values).
+    encrypted_client_secret: Mapped[str | None] = mapped_column(default=None)
+    key_id: Mapped[UUID | None] = mapped_column(ForeignKey("secret_key.id"), default=None)
+    scopes: Mapped[str] = mapped_column()
+    admin_groups: Mapped[list[str]] = mapped_column(JSON, default=list)
+    default_admin: Mapped[bool] = mapped_column(default=False)
+    team_mapping: Mapped[dict] = mapped_column(JSON, default=dict)
+    redirect_uri: Mapped[str | None] = mapped_column(default=None)
+
+    def to_entity(self) -> SsoSettings:
+        return SsoSettings(
+            id=self.id,
+            enabled=self.enabled,
+            discovery_url=self.discovery_url,
+            client_id=self.client_id,
+            scopes=self.scopes,
+            admin_groups=tuple(self.admin_groups),
+            default_admin=self.default_admin,
+            team_mapping=parse_team_mapping(self.team_mapping),
+            redirect_uri=self.redirect_uri,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            has_client_secret=self.encrypted_client_secret is not None,
         )
 
 

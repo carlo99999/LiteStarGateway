@@ -33,6 +33,7 @@ from litestar_gateway.infrastructure.persistence.secret_key_repository import (
 )
 from litestar_gateway.infrastructure.rate_limiter import build_rate_limiter
 from litestar_gateway.infrastructure.rotation import make_rotation_scheduler
+from litestar_gateway.infrastructure.sso.dynamic import build_sso_config_provider
 from litestar_gateway.infrastructure.sso.oidc import OIDCIdentityProvider
 from litestar_gateway.infrastructure.usage_reconciler import make_usage_reconciler
 from litestar_gateway.infrastructure.web.api_router.dependencies import (
@@ -86,6 +87,10 @@ from litestar_gateway.infrastructure.web.service_principals.dependencies import 
 )
 from litestar_gateway.infrastructure.web.session import create_session_router
 from litestar_gateway.infrastructure.web.session.sso import create_sso_router
+from litestar_gateway.infrastructure.web.sso_settings import SsoSettingsController
+from litestar_gateway.infrastructure.web.sso_settings.dependencies import (
+    provide_sso_settings_service,
+)
 from litestar_gateway.infrastructure.web.teams import TeamController
 from litestar_gateway.infrastructure.web.ui_site import create_ui_router
 from litestar_gateway.infrastructure.web.users import create_users_router
@@ -115,10 +120,15 @@ def create_app(
     if ui_router is not None:
         route_handlers.append(ui_router)
 
-    idp = _resolve_identity_provider(settings, identity_provider)
-    if idp is not None:
-        route_handlers.append(create_sso_router())
-        dependencies.update(_build_sso_dependencies(settings, idp))
+    # SSO routes/DI are registered unconditionally: the OIDC config can now
+    # live in the DB (UI-managed, hot-reloadable) as well as env vars, and
+    # enabling it from the console must not require a restart. When neither
+    # is configured, `sso_config` raises `SSONotConfigured` (-> 404) instead.
+    env_idp = _resolve_identity_provider(settings, identity_provider)
+    route_handlers.append(create_sso_router())
+    dependencies.update(
+        _build_sso_dependencies(settings, env_idp, explicit_override=identity_provider is not None)
+    )
 
     app = Litestar(
         route_handlers=route_handlers,
@@ -228,6 +238,7 @@ def _build_route_handlers(database: Database) -> list:
         platform_routing_savings,  # platform-admin: cross-team routing savings
         ServicePrincipalController,  # team-admin: service principals + their keys
         CredentialController,  # platform-admin: encrypted provider credentials
+        SsoSettingsController,  # platform-admin: DB-backed OIDC config (hot-reloadable)
         AuditController,  # platform-admin: read the audit trail
         create_scim_router(),  # IdP-facing SCIM 2.0 Users (provisioning-token auth)
         create_scim_tokens_router(),  # platform-admin: mint/revoke SCIM tokens
@@ -253,6 +264,7 @@ def _build_dependencies(
         "model_service": Provide(provide_model_service, sync_to_thread=False),
         "callable_resolver": Provide(provide_callable_resolver, sync_to_thread=False),
         "credential_service": Provide(provide_credential_service, sync_to_thread=False),
+        "sso_settings_service": Provide(provide_sso_settings_service, sync_to_thread=False),
         "completion_service": Provide(provide_completion_service, sync_to_thread=False),
         "service_principal_service": Provide(
             provide_service_principal_service, sync_to_thread=False
@@ -295,13 +307,15 @@ def _resolve_identity_provider(
     return identity_provider
 
 
-def _build_sso_dependencies(settings: Settings, idp: IdentityProvider) -> dict[str, Provide]:
+def _build_sso_dependencies(
+    settings: Settings, env_idp: IdentityProvider | None, *, explicit_override: bool
+) -> dict[str, Provide]:
     return {
-        "identity_provider": Provide(lambda: idp, sync_to_thread=False),
-        "sso_admin_groups": Provide(lambda: settings.oidc_admin_groups, sync_to_thread=False),
-        "sso_default_admin": Provide(lambda: settings.default_admin, sync_to_thread=False),
-        "sso_team_mapping": Provide(lambda: settings.oidc_team_mapping, sync_to_thread=False),
-        "sso_redirect_uri": Provide(lambda: settings.oidc_redirect_uri, sync_to_thread=False),
+        # Async provider (reads the DB before deciding DB vs. env fallback);
+        # `sync_to_thread` only applies to sync callables.
+        "sso_config": Provide(
+            build_sso_config_provider(settings, env_idp, explicit_override=explicit_override)
+        ),
         "sso_cookie_secure": Provide(lambda: settings.session_cookie_secure, sync_to_thread=False),
     }
 

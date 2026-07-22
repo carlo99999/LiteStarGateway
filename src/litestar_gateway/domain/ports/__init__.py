@@ -33,6 +33,7 @@ from litestar_gateway.domain.ports.routing import (
 from litestar_gateway.domain.ports.scim_token import ScimTokenRepository
 from litestar_gateway.domain.ports.secret_key import SecretKeyRepository
 from litestar_gateway.domain.ports.service_principal import ServicePrincipalRepository
+from litestar_gateway.domain.ports.sso_settings import SsoSettingsRepository
 from litestar_gateway.domain.ports.team import (
     TeamLifecycleRepository,
     TeamMembershipRepository,
@@ -66,6 +67,7 @@ __all__ = [
     "ScimTokenRepository",
     "SecretKeyRepository",
     "ServicePrincipalRepository",
+    "SsoSettingsRepository",
     "TeamMembershipRepository",
     "TeamLifecycleRepository",
     "TeamRepository",

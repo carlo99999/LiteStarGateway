@@ -63,6 +63,9 @@ const BudgetsPage = lazy(() =>
 const AuditPage = lazy(() =>
   import("@/features/audit/AuditPage").then((m) => ({ default: m.AuditPage })),
 );
+const SsoSettingsPage = lazy(() =>
+  import("@/features/sso/SsoSettingsPage").then((m) => ({ default: m.SsoSettingsPage })),
+);
 
 function captureInviteTokenFromWindow() {
   if (typeof window !== "undefined") {
@@ -197,6 +200,12 @@ const auditRoute = createRoute({
   component: AuditPage,
 });
 
+const ssoSettingsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/sso-settings",
+  component: SsoSettingsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   signupRoute,
@@ -217,6 +226,7 @@ const routeTree = rootRoute.addChildren([
     usageRoute,
     budgetsRoute,
     auditRoute,
+    ssoSettingsRoute,
   ]),
 ]);
 
