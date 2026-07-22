@@ -16,6 +16,7 @@ const SELECT_CLASS =
   "flex h-9 min-w-64 rounded-md border border-input bg-background px-3 py-1 font-mono text-sm " +
   "text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background";
+const MAX_MODELS = 5;
 
 function formatCost(cost: number | null | undefined): string {
   if (cost === null || cost === undefined) return "—";
@@ -23,7 +24,7 @@ function formatCost(cost: number | null | undefined): string {
 }
 
 /** Compare one prompt across several of a team's chat models: response,
- * latency, tokens and estimated cost, side by side. Real (unmetered) calls. */
+ * latency, tokens and estimated cost, side by side. Calls are governed usage. */
 export function PlaygroundPage() {
   const teams = useAccessibleTeams();
   const [teamId, setTeamId] = useState("");
@@ -72,7 +73,7 @@ export function PlaygroundPage() {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(alias)) next.delete(alias);
-      else next.add(alias);
+      else if (next.size < MAX_MODELS) next.add(alias);
       return next;
     });
   }
@@ -84,7 +85,7 @@ export function PlaygroundPage() {
       <PageHeader
         command="playground compare"
         title="Playground"
-        description="Send one prompt to several models at once and compare the responses, latency, tokens and cost. Real calls — not metered against usage or budgets."
+        description="Compare real model responses, latency, tokens and cost. Calls consume the team's rate limit and budget and are recorded as usage."
       />
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -108,7 +109,7 @@ export function PlaygroundPage() {
       </div>
 
       <div className="mb-3 grid gap-1.5">
-        <Label>models to compare</Label>
+        <Label>models to compare (up to {MAX_MODELS})</Label>
         {options.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             {teamId ? "no enabled chat models or routers for this team" : "select a team"}
@@ -124,6 +125,7 @@ export function PlaygroundPage() {
                   type="checkbox"
                   checked={selected.has(o.alias)}
                   onChange={() => toggle(o.alias)}
+                  disabled={!selected.has(o.alias) && selected.size >= MAX_MODELS}
                 />
                 <span className="text-sm">{o.alias}</span>
                 {o.kind === "router" ? (

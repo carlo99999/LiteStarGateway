@@ -181,6 +181,10 @@ class InvalidRouterConfig(DomainError):
     default_model not among candidates, ...)."""
 
 
+class InvalidPlaygroundRequest(DomainError):
+    """A Playground batch exceeds its bounded input contract (→ 400)."""
+
+
 class NoRoutableCandidate(DomainError):
     """The hard capability filters left zero candidates — a router
     configuration problem, surfaced clearly instead of guessing a model."""

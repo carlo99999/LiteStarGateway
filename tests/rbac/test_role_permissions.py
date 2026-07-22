@@ -27,7 +27,12 @@ def test_admin_holds_every_permission_and_member_none() -> None:
 
 def test_new_roles_are_scoped_to_their_domain() -> None:
     assert ROLE_PERMISSIONS[TeamRole.MODEL_MANAGER] == frozenset(
-        {Permission.MODELS_READ, Permission.MODELS_MANAGE, Permission.DECISIONS_READ}
+        {
+            Permission.MODELS_READ,
+            Permission.MODELS_MANAGE,
+            Permission.DECISIONS_READ,
+            Permission.PLAYGROUND_EXECUTE,
+        }
     )
     assert ROLE_PERMISSIONS[TeamRole.KEY_ISSUER] == frozenset(
         {Permission.KEYS_READ, Permission.KEYS_ISSUE}

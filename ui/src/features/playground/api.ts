@@ -4,7 +4,7 @@ import type { components } from "@/lib/api/schema";
 export type PlaygroundResult = components["schemas"]["PlaygroundResultResponse"];
 
 /** POST /playground/compare — run one prompt against several models and get the
- * response, latency, tokens and estimated cost for each. Real (unmetered) calls. */
+ * response, latency, tokens and estimated cost for each. Calls are metered. */
 export async function comparePrompt(
   teamId: string,
   modelNames: string[],

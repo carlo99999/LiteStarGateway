@@ -29,8 +29,10 @@
 
 ## 1. Goal
 
-Track token usage and cost per team/model/key, expose it, and **enforce budgets**
-(hard spend caps). The `Model` already carries `input_cost_per_token` /
+Track token usage and cost per team/model and, when present, API key; expose it,
+and **enforce budgets** (hard spend caps). Session-authenticated Playground calls
+use a null `api_key_id` and remain attributable to their human actor in the audit
+log. The `Model` already carries `input_cost_per_token` /
 `output_cost_per_token`, but nothing aggregates them today. You can't safely run a
 multi-tenant gateway without accounting + limits.
 
@@ -40,7 +42,7 @@ multi-tenant gateway without accounting + limits.
 
 - After each call, read `usage` from the provider response (prompt/completion
   tokens), compute cost = tokens × the `Model` cost fields, and persist a
-  **`UsageEvent`** (team_id, model_id, key_id, op, tokens, cost, ts, status).
+  **`UsageEvent`** (team_id, model_id, optional key_id, op, tokens, cost, ts, status).
 - This overlaps with observability (`adding-observability-via-mlflow`): MLflow is
   for traces/analytics; the `UsageEvent` table is the **authoritative billing
   record** and the source for budget enforcement. Keep both (different purposes),

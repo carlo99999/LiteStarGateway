@@ -49,6 +49,16 @@ async def test_model_manager_manages_models_and_nothing_else(client: AsyncTestCl
     assert (
         await client.get(f"/teams/{team}/models", headers=_bearer(token))
     ).status_code == HTTP_200_OK
+    playground = await client.post(
+        "/playground/compare",
+        json={
+            "team_id": team,
+            "model_names": ["unknown"],
+            "messages": [{"role": "user", "content": "hello"}],
+        },
+        headers=_bearer(token),
+    )
+    assert playground.status_code == HTTP_201_CREATED, playground.text
 
     denied = [
         client.post(
@@ -213,6 +223,15 @@ async def test_plain_member_is_still_denied_all_management(client: AsyncTestClie
         client.get(f"/teams/{team}/keys", headers=_bearer(token)),
         client.get(f"/teams/{team}/usage", headers=_bearer(token)),
         client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(token)),
+        client.post(
+            "/playground/compare",
+            json={
+                "team_id": team,
+                "model_names": ["unknown"],
+                "messages": [{"role": "user", "content": "hello"}],
+            },
+            headers=_bearer(token),
+        ),
     ):
         assert (await request).status_code == HTTP_403_FORBIDDEN
 

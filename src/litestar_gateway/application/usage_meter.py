@@ -313,7 +313,7 @@ class UsageMeter:
     async def settle_ok(
         self,
         team_id: UUID,
-        api_key_id: UUID,
+        api_key_id: UUID | None,
         model: Model,
         operation: str,
         response: dict[str, Any],
@@ -361,7 +361,7 @@ class UsageMeter:
     def trace_error(
         self,
         team_id: UUID,
-        api_key_id: UUID,
+        api_key_id: UUID | None,
         model: Model,
         operation: str,
         latency_ms: float,
@@ -429,7 +429,7 @@ class UsageMeter:
     async def _bill(
         self,
         team_id: UUID,
-        api_key_id: UUID,
+        api_key_id: UUID | None,
         model: Model,
         operation: str,
         prompt: int,

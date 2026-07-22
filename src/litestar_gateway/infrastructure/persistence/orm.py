@@ -377,7 +377,9 @@ class UsageEventModel(base.UUIDAuditBase):
     __table_args__ = (Index("ix_usage_event_team_id_created_at", "team_id", "created_at"),)
 
     team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
-    api_key_id: Mapped[UUID] = mapped_column(ForeignKey("api_key.id"), index=True)
+    api_key_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("api_key.id"), index=True, nullable=True
+    )
     model_id: Mapped[UUID] = mapped_column(index=True)
     model_name: Mapped[str] = mapped_column()
     operation: Mapped[str] = mapped_column()
@@ -413,7 +415,7 @@ class PendingUsageEventModel(base.UUIDAuditBase):
 
     event_id: Mapped[UUID] = mapped_column(unique=True, index=True)  # intended usage_event.id
     team_id: Mapped[UUID] = mapped_column(index=True)
-    api_key_id: Mapped[UUID] = mapped_column()
+    api_key_id: Mapped[UUID | None] = mapped_column(nullable=True)
     model_id: Mapped[UUID] = mapped_column()
     model_name: Mapped[str] = mapped_column()
     operation: Mapped[str] = mapped_column()
