@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CreateCredentialDialog } from "@/features/credentials/CreateCredentialDialog";
 import { CredentialsTable } from "@/features/credentials/CredentialsTable";
 import { DeleteCredentialDialog } from "@/features/credentials/DeleteCredentialDialog";
+import { EditCredentialDialog } from "@/features/credentials/EditCredentialDialog";
 import { listCredentialsPage, type Credential } from "@/features/credentials/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
 import { toError } from "@/lib/toError";
@@ -27,6 +28,7 @@ export function CredentialsPage() {
   }, [credentials.data, credentials.isFetching, offset]);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<Credential | null>(null);
   const [deleting, setDeleting] = useState<Credential | null>(null);
 
   return (
@@ -46,6 +48,7 @@ export function CredentialsPage() {
         rows={credentials.data?.items}
         isLoading={credentials.isLoading}
         error={toError(credentials.error)}
+        onEdit={setEditing}
         onDelete={setDeleting}
       />
       {credentials.data ? (
@@ -60,6 +63,12 @@ export function CredentialsPage() {
       ) : null}
 
       <CreateCredentialDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <EditCredentialDialog
+        credential={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+      />
       <DeleteCredentialDialog
         credential={deleting}
         onOpenChange={(open) => {

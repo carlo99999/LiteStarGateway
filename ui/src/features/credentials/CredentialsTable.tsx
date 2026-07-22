@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ interface CredentialsTableProps {
   rows: Credential[] | undefined;
   isLoading: boolean;
   error: Error | null;
+  onEdit: (credential: Credential) => void;
   onDelete: (credential: Credential) => void;
 }
 
@@ -16,7 +17,13 @@ function formatWhen(iso: string): string {
   return new Date(iso).toISOString().slice(0, 19).replace("T", " ");
 }
 
-export function CredentialsTable({ rows, isLoading, error, onDelete }: CredentialsTableProps) {
+export function CredentialsTable({
+  rows,
+  isLoading,
+  error,
+  onEdit,
+  onDelete,
+}: CredentialsTableProps) {
   const columns: Column<Credential>[] = [
     { key: "name", header: "name", cell: (c) => <span className="text-foreground">{c.name}</span> },
     {
@@ -32,18 +39,29 @@ export function CredentialsTable({ rows, isLoading, error, onDelete }: Credentia
     {
       key: "actions",
       header: "",
-      className: "w-12",
+      className: "w-20",
       numeric: true,
       cell: (c) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-          aria-label={`Delete ${c.name}`}
-          onClick={() => onDelete(c)}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+        <span className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            aria-label={`Edit ${c.name}`}
+            onClick={() => onEdit(c)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            aria-label={`Delete ${c.name}`}
+            onClick={() => onDelete(c)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </span>
       ),
     },
   ];

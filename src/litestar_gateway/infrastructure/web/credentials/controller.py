@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from litestar import Controller, Request, delete, get, post
+from litestar import Controller, Request, delete, get, patch, post
 from litestar.di import NamedDependency, Provide
 from litestar.openapi.spec import Example
 from litestar.params import Body, FromPath, FromQuery
@@ -23,6 +23,7 @@ from litestar_gateway.infrastructure.web.audit.recorder import record_audit
 from litestar_gateway.infrastructure.web.credentials.schemas import (
     CreateCredentialRequest,
     CredentialResponse,
+    UpdateCredentialRequest,
 )
 from litestar_gateway.infrastructure.web.session.dependencies import provide_current_admin
 
@@ -135,6 +136,38 @@ class CredentialController(Controller):
             current_admin, limit=page_limit, offset=page_offset
         )
         return [CredentialResponse.from_entity(c) for c in credentials]
+
+    @patch(
+        "/{credential_id:uuid}",
+        summary="Update a provider credential",
+        description=(
+            "Rename and/or replace the secret values (e.g. a rotated token). "
+            "The provider is immutable; secrets are never returned, so `values` "
+            "is a full replacement set. Omitted fields are left unchanged."
+        ),
+    )
+    async def update_credential(
+        self,
+        credential_id: FromPath[UUID],
+        data: UpdateCredentialRequest,
+        current_admin: NamedDependency[User],
+        credential_service: NamedDependency[CredentialService],
+        request: Request,
+        audit_log: NamedDependency[AuditLog],
+    ) -> CredentialResponse:
+        credential = await credential_service.update(
+            current_admin, credential_id, name=data.name, values=data.values
+        )
+        await record_audit(
+            audit_log,
+            request,
+            current_admin,
+            "credential.update",
+            target_type="credential",
+            target_id=credential_id,
+            detail="values rotated" if data.values is not None else f"renamed to {data.name}",
+        )
+        return CredentialResponse.from_entity(credential)
 
     @delete(
         "/{credential_id:uuid}",

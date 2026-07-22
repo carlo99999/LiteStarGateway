@@ -27,19 +27,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -72,19 +72,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -120,19 +120,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -168,19 +168,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -229,19 +229,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -325,19 +325,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -421,19 +421,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -520,19 +520,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -619,19 +619,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -726,19 +726,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -820,19 +820,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -916,19 +916,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1040,19 +1040,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1141,19 +1141,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1240,19 +1240,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1336,19 +1336,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1432,19 +1432,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1533,19 +1533,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1641,19 +1641,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1739,19 +1739,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1828,19 +1828,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1915,19 +1915,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1956,19 +1956,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2004,19 +2004,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2065,19 +2065,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2151,19 +2151,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2199,19 +2199,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2285,19 +2285,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2382,19 +2382,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2490,19 +2490,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2588,19 +2588,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2684,19 +2684,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2783,19 +2783,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2899,19 +2899,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3033,19 +3033,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3142,19 +3142,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3276,19 +3276,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3385,19 +3385,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3483,19 +3483,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3589,19 +3589,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3685,19 +3685,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3776,19 +3776,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3872,19 +3872,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3971,19 +3971,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4105,19 +4105,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4232,19 +4232,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4343,19 +4343,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4452,19 +4452,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4560,19 +4560,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4661,19 +4661,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4832,19 +4832,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4969,19 +4969,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5079,19 +5079,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5187,19 +5187,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5297,19 +5297,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5395,19 +5395,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5522,19 +5522,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5619,19 +5619,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5717,19 +5717,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5816,19 +5816,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5924,19 +5924,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6025,19 +6025,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6126,19 +6126,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6224,19 +6224,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6328,19 +6328,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6426,19 +6426,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6535,19 +6535,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6653,19 +6653,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6759,19 +6759,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6914,19 +6914,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7112,19 +7112,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7223,19 +7223,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7332,19 +7332,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7431,19 +7431,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7518,19 +7518,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7615,19 +7615,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7724,19 +7724,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7832,19 +7832,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7941,19 +7941,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8059,19 +8059,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8184,19 +8184,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8282,19 +8282,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8381,11 +8381,103 @@
                                 "required": false,
                                 "deprecated": false
                             },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "patch": {
+                "tags": [
+                    "credentials"
+                ],
+                "summary": "Update a provider credential",
+                "description": "Rename and/or replace the secret values (e.g. a rotated token). The provider is immutable; secrets are never returned, so `values` is a full replacement set. Omitted fields are left unchanged.",
+                "operationId": "CredentialsCredentialIdUpdateCredential",
+                "parameters": [
+                    {
+                        "name": "credential_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateCredentialRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             },
@@ -8396,6 +8488,21 @@
                                 "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CredentialResponse"
+                                }
                             }
                         }
                     },
@@ -8498,19 +8605,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8587,19 +8694,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8691,19 +8798,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8775,19 +8882,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8835,19 +8942,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8931,19 +9038,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9027,19 +9134,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9116,19 +9223,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9202,19 +9309,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9261,19 +9368,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9359,19 +9466,19 @@
                                 "required": false,
                                 "deprecated": false
                             },
-                            "X-Frame-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "Clickjacking",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "Referrer-Policy": {
                                 "schema": {
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -11205,6 +11312,38 @@
                     "token_type"
                 ],
                 "title": "TokenResponse"
+            },
+            "UpdateCredentialRequest": {
+                "properties": {
+                    "name": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "New unique name. Omit to keep the current one."
+                    },
+                    "values": {
+                        "oneOf": [
+                            {
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "A full fresh set of the provider's secret fields (e.g. a rotated token). Omit to keep the current values — they are never revealed, so this replaces, it does not merge."
+                    }
+                },
+                "type": "object",
+                "required": [],
+                "title": "UpdateCredentialRequest"
             },
             "UpdateModelRequest": {
                 "properties": {
