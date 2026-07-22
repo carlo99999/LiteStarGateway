@@ -11,11 +11,12 @@ error, so one failure never sinks the comparison.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from time import perf_counter
 from typing import Any
 from uuid import UUID
 
+from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.domain.entities import Model, ModelType
 from litestar_gateway.domain.ports import CredentialRepository, LLMGateway, ModelRepository
 from litestar_gateway.domain.request_policy import clamp_output_tokens, sanitize_request
@@ -31,6 +32,8 @@ class PlaygroundResult:
     completion_tokens: int | None = None
     cost: float | None = None
     error: str | None = None
+    # For a router: the candidate it selected for this request.
+    chosen_model: str | None = None
 
 
 def _content(response: dict[str, Any]) -> str | None:
@@ -42,11 +45,16 @@ def _content(response: dict[str, Any]) -> str | None:
 
 class PlaygroundService:
     def __init__(
-        self, models: ModelRepository, credentials: CredentialRepository, gateway: LLMGateway
+        self,
+        models: ModelRepository,
+        credentials: CredentialRepository,
+        gateway: LLMGateway,
+        routers: RouterService | None = None,
     ) -> None:
         self._models = models
         self._credentials = credentials
         self._gateway = gateway
+        self._routers = routers
 
     async def compare(
         self,
@@ -70,16 +78,48 @@ class PlaygroundService:
         max_completion_tokens: int | None,
     ) -> PlaygroundResult:
         model = await self._models.get_by_name(team_id, name)
-        if model is None:
-            return PlaygroundResult(name, ok=False, error="unknown model")
-        if not model.enabled:
-            return PlaygroundResult(name, ok=False, error="model is disabled")
-        if model.type is not ModelType.CHAT:
-            return PlaygroundResult(
-                name, ok=False, error=f"'{name}' is a {model.type} model, not chat"
-            )
+        if model is not None:
+            if not model.enabled:
+                return PlaygroundResult(name, ok=False, error="model is disabled")
+            if model.type is not ModelType.CHAT:
+                return PlaygroundResult(
+                    name, ok=False, error=f"'{name}' is a {model.type} model, not chat"
+                )
+            return await self._call_model(team_id, name, model, messages, max_completion_tokens)
 
-        request: dict[str, Any] = {"model": name, "messages": messages}
+        # Not a model — maybe a router. Preview which candidate it picks, then
+        # call that candidate; label the result with the router + its choice.
+        if self._routers is not None:
+            router = await self._routers.get_enabled_by_name(team_id, name)
+            if router is not None:
+                try:
+                    request = {"model": name, "messages": messages}
+                    decision = await self._routers.select_preview(
+                        router, request, acting_team_id=team_id
+                    )
+                except Exception as exc:
+                    return PlaygroundResult(name, ok=False, error=str(exc) or "routing failed")
+                chosen = await self._models.get_by_name(team_id, decision.model_name)
+                if chosen is None:
+                    return PlaygroundResult(
+                        name, ok=False, error=f"router chose unknown model '{decision.model_name}'"
+                    )
+                result = await self._call_model(
+                    team_id, name, chosen, messages, max_completion_tokens
+                )
+                return replace(result, chosen_model=decision.model_name)
+
+        return PlaygroundResult(name, ok=False, error="unknown model")
+
+    async def _call_model(
+        self,
+        team_id: UUID,
+        label: str,
+        model: Model,
+        messages: list[dict[str, Any]],
+        max_completion_tokens: int | None,
+    ) -> PlaygroundResult:
+        request: dict[str, Any] = {"model": model.name, "messages": messages}
         if max_completion_tokens is not None:
             request["max_completion_tokens"] = max_completion_tokens
         clean = sanitize_request("chat.completions", request)
@@ -88,18 +128,18 @@ class PlaygroundService:
         try:
             values = await self._credentials.get_values(model.credential_id)
             if values is None:
-                return PlaygroundResult(name, ok=False, error="credential missing")
+                return PlaygroundResult(label, ok=False, error="credential missing")
             start = perf_counter()
             response = await self._gateway.achat_completion(clean, model, values)
             latency_ms = (perf_counter() - start) * 1000
         except Exception as exc:  # per-model isolation — never sink the batch
-            return PlaygroundResult(name, ok=False, error=str(exc) or exc.__class__.__name__)
+            return PlaygroundResult(label, ok=False, error=str(exc) or exc.__class__.__name__)
 
         usage = response.get("usage") or {}
         prompt = usage.get("prompt_tokens")
         completion = usage.get("completion_tokens")
         return PlaygroundResult(
-            model_name=name,
+            model_name=label,
             ok=True,
             content=_content(response),
             latency_ms=latency_ms,

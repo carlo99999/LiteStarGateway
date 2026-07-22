@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { listCallableModels } from "@/features/models/api";
 import { comparePrompt } from "@/features/playground/api";
+import { listCallableRouters } from "@/features/routing/api";
 import { listAllTeams } from "@/features/teams/api";
 import { toError } from "@/lib/toError";
 
@@ -35,6 +36,11 @@ export function PlaygroundPage() {
     queryFn: ({ signal }) => listCallableModels(teamId, signal),
     enabled: teamId.length > 0,
   });
+  const routers = useQuery({
+    queryKey: ["team-routers", teamId, "callable"],
+    queryFn: () => listCallableRouters(teamId),
+    enabled: teamId.length > 0,
+  });
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [prompt, setPrompt] = useState("");
@@ -45,10 +51,19 @@ export function PlaygroundPage() {
   }, [teamId, teams.data]);
   useEffect(() => setSelected(new Set()), [teamId]);
 
-  // Only chat models can be compared (the playground sends chat completions).
-  const chatModels = (models.data ?? []).filter(
-    (c) => c.model.type === "chat" && c.model.enabled,
-  );
+  // Chat models + routers can be compared (both resolve to a chat completion).
+  const options: { alias: string; kind: "model" | "router"; badge?: string }[] = [
+    ...(models.data ?? [])
+      .filter((c) => c.model.type === "chat" && c.model.enabled)
+      .map((c) => ({
+        alias: c.alias,
+        kind: "model" as const,
+        badge: c.origin !== "own" ? c.origin : undefined,
+      })),
+    ...(routers.data ?? [])
+      .filter((c) => c.router.enabled)
+      .map((c) => ({ alias: c.alias, kind: "router" as const })),
+  ];
 
   const run = useMutation({
     mutationFn: () => {
@@ -98,24 +113,28 @@ export function PlaygroundPage() {
 
       <div className="mb-3 grid gap-1.5">
         <Label>models to compare</Label>
-        {chatModels.length === 0 ? (
+        {options.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            {teamId ? "no enabled chat models for this team" : "select a team"}
+            {teamId ? "no enabled chat models or routers for this team" : "select a team"}
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {chatModels.map((c) => (
+            {options.map((o) => (
               <label
-                key={c.alias}
+                key={`${o.kind}:${o.alias}`}
                 className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-2 py-1 hover:bg-muted"
               >
                 <input
                   type="checkbox"
-                  checked={selected.has(c.alias)}
-                  onChange={() => toggle(c.alias)}
+                  checked={selected.has(o.alias)}
+                  onChange={() => toggle(o.alias)}
                 />
-                <span className="text-sm">{c.alias}</span>
-                {c.origin !== "own" ? <Badge variant="accent">{c.origin}</Badge> : null}
+                <span className="text-sm">{o.alias}</span>
+                {o.kind === "router" ? (
+                  <Badge variant="muted">router</Badge>
+                ) : o.badge ? (
+                  <Badge variant="accent">{o.badge}</Badge>
+                ) : null}
               </label>
             ))}
           </div>
@@ -167,6 +186,11 @@ export function PlaygroundPage() {
                 <span className="flex items-center gap-1.5 font-medium">
                   <StatusDot tone={r.ok ? "green" : "amber"} />
                   {r.model_name}
+                  {r.chosen_model ? (
+                    <span className="font-mono text-[10px] font-normal text-muted-foreground">
+                      → {r.chosen_model}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="tabular text-[10px] text-muted-foreground">
                   {r.latency_ms !== null && r.latency_ms !== undefined

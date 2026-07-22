@@ -100,3 +100,47 @@ async def test_unknown_and_wrong_type_models_error() -> None:
     by_name = {r.model_name: r for r in results}
     assert by_name["nope"].error == "unknown model"
     assert not by_name["emb"].ok and "not chat" in (by_name["emb"].error or "")
+
+
+async def test_router_is_previewed_and_labelled() -> None:
+    from litestar_gateway.domain.routing import RouterConfig, RoutingDecision
+
+    router = RouterConfig(
+        id=uuid4(),
+        team_id=TEAM,
+        name="smart",
+        candidates=(),
+        default_model="a",
+        strategy="weighted",
+        strategy_config={},
+        enabled=True,
+        created_at=datetime.now(UTC),
+    )
+
+    class _RS:
+        async def get_enabled_by_name(self, team_id: UUID, name: str) -> Any:
+            return router if name == "smart" else None
+
+        async def select_preview(
+            self, r: Any, request: Any, *, acting_team_id: UUID
+        ) -> RoutingDecision:
+            return RoutingDecision(
+                model_name="a",
+                strategy="weighted",
+                tier=None,
+                score=None,
+                signals=(),
+                decision_ms=1.0,
+            )
+
+    svc = PlaygroundService(
+        models=cast("ModelRepository", _Models({"a": _model("a")})),
+        credentials=cast("CredentialRepository", _Credentials()),
+        gateway=cast("LLMGateway", _Gateway()),
+        routers=cast("Any", _RS()),
+    )
+    [res] = await svc.compare(TEAM, ["smart"], [{"role": "user", "content": "hi"}])
+    assert res.ok
+    assert res.model_name == "smart"
+    assert res.chosen_model == "a"
+    assert res.content == "hi from a"
