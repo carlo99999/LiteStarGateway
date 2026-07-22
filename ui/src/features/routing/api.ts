@@ -6,6 +6,8 @@ export type Router = components["schemas"]["RouterResponse"];
 export type RouterRequest = components["schemas"]["RouterRequest"];
 export type CandidateRequest = components["schemas"]["CandidateRequest"];
 export type Decision = components["schemas"]["DecisionResponse"];
+export type RouterGrant = components["schemas"]["RouterGrantResponse"];
+export type CallableRouter = components["schemas"]["CallableRouterResponse"];
 
 /** Shape of GET .../stats (untyped dict in the OpenAPI schema). */
 export interface RouterStats {
@@ -91,6 +93,97 @@ export async function deleteRouter(teamId: string, routerId: string): Promise<vo
     params: { path: { team_id: teamId, router_id: routerId } },
   });
   if (error) throw fail(error, "Failed to delete router");
+}
+
+/** GET /teams/{id}/routers/callable — own + extended + global routers. */
+export async function listCallableRouters(teamId: string): Promise<CallableRouter[]> {
+  const { data, error } = await api.GET("/teams/{team_id}/routers/callable", {
+    params: { path: { team_id: teamId } },
+  });
+  if (error || !data) throw fail(error, "Failed to load routers");
+  return data;
+}
+
+/** GET /platform/routers — global (platform) routers. */
+export async function listGlobalRouters(): Promise<Router[]> {
+  const { data, error } = await api.GET("/platform/routers", {});
+  if (error || !data) throw fail(error, "Failed to load global routers");
+  return data;
+}
+
+/** POST /platform/routers — create a global router callable by every team. */
+export async function createGlobalRouter(body: RouterRequest): Promise<Router> {
+  const { data, error } = await api.POST("/platform/routers", { body });
+  if (error || !data) throw fail(error, "Failed to create global router");
+  return data;
+}
+
+/** PUT /platform/routers/{id} — replace a global router definition. */
+export async function replaceGlobalRouter(routerId: string, body: RouterRequest): Promise<Router> {
+  const { data, error } = await api.PUT("/platform/routers/{router_id}", {
+    params: { path: { router_id: routerId } },
+    body,
+  });
+  if (error || !data) throw fail(error, "Failed to update global router");
+  return data;
+}
+
+/** Toggle a global router's `enabled` by replaying its definition. */
+export async function setGlobalRouterEnabled(router: Router, enabled: boolean): Promise<Router> {
+  return replaceGlobalRouter(router.id, {
+    name: router.name,
+    candidates: router.candidates as unknown as CandidateRequest[],
+    default_model: router.default_model,
+    strategy: router.strategy,
+    strategy_config: router.strategy_config,
+    enabled,
+    shadow_strategy: router.shadow_strategy,
+  });
+}
+
+/** DELETE /platform/routers/{id}. */
+export async function deleteGlobalRouter(routerId: string): Promise<void> {
+  const { error } = await api.DELETE("/platform/routers/{router_id}", {
+    params: { path: { router_id: routerId } },
+  });
+  if (error) throw fail(error, "Failed to delete global router");
+}
+
+/** POST /platform/routers/{id}/make-global — promote a team router. */
+export async function makeRouterGlobal(routerId: string): Promise<Router> {
+  const { data, error } = await api.POST("/platform/routers/{router_id}/make-global", {
+    params: { path: { router_id: routerId } },
+  });
+  if (error || !data) throw fail(error, "Failed to make the router global");
+  return data;
+}
+
+/** POST /platform/routers/{id}/extend — share a team router with other teams. */
+export async function extendRouter(routerId: string, teamIds: string[]): Promise<RouterGrant[]> {
+  const { data, error } = await api.POST("/platform/routers/{router_id}/extend", {
+    params: { path: { router_id: routerId } },
+    body: { team_ids: teamIds },
+  });
+  if (error || !data) throw fail(error, "Failed to extend the router");
+  return data;
+}
+
+/** GET /platform/routers/{id}/grants — teams a router is extended to. */
+export async function listRouterGrants(routerId: string, signal?: AbortSignal): Promise<RouterGrant[]> {
+  const { data, error } = await api.GET("/platform/routers/{router_id}/grants", {
+    params: { path: { router_id: routerId } },
+    signal,
+  });
+  if (error || !data) throw fail(error, "Failed to load extensions");
+  return data;
+}
+
+/** DELETE /platform/routers/grants/{id} — revoke an extension. */
+export async function unextendRouter(grantId: string): Promise<void> {
+  const { error } = await api.DELETE("/platform/routers/grants/{grant_id}", {
+    params: { path: { grant_id: grantId } },
+  });
+  if (error) throw fail(error, "Failed to revoke the extension");
 }
 
 /** GET .../stats — request distribution per chosen model / tier. */

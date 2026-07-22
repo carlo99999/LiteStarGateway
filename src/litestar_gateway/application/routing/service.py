@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
+import re
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
@@ -43,6 +44,7 @@ from litestar_gateway.domain.ports import (
 from litestar_gateway.domain.routing import (
     CandidateModel,
     RouterConfig,
+    RouterGrant,
     RoutingDecision,
     RoutingDecisionRecord,
     build_routing_context,
@@ -50,6 +52,23 @@ from litestar_gateway.domain.routing import (
 )
 
 logger = logging.getLogger("litestar_gateway.routing")
+
+
+@dataclasses.dataclass(frozen=True)
+class CallableRouter:
+    """A router a team can call, with its effective alias and provenance.
+    `origin` is one of `own`, `extended`, `global`."""
+
+    alias: str
+    router: RouterConfig
+    origin: str
+    source_team_id: UUID | None
+
+
+def _slug(text: str) -> str:
+    """A label safe to embed in a router alias (no spaces/punctuation)."""
+    return re.sub(r"[^a-zA-Z0-9]+", "-", text).strip("-").lower() or "team"
+
 
 STRATEGIES: dict[str, type] = {
     "complexity": ComplexityStrategy,
@@ -247,6 +266,94 @@ class RouterService:
         router = await self._routers.get_by_name(team_id, name)
         return router if router is not None and router.enabled else None
 
+    # ── Platform (global) routers + extension ────────────────────────────────
+
+    async def get_any(self, router_id: UUID) -> RouterConfig:
+        router = await self._routers.get_any(router_id)
+        if router is None:
+            raise RouterNotFound(str(router_id))
+        return router
+
+    async def list_global(self) -> list[RouterConfig]:
+        return await self._routers.list_global()
+
+    async def update_global(self, router: RouterConfig) -> RouterConfig:
+        """Update a global router (team_id is None; scoped by `update`)."""
+        await self._validate(router)
+        return await self._routers.update(router)
+
+    async def delete_global(self, router_id: UUID) -> None:
+        if not await self._routers.delete_global(router_id):
+            raise RouterNotFound(str(router_id))
+
+    async def make_global(self, router_id: UUID) -> RouterConfig:
+        """Promote a team-owned router to a global (platform) one."""
+        router = await self.get_any(router_id)
+        if router.team_id is None:
+            return router
+        promoted = await self._routers.promote_to_global(router_id)
+        if promoted is None:  # pragma: no cover - just fetched
+            raise RouterNotFound(str(router_id))
+        return promoted
+
+    async def list_callable(self, team_id: UUID) -> list[CallableRouter]:
+        """Every router a team can call, by effective alias: own → extended →
+        global (own > extended > global on a clash; global gets `-global`)."""
+        by_alias: dict[str, CallableRouter] = {}
+        for router in await self._routers.list_by_team(team_id):
+            by_alias[router.name] = CallableRouter(router.name, router, "own", team_id)
+        for grant in await self._routers.list_grants_for_team(team_id):
+            source = await self._routers.get_any(grant.router_id)
+            if source is not None and grant.alias not in by_alias:
+                by_alias[grant.alias] = CallableRouter(
+                    grant.alias, source, "extended", source.team_id
+                )
+        for router in await self._routers.all_global():
+            alias = router.name if router.name not in by_alias else f"{router.name}-global"
+            if alias not in by_alias:
+                by_alias[alias] = CallableRouter(alias, router, "global", router.origin_team_id)
+        return sorted(by_alias.values(), key=lambda c: c.alias)
+
+    async def extend(
+        self, router_id: UUID, source_label: str, team_ids: list[UUID]
+    ) -> list[RouterGrant]:
+        router = await self.get_any(router_id)
+        label = _slug(source_label)
+        grants: list[RouterGrant] = []
+        existing = {g.team_id for g in await self._routers.list_grants_for_router(router_id)}
+        for team_id in team_ids:
+            if team_id == router.team_id or team_id in existing:
+                continue
+            alias = await self._disambiguate(team_id, router.name, label)
+            grants.append(
+                await self._routers.add_grant(
+                    RouterGrant(
+                        id=uuid4(),
+                        router_id=router_id,
+                        team_id=team_id,
+                        alias=alias,
+                        created_at=_now(),
+                    )
+                )
+            )
+        return grants
+
+    async def _disambiguate(self, team_id: UUID, base: str, label: str) -> str:
+        if not await self._routers.name_taken_in_team(team_id, base):
+            return base
+        candidate = f"{base}-{label}"
+        suffix = 2
+        while await self._routers.name_taken_in_team(team_id, candidate):
+            candidate = f"{base}-{label}-{suffix}"
+            suffix += 1
+        return candidate
+
+    async def list_grants(self, router_id: UUID) -> list[RouterGrant]:
+        return await self._routers.list_grants_for_router(router_id)
+
+    async def unextend(self, grant_id: UUID) -> None:
+        await self._routers.remove_grant(grant_id)
+
     # ── The decision ─────────────────────────────────────────────────────────
 
     async def route(
@@ -254,13 +361,17 @@ class RouterService:
         router: RouterConfig,
         request: dict[str, Any],
         *,
+        acting_team_id: UUID,
         api_key_id: UUID | None = None,
     ) -> RoutingDecision:
         """Pick the candidate for this request and persist the decision.
 
-        Raises only `NoRoutableCandidate` (a config problem); every strategy
-        failure falls back to `default_model` per §4."""
-        ctx = build_routing_context(request, team_id=router.team_id, api_key_id=api_key_id)
+        `acting_team_id` is the CALLING team — a global/extended router routes,
+        meters (judge/embeddings strategies), and attributes its decisions in the
+        caller's context, not the owner's. For a team-owned router it equals
+        `router.team_id`. Raises only `NoRoutableCandidate` (a config problem);
+        every strategy failure falls back to `default_model` per §4."""
+        ctx = build_routing_context(request, team_id=acting_team_id, api_key_id=api_key_id)
         ctx = dataclasses.replace(ctx, default_model=router.default_model)
         capable = filter_candidates(ctx, router.candidates)
         if not capable:
@@ -333,7 +444,7 @@ class RouterService:
 
     async def _embed_texts(
         self,
-        team_id: UUID,
+        team_id: UUID | None,
         model_name: str,
         texts: list[str],
         models: ModelRepository,
@@ -342,6 +453,9 @@ class RouterService:
         api_key_id: UUID | None = None,
     ) -> list[list[float]]:
         """Embed via the gateway's own port, using the team's embedding model."""
+        # Metering needs a concrete team; the route path always passes the
+        # acting team. None would be a wiring bug, not a global-router case.
+        assert team_id is not None, "embeddings strategy requires an acting team"
         if self._gateway is None or credentials is None:
             raise ValueError("embeddings strategy is not wired (no gateway/credentials)")
         model = await models.get_by_name(team_id, model_name)
@@ -364,7 +478,7 @@ class RouterService:
 
     async def _judge_complete(
         self,
-        team_id: UUID,
+        team_id: UUID | None,
         model_name: str,
         request: dict[str, Any],
         models: ModelRepository,
@@ -373,6 +487,7 @@ class RouterService:
         api_key_id: UUID | None = None,
     ) -> dict[str, Any]:
         """One non-streamed chat call to the judge, via the gateway's own port."""
+        assert team_id is not None, "judge strategy requires an acting team"
         if self._gateway is None or credentials is None:
             raise ValueError("judge strategy is not wired (no gateway/credentials)")
         model = await models.get_by_name(team_id, model_name)
@@ -401,14 +516,19 @@ class RouterService:
         credentials: CredentialRepository | None = None,
         meter: UsageMeter | None = None,
         api_key_id: UUID | None = None,
+        acting_team_id: UUID | None = None,
     ):
         models = self._models if models is None else models
         credentials = self._credentials if credentials is None else credentials
+        # The judge/embeddings strategies make real, billable provider calls;
+        # resolve their model + bill them in the CALLING team's context (falls
+        # back to the router's owner for team-owned routers / validation).
+        team_id = acting_team_id if acting_team_id is not None else router.team_id
         if name == "embeddings":
 
             async def embed(model_name: str, texts: list[str]) -> list[list[float]]:
                 return await self._embed_texts(
-                    router.team_id, model_name, texts, models, credentials, meter, api_key_id
+                    team_id, model_name, texts, models, credentials, meter, api_key_id
                 )
 
             return EmbeddingsStrategy(config, embed=embed)
@@ -416,7 +536,7 @@ class RouterService:
 
             async def complete(model_name: str, request: dict[str, Any]) -> dict[str, Any]:
                 return await self._judge_complete(
-                    router.team_id, model_name, request, models, credentials, meter, api_key_id
+                    team_id, model_name, request, models, credentials, meter, api_key_id
                 )
 
             return JudgeStrategy(config, complete=complete)
@@ -430,6 +550,7 @@ class RouterService:
                 credentials=credentials,
                 meter=meter,
                 api_key_id=api_key_id,
+                acting_team_id=acting_team_id,
             )
             return HybridStrategy(config, escalation=escalation)
         return STRATEGIES[name](config)
@@ -444,6 +565,7 @@ class RouterService:
                 router.strategy_config,
                 meter=self._meter,
                 api_key_id=ctx.api_key_id,
+                acting_team_id=ctx.team_id,
             )
             async with asyncio.timeout(budget_ms / 1000):
                 decision = await strategy.select(ctx, capable)
@@ -503,7 +625,7 @@ class RouterService:
                 await log.record(
                     RoutingDecisionRecord(
                         id=uuid4(),
-                        team_id=router.team_id,
+                        team_id=ctx.team_id,
                         router_id=router.id,
                         router_name=router.name,
                         strategy=decision.strategy,
@@ -535,12 +657,19 @@ class RouterService:
         the same care `_shadow_decisions` takes for the decision log."""
         budget_ms = config.get("time_budget_ms", DEFAULT_TIME_BUDGET_MS)
         if self._shadow_repos is None:
-            strategy = self._build_strategy(router, router.shadow_strategy, config)
+            strategy = self._build_strategy(
+                router, router.shadow_strategy, config, acting_team_id=ctx.team_id
+            )
             async with asyncio.timeout(budget_ms / 1000):
                 return await strategy.select(ctx, capable)
         async with self._shadow_repos() as (models, credentials):
             strategy = self._build_strategy(
-                router, router.shadow_strategy, config, models=models, credentials=credentials
+                router,
+                router.shadow_strategy,
+                config,
+                models=models,
+                credentials=credentials,
+                acting_team_id=ctx.team_id,
             )
             async with asyncio.timeout(budget_ms / 1000):
                 return await strategy.select(ctx, capable)
@@ -661,7 +790,7 @@ class RouterService:
             await self._decisions.record(
                 RoutingDecisionRecord(
                     id=record_id,
-                    team_id=router.team_id,
+                    team_id=ctx.team_id,
                     router_id=router.id,
                     router_name=router.name,
                     strategy=decision.strategy,

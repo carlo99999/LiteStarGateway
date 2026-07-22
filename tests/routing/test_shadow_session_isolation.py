@@ -123,7 +123,9 @@ async def test_shadow_judge_lookups_use_their_own_repositories() -> None:
         shadow_repos=shadow_repos,  # type: ignore[arg-type]
     )
     decision = await service.route(
-        _router(), {"messages": [{"role": "user", "content": "Ciao, grazie!"}]}
+        _router(),
+        {"messages": [{"role": "user", "content": "Ciao, grazie!"}]},
+        acting_team_id=TEAM_ID,
     )
     assert decision.model_name == "cheap"  # active complexity → SIMPLE
 
