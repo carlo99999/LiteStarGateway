@@ -14,8 +14,10 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID
 
+from litestar_gateway.application.callable_aliases import CallableAliasResolver
 from litestar_gateway.application.completion_service import CompletionService
 from litestar_gateway.application.routing.service import RouterService
+from litestar_gateway.domain.callable_alias import CallableKind
 from litestar_gateway.domain.entities import Model, ModelType
 from litestar_gateway.domain.exceptions import (
     BudgetExceeded,
@@ -23,6 +25,7 @@ from litestar_gateway.domain.exceptions import (
     RateLimited,
 )
 from litestar_gateway.domain.ports import ModelRepository
+from litestar_gateway.domain.routing import RouterConfig
 
 DEFAULT_MAX_MODELS = 5
 DEFAULT_MAX_CONCURRENCY = 1
@@ -55,6 +58,7 @@ class PlaygroundService:
         models: ModelRepository,
         completion_service: CompletionService,
         routers: RouterService | None = None,
+        callable_resolver: CallableAliasResolver | None = None,
         *,
         max_models: int = DEFAULT_MAX_MODELS,
         max_concurrency: int = DEFAULT_MAX_CONCURRENCY,
@@ -62,6 +66,7 @@ class PlaygroundService:
         self._models = models
         self._completion_service = completion_service
         self._routers = routers
+        self._callable_resolver = callable_resolver
         self._max_models = max_models
         self._max_concurrency = max_concurrency
 
@@ -104,8 +109,20 @@ class PlaygroundService:
         messages: list[dict[str, Any]],
         max_completion_tokens: int | None,
     ) -> PlaygroundResult:
-        model = await self._models.get_by_name(team_id, name)
+        resolved = (
+            await self._callable_resolver.resolve(team_id, name)
+            if self._callable_resolver is not None
+            else None
+        )
+        model = (
+            resolved.resource
+            if resolved is not None and resolved.kind is CallableKind.MODEL
+            else await self._models.get_by_name(team_id, name)
+            if self._callable_resolver is None
+            else None
+        )
         if model is not None:
+            assert isinstance(model, Model)
             if not model.enabled:
                 return PlaygroundResult(name, ok=False, error="model is disabled")
             if model.type is not ModelType.CHAT:
@@ -117,8 +134,17 @@ class PlaygroundService:
         # Not a model — maybe a router. Preview which candidate it picks, then
         # call that candidate; label the result with the router + its choice.
         if self._routers is not None:
-            router = await self._routers.get_enabled_by_name(team_id, name)
+            router = (
+                resolved.resource
+                if resolved is not None and resolved.kind is CallableKind.ROUTER
+                else await self._routers.get_enabled_by_name(team_id, name)
+                if self._callable_resolver is None
+                else None
+            )
+            if isinstance(router, RouterConfig) and not router.enabled:
+                router = None
             if router is not None:
+                assert isinstance(router, RouterConfig)
                 try:
                     request = {"model": name, "messages": messages}
                     decision = await self._routers.select_preview(
@@ -126,11 +152,23 @@ class PlaygroundService:
                     )
                 except Exception as exc:
                     return PlaygroundResult(name, ok=False, error=str(exc) or "routing failed")
-                chosen = await self._models.get_by_name(team_id, decision.model_name)
+                chosen_resolved = (
+                    await self._callable_resolver.resolve(team_id, decision.model_name)
+                    if self._callable_resolver is not None
+                    else None
+                )
+                chosen = (
+                    chosen_resolved.resource
+                    if chosen_resolved is not None and chosen_resolved.kind is CallableKind.MODEL
+                    else await self._models.get_by_name(team_id, decision.model_name)
+                    if self._callable_resolver is None
+                    else None
+                )
                 if chosen is None:
                     return PlaygroundResult(
                         name, ok=False, error=f"router chose unknown model '{decision.model_name}'"
                     )
+                assert isinstance(chosen, Model)
                 result = await self._call_model(
                     team_id,
                     name,

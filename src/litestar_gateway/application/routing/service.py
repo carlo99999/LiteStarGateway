@@ -18,6 +18,7 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
 
+from litestar_gateway.application.callable_aliases import CallableAliasResolver
 from litestar_gateway.application.routing.complexity import ComplexityStrategy
 from litestar_gateway.application.routing.embeddings import EmbeddingsStrategy
 from litestar_gateway.application.routing.hybrid import HybridStrategy
@@ -25,7 +26,8 @@ from litestar_gateway.application.routing.judge import JudgeStrategy
 from litestar_gateway.application.routing.webhook import WebhookStrategy
 from litestar_gateway.application.routing.weighted import WeightedStrategy
 from litestar_gateway.application.usage_meter import UsageMeter
-from litestar_gateway.domain.entities import ModelType
+from litestar_gateway.domain.callable_alias import CallableKind
+from litestar_gateway.domain.entities import Model, ModelType
 from litestar_gateway.domain.exceptions import (
     InvalidRouterConfig,
     NoRoutableCandidate,
@@ -33,6 +35,7 @@ from litestar_gateway.domain.exceptions import (
     RouterNotFound,
 )
 from litestar_gateway.domain.ports import (
+    CallableModelResolver,
     CredentialRepository,
     LLMGateway,
     ModelRepository,
@@ -135,6 +138,7 @@ class RouterService:
         gateway: LLMGateway | None = None,
         shadow_repos: RoutingRepositoryFactory | None = None,
         meter: UsageMeter | None = None,
+        callable_resolver: CallableAliasResolver | None = None,
     ) -> None:
         self._routers = routers
         self._models = models
@@ -147,11 +151,28 @@ class RouterService:
         # meters those calls (budget-gated + billed). Shadow runs on a detached
         # task with its own session and cannot share this request-scoped meter.
         self._meter = meter
+        self._callable_resolver = callable_resolver
         # The persisted record id of this request's routing decision (the
         # service is request-scoped), so settlement can attach actual usage.
         self.last_decision_record_id: UUID | None = None
 
     # ── CRUD (validated) ─────────────────────────────────────────────────────
+
+    async def _resolve_model(
+        self,
+        team_id: UUID | None,
+        name: str | None,
+        models: ModelRepository | None = None,
+        resolver: CallableModelResolver | None = None,
+    ) -> Model | None:
+        if not name:
+            return None
+        lookup = self._models if models is None else models
+        if resolver is not None:
+            return await resolver.resolve_model(team_id, name)
+        if self._callable_resolver is not None and lookup is self._models:
+            return await self._callable_resolver.resolve_model(team_id, name)
+        return await lookup.get_by_name(team_id, name)
 
     async def _validate(self, router: RouterConfig) -> None:
         if router.strategy not in STRATEGIES:
@@ -185,10 +206,13 @@ class RouterService:
         if router.default_model not in names:
             raise InvalidRouterConfig("default_model must be one of the candidates")
         # A router is a virtual model: its name must not shadow a real one.
-        if await self._models.get_by_name(router.team_id, router.name) is not None:
+        if (
+            self._callable_resolver is None
+            and await self._models.get_by_name(router.team_id, router.name) is not None
+        ):
             raise RouterNameExists(router.name)
         for name in names:
-            model = await self._models.get_by_name(router.team_id, name)
+            model = await self._resolve_model(router.team_id, name)
             if model is None or not model.enabled or model.type is not ModelType.CHAT:
                 raise InvalidRouterConfig(
                     f"Candidate '{name}' is not an enabled chat model of this team"
@@ -224,13 +248,13 @@ class RouterService:
 
     async def _validate_judge_config(self, router: RouterConfig, config: dict) -> None:
         judge_name = config.get("judge_model")
-        model = await self._models.get_by_name(router.team_id, judge_name) if judge_name else None
+        model = await self._resolve_model(router.team_id, judge_name)
         if model is None or not model.enabled or model.type is not ModelType.CHAT:
             raise InvalidRouterConfig(f"'{judge_name}' is not an enabled chat model of this team")
 
     async def _validate_embeddings_config(self, router: RouterConfig, config: dict) -> None:
         model_name = config.get("embedding_model")
-        model = await self._models.get_by_name(router.team_id, model_name) if model_name else None
+        model = await self._resolve_model(router.team_id, model_name)
         if model is None or not model.enabled or model.type is not ModelType.EMBEDDINGS:
             raise InvalidRouterConfig(
                 f"'{model_name}' is not an enabled embeddings model of this team"
@@ -243,6 +267,10 @@ class RouterService:
                 )
 
     async def create(self, router: RouterConfig) -> RouterConfig:
+        if self._callable_resolver is not None and await self._callable_resolver.explicit_taken(
+            router.team_id, router.name
+        ):
+            raise RouterNameExists(router.name)
         await self._validate(router)
         return await self._routers.add(router)
 
@@ -264,6 +292,13 @@ class RouterService:
             raise RouterNotFound(str(router_id))
 
     async def get_enabled_by_name(self, team_id: UUID, name: str) -> RouterConfig | None:
+        if self._callable_resolver is not None:
+            resolved = await self._callable_resolver.resolve(team_id, name)
+            if resolved is None or resolved.kind is not CallableKind.ROUTER:
+                return None
+            router = resolved.resource
+            assert isinstance(router, RouterConfig)
+            return router if router.enabled else None
         router = await self._routers.get_by_name(team_id, name)
         return router if router is not None and router.enabled else None
 
@@ -300,6 +335,19 @@ class RouterService:
     async def list_callable(self, team_id: UUID) -> list[CallableRouter]:
         """Every router a team can call, by effective alias: own → extended →
         global (own > extended > global on a clash; global gets `-global`)."""
+        if self._callable_resolver is not None:
+            resolved = await self._callable_resolver.list_callable(team_id)
+            return [
+                CallableRouter(
+                    item.effective_alias,
+                    item.resource,
+                    item.binding.origin.value,
+                    item.binding.source_team_id,
+                )
+                for item in resolved
+                if item.kind is CallableKind.ROUTER and isinstance(item.resource, RouterConfig)
+            ]
+
         by_alias: dict[str, CallableRouter] = {}
         for router in await self._routers.list_by_team(team_id):
             by_alias[router.name] = CallableRouter(router.name, router, "own", team_id)
@@ -327,24 +375,27 @@ class RouterService:
                 continue
             alias = await self._disambiguate(team_id, router.name, label)
             grants.append(
-                await self._routers.add_grant(
-                    RouterGrant(
-                        id=uuid4(),
-                        router_id=router_id,
-                        team_id=team_id,
-                        alias=alias,
-                        created_at=_now(),
-                    )
+                RouterGrant(
+                    id=uuid4(),
+                    router_id=router_id,
+                    team_id=team_id,
+                    alias=alias,
+                    created_at=_now(),
                 )
             )
-        return grants
+        return await self._routers.add_grants(grants)
 
     async def _disambiguate(self, team_id: UUID, base: str, label: str) -> str:
-        if not await self._routers.name_taken_in_team(team_id, base):
+        async def taken(alias: str) -> bool:
+            if self._callable_resolver is not None:
+                return await self._callable_resolver.slot_reserved(team_id, alias)
+            return await self._routers.name_taken_in_team(team_id, alias)
+
+        if not await taken(base):
             return base
         candidate = f"{base}-{label}"
         suffix = 2
-        while await self._routers.name_taken_in_team(team_id, candidate):
+        while await taken(candidate):
             candidate = f"{base}-{label}-{suffix}"
             suffix += 1
         return candidate
@@ -495,6 +546,7 @@ class RouterService:
         texts: list[str],
         models: ModelRepository,
         credentials: CredentialRepository | None,
+        resolver: CallableModelResolver | None = None,
         meter: UsageMeter | None = None,
         api_key_id: UUID | None = None,
     ) -> list[list[float]]:
@@ -504,7 +556,7 @@ class RouterService:
         assert team_id is not None, "embeddings strategy requires an acting team"
         if self._gateway is None or credentials is None:
             raise ValueError("embeddings strategy is not wired (no gateway/credentials)")
-        model = await models.get_by_name(team_id, model_name)
+        model = await self._resolve_model(team_id, model_name, models, resolver)
         if model is None or not model.enabled or model.type is not ModelType.EMBEDDINGS:
             raise ValueError(f"'{model_name}' is not an enabled embeddings model of this team")
         values = await credentials.get_values(model.credential_id)
@@ -529,6 +581,7 @@ class RouterService:
         request: dict[str, Any],
         models: ModelRepository,
         credentials: CredentialRepository | None,
+        resolver: CallableModelResolver | None = None,
         meter: UsageMeter | None = None,
         api_key_id: UUID | None = None,
     ) -> dict[str, Any]:
@@ -536,7 +589,7 @@ class RouterService:
         assert team_id is not None, "judge strategy requires an acting team"
         if self._gateway is None or credentials is None:
             raise ValueError("judge strategy is not wired (no gateway/credentials)")
-        model = await models.get_by_name(team_id, model_name)
+        model = await self._resolve_model(team_id, model_name, models, resolver)
         if model is None or not model.enabled or model.type is not ModelType.CHAT:
             raise ValueError(f"'{model_name}' is not an enabled chat model of this team")
         values = await credentials.get_values(model.credential_id)
@@ -560,6 +613,7 @@ class RouterService:
         *,
         models: ModelRepository | None = None,
         credentials: CredentialRepository | None = None,
+        resolver: CallableModelResolver | None = None,
         meter: UsageMeter | None = None,
         api_key_id: UUID | None = None,
         acting_team_id: UUID | None = None,
@@ -574,7 +628,14 @@ class RouterService:
 
             async def embed(model_name: str, texts: list[str]) -> list[list[float]]:
                 return await self._embed_texts(
-                    team_id, model_name, texts, models, credentials, meter, api_key_id
+                    team_id,
+                    model_name,
+                    texts,
+                    models,
+                    credentials,
+                    resolver,
+                    meter,
+                    api_key_id,
                 )
 
             return EmbeddingsStrategy(config, embed=embed)
@@ -582,7 +643,14 @@ class RouterService:
 
             async def complete(model_name: str, request: dict[str, Any]) -> dict[str, Any]:
                 return await self._judge_complete(
-                    team_id, model_name, request, models, credentials, meter, api_key_id
+                    team_id,
+                    model_name,
+                    request,
+                    models,
+                    credentials,
+                    resolver,
+                    meter,
+                    api_key_id,
                 )
 
             return JudgeStrategy(config, complete=complete)
@@ -594,6 +662,7 @@ class RouterService:
                 shell.escalation_config,
                 models=models,
                 credentials=credentials,
+                resolver=resolver,
                 meter=meter,
                 api_key_id=api_key_id,
                 acting_team_id=acting_team_id,
@@ -708,13 +777,14 @@ class RouterService:
             )
             async with asyncio.timeout(budget_ms / 1000):
                 return await strategy.select(ctx, capable)
-        async with self._shadow_repos() as (models, credentials):
+        async with self._shadow_repos() as (models, credentials, resolver):
             strategy = self._build_strategy(
                 router,
                 router.shadow_strategy,
                 config,
                 models=models,
                 credentials=credentials,
+                resolver=resolver,
                 acting_team_id=ctx.team_id,
             )
             async with asyncio.timeout(budget_ms / 1000):

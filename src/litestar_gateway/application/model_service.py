@@ -15,6 +15,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from litestar_gateway.application.callable_aliases import CallableAliasResolver
+from litestar_gateway.domain.callable_alias import CallableKind
 from litestar_gateway.domain.entities import Credential, Model, ModelGrant, ModelType, Provider
 from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
@@ -49,9 +51,15 @@ class CallableModel:
 
 
 class ModelService:
-    def __init__(self, models: ModelRepository, credentials: CredentialRepository) -> None:
+    def __init__(
+        self,
+        models: ModelRepository,
+        credentials: CredentialRepository,
+        callable_resolver: CallableAliasResolver | None = None,
+    ) -> None:
         self._models = models
         self._credentials = credentials
+        self._callable_resolver = callable_resolver
 
     async def _validate_credential(self, provider: Provider, credential_id: UUID) -> None:
         credential = await self._credentials.get(credential_id)
@@ -83,10 +91,21 @@ class ModelService:
         None). A team may reuse a name that only exists as a global (it shadows
         the global); it may not reuse one of its own names or an extended alias."""
         if team_id is not None:
-            if await self._models.name_taken_in_team(team_id, name):
+            taken = (
+                await self._callable_resolver.explicit_taken(team_id, name)
+                if self._callable_resolver is not None
+                else await self._models.name_taken_in_team(team_id, name)
+            )
+            if taken:
                 raise ModelNameExists(name)
-        elif any(g.name == name for g in await self._models.all_global()):
-            raise ModelNameExists(name)
+        else:
+            taken = (
+                await self._callable_resolver.explicit_taken(None, name)
+                if self._callable_resolver is not None
+                else any(g.name == name for g in await self._models.all_global())
+            )
+            if taken:
+                raise ModelNameExists(name)
         await self._validate_credential(provider, credential_id)
         return await self._models.add(
             Model(
@@ -130,6 +149,19 @@ class ModelService:
         models extended to it, and global models (each under its name, or the
         `<name>-global` form when the team already uses that name). Own > extended
         > global on any alias clash."""
+        if self._callable_resolver is not None:
+            resolved = await self._callable_resolver.list_callable(team_id)
+            return [
+                CallableModel(
+                    item.effective_alias,
+                    item.resource,
+                    item.binding.origin.value,
+                    item.binding.source_team_id,
+                )
+                for item in resolved
+                if item.kind is CallableKind.MODEL and isinstance(item.resource, Model)
+            ]
+
         by_alias: dict[str, CallableModel] = {}
 
         offset = 0
@@ -227,24 +259,27 @@ class ModelService:
                 continue
             alias = await self._disambiguate(team_id, model.name, label)
             grants.append(
-                await self._models.add_grant(
-                    ModelGrant(
-                        id=uuid4(),
-                        model_id=model_id,
-                        team_id=team_id,
-                        alias=alias,
-                        created_at=_now(),
-                    )
+                ModelGrant(
+                    id=uuid4(),
+                    model_id=model_id,
+                    team_id=team_id,
+                    alias=alias,
+                    created_at=_now(),
                 )
             )
-        return grants
+        return await self._models.add_grants(grants)
 
     async def _disambiguate(self, team_id: UUID, base: str, source_label: str) -> str:
-        if not await self._models.name_taken_in_team(team_id, base):
+        async def taken(alias: str) -> bool:
+            if self._callable_resolver is not None:
+                return await self._callable_resolver.slot_reserved(team_id, alias)
+            return await self._models.name_taken_in_team(team_id, alias)
+
+        if not await taken(base):
             return base
         candidate = f"{base}-{source_label}"
         suffix = 2
-        while await self._models.name_taken_in_team(team_id, candidate):
+        while await taken(candidate):
             candidate = f"{base}-{source_label}-{suffix}"
             suffix += 1
         return candidate

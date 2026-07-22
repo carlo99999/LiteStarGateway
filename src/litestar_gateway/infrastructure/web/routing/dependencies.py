@@ -9,8 +9,10 @@ from typing import Any
 from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from litestar_gateway.application.callable_aliases import CallableAliasResolver
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.domain.ports import (
+    CallableModelResolver,
     CredentialRepository,
     ModelRepository,
     RoutingDecisionLog,
@@ -18,6 +20,9 @@ from litestar_gateway.domain.ports import (
     RoutingRepositoryFactory,
 )
 from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.persistence.callable_alias_repository import (
+    SQLAlchemyCallableAliasRepository,
+)
 from litestar_gateway.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
 )
@@ -31,12 +36,17 @@ from litestar_gateway.infrastructure.persistence.router_repository import (
 
 
 def provide_router_service(
-    db_session: NamedDependency[AsyncSession], keyring: NamedDependency[Keyring]
+    db_session: NamedDependency[AsyncSession],
+    keyring: NamedDependency[Keyring],
+    callable_resolver: NamedDependency[CallableAliasResolver],
 ) -> RouterService:
+    routers = SQLAlchemyRouterRepository(db_session, keyring)
+    models = SQLAlchemyModelRepository(db_session)
     return RouterService(
-        routers=SQLAlchemyRouterRepository(db_session, keyring),
-        models=SQLAlchemyModelRepository(db_session),
+        routers=routers,
+        models=models,
         decisions=SQLAlchemyRoutingDecisionLog(db_session),
+        callable_resolver=callable_resolver,
     )
 
 
@@ -60,11 +70,20 @@ def make_shadow_repos_factory(
     which is still issuing statements on the request-scoped session."""
 
     @asynccontextmanager
-    async def open_repos() -> AsyncIterator[tuple[ModelRepository, CredentialRepository]]:
+    async def open_repos() -> AsyncIterator[
+        tuple[ModelRepository, CredentialRepository, CallableModelResolver]
+    ]:
         async with session_maker() as session:
+            models = SQLAlchemyModelRepository(session)
+            keyring = keyring_factory(session)
             yield (
-                SQLAlchemyModelRepository(session),
-                SQLAlchemyCredentialRepository(session, keyring_factory(session)),
+                models,
+                SQLAlchemyCredentialRepository(session, keyring),
+                CallableAliasResolver(
+                    SQLAlchemyCallableAliasRepository(session),
+                    models,
+                    SQLAlchemyRouterRepository(session, keyring),
+                ),
             )
 
     return open_repos

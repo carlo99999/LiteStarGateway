@@ -16,6 +16,7 @@ from litestar import Controller, Request, post
 from litestar.di import NamedDependency, Provide
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from litestar_gateway.application.callable_aliases import CallableAliasResolver
 from litestar_gateway.application.completion_service import CompletionService
 from litestar_gateway.application.playground_service import (
     DEFAULT_MAX_MODELS,
@@ -36,11 +37,13 @@ def provide_playground_service(
     db_session: NamedDependency[AsyncSession],
     completion_service: NamedDependency[CompletionService],
     router_service: NamedDependency[RouterService],
+    callable_resolver: NamedDependency[CallableAliasResolver],
 ) -> PlaygroundService:
     return PlaygroundService(
         models=SQLAlchemyModelRepository(db_session),
         completion_service=completion_service,
         routers=router_service,
+        callable_resolver=callable_resolver,
     )
 
 

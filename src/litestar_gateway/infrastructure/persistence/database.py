@@ -14,7 +14,7 @@ from advanced_alchemy.extensions.litestar import (
     SQLAlchemyAsyncConfig,
     SQLAlchemyPlugin,
 )
-from sqlalchemy import event
+from sqlalchemy import event, inspect
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from litestar_gateway.config import Settings
@@ -62,12 +62,32 @@ class Database:
     plugin: SQLAlchemyPlugin
 
 
+_APPLICATION_SCHEMA_ANCHORS = frozenset({"user", "team", "model", "router"})
+
+
+class GuardedSQLAlchemyAsyncConfig(SQLAlchemyAsyncConfig):
+    """Prevent dev ``create_all`` from masking an unmigrated legacy schema."""
+
+    async def create_all_metadata(self, app: Any) -> None:
+        async with self.get_engine().connect() as connection:
+            tables = await connection.run_sync(
+                lambda sync_connection: set(inspect(sync_connection).get_table_names())
+            )
+        if tables & _APPLICATION_SCHEMA_ANCHORS and "callable_alias" not in tables:
+            raise RuntimeError(
+                "Legacy application schema detected without callable_alias; "
+                "refusing create_all because it would create an empty registry. "
+                "Run `database upgrade` before starting the application."
+            )
+        await super().create_all_metadata(app)
+
+
 def create_database(settings: Settings) -> Database:
     # Auto-create the schema for zero-config dev/test runs; production (and the
     # migration-managed dev container, via AUTO_CREATE_SCHEMA=false) uses Alembic
     # instead, so create_all and `database upgrade` never fight over creating the
     # same tables ("relation already exists").
-    config = SQLAlchemyAsyncConfig(
+    config = GuardedSQLAlchemyAsyncConfig(
         connection_string=settings.database_url,
         create_all=settings.should_create_schema,
         engine_config=_engine_config(settings),

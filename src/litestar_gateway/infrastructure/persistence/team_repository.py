@@ -10,9 +10,14 @@ from sqlalchemy import bindparam, delete, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from litestar_gateway.domain.callable_alias import CallableKind
 from litestar_gateway.domain.entities import Team
 from litestar_gateway.domain.exceptions import TeamNotEmpty
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.infrastructure.persistence.callable_alias_slots import (
+    lock_resource_lifecycle,
+    tombstone_resource,
+)
 from litestar_gateway.infrastructure.persistence.orm import (
     InviteModel,
     PendingUsageEventModel,
@@ -115,6 +120,20 @@ class SQLAlchemyTeamRepository:
         # when any remain. pending_usage_event has no FK but is team-scoped, so
         # it's cleared for hygiene. Staged only; the service commits.
         try:
+            router_ids = list(
+                await self._session.scalars(
+                    select(RouterModel.id)
+                    .where(RouterModel.team_id == team_id)
+                    .order_by(RouterModel.id)
+                )
+            )
+            for router_id in router_ids:
+                router = await lock_resource_lifecycle(
+                    self._session, CallableKind.ROUTER, router_id
+                )
+                if not isinstance(router, RouterModel) or router.team_id != team_id:
+                    continue
+                await tombstone_resource(self._session, CallableKind.ROUTER, router_id)
             for child in (
                 InviteModel,
                 UsageEventModel,

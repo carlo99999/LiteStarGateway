@@ -15,8 +15,10 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID
 
+from litestar_gateway.application.callable_aliases import CallableAliasResolver
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import UsageMeter
+from litestar_gateway.domain.callable_alias import CallableKind
 from litestar_gateway.domain.entities import Model, ModelType, Provider
 from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
@@ -121,12 +123,14 @@ class CompletionService:
         gateway: LLMGateway,
         meter: UsageMeter,
         router_service: RouterService | None = None,
+        callable_resolver: CallableAliasResolver | None = None,
     ) -> None:
         self._models = models
         self._credentials = credentials
         self._gateway = gateway
         self._meter = meter
         self._router_service = router_service
+        self._callable_resolver = callable_resolver
 
     async def _dispatch(
         self,
@@ -193,6 +197,17 @@ class CompletionService:
             )
         return model
 
+    async def _resolve_model(self, team_id: UUID, alias: str | None) -> Model | None:
+        if not alias:
+            return None
+        if self._callable_resolver is None:
+            return await self._models.get_by_name(team_id, alias)
+        resolved = await self._callable_resolver.resolve(team_id, alias)
+        if resolved is None or resolved.kind is not CallableKind.MODEL:
+            return None
+        assert isinstance(resolved.resource, Model)
+        return resolved.resource
+
     async def prepare_native(
         self, team_id: UUID, expected_type: ModelType, alias: str | None, data: dict[str, Any]
     ) -> tuple[Model, dict[str, str], dict[str, Any]]:
@@ -213,7 +228,7 @@ class CompletionService:
         upstream `base_url` still comes only from the credential (`get_values`),
         never from the client."""
         model = self._ensure_usable(
-            await self._models.get_by_name(team_id, alias) if alias else None,
+            await self._resolve_model(team_id, alias),
             alias,
             expected_type,
         )
@@ -434,9 +449,39 @@ class CompletionService:
         # external request consumes exactly one key-RPM hit.
         await self._meter.enforce_key_rate_limit(api_key_id)
         alias = request.get("model")
-        model = await self._models.get_by_name(team_id, alias) if alias else None
+        model = None
+        resolved = (
+            await self._callable_resolver.resolve(team_id, alias)
+            if alias and self._callable_resolver is not None
+            else None
+        )
+        if resolved is not None and resolved.kind is CallableKind.MODEL:
+            assert isinstance(resolved.resource, Model)
+            model = resolved.resource
+        elif (
+            resolved is not None
+            and resolved.kind is CallableKind.ROUTER
+            and self._router_service is not None
+            and expected_type is ModelType.CHAT
+        ):
+            router = resolved.resource
+            from litestar_gateway.domain.routing import RouterConfig
+
+            assert isinstance(router, RouterConfig)
+            if router.enabled:
+                decision = await self._router_service.route(
+                    router, request, acting_team_id=team_id, api_key_id=api_key_id
+                )
+                assert self._callable_resolver is not None
+                chosen = await self._callable_resolver.resolve(team_id, decision.model_name)
+                if chosen is not None and chosen.kind is CallableKind.MODEL:
+                    assert isinstance(chosen.resource, Model)
+                    model = chosen.resource
+        elif self._callable_resolver is None:
+            model = await self._models.get_by_name(team_id, alias) if alias else None
         if (
-            model is None
+            self._callable_resolver is None
+            and model is None
             and alias
             and self._router_service is not None
             and expected_type is ModelType.CHAT

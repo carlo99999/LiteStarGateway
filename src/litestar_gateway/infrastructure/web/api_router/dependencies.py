@@ -5,6 +5,7 @@ from __future__ import annotations
 from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from litestar_gateway.application.callable_aliases import CallableAliasResolver
 from litestar_gateway.application.completion_service import CompletionService
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import InFlightSpend, UsageMeter
@@ -75,6 +76,7 @@ def provide_completion_service(
     shadow_decision_log_factory: NamedDependency[RoutingDecisionLogFactory],
     shadow_repos_factory: NamedDependency[RoutingRepositoryFactory],
     rate_limiter: NamedDependency[RateLimiter],
+    callable_resolver: NamedDependency[CallableAliasResolver],
 ) -> CompletionService:
     # One request-scoped meter, shared by the completion path and the router:
     # judge/embeddings strategies make real, billable provider calls that must be
@@ -88,19 +90,24 @@ def provide_completion_service(
         teams=SQLAlchemyTeamRepository(db_session),
         api_keys=SQLAlchemyAPIKeyRepository(db_session),
     )
-    return CompletionService(
-        models=SQLAlchemyModelRepository(db_session),
+    models = SQLAlchemyModelRepository(db_session)
+    routers = SQLAlchemyRouterRepository(db_session, keyring)
+    router_service = RouterService(
+        routers=routers,
+        models=models,
+        decisions=SQLAlchemyRoutingDecisionLog(db_session),
+        shadow_decisions=shadow_decision_log_factory,
         credentials=SQLAlchemyCredentialRepository(db_session, keyring),
         gateway=llm_gateway,
-        router_service=RouterService(
-            routers=SQLAlchemyRouterRepository(db_session, keyring),
-            models=SQLAlchemyModelRepository(db_session),
-            decisions=SQLAlchemyRoutingDecisionLog(db_session),
-            shadow_decisions=shadow_decision_log_factory,
-            credentials=SQLAlchemyCredentialRepository(db_session, keyring),
-            gateway=llm_gateway,
-            shadow_repos=shadow_repos_factory,
-            meter=meter,
-        ),
+        shadow_repos=shadow_repos_factory,
         meter=meter,
+        callable_resolver=callable_resolver,
+    )
+    return CompletionService(
+        models=models,
+        credentials=SQLAlchemyCredentialRepository(db_session, keyring),
+        gateway=llm_gateway,
+        router_service=router_service,
+        meter=meter,
+        callable_resolver=callable_resolver,
     )

@@ -44,6 +44,7 @@ from litestar_gateway.infrastructure.web.api_router.dependencies import (
 from litestar_gateway.infrastructure.web.api_router.router import create_api_router
 from litestar_gateway.infrastructure.web.audit.controller import AuditController
 from litestar_gateway.infrastructure.web.audit.dependencies import provide_audit_log
+from litestar_gateway.infrastructure.web.callable_aliases import provide_callable_resolver
 from litestar_gateway.infrastructure.web.credentials import CredentialController
 from litestar_gateway.infrastructure.web.credentials.dependencies import (
     provide_credential_service,
@@ -250,6 +251,7 @@ def _build_dependencies(
         "organization_service": Provide(provide_organization_service, sync_to_thread=False),
         "team_service": Provide(provide_team_service, sync_to_thread=False),
         "model_service": Provide(provide_model_service, sync_to_thread=False),
+        "callable_resolver": Provide(provide_callable_resolver, sync_to_thread=False),
         "credential_service": Provide(provide_credential_service, sync_to_thread=False),
         "completion_service": Provide(provide_completion_service, sync_to_thread=False),
         "service_principal_service": Provide(
