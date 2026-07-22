@@ -100,6 +100,9 @@ async def test_streaming_records_usage(
     assert rows[0]["prompt_tokens"] == 5
     assert rows[0]["completion_tokens"] == 7
     assert rows[0]["calls"] == 1
+    assert rows[0]["requested_alias"] == "m"
+    assert rows[0]["canonical_model_name"] == "m"
+    assert rows[0]["callable_origin"] == "own"
 
 
 async def test_streaming_databricks_sse(

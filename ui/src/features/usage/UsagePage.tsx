@@ -25,8 +25,18 @@ function formatCount(n: number): string {
 const COLUMNS: Column<TeamUsage>[] = [
   {
     key: "model",
-    header: "model",
-    cell: (u) => <span className="text-foreground">{u.model}</span>,
+    header: "requested alias",
+    cell: (u) => <span className="text-foreground">{u.requested_alias}</span>,
+  },
+  {
+    key: "canonical",
+    header: "resolved model",
+    cell: (u) => (
+      <div className="font-mono text-xs">
+        <div className="text-foreground">{u.canonical_model_name}</div>
+        <div className="text-muted-foreground">{u.callable_origin}</div>
+      </div>
+    ),
   },
   {
     key: "calls",
@@ -138,7 +148,7 @@ export function UsagePage() {
       <DataTable
         columns={COLUMNS}
         rows={usage.data?.items}
-        rowKey={(u) => u.model}
+        rowKey={(u) => u.row_id}
         isLoading={teams.isLoading || (teamId.length > 0 && usage.isLoading)}
         error={error}
         emptyTitle="no usage"

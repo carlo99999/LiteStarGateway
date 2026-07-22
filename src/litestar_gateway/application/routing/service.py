@@ -27,7 +27,7 @@ from litestar_gateway.application.routing.webhook import WebhookStrategy
 from litestar_gateway.application.routing.weighted import WeightedStrategy
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.callable_alias import CallableKind
-from litestar_gateway.domain.entities import AuditEvent, Model, ModelType
+from litestar_gateway.domain.entities import AuditEvent, Model, ModelType, UsageAttribution
 from litestar_gateway.domain.exceptions import (
     InvalidRouterConfig,
     NoRoutableCandidate,
@@ -768,6 +768,7 @@ class RouterService:
         api_key_id: UUID | None,
         team_id: UUID,
         model,
+        requested_alias: str,
         operation: str,
         request: dict[str, Any],
         call: Any,
@@ -797,6 +798,17 @@ class RouterService:
                 response,
                 (perf_counter() - start) * 1000,
                 request,
+                UsageAttribution(
+                    requested_alias=requested_alias,
+                    callable_origin=(
+                        "global"
+                        if model.team_id is None
+                        else "own"
+                        if model.team_id == team_id
+                        else "extended"
+                    ),
+                    source_team_id=model.origin_team_id or model.team_id,
+                ),
             )
             return response
         finally:
@@ -836,6 +848,7 @@ class RouterService:
             api_key_id,
             team_id,
             model,
+            model_name,
             "routing.embeddings",
             request,
             lambda: self._gateway.aembeddings(request, model, values),
@@ -873,6 +886,7 @@ class RouterService:
             api_key_id,
             team_id,
             model,
+            model_name,
             "routing.judge",
             request,
             lambda: self._gateway.achat_completion(request, model, values),

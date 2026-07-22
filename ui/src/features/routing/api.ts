@@ -158,11 +158,24 @@ export async function makeRouterGlobal(routerId: string): Promise<Router> {
   return data;
 }
 
+interface RouterEgressAcknowledgements {
+  activePromptEgress: boolean;
+  shadowPromptEgress: boolean;
+}
+
 /** POST /platform/routers/{id}/extend — share a team router with other teams. */
-export async function extendRouter(routerId: string, teamIds: string[]): Promise<RouterGrant[]> {
+export async function extendRouter(
+  routerId: string,
+  teamIds: string[],
+  acknowledgements: RouterEgressAcknowledgements,
+): Promise<RouterGrant[]> {
   const { data, error } = await api.POST("/platform/routers/{router_id}/extend", {
     params: { path: { router_id: routerId } },
-    body: { team_ids: teamIds },
+    body: {
+      team_ids: teamIds,
+      ack_active_prompt_egress: acknowledgements.activePromptEgress,
+      ack_shadow_prompt_egress: acknowledgements.shadowPromptEgress,
+    },
   });
   if (error || !data) throw fail(error, "Failed to extend the router");
   return data;

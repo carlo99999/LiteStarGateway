@@ -385,3 +385,6 @@ async def test_round_trip_bills_native_tokens(
     assert row["prompt_tokens"] == 30  # native promptTokenCount: 10 + 20
     assert row["completion_tokens"] == 23  # native candidatesTokenCount: 15 + 8
     assert row["cost"] == pytest.approx((30 + 23) * 0.01)
+    assert row["requested_alias"] == "m"
+    assert row["canonical_model_name"] == "m"
+    assert row["callable_origin"] == "own"

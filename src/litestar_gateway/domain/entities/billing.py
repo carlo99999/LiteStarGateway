@@ -40,6 +40,20 @@ class UsageEvent:
     completion_tokens: int
     cost: float
     created_at: datetime
+    requested_alias: str | None = None
+    resolved_model_id: UUID | None = None
+    canonical_model_name: str | None = None
+    callable_origin: str | None = None
+    source_team_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class UsageAttribution:
+    """Requested callable identity captured before provider dispatch."""
+
+    requested_alias: str | None
+    callable_origin: str | None
+    source_team_id: UUID | None
 
 
 @dataclass(frozen=True)
@@ -52,6 +66,11 @@ class UsageAggregate:
     completion_tokens: int
     cost: float
     calls: int
+    requested_alias: str | None = None
+    resolved_model_id: UUID | None = None
+    canonical_model_name: str | None = None
+    callable_origin: str | None = None
+    source_team_id: UUID | None = None
 
 
 @dataclass(frozen=True)

@@ -21,12 +21,17 @@ class UsageRepository(Protocol):
         team_id: UUID,
         *,
         model_name: str | None = None,
+        requested_alias: str | None = None,
+        resolved_model_id: UUID | None = None,
         api_key_id: UUID | None = None,
         limit: int = DEFAULT_PAGE_SIZE,
         offset: int = 0,
     ) -> list[UsageAggregate]:
-        """Usage summed per model for a team, optionally filtered by model name
-        and/or API key. One row per model, paged like every other list query."""
+        """Usage grouped by requested alias and resolved model identity.
+
+        ``model_name`` is the compatible broad filter (alias OR canonical
+        model); the other filters are explicit and exact.
+        """
         ...
 
     async def spend_by_api_key(self, team_id: UUID) -> list[ApiKeySpend]:

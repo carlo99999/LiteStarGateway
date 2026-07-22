@@ -55,16 +55,31 @@ class UsageResponse:
     total_tokens: int
     cost: float
     calls: int
+    row_id: str
+    requested_alias: str
+    resolved_model_id: UUID
+    canonical_model_name: str
+    callable_origin: str
+    source_team_id: UUID | None
 
     @classmethod
     def from_aggregate(cls, a: UsageAggregate) -> UsageResponse:
         return cls(
-            model=a.model_name,
+            model=a.requested_alias or a.canonical_model_name or a.model_name,
             prompt_tokens=a.prompt_tokens,
             completion_tokens=a.completion_tokens,
             total_tokens=a.prompt_tokens + a.completion_tokens,
             cost=a.cost,
             calls=a.calls,
+            row_id=(
+                f"{a.resolved_model_id or a.model_id}:"
+                f"{a.requested_alias or 'unknown'}:{a.callable_origin or 'unknown'}"
+            ),
+            requested_alias=a.requested_alias or "unknown",
+            resolved_model_id=a.resolved_model_id or a.model_id,
+            canonical_model_name=a.canonical_model_name or a.model_name,
+            callable_origin=a.callable_origin or "unknown",
+            source_team_id=a.source_team_id,
         )
 
 

@@ -453,12 +453,15 @@ class TeamController(Controller):
         team_service: NamedDependency[TeamService],
         usage_repository: NamedDependency[UsageRepository],
         model: FromQuery[str | None] = None,
+        alias: FromQuery[str | None] = None,
+        resolved_model_id: FromQuery[UUID | None] = None,
         api_key_id: FromQuery[UUID | None] = None,
         limit: FromQuery[int | None] = None,
         offset: FromQuery[int | None] = None,
     ) -> list[UsageResponse]:
-        """Per-model token/cost totals for the team. Optional `?model=` and
-        `?api_key_id=` query filters; unfiltered returns every model, paged.
+        """Per-callable token/cost totals. ``model`` matches requested alias or
+        canonical name; ``alias`` and ``resolved_model_id`` are exact filters.
+        Optional `?api_key_id=` filters by caller; unfiltered returns all rows, paged.
         Accepts a JWT or a management-scoped API key (own team only)."""
         await team_service.ensure_principal_team_permission(
             principal, team_id, Permission.USAGE_READ
@@ -467,6 +470,8 @@ class TeamController(Controller):
         aggregates = await usage_repository.aggregate(
             team_id,
             model_name=model,
+            requested_alias=alias,
+            resolved_model_id=resolved_model_id,
             api_key_id=api_key_id,
             limit=page_limit,
             offset=page_offset,

@@ -20,7 +20,7 @@ from uuid import UUID, uuid4
 import anyio
 
 from litestar_gateway.domain.budget import window_start
-from litestar_gateway.domain.entities import Model, TraceRecord, UsageEvent
+from litestar_gateway.domain.entities import Model, TraceRecord, UsageAttribution, UsageEvent
 from litestar_gateway.domain.exceptions import BudgetExceeded, RateLimited
 from litestar_gateway.domain.ports import (
     APIKeyRepository,
@@ -319,6 +319,7 @@ class UsageMeter:
         response: dict[str, Any],
         latency_ms: float,
         request: dict[str, Any] | None = None,
+        attribution: UsageAttribution | None = None,
     ) -> None:
         """Record usage (billing) + emit an observability trace. Fail-safe.
 
@@ -340,7 +341,17 @@ class UsageMeter:
                 )
         prompt, completion, cost = _parse_usage(model, usage)
         now = datetime.now(UTC)
-        await self._bill(team_id, api_key_id, model, operation, prompt, completion, cost, now)
+        await self._bill(
+            team_id,
+            api_key_id,
+            model,
+            operation,
+            prompt,
+            completion,
+            cost,
+            now,
+            attribution,
+        )
         # Trace = observability (latency/analytics), fire-and-forget off the path.
         self._emit_trace(
             TraceRecord(
@@ -436,6 +447,7 @@ class UsageMeter:
         completion: int,
         cost: float,
         now: datetime,
+        attribution: UsageAttribution | None = None,
     ) -> None:
         """Persist the authoritative billing record (no trace — callers emit
         their own 'ok' or 'error' trace alongside)."""
@@ -451,6 +463,11 @@ class UsageMeter:
                 completion_tokens=completion,
                 cost=cost,
                 created_at=now,
+                requested_alias=attribution.requested_alias if attribution else None,
+                resolved_model_id=model.id,
+                canonical_model_name=model.name,
+                callable_origin=attribution.callable_origin if attribution else None,
+                source_team_id=attribution.source_team_id if attribution else None,
             )
         )
 
@@ -463,6 +480,7 @@ class UsageMeter:
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
         release: Callable[[], None] | None = None,
+        attribution: UsageAttribution | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Relay chunks unchanged while capturing usage as it flows, then record a
         UsageEvent + emit a trace once the stream finishes (or the client
@@ -516,6 +534,7 @@ class UsageMeter:
                     streamed_chars,
                     error,
                     start,
+                    attribution,
                 )
 
     async def metered_native_stream(
@@ -527,6 +546,7 @@ class UsageMeter:
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
         release: Callable[[], None] | None = None,
+        attribution: UsageAttribution | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Relay raw Anthropic Messages stream events unchanged while capturing the
         native usage they carry, then settle once at the tail (or on client
@@ -576,6 +596,7 @@ class UsageMeter:
                     streamed_chars,
                     error,
                     start,
+                    attribution,
                 )
 
     async def metered_gemini_stream(
@@ -587,6 +608,7 @@ class UsageMeter:
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
         release: Callable[[], None] | None = None,
+        attribution: UsageAttribution | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Relay raw Gemini `GenerateContentResponse` chunks unchanged while
         capturing the native `usageMetadata` they carry, then settle once at the
@@ -631,6 +653,7 @@ class UsageMeter:
                     streamed_chars,
                     error,
                     start,
+                    attribution,
                 )
 
     async def _finalize_stream_billing(
@@ -644,6 +667,7 @@ class UsageMeter:
         streamed_chars: int,
         error: Exception | None,
         start: float,
+        attribution: UsageAttribution | None,
     ) -> None:
         """Post-stream settlement: estimate usage if none arrived, bill, and
         trace. Runs inside `metered_stream`'s shielded finally — callers must
@@ -695,6 +719,7 @@ class UsageMeter:
                         completion,
                         cost,
                         datetime.now(UTC),
+                        attribution,
                     )
                 self.trace_error(
                     team_id,
@@ -709,7 +734,13 @@ class UsageMeter:
                 )
             else:
                 await self.settle_ok(
-                    team_id, api_key_id, model, operation, {"usage": usage}, latency_ms
+                    team_id,
+                    api_key_id,
+                    model,
+                    operation,
+                    {"usage": usage},
+                    latency_ms,
+                    attribution=attribution,
                 )
         if settle_scope.cancelled_caught:
             logger.error(
