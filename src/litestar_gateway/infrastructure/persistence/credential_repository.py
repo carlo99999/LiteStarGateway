@@ -17,6 +17,7 @@ from litestar_gateway.domain.entities import Credential
 from litestar_gateway.domain.exceptions import (
     CredentialMisconfigured,
     CredentialNameExists,
+    CredentialNotFound,
     SaltKeyMissing,
 )
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
@@ -97,6 +98,29 @@ class SQLAlchemyCredentialRepository:
                 continue
             model.encrypted_values = new_cipher.encrypt(old.decrypt(model.encrypted_values))
             model.key_id = new_key_id
+        await self._session.commit()
+
+    async def rename(self, credential_id: UUID, name: str) -> Credential:
+        model = await self._session.get(CredentialModel, credential_id)
+        if model is None:  # pragma: no cover - guarded by the service
+            raise CredentialNotFound(str(credential_id))
+        model.name = name
+        try:
+            await self._session.commit()
+        except IntegrityError as exc:
+            await self._session.rollback()
+            raise CredentialNameExists(name) from exc
+        await self._session.refresh(model)
+        return model.to_entity()
+
+    async def replace_values(self, credential_id: UUID, values: dict[str, str]) -> None:
+        model = await self._session.get(CredentialModel, credential_id)
+        if model is None:  # pragma: no cover - guarded by the service
+            raise CredentialNotFound(str(credential_id))
+        # Re-encrypt with the active data key (same envelope scheme as add).
+        key_id, cipher = await self._require_keyring().active_credential_cipher()
+        model.encrypted_values = cipher.encrypt(values)
+        model.key_id = key_id
         await self._session.commit()
 
     async def remove(self, credential_id: UUID) -> None:

@@ -288,3 +288,64 @@ async def test_values_are_encrypted_at_rest_and_round_trip(database_url: str) ->
     assert DataCipher(data_key).decrypt(cred["encrypted_values"]) == {
         "api_key": "super-secret-value"
     }
+
+
+async def _create_openai_cred(client: AsyncTestClient, admin: str, name: str = "c1") -> str:
+    resp = await client.post(
+        "/credentials",
+        json={"name": name, "provider": "openai", "values": {"api_key": "sk-old"}},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_201_CREATED, resp.text
+    return resp.json()["id"]
+
+
+async def test_rename_credential(client: AsyncTestClient) -> None:
+    admin = await _admin_token(client)
+    cid = await _create_openai_cred(client, admin, "before")
+    resp = await client.patch(f"/credentials/{cid}", json={"name": "after"}, headers=_bearer(admin))
+    assert resp.status_code == HTTP_200_OK, resp.text
+    assert resp.json()["name"] == "after"
+    assert resp.json()["provider"] == "openai"
+
+
+async def test_rotate_values_keeps_metadata(client: AsyncTestClient) -> None:
+    # Rotating the secret succeeds and leaves name/provider untouched. (The new
+    # secret is encrypted at rest and never returned, so we assert the round-trip
+    # 200 and unchanged metadata, not the ciphertext.)
+    admin = await _admin_token(client)
+    cid = await _create_openai_cred(client, admin, "rotate-me")
+    resp = await client.patch(
+        f"/credentials/{cid}",
+        json={"values": {"api_key": "sk-new-rotated"}},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_200_OK, resp.text
+    assert resp.json()["name"] == "rotate-me"
+
+
+async def test_rotate_with_invalid_values_is_rejected(client: AsyncTestClient) -> None:
+    admin = await _admin_token(client)
+    cid = await _create_openai_cred(client, admin, "bad-rotate")
+    resp = await client.patch(f"/credentials/{cid}", json={"values": {}}, headers=_bearer(admin))
+    assert resp.status_code == 400
+
+
+async def test_rename_to_existing_name_conflicts(client: AsyncTestClient) -> None:
+    admin = await _admin_token(client)
+    await _create_openai_cred(client, admin, "taken")
+    other = await _create_openai_cred(client, admin, "other")
+    resp = await client.patch(
+        f"/credentials/{other}", json={"name": "taken"}, headers=_bearer(admin)
+    )
+    assert resp.status_code == HTTP_409_CONFLICT
+
+
+async def test_update_requires_platform_admin(client: AsyncTestClient) -> None:
+    admin = await _admin_token(client)
+    cid = await _create_openai_cred(client, admin, "guarded")
+    member = await _register_and_login(client, admin, "member@example.com")
+    resp = await client.patch(
+        f"/credentials/{cid}", json={"name": "hijack"}, headers=_bearer(member)
+    )
+    assert resp.status_code == HTTP_403_FORBIDDEN

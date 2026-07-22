@@ -46,6 +46,33 @@ class CredentialService:
         credential = Credential(id=uuid4(), name=name, provider=provider, created_at=_now())
         return await self._repo.add(credential, values)
 
+    async def update(
+        self,
+        actor: User,
+        credential_id: UUID,
+        *,
+        name: str | None = None,
+        values: dict[str, str] | None = None,
+    ) -> Credential:
+        """Rename a credential and/or replace its secret values (e.g. a rotated
+        token). The provider is immutable — recreate to change it. Secrets are
+        never revealed, so `values`, when given, is a full replacement set."""
+        _require_platform_admin(actor)
+        existing = await self._repo.get(credential_id)
+        if existing is None:
+            raise CredentialNotFound(str(credential_id))
+        if values is not None:
+            validate_credential_values(existing.provider, values)
+            await self._repo.replace_values(credential_id, values)
+        if name is not None and name != existing.name:
+            clash = await self._repo.get_by_name(name)
+            if clash is not None and clash.id != credential_id:
+                raise CredentialNameExists(name)
+            return await self._repo.rename(credential_id, name)
+        refreshed = await self._repo.get(credential_id)
+        assert refreshed is not None  # just fetched under the same session
+        return refreshed
+
     async def list(
         self, actor: User, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
     ) -> list[Credential]:

@@ -1148,7 +1148,11 @@ export interface paths {
         delete: operations["CredentialsCredentialIdDeleteCredential"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update a provider credential
+         * @description Rename and/or replace the secret values (e.g. a rotated token). The provider is immutable; secrets are never returned, so `values` is a full replacement set. Omitted fields are left unchanged.
+         */
+        patch: operations["CredentialsCredentialIdUpdateCredential"];
         trace?: never;
     };
     "/audit": {
@@ -1748,6 +1752,15 @@ export interface components {
             token_type: string;
             expires_in: number;
         };
+        /** UpdateCredentialRequest */
+        UpdateCredentialRequest: {
+            /** @description New unique name. Omit to keep the current one. */
+            name?: string | null;
+            /** @description A full fresh set of the provider's secret fields (e.g. a rotated token). Omit to keep the current values — they are never revealed, so this replaces, it does not merge. */
+            values?: {
+                [key: string]: string;
+            } | null;
+        };
         /** UpdateModelRequest */
         UpdateModelRequest: {
             provider_model_id?: string | null;
@@ -1819,10 +1832,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1845,10 +1858,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1871,10 +1884,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1897,10 +1910,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1931,10 +1944,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1978,10 +1991,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2025,10 +2038,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2074,10 +2087,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2123,10 +2136,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2172,10 +2185,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2217,10 +2230,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2262,10 +2275,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2306,10 +2319,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2349,10 +2362,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -2394,10 +2407,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2439,10 +2452,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2484,10 +2497,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -2529,10 +2542,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2576,10 +2589,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2619,10 +2632,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -2662,10 +2675,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2703,10 +2716,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -2727,10 +2740,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2753,10 +2766,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2783,10 +2796,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2824,10 +2837,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2850,10 +2863,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2879,10 +2892,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2924,10 +2937,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2971,10 +2984,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3014,10 +3027,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3057,10 +3070,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -3102,10 +3115,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3147,10 +3160,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3193,10 +3206,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3240,10 +3253,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3286,10 +3299,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3333,10 +3346,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3376,10 +3389,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3423,10 +3436,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3466,10 +3479,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -3507,10 +3520,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3550,10 +3563,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -3595,10 +3608,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3641,10 +3654,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3685,10 +3698,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3729,10 +3742,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -3775,10 +3788,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3819,10 +3832,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -3861,10 +3874,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3909,10 +3922,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3955,10 +3968,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4002,10 +4015,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4046,10 +4059,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -4092,10 +4105,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4135,10 +4148,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4179,10 +4192,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4224,10 +4237,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4267,10 +4280,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -4312,10 +4325,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4359,10 +4372,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4402,10 +4415,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4445,10 +4458,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4488,10 +4501,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -4530,10 +4543,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4573,10 +4586,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4620,10 +4633,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4668,10 +4681,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4712,10 +4725,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -4758,10 +4771,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4808,10 +4821,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4852,10 +4865,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4898,10 +4911,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4943,10 +4956,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4986,10 +4999,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5019,10 +5032,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5066,10 +5079,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5110,10 +5123,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -5156,10 +5169,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5204,10 +5217,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5248,10 +5261,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5293,10 +5306,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5336,13 +5349,60 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    CredentialsCredentialIdUpdateCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialResponse"];
+                };
             };
             /** @description Bad request syntax or unsupported method */
             400: {
@@ -5378,10 +5438,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5419,10 +5479,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5449,10 +5509,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5490,10 +5550,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5518,10 +5578,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5561,10 +5621,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5604,10 +5664,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -5645,10 +5705,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5686,10 +5746,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5716,10 +5776,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5759,10 +5819,10 @@ export interface operations {
                 headers: {
                     /** @description MIME sniffing */
                     "X-Content-Type-Options"?: string;
-                    /** @description Clickjacking */
-                    "X-Frame-Options"?: string;
                     /** @description Referrer */
                     "Referrer-Policy"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;

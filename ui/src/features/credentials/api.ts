@@ -58,6 +58,21 @@ export async function createCredential(
   return data;
 }
 
+/** PATCH /credentials/{id} — rename and/or replace the secret values (e.g. a
+ * rotated token). Pass `values` only to replace them (a full set — secrets are
+ * never returned, so it can't merge); omit to keep the current ones. */
+export async function updateCredential(
+  id: string,
+  changes: { name?: string; values?: Record<string, string> },
+): Promise<Credential> {
+  const { data, error } = await api.PATCH("/credentials/{credential_id}", {
+    params: { path: { credential_id: id } },
+    body: { name: changes.name ?? null, values: changes.values ?? null },
+  });
+  if (error || !data) throw fail(error, "Failed to update credential");
+  return data;
+}
+
 /** DELETE /credentials/{id} — remove a credential. Refused (409) if any model
  * still references it. */
 export async function deleteCredential(id: string): Promise<void> {

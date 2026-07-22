@@ -35,6 +35,27 @@ class CreateCredentialRequest:
 
 
 @dataclass(frozen=True)
+class UpdateCredentialRequest:
+    """Rename a credential and/or replace its secret values. Both optional;
+    omitted/null fields are left unchanged. The provider is immutable."""
+
+    name: Annotated[
+        str | None,
+        Parameter(description="New unique name. Omit to keep the current one."),
+    ] = None
+    values: Annotated[
+        dict[str, str] | None,
+        Parameter(
+            description=(
+                "A full fresh set of the provider's secret fields (e.g. a rotated "
+                "token). Omit to keep the current values — they are never revealed, "
+                "so this replaces, it does not merge."
+            ),
+        ),
+    ] = None
+
+
+@dataclass(frozen=True)
 class CredentialResponse:
     """Credential metadata. Secret values are intentionally never included."""
 
