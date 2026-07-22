@@ -28,20 +28,22 @@ Baseline eseguita:
 
 ## Remediation update — 2026-07-22
 
-Tutti i finding sono stati implementati e verificati in uno stack di otto PR
-ancora **open**. Quindi lo stato corretto è “fixed nello stack”, non ancora
-“rilasciato su `main`”. L'HEAD integrato è `6a4defd`.
+Tutti i finding sono stati implementati, verificati e integrati in `main`
+tramite le nove PR #313–#321. Lo stato corretto è quindi **fixed on main**;
+questo non implica che il codice sia già stato distribuito in un ambiente.
+L'HEAD di integrazione è `dca1da2`.
 
-| PR | Branch | Issue | Commit | Stato al 2026-07-22 |
+| PR | Branch | Issue | Merge commit | Stato al 2026-07-22 |
 |---|---|---|---|---|
-| [#313](https://github.com/carlo99999/LiteStarGateway/pull/313) | `fix/r11-013-webhook-ip-pinning` | ISSUE-013 | `1adef23` | Open, mergeable |
-| [#314](https://github.com/carlo99999/LiteStarGateway/pull/314) | `fix/r11-persistence-integrity` | ISSUE-014/017/018 | `8953952` | Open, mergeable |
-| [#315](https://github.com/carlo99999/LiteStarGateway/pull/315) | `fix/r11-016-role-aware-console` | ISSUE-016 | `bbba66a` | Open, mergeable |
-| [#316](https://github.com/carlo99999/LiteStarGateway/pull/316) | `fix/r11-010-playground-governance` | ISSUE-010 | `2bff783` | Open, mergeable |
-| [#317](https://github.com/carlo99999/LiteStarGateway/pull/317) | `refactor/r11-012-callable-alias-registry` | ISSUE-012 (namespace) | `cf16940` | Open, mergeable |
-| [#318](https://github.com/carlo99999/LiteStarGateway/pull/318) | `fix/r11-router-revisions` | ISSUE-011 + ISSUE-012 (identity) | `b05ca26` | Open, mergeable |
-| [#319](https://github.com/carlo99999/LiteStarGateway/pull/319) | `fix/r11-015-usage-attribution` | ISSUE-015 | `28a5a9e` | Open, mergeable |
-| [#320](https://github.com/carlo99999/LiteStarGateway/pull/320) | `fix/r11-019-migration-rollback-contract` | ISSUE-019 | `6a4defd` | Open, mergeable |
+| [#313](https://github.com/carlo99999/LiteStarGateway/pull/313) | `fix/r11-013-webhook-ip-pinning` | ISSUE-013 | `5ea3121` | Merged |
+| [#314](https://github.com/carlo99999/LiteStarGateway/pull/314) | `fix/r11-persistence-integrity` | ISSUE-014/017/018 | `ec5fde0` | Merged |
+| [#315](https://github.com/carlo99999/LiteStarGateway/pull/315) | `fix/r11-016-role-aware-console` | ISSUE-016 | `03baad8` | Merged |
+| [#316](https://github.com/carlo99999/LiteStarGateway/pull/316) | `fix/r11-010-playground-governance` | ISSUE-010 | `c66fffd` | Merged |
+| [#317](https://github.com/carlo99999/LiteStarGateway/pull/317) | `refactor/r11-012-callable-alias-registry` | ISSUE-012 (namespace) | `71ca220` | Merged |
+| [#318](https://github.com/carlo99999/LiteStarGateway/pull/318) | `fix/r11-router-revisions` | ISSUE-011 + ISSUE-012 (identity) | `048fb8b` | Merged |
+| [#319](https://github.com/carlo99999/LiteStarGateway/pull/319) | `fix/r11-015-usage-attribution` | ISSUE-015 | `db072e9` | Merged |
+| [#320](https://github.com/carlo99999/LiteStarGateway/pull/320) | `fix/r11-019-migration-rollback-contract` | ISSUE-019 | `97954a2` | Merged |
+| [#321](https://github.com/carlo99999/LiteStarGateway/pull/321) | `docs/r11-remediated` | Report finale | `dca1da2` | Merged |
 
 Gate finali eseguiti sull'HEAD integrato:
 
@@ -57,9 +59,10 @@ Gate finali eseguiti sull'HEAD integrato:
 
 Il job remoto `checks` era inizialmente rosso da PR #317 per falsi positivi
 `detect-secrets` su ID di migrazione deterministici e per una baseline con line
-number obsoleto. Le fixture sono ora annotate esplicitamente, la baseline è
-riallineata e l'intero `pre-commit --all-files` passa localmente; i check GitHub
-sono stati riavviati dai branch aggiornati.
+number obsoleto. Le fixture sono ora annotate esplicitamente e la baseline è
+riallineata. Due job PostgreSQL hanno poi incontrato la stessa soglia temporale
+flaky nel test MLflow; i rerun isolati sono passati. Al momento del merge ogni
+PR aveva verdi `checks`, PostgreSQL, UI e Docker.
 
 ## Executive summary
 
