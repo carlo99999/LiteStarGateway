@@ -32,6 +32,23 @@ interface ExtendRouterDialogProps {
 export function ExtendRouterDialog({ router, onOpenChange }: ExtendRouterDialogProps) {
   const queryClient = useQueryClient();
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [ackActivePromptEgress, setAckActivePromptEgress] = useState(false);
+  const [ackShadowPromptEgress, setAckShadowPromptEgress] = useState(false);
+
+  const usesPromptWebhook = (strategy: string | null, config: Record<string, unknown>) =>
+    strategy === "webhook" ||
+    (strategy === "hybrid" && config.escalation_strategy === "webhook");
+  const activePromptEgress = router
+    ? usesPromptWebhook(router.strategy, router.strategy_config)
+    : false;
+  const rawShadowConfig = router?.strategy_config.shadow;
+  const shadowConfig =
+    rawShadowConfig && typeof rawShadowConfig === "object" && !Array.isArray(rawShadowConfig)
+      ? (rawShadowConfig as Record<string, unknown>)
+      : {};
+  const shadowPromptEgress = router
+    ? usesPromptWebhook(router.shadow_strategy, shadowConfig)
+    : false;
 
   const teams = useQuery({
     queryKey: ["teams", "all"],
@@ -55,9 +72,15 @@ export function ExtendRouterDialog({ router, onOpenChange }: ExtendRouterDialogP
   }
 
   const extend = useMutation({
-    mutationFn: () => extendRouter(router!.id, [...picked]),
+    mutationFn: () =>
+      extendRouter(router!.id, [...picked], {
+        activePromptEgress: ackActivePromptEgress,
+        shadowPromptEgress: ackShadowPromptEgress,
+      }),
     onSuccess: async () => {
       setPicked(new Set());
+      setAckActivePromptEgress(false);
+      setAckShadowPromptEgress(false);
       await refresh();
     },
   });
@@ -77,12 +100,11 @@ export function ExtendRouterDialog({ router, onOpenChange }: ExtendRouterDialogP
   const error = extend.error ?? promote.error ?? revoke.error;
 
   function toggle(teamId: string) {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(teamId)) next.delete(teamId);
-      else next.add(teamId);
-      return next;
-    });
+    setPicked((prev) =>
+      prev.has(teamId)
+        ? new Set([...prev].filter((candidate) => candidate !== teamId))
+        : new Set([...prev, teamId]),
+    );
   }
 
   const selectable = (teams.data ?? []).filter(
@@ -98,6 +120,8 @@ export function ExtendRouterDialog({ router, onOpenChange }: ExtendRouterDialogP
           promote.reset();
           revoke.reset();
           setPicked(new Set());
+          setAckActivePromptEgress(false);
+          setAckShadowPromptEgress(false);
         }
         onOpenChange(next);
       }}
@@ -176,6 +200,37 @@ export function ExtendRouterDialog({ router, onOpenChange }: ExtendRouterDialogP
             )}
           </div>
 
+          {activePromptEgress || shadowPromptEgress ? (
+            <div className="grid gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+              <p className="text-xs text-foreground">
+                This router can send target-team prompt content to its configured external webhook.
+                Confirm each enabled path before sharing it.
+              </p>
+              {activePromptEgress ? (
+                <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={ackActivePromptEgress}
+                    onChange={(event) => setAckActivePromptEgress(event.target.checked)}
+                    disabled={busy}
+                  />
+                  I acknowledge active-strategy prompt egress.
+                </label>
+              ) : null}
+              {shadowPromptEgress ? (
+                <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={ackShadowPromptEgress}
+                    onChange={(event) => setAckShadowPromptEgress(event.target.checked)}
+                    disabled={busy}
+                  />
+                  I acknowledge shadow-strategy prompt egress.
+                </label>
+              ) : null}
+            </div>
+          ) : null}
+
           {error ? <p className="font-mono text-xs text-destructive">{error.message}</p> : null}
         </div>
 
@@ -196,7 +251,12 @@ export function ExtendRouterDialog({ router, onOpenChange }: ExtendRouterDialogP
             </Button>
             <Button
               type="button"
-              disabled={busy || picked.size === 0}
+              disabled={
+                busy ||
+                picked.size === 0 ||
+                (activePromptEgress && !ackActivePromptEgress) ||
+                (shadowPromptEgress && !ackShadowPromptEgress)
+              }
               onClick={() => extend.mutate()}
             >
               {extend.isPending ? "extending…" : `extend to ${picked.size || ""}`}

@@ -43,6 +43,11 @@ def _event(created_at: datetime | None = None) -> UsageEvent:
         completion_tokens=7,
         cost=0.12,
         created_at=created_at or datetime.now(UTC),
+        requested_alias="m-global",
+        resolved_model_id=None,
+        canonical_model_name="m",
+        callable_origin="global",
+        source_team_id=None,
     )
 
 
@@ -62,6 +67,10 @@ async def test_enqueue_then_reconcile_lands_in_ledger(session: AsyncSession) -> 
     assert rows[0].prompt_tokens == 5
     assert rows[0].completion_tokens == 7
     assert rows[0].calls == 1
+    assert rows[0].requested_alias == "m-global"
+    assert rows[0].resolved_model_id == event.model_id
+    assert rows[0].canonical_model_name == "m"
+    assert rows[0].callable_origin == "global"
 
     # Idempotent + drained: a second reconcile settles nothing.
     assert await repo.reconcile_pending() == 0

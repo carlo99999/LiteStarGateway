@@ -19,14 +19,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -40,6 +32,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -64,14 +64,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -85,6 +77,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -112,14 +112,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -133,6 +125,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -160,14 +160,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -181,6 +173,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -221,14 +221,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -242,6 +234,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -317,14 +317,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -338,6 +330,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -413,14 +413,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -434,6 +426,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -512,14 +512,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -533,6 +525,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -611,14 +611,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -632,6 +624,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -718,14 +718,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -739,6 +731,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -812,14 +812,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -833,6 +825,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -908,14 +908,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -929,6 +921,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1032,14 +1032,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -1053,6 +1045,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1133,14 +1133,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -1154,6 +1146,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1232,14 +1232,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -1253,6 +1245,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1328,14 +1328,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -1349,6 +1341,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1424,14 +1424,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -1445,6 +1437,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1525,14 +1525,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -1546,6 +1538,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1633,14 +1633,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -1654,6 +1646,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1731,14 +1731,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -1752,6 +1744,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1820,14 +1820,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -1841,6 +1833,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1907,14 +1907,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -1928,6 +1920,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1948,14 +1948,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -1969,6 +1961,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -1996,14 +1996,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -2017,6 +2009,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2057,14 +2057,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -2078,6 +2070,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2143,14 +2143,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -2164,6 +2156,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2191,14 +2191,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -2212,6 +2204,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2277,14 +2277,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -2298,6 +2290,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2374,14 +2374,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -2395,6 +2387,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2482,14 +2482,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -2503,6 +2495,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2580,14 +2580,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -2601,6 +2593,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2676,14 +2676,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -2697,6 +2689,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2775,14 +2775,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -2796,6 +2788,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -2891,14 +2891,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -2912,6 +2904,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3025,14 +3025,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -3046,6 +3038,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3134,14 +3134,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -3155,6 +3147,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3268,14 +3268,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -3289,6 +3281,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3377,14 +3377,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -3398,6 +3390,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3475,14 +3475,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -3496,6 +3488,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3581,14 +3581,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -3602,6 +3594,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3677,14 +3677,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -3698,6 +3690,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3768,14 +3768,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -3789,6 +3781,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3864,14 +3864,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -3885,6 +3877,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -3963,14 +3963,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -3984,6 +3976,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4097,14 +4097,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -4118,6 +4110,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4224,14 +4224,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -4245,6 +4237,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4335,14 +4335,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -4356,6 +4348,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4444,14 +4444,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -4465,6 +4457,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4552,14 +4552,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -4573,6 +4565,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4653,14 +4653,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -4674,6 +4666,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4765,6 +4765,43 @@
                         "allowReserved": false
                     },
                     {
+                        "name": "alias",
+                        "in": "query",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ]
+                        },
+                        "required": false,
+                        "deprecated": false,
+                        "allowEmptyValue": false,
+                        "allowReserved": false
+                    },
+                    {
+                        "name": "resolved_model_id",
+                        "in": "query",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "format": "uuid"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ]
+                        },
+                        "required": false,
+                        "deprecated": false,
+                        "allowEmptyValue": false,
+                        "allowReserved": false
+                    },
+                    {
                         "name": "api_key_id",
                         "in": "query",
                         "schema": {
@@ -4824,14 +4861,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -4845,6 +4874,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -4961,14 +4998,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -4982,6 +5011,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5071,14 +5108,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -5092,6 +5121,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5179,14 +5216,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -5200,6 +5229,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5289,14 +5326,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -5310,6 +5339,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5387,14 +5424,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -5408,6 +5437,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5652,14 +5689,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -5673,6 +5702,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5749,14 +5786,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -5770,6 +5799,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5847,14 +5884,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -5868,6 +5897,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -5946,14 +5983,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -5967,6 +5996,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6054,14 +6091,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -6075,6 +6104,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6155,14 +6192,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -6176,6 +6205,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6256,14 +6293,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -6277,6 +6306,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6354,14 +6391,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -6375,6 +6404,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6458,14 +6495,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -6479,6 +6508,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6555,14 +6592,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -6576,6 +6605,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6656,14 +6693,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -6677,6 +6706,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6765,14 +6802,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -6786,6 +6815,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6883,14 +6920,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -6904,6 +6933,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -6989,14 +7026,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -7010,6 +7039,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7144,14 +7181,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -7165,6 +7194,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7242,14 +7279,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -7263,6 +7292,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7443,14 +7480,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -7464,6 +7493,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7554,14 +7591,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -7575,6 +7604,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7663,14 +7700,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -7684,6 +7713,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7762,14 +7799,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -7783,6 +7812,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7849,14 +7886,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -7870,6 +7899,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -7908,14 +7945,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -7929,6 +7958,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8016,14 +8053,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -8037,6 +8066,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8112,14 +8149,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -8133,6 +8162,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8213,14 +8250,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -8234,6 +8263,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8314,14 +8351,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -8337,6 +8366,14 @@
                                 "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
                             }
                         },
                         "content": {
@@ -8344,6 +8381,107 @@
                                 "schema": {
                                     "items": {
                                         "$ref": "#/components/schemas/RouterGrantResponse"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/platform/routers/{router_id}/revisions": {
+            "get": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "List immutable router revisions",
+                "operationId": "PlatformRoutersRouterIdRevisionsListRevisions",
+                "parameters": [
+                    {
+                        "name": "router_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/RouterResponse"
                                     },
                                     "type": "array"
                                 }
@@ -8415,14 +8553,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -8436,6 +8566,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8513,14 +8651,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -8536,6 +8666,122 @@
                                 "description": "Referrer",
                                 "required": false,
                                 "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/platform/routers/grants/{grant_id}/upgrade": {
+            "post": {
+                "tags": [
+                    "routers"
+                ],
+                "summary": "Upgrade a grant revision",
+                "operationId": "PlatformRoutersGrantsGrantIdUpgradeUpgradeGrant",
+                "parameters": [
+                    {
+                        "name": "grant_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpgradeRouterGrantRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Document created, URL follows",
+                        "headers": {
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RouterGrantResponse"
+                                }
                             }
                         }
                     },
@@ -8592,14 +8838,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -8613,6 +8851,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8689,14 +8935,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -8710,6 +8948,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8798,14 +9044,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -8819,6 +9057,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -8906,14 +9152,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -8927,6 +9165,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9015,14 +9261,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -9036,6 +9274,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9133,14 +9379,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -9154,6 +9392,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9258,14 +9504,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -9279,6 +9517,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9356,14 +9602,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -9377,6 +9615,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9455,14 +9701,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -9476,6 +9714,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9555,14 +9801,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -9576,6 +9814,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9679,14 +9925,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -9700,6 +9938,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9768,14 +10014,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -9789,6 +10027,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9872,14 +10118,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -9893,6 +10131,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -9956,14 +10202,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -9977,6 +10215,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10016,14 +10262,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -10037,6 +10275,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10112,14 +10358,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -10133,6 +10371,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10208,14 +10454,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -10229,6 +10467,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10297,14 +10543,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -10318,6 +10556,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10383,14 +10629,6 @@
                     "200": {
                         "description": "Request fulfilled, document follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -10404,6 +10642,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10442,14 +10688,6 @@
                     "201": {
                         "description": "Document created, URL follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -10463,6 +10701,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10540,14 +10786,6 @@
                     "204": {
                         "description": "Request fulfilled, nothing follows",
                         "headers": {
-                            "X-Content-Type-Options": {
-                                "schema": {
-                                    "type": "string"
-                                },
-                                "description": "MIME sniffing",
-                                "required": false,
-                                "deprecated": false
-                            },
                             "X-Frame-Options": {
                                 "schema": {
                                     "type": "string"
@@ -10561,6 +10799,14 @@
                                     "type": "string"
                                 },
                                 "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
                                 "required": false,
                                 "deprecated": false
                             }
@@ -10849,6 +11095,17 @@
                     },
                     "quality_tier": {
                         "type": "string"
+                    },
+                    "model_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     },
                     "supports_vision": {
                         "type": "boolean",
@@ -11422,6 +11679,14 @@
                             "format": "uuid"
                         },
                         "type": "array"
+                    },
+                    "ack_active_prompt_egress": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "ack_shadow_prompt_egress": {
+                        "type": "boolean",
+                        "default": false
                     }
                 },
                 "type": "object",
@@ -12210,13 +12475,44 @@
                     "created_at": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "revision_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "revision_number": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "ack_active_prompt_egress": {
+                        "type": "boolean"
+                    },
+                    "ack_shadow_prompt_egress": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object",
                 "required": [
+                    "ack_active_prompt_egress",
+                    "ack_shadow_prompt_egress",
                     "alias",
                     "created_at",
                     "id",
+                    "revision_id",
+                    "revision_number",
                     "router_id",
                     "team_id"
                 ],
@@ -12252,6 +12548,17 @@
                         "oneOf": [
                             {
                                 "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "base_revision_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
                             },
                             {
                                 "type": "null"
@@ -12322,6 +12629,38 @@
                         ]
                     },
                     "origin_team_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "revision_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "revision_number": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "default_model_id": {
                         "oneOf": [
                             {
                                 "type": "string",
@@ -12843,6 +13182,32 @@
                 ],
                 "title": "UpdateTeamRequest"
             },
+            "UpgradeRouterGrantRequest": {
+                "properties": {
+                    "target_revision_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "expected_current_revision_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "ack_active_prompt_egress": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "ack_shadow_prompt_egress": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "expected_current_revision_id",
+                    "target_revision_id"
+                ],
+                "title": "UpgradeRouterGrantRequest"
+            },
             "UsageResponse": {
                 "properties": {
                     "model": {
@@ -12862,15 +13227,48 @@
                     },
                     "calls": {
                         "type": "integer"
+                    },
+                    "row_id": {
+                        "type": "string"
+                    },
+                    "requested_alias": {
+                        "type": "string"
+                    },
+                    "resolved_model_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "canonical_model_name": {
+                        "type": "string"
+                    },
+                    "callable_origin": {
+                        "type": "string"
+                    },
+                    "source_team_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",
                 "required": [
+                    "callable_origin",
                     "calls",
+                    "canonical_model_name",
                     "completion_tokens",
                     "cost",
                     "model",
                     "prompt_tokens",
+                    "requested_alias",
+                    "resolved_model_id",
+                    "row_id",
+                    "source_team_id",
                     "total_tokens"
                 ],
                 "title": "UsageResponse"

@@ -464,6 +464,11 @@ class UsageEventModel(base.UUIDAuditBase):
     )
     model_id: Mapped[UUID] = mapped_column(index=True)
     model_name: Mapped[str] = mapped_column()
+    requested_alias: Mapped[str | None] = mapped_column(default=None, index=True)
+    resolved_model_id: Mapped[UUID | None] = mapped_column(default=None, index=True)
+    canonical_model_name: Mapped[str | None] = mapped_column(default=None, index=True)
+    callable_origin: Mapped[str | None] = mapped_column(default=None)
+    source_team_id: Mapped[UUID | None] = mapped_column(default=None)
     operation: Mapped[str] = mapped_column()
     prompt_tokens: Mapped[int] = mapped_column(default=0)
     completion_tokens: Mapped[int] = mapped_column(default=0)
@@ -481,6 +486,11 @@ class UsageEventModel(base.UUIDAuditBase):
             completion_tokens=self.completion_tokens,
             cost=self.cost,
             created_at=self.created_at,
+            requested_alias=self.requested_alias,
+            resolved_model_id=self.resolved_model_id,
+            canonical_model_name=self.canonical_model_name,
+            callable_origin=self.callable_origin,
+            source_team_id=self.source_team_id,
         )
 
 
@@ -500,6 +510,11 @@ class PendingUsageEventModel(base.UUIDAuditBase):
     api_key_id: Mapped[UUID | None] = mapped_column(nullable=True)
     model_id: Mapped[UUID] = mapped_column()
     model_name: Mapped[str] = mapped_column()
+    requested_alias: Mapped[str | None] = mapped_column(default=None)
+    resolved_model_id: Mapped[UUID | None] = mapped_column(default=None)
+    canonical_model_name: Mapped[str | None] = mapped_column(default=None)
+    callable_origin: Mapped[str | None] = mapped_column(default=None)
+    source_team_id: Mapped[UUID | None] = mapped_column(default=None)
     operation: Mapped[str] = mapped_column()
     prompt_tokens: Mapped[int] = mapped_column(default=0)
     completion_tokens: Mapped[int] = mapped_column(default=0)

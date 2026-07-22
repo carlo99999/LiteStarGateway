@@ -2,7 +2,14 @@
 
 from .access import APIKey, IssuedKey, SecretKey, ServicePrincipal
 from .audit import AuditEvent
-from .billing import ApiKeySpend, Budget, TraceRecord, UsageAggregate, UsageEvent
+from .billing import (
+    ApiKeySpend,
+    Budget,
+    TraceRecord,
+    UsageAggregate,
+    UsageAttribution,
+    UsageEvent,
+)
 from .enums import (
     BudgetWindow,
     KeyPurpose,
@@ -38,6 +45,7 @@ __all__ = [
     "Budget",
     "TraceRecord",
     "UsageAggregate",
+    "UsageAttribution",
     "UsageEvent",
     # Enums
     "BudgetWindow",

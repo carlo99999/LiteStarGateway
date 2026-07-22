@@ -50,6 +50,20 @@ multi-tenant gateway without accounting + limits.
 - Expose `GET /usage` (team-scoped; platform-admin can see all) with filters +
   aggregation (by day/model/key).
 
+Each aggregate preserves both sides of callable resolution: `requested_alias`
+(what the client sent) and `resolved_model_id`/`canonical_model_name` (what was
+actually billed), plus callable origin and source-team provenance. Historical
+rows created before the identity migration report alias/origin as `unknown`;
+the service never guesses them.
+
+`GET /teams/{id}/usage` filter semantics are explicit:
+
+- `model` matches either requested alias or canonical model name (compatible,
+  broad search);
+- `alias` matches only the exact requested alias;
+- `resolved_model_id` matches only the stable billed model identity;
+- `api_key_id` retains its existing exact caller filter.
+
 > **Known gap — image generation is unbilled (L22).** The cost model is
 > per-token (`input_cost_per_token`/`output_cost_per_token`), but image responses
 > (DALL·E, Imagen) carry no token usage, so an image call records a `UsageEvent`

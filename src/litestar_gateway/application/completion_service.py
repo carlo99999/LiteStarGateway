@@ -15,11 +15,11 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID
 
-from litestar_gateway.application.callable_aliases import CallableAliasResolver
+from litestar_gateway.application.callable_aliases import CallableAliasResolver, ResolvedCallable
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.callable_alias import CallableKind
-from litestar_gateway.domain.entities import Model, ModelType, Provider
+from litestar_gateway.domain.entities import Model, ModelType, Provider, UsageAttribution
 from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
     ModelDisabled,
@@ -142,6 +142,7 @@ class CompletionService:
         call: Callable[[], Awaitable[dict[str, Any]]],
         reservation: float = 0.0,
         settle_view: Callable[[dict[str, Any]], dict[str, Any]] = lambda response: response,
+        attribution: UsageAttribution | None = None,
     ) -> dict[str, Any]:
         """Run one gateway call, observing success (usage + trace) and failure
         (error trace) before the exception propagates to the HTTP layer. The
@@ -162,7 +163,14 @@ class CompletionService:
                 raise
             latency_ms = (perf_counter() - start) * 1000
             await self._meter.settle_ok(
-                team_id, api_key_id, model, operation, settle_view(response), latency_ms, request
+                team_id,
+                api_key_id,
+                model,
+                operation,
+                settle_view(response),
+                latency_ms,
+                request,
+                attribution,
             )
             await self._attach_routing_usage(response)
             return response
@@ -208,9 +216,31 @@ class CompletionService:
         assert isinstance(resolved.resource, Model)
         return resolved.resource
 
+    @staticmethod
+    def _usage_attribution(
+        team_id: UUID,
+        alias: str | None,
+        model: Model,
+        resolved: ResolvedCallable | None = None,
+    ) -> UsageAttribution:
+        if resolved is not None:
+            return UsageAttribution(
+                requested_alias=alias,
+                callable_origin=resolved.binding.origin.value,
+                source_team_id=resolved.binding.source_team_id,
+            )
+        origin = (
+            "global" if model.team_id is None else "own" if model.team_id == team_id else "extended"
+        )
+        return UsageAttribution(
+            requested_alias=alias,
+            callable_origin=origin,
+            source_team_id=model.origin_team_id or model.team_id,
+        )
+
     async def prepare_native(
         self, team_id: UUID, expected_type: ModelType, alias: str | None, data: dict[str, Any]
-    ) -> tuple[Model, dict[str, str], dict[str, Any]]:
+    ) -> tuple[Model, dict[str, str], dict[str, Any], UsageAttribution]:
         """Resolve a provider-native request's model `alias` to a usable team
         `Model` plus its decrypted credentials, and return the *governed* body.
 
@@ -227,17 +257,24 @@ class CompletionService:
         ceiling (ISSUE-003). Everything else in the body stays verbatim. The
         upstream `base_url` still comes only from the credential (`get_values`),
         never from the client."""
-        model = self._ensure_usable(
-            await self._resolve_model(team_id, alias),
-            alias,
-            expected_type,
+        resolved = (
+            await self._callable_resolver.resolve(team_id, alias)
+            if alias and self._callable_resolver is not None
+            else None
         )
+        candidate: Model | None = None
+        if resolved is not None and resolved.kind is CallableKind.MODEL:
+            assert isinstance(resolved.resource, Model)
+            candidate = resolved.resource
+        elif alias and self._callable_resolver is None:
+            candidate = await self._models.get_by_name(team_id, alias)
+        model = self._ensure_usable(candidate, alias, expected_type)
         values = await self._credentials.get_values(model.credential_id)
         if values is None:
             raise CredentialNotFound(str(model.credential_id))
         reject_native_control_kwargs(data)
         governed = clamp_native_output_tokens(model.provider, data, model.max_output_tokens)
-        return model, values, governed
+        return model, values, governed, self._usage_attribution(team_id, alias, model, resolved)
 
     async def native_messages(
         self, team_id: UUID, api_key_id: UUID, data: dict[str, Any]
@@ -255,7 +292,7 @@ class CompletionService:
         directly), releasing the reservation either way. Only the governance
         fields are touched (reserved-kwarg rejection + output-token clamp in
         `prepare_native`); the rest of the body flows to the provider verbatim."""
-        model, values, governed = await self.prepare_native(
+        model, values, governed, attribution = await self.prepare_native(
             team_id, ModelType.CHAT, data.get("model"), data
         )
         if model.provider is not Provider.ANTHROPIC:
@@ -273,6 +310,7 @@ class CompletionService:
             view,
             lambda: self._gateway.anative_messages(governed, model, values),
             reservation,
+            attribution=attribution,
         )
 
     async def open_native_messages_stream(
@@ -289,7 +327,7 @@ class CompletionService:
         status BEFORE the SSE 200 commits (H24). The events flow through
         untranslated; usage is accumulated from the raw events and settled at the
         tail (or on disconnect — `_rechain`'s aclose propagation)."""
-        model, values, governed = await self.prepare_native(
+        model, values, governed, attribution = await self.prepare_native(
             team_id, ModelType.CHAT, data.get("model"), data
         )
         if model.provider is not Provider.ANTHROPIC:
@@ -304,7 +342,9 @@ class CompletionService:
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        gen = self._metered_native(team_id, api_key_id, model, stream, view, reservation)
+        gen = self._metered_native(
+            team_id, api_key_id, model, stream, view, reservation, attribution
+        )
         return await _prime(gen)
 
     def _metered_native(
@@ -315,6 +355,7 @@ class CompletionService:
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
         reservation: float,
+        attribution: UsageAttribution,
     ) -> AsyncIterator[dict[str, Any]]:
         """Native mirror of `_metered`: wrap the raw Anthropic stream in the native
         metered generator (usage accumulated from the raw events) and release the
@@ -329,7 +370,14 @@ class CompletionService:
                 self._meter.release(team_id, reservation)
 
         gen = self._meter.metered_native_stream(
-            team_id, api_key_id, model, "native.messages", stream, request, release
+            team_id,
+            api_key_id,
+            model,
+            "native.messages",
+            stream,
+            request,
+            release,
+            attribution,
         )
         weakref.finalize(gen, release)
         return gen
@@ -355,7 +403,7 @@ class CompletionService:
         H14 estimate-when-usage-absent fallback fires here too (ISSUE-004): the
         OpenAI-shaped reservation view is passed as the settlement request, so a
         response missing `usageMetadata` is estimated instead of billed as $0."""
-        model, values, governed = await self.prepare_native(
+        model, values, governed, attribution = await self.prepare_native(
             team_id, ModelType.CHAT, model_alias, data
         )
         if model.provider is not Provider.VERTEX_AI:
@@ -374,6 +422,7 @@ class CompletionService:
             lambda: self._gateway.agenerate_content(governed, model, values),
             reservation,
             settle_view=_gemini_usage,
+            attribution=attribution,
         )
 
     async def open_generate_content_stream(
@@ -389,7 +438,7 @@ class CompletionService:
         status BEFORE the SSE 200 commits (H24). The chunks flow through
         untranslated; usage is accumulated from the raw `usageMetadata` and settled
         at the tail (or on disconnect — `_rechain`'s aclose propagation)."""
-        model, values, governed = await self.prepare_native(
+        model, values, governed, attribution = await self.prepare_native(
             team_id, ModelType.CHAT, model_alias, data
         )
         if model.provider is not Provider.VERTEX_AI:
@@ -404,7 +453,9 @@ class CompletionService:
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        gen = self._metered_gemini(team_id, api_key_id, model, stream, view, reservation)
+        gen = self._metered_gemini(
+            team_id, api_key_id, model, stream, view, reservation, attribution
+        )
         return await _prime(gen)
 
     def _metered_gemini(
@@ -415,6 +466,7 @@ class CompletionService:
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
         reservation: float,
+        attribution: UsageAttribution,
     ) -> AsyncIterator[dict[str, Any]]:
         """Native mirror of `_metered_native` for the Gemini wire shape: wrap the raw
         Gemini chunk stream in the native metered generator (usage accumulated from
@@ -430,7 +482,14 @@ class CompletionService:
                 self._meter.release(team_id, reservation)
 
         gen = self._meter.metered_gemini_stream(
-            team_id, api_key_id, model, "native.generate_content", stream, request, release
+            team_id,
+            api_key_id,
+            model,
+            "native.generate_content",
+            stream,
+            request,
+            release,
+            attribution,
         )
         weakref.finalize(gen, release)
         return gen
@@ -442,7 +501,7 @@ class CompletionService:
         request: dict[str, Any],
         expected_type: ModelType,
         api_key_id: UUID | None,
-    ) -> tuple[Model, dict[str, str], float, dict[str, Any]]:
+    ) -> tuple[Model, dict[str, str], float, dict[str, Any], UsageAttribution]:
         # Gate the caller before router strategies: judge/embedding strategies
         # may make billable provider calls while resolving a virtual model.
         # The later admit handles team RPM + budget and omits the key so this
@@ -513,13 +572,14 @@ class CompletionService:
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        return model, values, reservation, clean
+        attribution = self._usage_attribution(team_id, alias, model, resolved)
+        return model, values, reservation, clean, attribution
 
     async def chat_completion(
         self, team_id: UUID, api_key_id: UUID | None, request: dict[str, Any]
     ) -> dict[str, Any]:
         clean = sanitize_request("chat.completions", request)
-        model, values, reservation, clean = await self._prepare(
+        model, values, reservation, clean, attribution = await self._prepare(
             team_id, "chat.completions", clean, ModelType.CHAT, api_key_id
         )
         return await self._dispatch(
@@ -530,13 +590,14 @@ class CompletionService:
             clean,
             lambda: self._gateway.achat_completion(clean, model, values),
             reservation,
+            attribution=attribution,
         )
 
     async def responses(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
         clean = sanitize_request("responses", request)
-        model, values, reservation, clean = await self._prepare(
+        model, values, reservation, clean, attribution = await self._prepare(
             team_id, "responses", clean, ModelType.CHAT, api_key_id
         )
         return await self._dispatch(
@@ -547,6 +608,7 @@ class CompletionService:
             clean,
             lambda: self._gateway.aresponses(clean, model, values),
             reservation,
+            attribution=attribution,
         )
 
     async def open_chat_stream(
@@ -556,7 +618,7 @@ class CompletionService:
         async iterator of OpenAI chunk dicts, metered for usage. Awaited before
         streaming starts so resolution errors surface as HTTP status codes."""
         clean = sanitize_request("chat.completions", request)
-        model, values, reservation, clean = await self._prepare(
+        model, values, reservation, clean, attribution = await self._prepare(
             team_id, "chat.completions", clean, ModelType.CHAT, api_key_id
         )
         try:
@@ -565,7 +627,14 @@ class CompletionService:
             self._meter.release(team_id, reservation)
             raise
         gen = self._metered(
-            team_id, api_key_id, model, "chat.completions", stream, clean, reservation
+            team_id,
+            api_key_id,
+            model,
+            "chat.completions",
+            stream,
+            clean,
+            reservation,
+            attribution,
         )
         return await _prime(gen)
 
@@ -575,7 +644,7 @@ class CompletionService:
         """Resolve (may raise → HTTP error) and return an async iterator of
         Responses-API stream events, metered for usage."""
         clean = sanitize_request("responses", request)
-        model, values, reservation, clean = await self._prepare(
+        model, values, reservation, clean, attribution = await self._prepare(
             team_id, "responses", clean, ModelType.CHAT, api_key_id
         )
         try:
@@ -583,7 +652,9 @@ class CompletionService:
         except BaseException:
             self._meter.release(team_id, reservation)
             raise
-        gen = self._metered(team_id, api_key_id, model, "responses", stream, clean, reservation)
+        gen = self._metered(
+            team_id, api_key_id, model, "responses", stream, clean, reservation, attribution
+        )
         return await _prime(gen)
 
     def _metered(
@@ -595,6 +666,7 @@ class CompletionService:
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
         reservation: float,
+        attribution: UsageAttribution,
     ) -> AsyncIterator[dict[str, Any]]:
         """Wrap the provider stream with usage metering, releasing the budget
         reservation exactly once. The metered generator releases it in its
@@ -611,7 +683,7 @@ class CompletionService:
                 self._meter.release(team_id, reservation)
 
         gen = self._meter.metered_stream(
-            team_id, api_key_id, model, operation, stream, request, release
+            team_id, api_key_id, model, operation, stream, request, release, attribution
         )
         weakref.finalize(gen, release)
         return gen
@@ -620,7 +692,7 @@ class CompletionService:
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
         clean = sanitize_request("embeddings", request)
-        model, values, reservation, clean = await self._prepare(
+        model, values, reservation, clean, attribution = await self._prepare(
             team_id, "embeddings", clean, ModelType.EMBEDDINGS, api_key_id
         )
         return await self._dispatch(
@@ -631,13 +703,14 @@ class CompletionService:
             clean,
             lambda: self._gateway.aembeddings(clean, model, values),
             reservation,
+            attribution=attribution,
         )
 
     async def images(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
     ) -> dict[str, Any]:
         clean = sanitize_request("images", request)
-        model, values, reservation, clean = await self._prepare(
+        model, values, reservation, clean, attribution = await self._prepare(
             team_id, "images", clean, ModelType.IMAGE, api_key_id
         )
         return await self._dispatch(
@@ -648,4 +721,5 @@ class CompletionService:
             clean,
             lambda: self._gateway.aimages(clean, model, values),
             reservation,
+            attribution=attribution,
         )

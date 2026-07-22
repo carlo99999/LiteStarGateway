@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import ApiKeySpend, UsageAggregate, UsageEvent
@@ -36,6 +36,11 @@ class SQLAlchemyUsageRepository:
                 api_key_id=event.api_key_id,
                 model_id=event.model_id,
                 model_name=event.model_name,
+                requested_alias=event.requested_alias,
+                resolved_model_id=event.resolved_model_id or event.model_id,
+                canonical_model_name=event.canonical_model_name or event.model_name,
+                callable_origin=event.callable_origin,
+                source_team_id=event.source_team_id,
                 operation=event.operation,
                 prompt_tokens=event.prompt_tokens,
                 completion_tokens=event.completion_tokens,
@@ -50,6 +55,8 @@ class SQLAlchemyUsageRepository:
         team_id: UUID,
         *,
         model_name: str | None = None,
+        requested_alias: str | None = None,
+        resolved_model_id: UUID | None = None,
         api_key_id: UUID | None = None,
         limit: int = DEFAULT_PAGE_SIZE,
         offset: int = 0,
@@ -60,19 +67,53 @@ class SQLAlchemyUsageRepository:
             select(
                 UsageEventModel.model_id,
                 UsageEventModel.model_name,
+                UsageEventModel.requested_alias,
+                UsageEventModel.resolved_model_id,
+                UsageEventModel.canonical_model_name,
+                UsageEventModel.callable_origin,
+                UsageEventModel.source_team_id,
                 func.coalesce(func.sum(UsageEventModel.prompt_tokens), 0),
                 func.coalesce(func.sum(UsageEventModel.completion_tokens), 0),
                 func.coalesce(func.sum(UsageEventModel.cost), 0.0),
                 func.count(),
             )
             .where(UsageEventModel.team_id == team_id)
-            .group_by(UsageEventModel.model_id, UsageEventModel.model_name)
-            .order_by(UsageEventModel.model_name, UsageEventModel.model_id)
+            .group_by(
+                UsageEventModel.model_id,
+                UsageEventModel.model_name,
+                UsageEventModel.requested_alias,
+                UsageEventModel.resolved_model_id,
+                UsageEventModel.canonical_model_name,
+                UsageEventModel.callable_origin,
+                UsageEventModel.source_team_id,
+            )
+            .order_by(
+                UsageEventModel.requested_alias,
+                UsageEventModel.model_name,
+                UsageEventModel.model_id,
+            )
             .limit(limit)
             .offset(offset)
         )
         if model_name is not None:
-            query = query.where(UsageEventModel.model_name == model_name)
+            # Backwards-compatible `model`: match what the caller requested OR
+            # the canonical model that was actually billed.
+            query = query.where(
+                or_(
+                    UsageEventModel.requested_alias == model_name,
+                    UsageEventModel.canonical_model_name == model_name,
+                    UsageEventModel.model_name == model_name,
+                )
+            )
+        if requested_alias is not None:
+            query = query.where(UsageEventModel.requested_alias == requested_alias)
+        if resolved_model_id is not None:
+            query = query.where(
+                or_(
+                    UsageEventModel.resolved_model_id == resolved_model_id,
+                    UsageEventModel.model_id == resolved_model_id,
+                )
+            )
         if api_key_id is not None:
             query = query.where(UsageEventModel.api_key_id == api_key_id)
 
@@ -81,10 +122,15 @@ class SQLAlchemyUsageRepository:
             UsageAggregate(
                 model_id=row[0],
                 model_name=row[1],
-                prompt_tokens=int(row[2]),
-                completion_tokens=int(row[3]),
-                cost=float(row[4]),
-                calls=int(row[5]),
+                requested_alias=row[2],
+                resolved_model_id=row[3] or row[0],
+                canonical_model_name=row[4] or row[1],
+                callable_origin=row[5],
+                source_team_id=row[6],
+                prompt_tokens=int(row[7]),
+                completion_tokens=int(row[8]),
+                cost=float(row[9]),
+                calls=int(row[10]),
             )
             for row in rows
         ]
@@ -155,6 +201,11 @@ class SQLAlchemyUsageRepository:
                 api_key_id=event.api_key_id,
                 model_id=event.model_id,
                 model_name=event.model_name,
+                requested_alias=event.requested_alias,
+                resolved_model_id=event.resolved_model_id or event.model_id,
+                canonical_model_name=event.canonical_model_name or event.model_name,
+                callable_origin=event.callable_origin,
+                source_team_id=event.source_team_id,
                 operation=event.operation,
                 prompt_tokens=event.prompt_tokens,
                 completion_tokens=event.completion_tokens,
@@ -188,6 +239,11 @@ class SQLAlchemyUsageRepository:
                             api_key_id=row.api_key_id,
                             model_id=row.model_id,
                             model_name=row.model_name,
+                            requested_alias=row.requested_alias,
+                            resolved_model_id=row.resolved_model_id or row.model_id,
+                            canonical_model_name=row.canonical_model_name or row.model_name,
+                            callable_origin=row.callable_origin,
+                            source_team_id=row.source_team_id,
                             operation=row.operation,
                             prompt_tokens=row.prompt_tokens,
                             completion_tokens=row.completion_tokens,
