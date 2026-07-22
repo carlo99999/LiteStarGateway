@@ -16,6 +16,7 @@ from litestar.di import NamedDependency, Provide
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.application.playground_service import PlaygroundResult, PlaygroundService
+from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.domain.authorization import Permission
 from litestar_gateway.domain.entities import User
@@ -32,11 +33,13 @@ def provide_playground_service(
     db_session: NamedDependency[AsyncSession],
     keyring: NamedDependency[Keyring],
     llm_gateway: NamedDependency[LLMGateway],
+    router_service: NamedDependency[RouterService],
 ) -> PlaygroundService:
     return PlaygroundService(
         models=SQLAlchemyModelRepository(db_session),
         credentials=SQLAlchemyCredentialRepository(db_session, keyring),
         gateway=llm_gateway,
+        routers=router_service,
     )
 
 
@@ -58,6 +61,7 @@ class PlaygroundResultResponse:
     completion_tokens: int | None
     cost: float | None
     error: str | None
+    chosen_model: str | None = None
 
     @classmethod
     def from_result(cls, r: PlaygroundResult) -> PlaygroundResultResponse:
@@ -70,6 +74,7 @@ class PlaygroundResultResponse:
             completion_tokens=r.completion_tokens,
             cost=r.cost,
             error=r.error,
+            chosen_model=r.chosen_model,
         )
 
 

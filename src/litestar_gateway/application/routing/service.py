@@ -356,6 +356,30 @@ class RouterService:
 
     # ── The decision ─────────────────────────────────────────────────────────
 
+    async def select_preview(
+        self, router: RouterConfig, request: dict[str, Any], *, acting_team_id: UUID
+    ) -> RoutingDecision:
+        """Pick a candidate WITHOUT persisting a decision or running shadow — for
+        the playground, which shows which candidate a router would choose without
+        recording it. Judge/embeddings strategies (which need a wired meter) fall
+        back to `default_model` here, since the preview service isn't metered."""
+        ctx = build_routing_context(request, team_id=acting_team_id, api_key_id=None)
+        ctx = dataclasses.replace(ctx, default_model=router.default_model)
+        capable = filter_candidates(ctx, router.candidates)
+        if not capable:
+            raise NoRoutableCandidate(f"Router '{router.name}': no candidate supports this request")
+        if len(capable) == 1:
+            return RoutingDecision(
+                model_name=capable[0].model_name,
+                strategy="capability-filter",
+                tier=None,
+                score=None,
+                signals=("single capable candidate",),
+                decision_ms=0.0,
+            )
+        decision, _ = await self._run_strategy(router, ctx, capable)
+        return decision
+
     async def route(
         self,
         router: RouterConfig,
