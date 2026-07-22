@@ -1,6 +1,6 @@
 [project]
 name = "litestar-gateway"
-version = "1.3.0"
+version = "1.4.0"
 description = "An OpenAI-compatible LLM gateway (Litestar, hexagonal architecture)."
 readme = "README.md"
 license = "Apache-2.0"
