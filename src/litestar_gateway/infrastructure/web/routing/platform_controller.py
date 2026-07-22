@@ -18,12 +18,13 @@ from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.domain.entities import User
 from litestar_gateway.domain.ports import AuditLog
-from litestar_gateway.infrastructure.web.audit.recorder import record_audit
+from litestar_gateway.infrastructure.web.audit.recorder import make_audit_event, record_audit
 from litestar_gateway.infrastructure.web.routing.controller import (
     ExtendRouterRequest,
     RouterGrantResponse,
     RouterRequest,
     RouterResponse,
+    UpgradeRouterGrantRequest,
 )
 from litestar_gateway.infrastructure.web.session.dependencies import provide_current_admin
 
@@ -73,9 +74,12 @@ class PlatformRouterController(Controller):
         audit_log: NamedDependency[AuditLog],
     ) -> RouterResponse:
         existing = await router_service.get_any(router_id)
-        router = await router_service.update_global(
-            data.to_entity(None, router_id, origin_team_id=existing.origin_team_id)
-        )
+        entity = data.to_entity(None, router_id, origin_team_id=existing.origin_team_id)
+        if entity.revision_id is None:
+            import dataclasses
+
+            entity = dataclasses.replace(entity, revision_id=existing.revision_id)
+        router = await router_service.update_global(entity)
         await record_audit(
             audit_log,
             request,
@@ -143,7 +147,13 @@ class PlatformRouterController(Controller):
         if router.team_id is None:
             raise ClientException("A global router is already available to every team")
         source_team = await team_service.get_team(current_admin, router.team_id)
-        grants = await router_service.extend(router_id, source_team.name, data.team_ids)
+        grants = await router_service.extend(
+            router_id,
+            source_team.name,
+            data.team_ids,
+            ack_active_prompt_egress=data.ack_active_prompt_egress,
+            ack_shadow_prompt_egress=data.ack_shadow_prompt_egress,
+        )
         await record_audit(
             audit_log,
             request,
@@ -154,6 +164,18 @@ class PlatformRouterController(Controller):
             detail=f"{router.name} → {len(grants)} team(s)",
         )
         return [RouterGrantResponse.from_entity(g) for g in grants]
+
+    @get("/{router_id:uuid}/revisions", summary="List immutable router revisions")
+    async def list_revisions(
+        self,
+        router_id: FromPath[UUID],
+        current_admin: NamedDependency[User],
+        router_service: NamedDependency[RouterService],
+    ) -> list[RouterResponse]:
+        return [
+            RouterResponse.from_entity(revision)
+            for revision in await router_service.list_revisions(router_id)
+        ]
 
     @get("/{router_id:uuid}/grants", summary="Teams a router is extended to")
     async def list_grants(
@@ -184,3 +206,30 @@ class PlatformRouterController(Controller):
             target_id=grant_id,
             detail="revoked",
         )
+
+    @post("/grants/{grant_id:uuid}/upgrade", summary="Upgrade a grant revision")
+    async def upgrade_grant(
+        self,
+        request: Request,
+        grant_id: FromPath[UUID],
+        data: UpgradeRouterGrantRequest,
+        current_admin: NamedDependency[User],
+        router_service: NamedDependency[RouterService],
+    ) -> RouterGrantResponse:
+        event = make_audit_event(
+            request,
+            current_admin,
+            "router.grant.upgrade",
+            target_type="router_grant",
+            target_id=grant_id,
+            detail=f"revision={data.target_revision_id}",
+        )
+        grant = await router_service.upgrade_grant(
+            grant_id,
+            data.target_revision_id,
+            data.expected_current_revision_id,
+            ack_active_prompt_egress=data.ack_active_prompt_egress,
+            ack_shadow_prompt_egress=data.ack_shadow_prompt_egress,
+            audit_event=event,
+        )
+        return RouterGrantResponse.from_entity(grant)

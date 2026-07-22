@@ -7,6 +7,7 @@ a router is a virtual model. Authorization goes through the central
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -41,6 +42,7 @@ class CandidateRequest:
     model_name: str
     description: str
     quality_tier: str
+    model_id: UUID | None = None
     supports_vision: bool = False
     supports_tools: bool = False
     supports_json_schema: bool = False
@@ -60,6 +62,7 @@ class CandidateRequest:
             model_name=self.model_name,
             description=self.description,
             quality_tier=tier,
+            model_id=self.model_id,
             supports_vision=self.supports_vision,
             supports_tools=self.supports_tools,
             supports_json_schema=self.supports_json_schema,
@@ -81,6 +84,9 @@ class RouterRequest:
     # Shadow strategy (§6): runs fire-and-forget after the active one; its
     # config lives under strategy_config["shadow"].
     shadow_strategy: str | None = None
+    # Optimistic concurrency token. Omit on create; update handlers default it
+    # to the head they just read for backwards-compatible clients.
+    base_revision_id: UUID | None = None
 
     def to_entity(
         self,
@@ -101,6 +107,7 @@ class RouterRequest:
             created_at=datetime.now(UTC),
             shadow_strategy=self.shadow_strategy,
             origin_team_id=origin_team_id,
+            revision_id=self.base_revision_id,
         )
 
 
@@ -130,6 +137,9 @@ class RouterResponse:
     shadow_strategy: str | None
     team_id: UUID | None = None  # None ⇒ a global (platform) router
     origin_team_id: UUID | None = None  # team a global router was promoted from
+    revision_id: UUID | None = None
+    revision_number: int | None = None
+    default_model_id: UUID | None = None
 
     @classmethod
     def from_entity(cls, router: RouterConfig) -> RouterResponse:
@@ -147,6 +157,9 @@ class RouterResponse:
             shadow_strategy=router.shadow_strategy,
             team_id=router.team_id,
             origin_team_id=router.origin_team_id,
+            revision_id=router.revision_id,
+            revision_number=router.revision_number,
+            default_model_id=router.default_model_id,
         )
 
 
@@ -157,6 +170,10 @@ class RouterGrantResponse:
     team_id: UUID
     alias: str
     created_at: datetime
+    revision_id: UUID | None
+    revision_number: int | None
+    ack_active_prompt_egress: bool
+    ack_shadow_prompt_egress: bool
 
     @classmethod
     def from_entity(cls, grant) -> RouterGrantResponse:
@@ -166,12 +183,26 @@ class RouterGrantResponse:
             team_id=grant.team_id,
             alias=grant.alias,
             created_at=grant.created_at,
+            revision_id=grant.revision_id,
+            revision_number=grant.revision_number,
+            ack_active_prompt_egress=grant.ack_active_prompt_egress,
+            ack_shadow_prompt_egress=grant.ack_shadow_prompt_egress,
         )
 
 
 @dataclass(frozen=True)
 class ExtendRouterRequest:
     team_ids: list[UUID]
+    ack_active_prompt_egress: bool = False
+    ack_shadow_prompt_egress: bool = False
+
+
+@dataclass(frozen=True)
+class UpgradeRouterGrantRequest:
+    target_revision_id: UUID
+    expected_current_revision_id: UUID
+    ack_active_prompt_egress: bool = False
+    ack_shadow_prompt_egress: bool = False
 
 
 @dataclass(frozen=True)
@@ -293,8 +324,11 @@ class RouterController(Controller):
         audit_log: NamedDependency[AuditLog],
     ) -> RouterResponse:
         await team_service.ensure_team_permission(current_user, team_id, Permission.MODELS_MANAGE)
-        await router_service.get(team_id, router_id)  # 404 before validation
-        router = await router_service.update(data.to_entity(team_id, router_id))
+        existing = await router_service.get(team_id, router_id)  # 404 before validation
+        entity = data.to_entity(team_id, router_id)
+        if entity.revision_id is None:
+            entity = dataclasses.replace(entity, revision_id=existing.revision_id)
+        router = await router_service.update(entity)
         await record_audit(
             audit_log,
             request,

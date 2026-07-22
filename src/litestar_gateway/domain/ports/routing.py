@@ -21,6 +21,14 @@ class RouterRepository(Protocol):
 
     async def get_any(self, router_id: UUID) -> RouterConfig | None: ...
 
+    async def get_revision(self, router_id: UUID, revision_id: UUID) -> RouterConfig | None: ...
+
+    async def get_for_grant(
+        self, grant_id: UUID, team_id: UUID | None = None
+    ) -> RouterConfig | None: ...
+
+    async def list_revisions(self, router_id: UUID) -> list[RouterConfig]: ...
+
     async def get_by_name(self, team_id: UUID, name: str) -> RouterConfig | None:
         """Resolve the router a team calls by `name`: own → extended → global →
         `<base>-global` when the team's own `<base>` shadows a global."""
@@ -47,6 +55,16 @@ class RouterRepository(Protocol):
     async def add_grants(self, grants: list[RouterGrant]) -> list[RouterGrant]: ...
 
     async def get_grant(self, grant_id: UUID) -> RouterGrant | None: ...
+
+    async def stage_grant_upgrade(
+        self,
+        grant_id: UUID,
+        target_revision_id: UUID,
+        expected_revision_id: UUID,
+        *,
+        ack_active_prompt_egress: bool,
+        ack_shadow_prompt_egress: bool,
+    ) -> RouterGrant: ...
 
     async def remove_grant(self, grant_id: UUID) -> None: ...
 
@@ -120,5 +138,10 @@ class RoutingRepositoryFactory(Protocol):
     def __call__(
         self,
     ) -> AbstractAsyncContextManager[
-        tuple[ModelRepository, CredentialRepository, CallableModelResolver]
+        tuple[
+            ModelRepository,
+            CredentialRepository,
+            CallableModelResolver,
+            RouterRepository,
+        ]
     ]: ...

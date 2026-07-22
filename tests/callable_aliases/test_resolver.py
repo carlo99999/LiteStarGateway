@@ -65,3 +65,20 @@ async def test_resolve_loads_only_the_selected_resource() -> None:
     assert aliases.snapshots == 1
     assert models.loads == [bindings[7].resource_id]
     assert routers.loads == []
+
+
+async def test_resolve_model_id_requires_an_accessible_model_binding() -> None:
+    team_id = uuid4()
+    accessible = _binding("approved", CallableKind.MODEL, team_id)
+    inaccessible_id = uuid4()
+    aliases = Aliases([accessible])
+    models = Resources()
+    resolver = CallableAliasResolver(aliases, models, Resources())  # type: ignore[arg-type]
+
+    allowed = await resolver.resolve_model_id(team_id, accessible.resource_id)
+    denied = await resolver.resolve_model_id(team_id, inaccessible_id)
+
+    assert allowed is not None
+    assert allowed.id == accessible.resource_id
+    assert denied is None
+    assert models.loads == [accessible.resource_id]

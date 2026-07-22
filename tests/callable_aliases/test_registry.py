@@ -499,6 +499,7 @@ async def test_revoke_does_not_rebind_grant_alias_to_shadowed_global_router(
 
 
 def _router_entity(team_id: UUID | None, name: str, candidate: str) -> RouterConfig:
+    candidate_id = uuid4()
     return RouterConfig(
         id=uuid4(),
         team_id=team_id,
@@ -508,9 +509,11 @@ def _router_entity(team_id: UUID | None, name: str, candidate: str) -> RouterCon
                 model_name=candidate,
                 description="general",
                 quality_tier=QualityTier.SIMPLE,
+                model_id=candidate_id,
             ),
         ),
         default_model=candidate,
+        default_model_id=candidate_id,
         strategy="complexity",
         strategy_config={},
         enabled=True,
@@ -797,7 +800,7 @@ async def test_promote_preserves_plain_grant_alias_for_same_identity(
     assert shared["resource_id"] == model_id
 
 
-async def test_router_promote_preserves_plain_grant_alias_for_same_identity(
+async def test_router_promote_requires_grants_to_be_revoked(
     client: AsyncTestClient,
 ) -> None:
     admin, credential, organization, source = await _setup(client)
@@ -808,7 +811,13 @@ async def test_router_promote_preserves_plain_grant_alias_for_same_identity(
             headers=_bearer(admin),
         )
     ).json()["id"]
-    await _team_model(client, admin, source, credential, "candidate")
+    candidate_id = await _team_model(client, admin, source, credential, "candidate")
+    model_grant = await client.post(
+        f"/platform/models/{candidate_id}/extend",
+        json={"team_ids": [target]},
+        headers=_bearer(admin),
+    )
+    assert model_grant.status_code == HTTP_201_CREATED, model_grant.text
     router = await client.post(
         f"/teams/{source}/routers",
         json=_router_payload("shared", "candidate"),
@@ -827,7 +836,7 @@ async def test_router_promote_preserves_plain_grant_alias_for_same_identity(
         f"/platform/routers/{router_id}/make-global", headers=_bearer(admin)
     )
 
-    assert promoted.status_code == HTTP_201_CREATED, promoted.text
+    assert promoted.status_code == HTTP_409_CONFLICT, promoted.text
     key = (
         await client.post(f"/teams/{target}/keys", json={"name": "key"}, headers=_bearer(admin))
     ).json()["plaintext"]
@@ -877,8 +886,8 @@ async def test_source_team_delete_does_not_rebind_extended_router_alias(
 
     deleted = await client.delete(f"/teams/{source}", headers=_bearer(admin))
 
-    assert deleted.status_code in (200, 204), deleted.text
+    assert deleted.status_code == HTTP_409_CONFLICT, deleted.text
     catalog = (await client.get("/v1/models", headers=_bearer(key))).json()["data"]
     aliases = {row["id"] for row in catalog}
-    assert "shared" not in aliases
+    assert "shared" in aliases
     assert "shared-global" in aliases

@@ -69,14 +69,30 @@ class GuardedSQLAlchemyAsyncConfig(SQLAlchemyAsyncConfig):
     """Prevent dev ``create_all`` from masking an unmigrated legacy schema."""
 
     async def create_all_metadata(self, app: Any) -> None:
-        async with self.get_engine().connect() as connection:
-            tables = await connection.run_sync(
-                lambda sync_connection: set(inspect(sync_connection).get_table_names())
+        def schema_state(sync_connection: Any) -> tuple[set[str], set[str]]:
+            inspector = inspect(sync_connection)
+            tables = set(inspector.get_table_names())
+            router_columns = (
+                {column["name"] for column in inspector.get_columns("router")}
+                if "router" in tables
+                else set()
             )
+            return tables, router_columns
+
+        async with self.get_engine().connect() as connection:
+            tables, router_columns = await connection.run_sync(schema_state)
         if tables & _APPLICATION_SCHEMA_ANCHORS and "callable_alias" not in tables:
             raise RuntimeError(
                 "Legacy application schema detected without callable_alias; "
                 "refusing create_all because it would create an empty registry. "
+                "Run `database upgrade` before starting the application."
+            )
+        if "callable_alias" in tables and (
+            "router_revision" not in tables or "current_revision_id" not in router_columns
+        ):
+            raise RuntimeError(
+                "Legacy router schema detected without immutable revisions; "
+                "refusing create_all because it would create unbackfilled revision state. "
                 "Run `database upgrade` before starting the application."
             )
         await super().create_all_metadata(app)

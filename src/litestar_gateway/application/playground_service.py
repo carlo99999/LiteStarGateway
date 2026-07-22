@@ -152,13 +152,20 @@ class PlaygroundService:
                     )
                 except Exception as exc:
                     return PlaygroundResult(name, ok=False, error=str(exc) or "routing failed")
+                chosen_by_id = (
+                    await self._callable_resolver.resolve_model_id(team_id, decision.model_id)
+                    if self._callable_resolver is not None and decision.model_id is not None
+                    else None
+                )
                 chosen_resolved = (
                     await self._callable_resolver.resolve(team_id, decision.model_name)
-                    if self._callable_resolver is not None
+                    if self._callable_resolver is not None and decision.model_id is None
                     else None
                 )
                 chosen = (
-                    chosen_resolved.resource
+                    chosen_by_id
+                    if chosen_by_id is not None
+                    else chosen_resolved.resource
                     if chosen_resolved is not None and chosen_resolved.kind is CallableKind.MODEL
                     else await self._models.get_by_name(team_id, decision.model_name)
                     if self._callable_resolver is None

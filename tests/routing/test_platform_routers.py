@@ -9,7 +9,12 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 import pytest
-from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED
+from litestar.status_codes import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_400_BAD_REQUEST,
+    HTTP_409_CONFLICT,
+)
 from litestar.testing import AsyncTestClient
 
 from litestar_gateway.app import create_app
@@ -118,18 +123,8 @@ async def test_make_router_global_keeps_provenance(client: AsyncTestClient) -> N
     admin = await _admin(client)
     cred = await _cred(client, admin)
     core = await _org_team(client, admin, "Core")
-    # A team router over a team model.
-    await client.post(
-        f"/teams/{core}/models",
-        json={
-            "name": "m",
-            "provider": "openai",
-            "credential_id": cred,
-            "type": "chat",
-            "provider_model_id": "gpt-4o",
-        },
-        headers=_b(admin),
-    )
+    # Promotion is safe only when the immutable revision has global deps.
+    await _global_model(client, admin, cred, "m")
     rid = (
         await client.post(
             f"/teams/{core}/routers",
@@ -156,7 +151,7 @@ async def test_extend_router_to_team(client: AsyncTestClient) -> None:
     cred = await _cred(client, admin)
     core = await _org_team(client, admin, "Core")
     blue = await _org_team(client, admin, "Blue")
-    await client.post(
+    model = await client.post(
         f"/teams/{core}/models",
         json={
             "name": "m",
@@ -167,6 +162,13 @@ async def test_extend_router_to_team(client: AsyncTestClient) -> None:
         },
         headers=_b(admin),
     )
+    model_id = model.json()["id"]
+    extended = await client.post(
+        f"/platform/models/{model_id}/extend",
+        json={"team_ids": [blue]},
+        headers=_b(admin),
+    )
+    assert extended.status_code == HTTP_201_CREATED, extended.text
     rid = (
         await client.post(
             f"/teams/{core}/routers",
@@ -193,3 +195,188 @@ async def test_extend_router_to_team(client: AsyncTestClient) -> None:
     shared = next(r for r in callable_rows if r["alias"] == "shared-router")
     assert shared["origin"] == "extended"
     assert shared["source_team_id"] == core
+
+
+async def test_grant_pins_revision_and_admin_upgrade_is_audited(
+    client: AsyncTestClient,
+) -> None:
+    admin = await _admin(client)
+    cred = await _cred(client, admin)
+    core = await _org_team(client, admin, "Core")
+    blue = await _org_team(client, admin, "Blue")
+    source_model = await client.post(
+        f"/teams/{core}/models",
+        json={
+            "name": "same-name",
+            "provider": "openai",
+            "credential_id": cred,
+            "type": "chat",
+            "provider_model_id": "source-model",
+        },
+        headers=_b(admin),
+    )
+    source_model_id = source_model.json()["id"]
+    target_model = await client.post(
+        f"/teams/{blue}/models",
+        json={
+            "name": "same-name",
+            "provider": "openai",
+            "credential_id": cred,
+            "type": "chat",
+            "provider_model_id": "target-homonym",
+        },
+        headers=_b(admin),
+    )
+    assert target_model.status_code == HTTP_201_CREATED
+    model_grant = await client.post(
+        f"/platform/models/{source_model_id}/extend",
+        json={"team_ids": [blue]},
+        headers=_b(admin),
+    )
+    assert model_grant.status_code == HTTP_201_CREATED, model_grant.text
+
+    created = await client.post(
+        f"/teams/{core}/routers",
+        json={
+            "name": "versioned",
+            "candidates": [
+                {
+                    "model_name": "same-name",
+                    "quality_tier": "SIMPLE",
+                    "description": "revision-one",
+                }
+            ],
+            "default_model": "same-name",
+            "strategy": "complexity",
+            "strategy_config": {},
+        },
+        headers=_b(admin),
+    )
+    assert created.status_code == HTTP_201_CREATED, created.text
+    router = created.json()
+    assert router["revision_number"] == 1
+    assert router["candidates"][0]["model_id"] == source_model_id
+
+    grant_response = await client.post(
+        f"/platform/routers/{router['id']}/extend",
+        json={"team_ids": [blue]},
+        headers=_b(admin),
+    )
+    assert grant_response.status_code == HTTP_201_CREATED, grant_response.text
+    grant = grant_response.json()[0]
+    revision_one = grant["revision_id"]
+
+    blocked_delete = await client.delete(f"/teams/{core}/routers/{router['id']}", headers=_b(admin))
+    assert blocked_delete.status_code == HTTP_409_CONFLICT
+
+    updated = await client.put(
+        f"/teams/{core}/routers/{router['id']}",
+        json={
+            "name": "versioned",
+            "base_revision_id": revision_one,
+            "candidates": [
+                {
+                    "model_name": "same-name",
+                    "model_id": source_model_id,
+                    "quality_tier": "SIMPLE",
+                    "description": "revision-two",
+                }
+            ],
+            "default_model": "same-name",
+            "strategy": "complexity",
+            "strategy_config": {},
+        },
+        headers=_b(admin),
+    )
+    assert updated.status_code == HTTP_200_OK, updated.text
+    revision_two = updated.json()["revision_id"]
+
+    revisions = await client.get(f"/platform/routers/{router['id']}/revisions", headers=_b(admin))
+    assert [row["revision_number"] for row in revisions.json()] == [2, 1]
+    callable_before = await client.get(f"/teams/{blue}/routers/callable", headers=_b(admin))
+    pinned = next(row for row in callable_before.json() if row["alias"] == "versioned")
+    assert pinned["router"]["revision_id"] == revision_one
+    assert pinned["router"]["candidates"][0]["description"] == "revision-one"
+    assert pinned["router"]["candidates"][0]["model_id"] == source_model_id
+
+    upgraded = await client.post(
+        f"/platform/routers/grants/{grant['id']}/upgrade",
+        json={
+            "target_revision_id": revision_two,
+            "expected_current_revision_id": revision_one,
+        },
+        headers=_b(admin),
+    )
+    assert upgraded.status_code == HTTP_201_CREATED, upgraded.text
+    assert upgraded.json()["revision_id"] == revision_two
+
+    stale = await client.post(
+        f"/platform/routers/grants/{grant['id']}/upgrade",
+        json={
+            "target_revision_id": revision_one,
+            "expected_current_revision_id": revision_one,
+        },
+        headers=_b(admin),
+    )
+    assert stale.status_code == HTTP_409_CONFLICT
+    events = (await client.get("/audit", headers=_b(admin))).json()
+    upgrades = [event for event in events if event["action"] == "router.grant.upgrade"]
+    assert len(upgrades) == 1
+
+
+async def test_extend_requires_separate_active_and_shadow_webhook_ack(
+    client: AsyncTestClient,
+) -> None:
+    admin = await _admin(client)
+    cred = await _cred(client, admin)
+    core = await _org_team(client, admin, "Core")
+    blue = await _org_team(client, admin, "Blue")
+    await _global_model(client, admin, cred, "global-chat")
+    created = await client.post(
+        f"/teams/{core}/routers",
+        json={
+            "name": "egress-router",
+            "candidates": [
+                {
+                    "model_name": "global-chat",
+                    "quality_tier": "SIMPLE",
+                    "description": "safe",
+                }
+            ],
+            "default_model": "global-chat",
+            "strategy": "webhook",
+            "strategy_config": {
+                "url": "https://active.example/route",
+                "shadow": {"url": "https://shadow.example/route"},
+            },
+            "shadow_strategy": "webhook",
+        },
+        headers=_b(admin),
+    )
+    assert created.status_code == HTTP_201_CREATED, created.text
+    router_id = created.json()["id"]
+
+    no_ack = await client.post(
+        f"/platform/routers/{router_id}/extend",
+        json={"team_ids": [blue]},
+        headers=_b(admin),
+    )
+    assert no_ack.status_code == HTTP_400_BAD_REQUEST
+    active_only = await client.post(
+        f"/platform/routers/{router_id}/extend",
+        json={"team_ids": [blue], "ack_active_prompt_egress": True},
+        headers=_b(admin),
+    )
+    assert active_only.status_code == HTTP_400_BAD_REQUEST
+    both = await client.post(
+        f"/platform/routers/{router_id}/extend",
+        json={
+            "team_ids": [blue],
+            "ack_active_prompt_egress": True,
+            "ack_shadow_prompt_egress": True,
+        },
+        headers=_b(admin),
+    )
+    assert both.status_code == HTTP_201_CREATED, both.text
+    team_delete = await client.delete(f"/teams/{core}", headers=_b(admin))
+    assert team_delete.status_code == HTTP_409_CONFLICT
