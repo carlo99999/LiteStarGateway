@@ -5,6 +5,7 @@ import {
   fromMembership,
   fromPlatformTeam,
   type AccessibleTeam,
+  type TeamRole,
 } from "@/features/teams/access";
 import { listAllTeams, listMyTeamMemberships } from "@/features/teams/api";
 
@@ -12,21 +13,24 @@ async function loadAccessibleTeams(
   isPlatformAdmin: boolean,
   signal: AbortSignal,
 ): Promise<AccessibleTeam[]> {
-  const teams = isPlatformAdmin
+  return isPlatformAdmin
     ? (await listAllTeams(signal)).map(fromPlatformTeam)
     : (await listMyTeamMemberships(signal)).map(fromMembership);
-  return teams.filter((team) => canReadModels(team.role));
 }
 
-/** Teams whose model/routing catalog the current user may read. */
-export function useAccessibleTeams() {
+/** The caller's teams, filtered to the given capability (default: teams whose
+ * model/routing catalog the caller may read). One shared query per session —
+ * every caller sees the same self-scoped or platform-wide team list, and only
+ * the client-side filter differs, so different pages can ask for different
+ * capabilities (e.g. billing) without an extra network round trip. */
+export function useAccessibleTeams(filter: (role: TeamRole | null) => boolean = canReadModels) {
   const { user } = useAuth();
   const isPlatformAdmin = Boolean(user?.is_admin);
   const query = useQuery({
-    queryKey: [isPlatformAdmin ? "teams" : "me", "model-access"],
+    queryKey: [isPlatformAdmin ? "teams" : "me", "accessible-teams"],
     queryFn: ({ signal }) => loadAccessibleTeams(isPlatformAdmin, signal),
     enabled: user !== null,
     retry: false,
   });
-  return { ...query, isPlatformAdmin };
+  return { ...query, data: query.data?.filter((team) => filter(team.role)), isPlatformAdmin };
 }

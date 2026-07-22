@@ -10,7 +10,9 @@ import {
   setTeamBudget,
   type BudgetWindow,
 } from "@/features/budgets/api";
-import { getTeamBudget, listAllTeams } from "@/features/teams/api";
+import { canReadUsage } from "@/features/teams/access";
+import { getTeamBudget } from "@/features/teams/api";
+import { useAccessibleTeams } from "@/features/teams/useAccessibleTeams";
 import { toError } from "@/lib/toError";
 
 const SELECT_CLASS =
@@ -37,11 +39,9 @@ function Stat({ label, value }: { label: string; value: string }) {
  * update the cap, or remove it. Enforcement happens at request admission. */
 export function BudgetsPage() {
   const queryClient = useQueryClient();
-  const teams = useQuery({
-    queryKey: ["teams", "all"],
-    queryFn: ({ signal }) => listAllTeams(signal),
-    retry: false,
-  });
+  // BILLING_VIEWER and the platform auditor hold budget:read wherever they
+  // hold usage:read (domain/authorization.py), so the same filter applies.
+  const teams = useAccessibleTeams(canReadUsage);
   const [teamId, setTeamId] = useState("");
   const budget = useQuery({
     queryKey: ["teams", teamId, "budget"],

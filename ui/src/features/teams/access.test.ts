@@ -59,6 +59,11 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
     isAuditor: false,
     teamRoles: ["admin" as const],
   };
+  const billingViewer = {
+    isPlatformAdmin: false,
+    isAuditor: false,
+    teamRoles: ["billing-viewer" as const],
+  };
   const auditor = { isPlatformAdmin: false, isAuditor: true, teamRoles: [] };
 
   assert.equal(canAccessConsoleSurface("dashboard", modelManager), true);
@@ -68,16 +73,30 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
   assert.equal(canAccessConsoleSurface("credentials", modelManager), false);
   assert.equal(canAccessConsoleSurface("teams", modelManager), false);
   assert.equal(canAccessConsoleSurface("usage", modelManager), false);
+  assert.equal(canAccessConsoleSurface("budgets", modelManager), false);
   assert.equal(canAccessConsoleSurface("audit", modelManager), false);
 
   assert.equal(canAccessConsoleSurface("models", teamAdmin), true);
   assert.equal(canAccessConsoleSurface("routing", teamAdmin), true);
   assert.equal(canAccessConsoleSurface("playground", teamAdmin), true);
   assert.equal(canAccessConsoleSurface("credentials", teamAdmin), false);
+  assert.equal(canAccessConsoleSurface("usage", teamAdmin), true);
+  assert.equal(canAccessConsoleSurface("budgets", teamAdmin), true);
+
+  // ISSUE-021 (Round 12): billing-viewer holds usage:read/budget:read and
+  // must see those two surfaces, but nothing model-related.
+  assert.equal(canAccessConsoleSurface("usage", billingViewer), true);
+  assert.equal(canAccessConsoleSurface("budgets", billingViewer), true);
+  assert.equal(canAccessConsoleSurface("models", billingViewer), false);
+  assert.equal(canAccessConsoleSurface("routing", billingViewer), false);
 
   assert.equal(canAccessConsoleSurface("dashboard", auditor), true);
   assert.equal(canAccessConsoleSurface("audit", auditor), true);
   assert.equal(canAccessConsoleSurface("models", auditor), false);
+  // The platform auditor holds usage:read/budget:read in every team
+  // (AUDITOR_TEAM_PERMISSIONS), independent of membership.
+  assert.equal(canAccessConsoleSurface("usage", auditor), true);
+  assert.equal(canAccessConsoleSurface("budgets", auditor), true);
 });
 
 test("platform admins retain every console surface", () => {
