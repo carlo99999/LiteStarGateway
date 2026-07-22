@@ -69,7 +69,7 @@ def create_database(settings: Settings) -> Database:
     # same tables ("relation already exists").
     config = SQLAlchemyAsyncConfig(
         connection_string=settings.database_url,
-        create_all=settings.auto_create_schema,
+        create_all=settings.should_create_schema,
         engine_config=_engine_config(settings),
         # Attach the SQLite FK pragma when the plugin lazily creates the engine.
         create_engine_callable=_create_engine_with_sqlite_fk,

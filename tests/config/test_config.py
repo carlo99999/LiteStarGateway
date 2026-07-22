@@ -304,7 +304,7 @@ def test_team_mapping_rejects_malformed_input(monkeypatch: pytest.MonkeyPatch, r
 def test_dev_auto_creates_schema_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ENVIRONMENT", "development")
     monkeypatch.delenv("AUTO_CREATE_SCHEMA", raising=False)
-    assert Settings.from_env().auto_create_schema is True
+    assert Settings.from_env().should_create_schema is True
 
 
 def test_dev_container_can_disable_auto_create(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -312,7 +312,7 @@ def test_dev_container_can_disable_auto_create(monkeypatch: pytest.MonkeyPatch) 
     # `database upgrade` don't both try to create the same new tables.
     monkeypatch.setenv("ENVIRONMENT", "development")
     monkeypatch.setenv("AUTO_CREATE_SCHEMA", "false")
-    assert Settings.from_env().auto_create_schema is False
+    assert Settings.from_env().should_create_schema is False
 
 
 def test_production_disables_auto_create(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -322,4 +322,4 @@ def test_production_disables_auto_create(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("SALT_KEY", "y" * 40)
     monkeypatch.setenv("MASTER_KEY", "z" * 40)
     monkeypatch.delenv("AUTO_CREATE_SCHEMA", raising=False)
-    assert Settings.from_env().auto_create_schema is False
+    assert Settings.from_env().should_create_schema is False
