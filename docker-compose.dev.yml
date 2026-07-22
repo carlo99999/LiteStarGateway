@@ -68,6 +68,10 @@ services:
         condition: service_healthy
     environment:
       ENVIRONMENT: development
+      # This container owns the schema via `database upgrade` (below), so the app
+      # must NOT also create_all on startup — running both races to create the
+      # same new tables ("relation already exists").
+      AUTO_CREATE_SCHEMA: "false"
       DATABASE_URL: postgresql+asyncpg://gateway:${POSTGRES_PASSWORD:?run `just dev` or provide POSTGRES_PASSWORD}@db:5432/gateway
       MASTER_KEY: ${MASTER_KEY:?run `just dev` or provide MASTER_KEY}
       JWT_SECRET: ${JWT_SECRET:?run `just dev` or provide JWT_SECRET}
