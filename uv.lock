@@ -1017,7 +1017,7 @@ requires-dist = [
     { name = "redis", specifier = ">=5.0" },
     { name = "rumdl", specifier = ">=0.2.28" },
     { name = "structlog", specifier = ">=26.1.0" },
-    { name = "types-authlib", specifier = ">=1.6.11.20260518" },
+    { name = "types-authlib", specifier = ">=1.7.1.20260722" },
 ]
 
 [package.metadata.requires-dev]
@@ -2104,14 +2104,14 @@ wheels = [
 
 [[package]]
 name = "types-authlib"
-version = "1.6.11.20260518"
+version = "1.7.1.20260722"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9e/30/19a552613eda35189e13784693cf98374153700378d6082cd89e35c96ae2/types_authlib-1.6.11.20260518.tar.gz", hash = "sha256:15b9a257e849e740241baa2113dd868c1b295cdc32449e54b109e9fc0105b556", size = 47147, upload-time = "2026-05-18T06:06:40.793Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/36/5d83da012e26b4a9433409ca2cd6a87060e598b6e5db1013313c55e375a7/types_authlib-1.7.1.20260722.tar.gz", hash = "sha256:1f36356bd0648ce9d50eedf12c1112ec86bf45bfe85b755a90ecab23a4e927a2", size = 49369, upload-time = "2026-07-22T04:56:01.302Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/75/62/503ca34fd9d92a79694fa2f1b6897f1603c5d9e4aa86b219b232de204578/types_authlib-1.6.11.20260518-py3-none-any.whl", hash = "sha256:e9c873dbc61d87f57cda25b8eb6d35610eb1cae2f5f2b74a8faf94c5e5f01b90", size = 104066, upload-time = "2026-05-18T06:06:39.553Z" },
+    { url = "https://files.pythonhosted.org/packages/be/75/78331f33def2721ea4877f0157f775f57d9b9ff107e08a1234bf24f515f3/types_authlib-1.7.1.20260722-py3-none-any.whl", hash = "sha256:ee42df33180924d6e03f56a513f044b4670b8ea802567335da682a5d2619e8e9", size = 109089, upload-time = "2026-07-22T04:56:00.211Z" },
 ]
 
 [[package]]
