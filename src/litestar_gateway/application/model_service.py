@@ -163,24 +163,36 @@ class ModelService:
             raise ModelNotFound(str(model_id))
         return model
 
+    async def _get_global(self, model_id: UUID) -> Model:
+        model = await self._models.get_global(model_id)
+        if model is None:
+            raise ModelNotFound(str(model_id))
+        return model
+
     async def update(self, team_id: UUID | None, model_id: UUID, **changes: Any) -> Model:
         """Apply the given non-None field changes. `provider`/`credential_id`
         are immutable here; recreate the model to change the provider. Pass
         `team_id=None` to edit a global model (platform-admin path)."""
         model = (
-            await self.get_any(model_id)
+            await self._get_global(model_id)
             if team_id is None
             else await self._get_scoped(team_id, model_id)
         )
         applied = {k: v for k, v in changes.items() if v is not None}
-        return await self._models.update(dataclasses.replace(model, **applied))
+        updated = dataclasses.replace(model, **applied)
+        if team_id is not None:
+            return await self._models.update(updated)
+        persisted = await self._models.update_global(updated)
+        if persisted is None:  # deleted or re-scoped after the read
+            raise ModelNotFound(str(model_id))
+        return persisted
 
     async def delete(self, team_id: UUID | None, model_id: UUID) -> None:
-        model = (
-            await self.get_any(model_id)
-            if team_id is None
-            else await self._get_scoped(team_id, model_id)
-        )
+        if team_id is None:
+            if not await self._models.remove_global(model_id):
+                raise ModelNotFound(str(model_id))
+            return
+        model = await self._get_scoped(team_id, model_id)
         await self._models.remove(model.id)
 
     async def make_global(self, model_id: UUID) -> Model:
@@ -191,12 +203,7 @@ class ModelService:
             return model  # already global
         if any(g.name == model.name for g in await self._models.all_global()):
             raise ModelNameExists(model.name)
-        for grant in await self._models.list_grants_for_model(model.id):
-            await self._models.remove_grant(grant.id)
-        # Keep the origin team for provenance; drop the ownership.
-        return await self._models.update(
-            dataclasses.replace(model, team_id=None, origin_team_id=model.team_id)
-        )
+        return await self._models.promote_to_global(model)
 
     async def extend(
         self, model_id: UUID, source_label: str, team_ids: list[UUID]

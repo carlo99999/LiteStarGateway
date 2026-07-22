@@ -27,11 +27,14 @@ class CredentialRepository(Protocol):
 
     async def get_values(self, credential_id: UUID) -> dict[str, str] | None: ...
 
-    async def rename(self, credential_id: UUID, name: str) -> Credential: ...
-
-    async def replace_values(self, credential_id: UUID, values: dict[str, str]) -> None:
-        """Re-encrypt and store a fresh set of secret values (e.g. a rotated
-        token), with the active data key."""
+    async def update(
+        self,
+        credential_id: UUID,
+        *,
+        name: str | None = None,
+        values: dict[str, str] | None = None,
+    ) -> Credential:
+        """Atomically rename and/or replace the encrypted secret values."""
         ...
 
     async def remove(self, credential_id: UUID) -> None: ...

@@ -260,6 +260,122 @@ async def test_make_global_promotes_and_keeps_provenance(client: AsyncTestClient
     assert promoted["source_team_id"] == core
 
 
+async def test_global_model_endpoints_reject_team_owned_id(client: AsyncTestClient) -> None:
+    from litestar.status_codes import HTTP_404_NOT_FOUND
+
+    admin = await _admin(client)
+    cred = await _credential(client, admin)
+    org = await _org(client, admin)
+    team = await _team(client, admin, org, "Core")
+    model_id = await _team_model(client, admin, team, cred, "team-only")
+
+    updated = await client.patch(
+        f"/platform/models/{model_id}",
+        json={"provider_model_id": "must-not-apply"},
+        headers=_bearer(admin),
+    )
+    deleted = await client.delete(f"/platform/models/{model_id}", headers=_bearer(admin))
+
+    assert updated.status_code == HTTP_404_NOT_FOUND
+    assert deleted.status_code == HTTP_404_NOT_FOUND
+    team_models = (await client.get(f"/teams/{team}/models", headers=_bearer(admin))).json()
+    assert (
+        next(model for model in team_models if model["id"] == model_id)["provider_model_id"]
+        == "gpt-4o"
+    )
+    audit_events = (await client.get("/audit", headers=_bearer(admin))).json()
+    assert not any(
+        event["target_id"] == model_id
+        and event["action"] in {"model.update_global", "model.delete_global"}
+        for event in audit_events
+    )
+
+
+async def test_failed_promotion_preserves_existing_grant(
+    client: AsyncTestClient, database_url: str
+) -> None:
+    """A late global-name conflict must roll back grant removal and promotion."""
+    from uuid import UUID, uuid4
+
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+
+    from litestar_gateway.application.model_service import ModelService
+    from litestar_gateway.domain.entities import Model
+    from litestar_gateway.domain.exceptions import ModelNameExists
+    from litestar_gateway.infrastructure.persistence.credential_repository import (
+        SQLAlchemyCredentialRepository,
+    )
+    from litestar_gateway.infrastructure.persistence.model_repository import (
+        SQLAlchemyModelRepository,
+    )
+    from litestar_gateway.infrastructure.persistence.orm import ModelGrantRecord, ModelRecord
+
+    class PromotionRaceRepository(SQLAlchemyModelRepository):
+        """Stages the global row that wins after the service pre-check."""
+
+        def _stage_name_conflict(self, model: Model) -> None:
+            self._session.add(
+                ModelRecord(
+                    id=uuid4(),
+                    team_id=None,
+                    name=model.name,
+                    provider=model.provider.value,
+                    credential_id=model.credential_id,
+                    type=model.type.value,
+                    provider_model_id=model.provider_model_id,
+                    params=model.params,
+                    params_enforced=model.params_enforced,
+                    max_output_tokens=model.max_output_tokens,
+                    api_version=model.api_version,
+                    input_cost_per_token=model.input_cost_per_token,
+                    output_cost_per_token=model.output_cost_per_token,
+                    enabled=model.enabled,
+                    origin_team_id=None,
+                )
+            )
+
+        async def all_global(self) -> list[Model]:
+            return []
+
+        async def update(self, model: Model) -> Model:
+            self._stage_name_conflict(model)
+            return await super().update(model)
+
+        async def promote_to_global(self, model: Model) -> Model:
+            self._stage_name_conflict(model)
+            return await super().promote_to_global(model)
+
+    admin = await _admin(client)
+    credential_id = await _credential(client, admin)
+    organization_id = await _org(client, admin)
+    source_team = await _team(client, admin, organization_id, "Source")
+    target_team = await _team(client, admin, organization_id, "Target")
+    model_id = await _team_model(client, admin, source_team, credential_id, "race-model")
+    grant_response = await client.post(
+        f"/platform/models/{model_id}/extend",
+        json={"team_ids": [target_team]},
+        headers=_bearer(admin),
+    )
+    grant_id = grant_response.json()[0]["id"]
+
+    engine = create_async_engine(database_url)
+    try:
+        async with AsyncSession(engine) as session:
+            repository = PromotionRaceRepository(session)
+            service = ModelService(repository, SQLAlchemyCredentialRepository(session))
+            with pytest.raises(ModelNameExists):
+                await service.make_global(UUID(model_id))
+
+        async with AsyncSession(engine) as verification_session:
+            grant = await verification_session.get(ModelGrantRecord, UUID(grant_id))
+            source = await verification_session.get(ModelRecord, UUID(model_id))
+            assert grant is not None
+            assert source is not None
+            assert source.team_id == UUID(source_team)
+    finally:
+        await engine.dispose()
+
+
 async def test_platform_routes_require_admin(client: AsyncTestClient) -> None:
     # No token → the platform-admin guard rejects before any work.
     resp = await client.get("/platform/models")
