@@ -322,9 +322,7 @@ class Settings:
         is_local = environment.strip().lower() in _LOCAL_ENVIRONMENTS
         # None unless explicitly set, so `should_create_schema` derives from env.
         auto_create_schema = (
-            _env_bool("AUTO_CREATE_SCHEMA", False)
-            if "AUTO_CREATE_SCHEMA" in os.environ
-            else None
+            _env_bool("AUTO_CREATE_SCHEMA", False) if "AUTO_CREATE_SCHEMA" in os.environ else None
         )
         return cls(
             database_url=os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL),
