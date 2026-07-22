@@ -356,6 +356,354 @@ le risorse globali native, oppure dichiarare la migration irreversibile con un
 errore intenzionale e documentato. Aggiungere un migration test con righe
 globali reali per modello e router.
 
+## Remediation plan — branch and PR stack
+
+La remediation è divisa in otto PR di implementazione, precedute dalla PR che
+registra il report e seguite da una PR documentale di chiusura. Una singola
+mega-PR mescolerebbe rischi di rete, transazioni, migrazioni, contratti API e UI
+e renderebbe sia la review sia il rollback inutilmente difficili.
+
+```text
+PR 0 — Report Round 11
+
+Wave 1, sviluppabile in parallelo
+├── PR 1 — SSRF pinning
+├── PR 2 — Playground governance
+├── PR 3 — Persistence integrity
+└── PR 4 — Role-aware console
+
+Wave 2, stack seriale
+PR 5 — Callable alias registry
+  └── PR 6 — Router revisions + candidate identity
+       └── PR 7 — Usage attribution
+            └── PR 8 — Migration rollback contract
+
+PR 9 — Report remediation + release notes
+```
+
+Le PR 1–4 sono indipendenti e possono essere sviluppate in parallelo. Le PR
+5–8 devono restare seriali: condividono resolver, routing service, identità
+persistite e migrazioni; lo stack evita conflitti e più head Alembic.
+
+### PR 0 — Registrare la review
+
+- **Branch:** `docs/r11-code-review`
+- **Titolo:** `docs: add Round 11 code review findings`
+- **Scope:** questo report e `issues/INDEX.md`; nessuna modifica prodotto.
+- **Exit criteria:** Markdown/pre-commit verdi e tutti gli ISSUE con ID stabile.
+- **Rollback:** revert documentale senza impatto runtime.
+
+### PR 1 — Pinning della destinazione webhook
+
+- **Branch:** `fix/r11-013-webhook-ip-pinning`
+- **Titolo:** `fix(security): pin validated webhook destinations`
+- **Issue:** ISSUE-013.
+- **Dimensione:** S/M.
+
+Implementazione:
+
+- separare risoluzione/validazione dalla connessione mediante un
+  `ResolvedTarget` immutabile;
+- connettersi esclusivamente a un IP approvato, conservando l'hostname originale
+  per `Host`, TLS SNI e certificate validation;
+- mantenere i redirect disabilitati e applicare la policy a IPv4, IPv6 e a ogni
+  record DNS;
+- documentare il comportamento in presenza di proxy, perché il proxy può
+  diventare il vero enforcement point della risoluzione.
+
+Test RED e acceptance criteria:
+
+- il resolver restituisce un IP pubblico durante il guard e uno privato a una
+  seconda chiamata: la seconda risoluzione non deve avvenire;
+- TLS/SNI e verifica del certificato usano l'hostname originale;
+- nessun fallback verso un IP non incluso nel set validato;
+- i test esistenti su IP letterali, record misti e redirect restano verdi.
+
+Il rischio principale è rompere TLS/SNI o proxy deployment. La PR deve restare
+piccola e autonomamente revertibile.
+
+### PR 2 — Governance del Playground
+
+- **Branch:** `fix/r11-010-playground-governance`
+- **Titolo:** `fix: enforce governance on playground provider calls`
+- **Issue:** ISSUE-010.
+- **Dimensione:** M.
+
+Implementazione:
+
+- eseguire ogni confronto attraverso `CompletionService` e il normale ciclo
+  `UsageMeter.admit/settle`;
+- applicare budget e rate limit di team/attore, con usage ledger e audit sempre
+  presenti per le chiamate reali;
+- introdurre un permesso esplicito `PLAYGROUND_EXECUTE` anziché riutilizzare
+  `MODELS_READ`;
+- imporre un massimo configurabile di alias distinti, deduplicazione e un
+  semaforo di concorrenza;
+- aggiornare la UI per dichiarare il consumo reale e mostrare errori di budget,
+  quota e autorizzazione senza trasformarli in risultati vuoti.
+
+Test RED e acceptance criteria:
+
+- budget insufficiente e RPM=1;
+- alias duplicati e superamento del limite di cardinalità;
+- ruolo senza il nuovo permesso;
+- ledger e audit valorizzati per ogni chiamata eseguita;
+- concorrenza osservata mai superiore al limite configurato;
+- fallimenti parziali restituiti senza perdere il settlement delle chiamate già
+  concluse.
+
+Questa PR deve entrare prima delle PR 5–6, che cambieranno il resolver usato
+anche dal Playground. Il rollback disabilita la nuova esecuzione governata senza
+toccare lo schema dati.
+
+### PR 3 — Integrità transazionale e scope globale
+
+- **Branch:** `fix/r11-persistence-integrity`
+- **Titolo:** `fix: make credential and model lifecycle operations atomic`
+- **Issue:** ISSUE-014, ISSUE-017 e ISSUE-018.
+- **Dimensione:** M.
+
+I tre finding condividono l'invariante “una use case applicativa, una
+transazione”. Implementazione:
+
+- PATCH credenziale con preflight del nome e aggiornamento di nome + ciphertext
+  sotto un solo commit;
+- traduzione degli `IntegrityError` soltanto dopo rollback completo;
+- repository operation `get/update/delete_global()` vincolate da
+  `team_id IS NULL`;
+- promozione modello con cambio ownership e rimozione grant nella stessa
+  transazione;
+- audit emesso esclusivamente dopo il commit riuscito.
+
+Commit interni consigliati:
+
+```text
+fix: make credential updates atomic
+fix: enforce global model scope
+fix: make model promotion atomic
+```
+
+Test RED e acceptance criteria:
+
+- una collisione di rename preserva il vecchio secret e non crea audit;
+- fault injection tra modifica e commit ripristina nome e ciphertext;
+- race sul nome globale con due sessioni PostgreSQL;
+- ogni fallimento di promozione preserva tutti i grant;
+- PATCH/DELETE platform rifiutano un UUID team-owned e non producono un audit
+  `global`;
+- percorso positivo verificato sia su SQLite sia su PostgreSQL.
+
+Va mergiata prima della PR 5 perché entrambe toccano `model_service.py` e
+`model_repository.py`. Il rollback è applicativo e non richiede downgrade.
+
+### PR 4 — Console role-aware
+
+- **Branch:** `fix/r11-016-role-aware-console`
+- **Titolo:** `fix(ui): load resources according to the caller capabilities`
+- **Issue:** ISSUE-016.
+- **Dimensione:** M.
+
+Implementazione:
+
+- introdurre un hook condiviso `useAccessibleTeams`;
+- usare `/teams` per platform admin e `/me/teams` per utenti team-scoped;
+- caricare collezioni `/platform/*` e mostrare azioni globali soltanto in
+  presenza delle relative capability;
+- preferire capability restituite dal backend alla duplicazione della matrice
+  ruoli dentro React;
+- mantenere distinguibili loading, forbidden, failure ed empty state.
+
+Test RED e acceptance criteria:
+
+- pagine Models, Routing e Playground per platform admin, team admin,
+  model-manager e ruolo read-only;
+- nessuna richiesta `/platform/*` da un utente privo di capability;
+- selezione dei soli team accessibili mediante `/me/teams`;
+- azioni mutate coerenti con i permessi, non soltanto nascoste visivamente;
+- test UI, ESLint, TypeScript e build Vite verdi.
+
+La PR è indipendente. È preferibile mergiarla prima del cambio di contratto del
+catalogo nelle PR 5–6; il rollback riguarda esclusivamente il frontend salvo
+l'eventuale aggiunta di capability alla risposta `/me`.
+
+### PR 5 — Registro unico degli alias callable
+
+- **Branch:** `refactor/r11-012-callable-alias-registry`
+- **Titolo:** `refactor: unify callable alias resolution`
+- **Issue:** prima parte di ISSUE-012.
+- **Dimensione:** L.
+
+Questa è la fondazione architetturale dello stack seriale. Implementazione:
+
+- un solo registro/resolver per alias di modelli e router;
+- namespace unico per scope team, grant e globale, con vincoli race-safe;
+- eliminazione della precedenza implicita “model prima, router dopo”;
+- resolver condiviso da completion, Playground e `/v1/models`;
+- catalogo con alias univoci, tipo esplicito (`model`/`router`) e identità
+  stabile;
+- preflight delle collisioni già presenti, senza rinomina automatica e
+  silenziosa;
+- mapping coerente delle collisioni a un errore di dominio 409.
+
+Matrice di test RED:
+
+- creazione model→router e router→model;
+- collisioni local→global e global→local;
+- grant verso un team con alias occupato;
+- creazioni concorrenti in sessioni separate;
+- `/v1/models` senza duplicati;
+- risoluzione identica sugli endpoint OpenAI, Anthropic e Gemini compatibili;
+- nessuna regressione di shadowing intenzionale mediante suffisso `-global`.
+
+La migrazione deve fallire in preflight con un elenco operativo delle collisioni
+invece di scegliere automaticamente un vincitore. Il rollback richiede che il
+vecchio resolver resti eliminabile senza perdere le identità già persistite.
+
+### PR 6 — Revisioni router e candidati con identità stabile
+
+- **Branch:** `fix/r11-router-revisions`
+- **Base iniziale:** `refactor/r11-012-callable-alias-registry`.
+- **Titolo:** `fix: version shared routers and bind candidates to model identities`
+- **Issue:** ISSUE-011 e seconda parte di ISSUE-012.
+- **Dimensione:** L.
+
+Implementazione:
+
+- salvare i candidati mediante model ID stabile e provenienza, non soltanto
+  tramite nome;
+- introdurre revisioni router immutabili;
+- fare puntare ogni grant alla revisione esplicitamente approvata;
+- trasformare l'update del tenant sorgente nella creazione di una nuova
+  revisione, senza modificare i grant esistenti;
+- rendere l'upgrade del grant esplicito, auditato e riservato al platform admin;
+- consentire a un router globale di referenziare soltanto modelli globali;
+- richiedere che le dipendenze di un router esteso siano esplicitamente
+  accessibili al target;
+- impedire la cancellazione di revisioni ancora referenziate o definirne una
+  revoca atomica e auditata.
+
+Test RED e acceptance criteria:
+
+1. il platform admin estende una revisione Source a Target;
+2. il Source model-manager configura un webhook attivo o shadow in una nuova
+   revisione;
+3. Target continua a usare la revisione approvata;
+4. nessun prompt Target raggiunge il webhook;
+5. soltanto dopo approvazione esplicita la nuova revisione diventa attiva;
+6. un modello omonimo nel target non cambia l'identità del candidato;
+7. candidati eliminati/disabilitati e grant revocati producono un errore di
+   dominio deterministico.
+
+La migrazione deve effettuare backfill dei candidati esistenti nel contesto del
+router proprietario e fermarsi sulle risoluzioni ambigue. Il rollback deve
+preservare la revisione attiva e non cancellare automaticamente la cronologia.
+
+### PR 7 — Attribution usage completa
+
+- **Branch:** `fix/r11-015-usage-attribution`
+- **Base iniziale:** `fix/r11-router-revisions`.
+- **Titolo:** `fix: preserve requested and resolved callable identity in usage`
+- **Issue:** ISSUE-015.
+- **Dimensione:** M.
+
+Implementazione:
+
+- aggiungere al ledger `requested_alias`, `resolved_model_id`, nome canonico e
+  origine/scope;
+- propagare la stessa identità attraverso outbox, settlement, streaming ed
+  endpoint nativi;
+- restituire ID, alias e nome canonico nelle API usage;
+- definire e documentare se ogni filtro opera su alias, nome canonico o entrambi;
+- usare un ID stabile come row key nella UI;
+- eseguire un backfill conservativo, marcando come sconosciuto ciò che non è
+  ricostruibile invece di inventare alias storici.
+
+Test RED e acceptance criteria:
+
+- modello locale e globale omonimi chiamati come `same` e `same-global`;
+- filtri per alias e identità;
+- righe UI distinte e stabili;
+- totale budget invariato;
+- streaming, endpoint OpenAI/Anthropic/Gemini e riconciliazione outbox;
+- dati storici senza alias ancora leggibili e chiaramente marcati.
+
+Dipende dalla PR 5 per l'identità callable e dalla PR 6 per l'identità stabile
+dei router. Il rollback deve mantenere compatibili in lettura le righe prive dei
+nuovi campi.
+
+### PR 8 — Contratto di downgrade delle risorse globali
+
+- **Branch:** `fix/r11-019-migration-rollback-contract`
+- **Base iniziale:** `fix/r11-015-usage-attribution`.
+- **Titolo:** `fix(migrations): make global resource downgrades data-safe`
+- **Issue:** ISSUE-019.
+- **Dimensione:** M.
+
+Implementazione:
+
+- riassegnare le risorse promosse al relativo `origin_team_id` prima di
+  ripristinare il NOT NULL;
+- per risorse globali native prive di origine, interrompere il downgrade prima
+  di qualsiasi DDL con un errore chiaro e azionabile;
+- non inventare un team e non cancellare risorse automaticamente;
+- aggiungere un comando/runbook di preflight e una procedura esplicita di
+  riassegnazione o rimozione;
+- eseguire questa PR per ultima, affinché il test copra anche tutte le nuove
+  migrazioni dello stack.
+
+Test RED e acceptance criteria:
+
+- upgrade→seed globale→downgrade→upgrade su SQLite e PostgreSQL;
+- modello e router promossi con `origin_team_id`;
+- risorsa globale nativa senza origine, con abort prima del DDL;
+- grant e revisioni esistenti;
+- una sola Alembic head e nessun drift finale;
+- documentazione del rollback verificata eseguendo i comandi del runbook.
+
+### PR 9 — Chiusura Round 11
+
+- **Branch:** `docs/r11-remediated`
+- **Titolo:** `docs: mark Round 11 findings as remediated`
+- **Scope:** stato e riferimenti delle PR per ISSUE-010–ISSUE-019,
+  `issues/INDEX.md`, release notes e migration notes.
+- **Exit criteria:** tutti gli ISSUE chiusi da test di regressione, baseline
+  completa riportata e nessuna dichiarazione “fixed” basata soltanto sul diff.
+- **Rollback:** documentale; deve seguire, non precedere, l'ultimo merge prodotto.
+
+### Merge order and release checkpoints
+
+Ordine di merge:
+
+1. `docs/r11-code-review`;
+2. `fix/r11-013-webhook-ip-pinning`;
+3. `fix/r11-010-playground-governance`;
+4. `fix/r11-persistence-integrity`;
+5. `fix/r11-016-role-aware-console`;
+6. `refactor/r11-012-callable-alias-registry`;
+7. `fix/r11-router-revisions`;
+8. `fix/r11-015-usage-attribution`;
+9. `fix/r11-019-migration-rollback-contract`;
+10. `docs/r11-remediated`.
+
+Checkpoint consigliati:
+
+- dopo PR 4: release **v1.4.1**, hardening senza il cambio architetturale degli
+  alias/router;
+- dopo PR 8: release **v1.5.0**, perché alias registry, candidate identity,
+  revisioni router e schema usage costituiscono un cambiamento architetturale e
+  potenzialmente contrattuale.
+
+Ogni PR di implementazione deve rispettare lo stesso gate:
+
+1. test RED nel primo commit;
+2. implementazione GREEN minima;
+3. refactor senza mutare il comportamento coperto;
+4. test mirati, suite completa SQLite e PostgreSQL, coverage ≥80%, Pyrefly e
+   pre-commit;
+5. verifica del diff, note di compatibilità e rollback;
+6. review sicurezza obbligatoria per PR 1, 2, 5 e 6;
+7. commit convenzionali e descrizione PR con mapping agli ISSUE chiusi.
+
 ## Resolution status — OPEN
 
 La revisione è stata eseguita in sola lettura sul codice prodotto. Nessuno dei
