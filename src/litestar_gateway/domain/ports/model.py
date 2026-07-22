@@ -17,6 +17,10 @@ class ModelRepository(Protocol):
 
     async def get(self, model_id: UUID) -> Model | None: ...
 
+    async def get_global(self, model_id: UUID) -> Model | None:
+        """Return the model only when it is platform-owned."""
+        ...
+
     async def get_by_name(self, team_id: UUID | None, name: str) -> Model | None:
         """Resolve the model a team calls by `name`, in priority order:
         the team's own model → a model extended to it under that alias → a
@@ -48,7 +52,19 @@ class ModelRepository(Protocol):
 
     async def update(self, model: Model) -> Model: ...
 
+    async def update_global(self, model: Model) -> Model | None:
+        """Update only a platform-owned model; None when the scoped row is absent."""
+        ...
+
     async def remove(self, model_id: UUID) -> None: ...
+
+    async def remove_global(self, model_id: UUID) -> bool:
+        """Delete only a platform-owned model and report whether one was removed."""
+        ...
+
+    async def promote_to_global(self, model: Model) -> Model:
+        """Atomically promote a model and remove its now-redundant grants."""
+        ...
 
     async def exists_for_credential(self, credential_id: UUID) -> bool:
         """True if any model (in any team) references this credential."""
