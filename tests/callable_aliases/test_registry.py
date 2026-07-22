@@ -29,7 +29,7 @@ from litestar_gateway.infrastructure.persistence.router_repository import SQLAlc
 
 MASTER_KEY = "master-secret"
 ADMIN_EMAIL = "admin@example.com"
-JWT_SECRET = "test-secret-key-0123456789-abcdefghij"
+JWT_SECRET = "test-secret-key-0123456789-abcdefghij"  # pragma: allowlist secret
 SALT_KEY = "unit-test-salt-key"
 
 

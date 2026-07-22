@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from litestar_gateway.config import Settings
 from litestar_gateway.infrastructure.persistence.database import create_database
 
-PARENT = "d41e8f6a2c10"
-HEAD = "f52a1c9d0b34"
+PARENT = "d41e8f6a2c10"  # pragma: allowlist secret
+HEAD = "f52a1c9d0b34"  # pragma: allowlist secret
 
 
 def _config(path: Path) -> AlembicCommandConfig:
