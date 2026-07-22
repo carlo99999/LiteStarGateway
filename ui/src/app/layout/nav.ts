@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   Boxes,
   Route,
+  FlaskConical,
   ShieldCheck,
   KeyRound,
   Building2,
@@ -44,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: "/models", label: "models", icon: Boxes, ready: true },
       { to: "/routing", label: "routing", icon: Route, ready: true },
+      { to: "/playground", label: "playground", icon: FlaskConical, ready: true },
       { to: "/credentials", label: "credentials", icon: ShieldCheck, ready: true },
       { to: "/api-keys", label: "api-keys", icon: KeyRound, ready: true },
     ],

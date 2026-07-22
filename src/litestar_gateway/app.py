@@ -63,6 +63,7 @@ from litestar_gateway.infrastructure.web.organizations.dependencies import (
     provide_organization_service,
     provide_team_service,
 )
+from litestar_gateway.infrastructure.web.playground import PlaygroundController
 from litestar_gateway.infrastructure.web.routing import (
     PlatformRouterController,
     RouterController,
@@ -220,6 +221,7 @@ def _build_route_handlers(database: Database) -> list:
         ModelController,  # team-admin: team-scoped model deployments
         PlatformModelController,  # platform-admin: global models + extension grants
         ModelPricesController,  # default per-token pricing lookup (console prefill)
+        PlaygroundController,  # compare a prompt across a team's models
         RouterController,  # team-admin: smart routers (virtual models)
         PlatformRouterController,  # platform-admin: global routers + extension grants
         platform_routing_savings,  # platform-admin: cross-team routing savings
