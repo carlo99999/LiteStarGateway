@@ -157,4 +157,29 @@ def data_upgrades() -> None:
 
 
 def data_downgrades() -> None:
-    """Add any optional data downgrade migrations here!"""
+    """Refuse to discard global models whose provenance was never recorded.
+
+    This revision predates ``origin_team_id``.  A NULL ``team_id`` therefore
+    cannot be mapped back to a real team without guessing or deleting data.  The
+    check deliberately runs before ``schema_downgrades()`` so the database stays
+    at this revision and an operator can remediate it safely.
+    """
+    names = list(
+        op.get_bind()
+        .execute(
+            sa.text(
+                "SELECT name FROM model WHERE team_id IS NULL "
+                "ORDER BY name LIMIT 5"
+            )
+        )
+        .scalars()
+    )
+    if names:
+        examples = ", ".join(repr(name) for name in names)
+        raise RuntimeError(
+            "Cannot downgrade revision 90e784ecd46b: global model rows have no provenance "
+            "column, so their owning team cannot be recovered safely "
+            f"(examples: {examples}). Set model.team_id to an existing team or delete each "
+            "resource intentionally, then retry. See docs/db-migrations.md#downgrading-global-resources. "
+            "No schema DDL from this revision was applied."
+        )

@@ -105,6 +105,10 @@ migration-history:
 migration-check:
     uv run litestar --app {{app}} database check
 
+# Read-only safety gate before downgrading the global model/router revisions.
+migration-global-downgrade-preflight:
+    uv run python scripts/preflight_global_resource_downgrade.py
+
 # ── Run ──────────────────────────────────────────────────────────────────────
 
 # Run the complete Docker development stack. The first invocation creates a
