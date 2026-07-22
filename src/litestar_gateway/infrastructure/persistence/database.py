@@ -63,12 +63,13 @@ class Database:
 
 
 def create_database(settings: Settings) -> Database:
-    # Dev/test auto-create the schema for zero-config runs; production uses Alembic
-    # migrations instead (the container runs `database upgrade` on start), so the
-    # two never fight over creating the same tables.
+    # Auto-create the schema for zero-config dev/test runs; production (and the
+    # migration-managed dev container, via AUTO_CREATE_SCHEMA=false) uses Alembic
+    # instead, so create_all and `database upgrade` never fight over creating the
+    # same tables ("relation already exists").
     config = SQLAlchemyAsyncConfig(
         connection_string=settings.database_url,
-        create_all=not settings.is_production,
+        create_all=settings.auto_create_schema,
         engine_config=_engine_config(settings),
         # Attach the SQLite FK pragma when the plugin lazily creates the engine.
         create_engine_callable=_create_engine_with_sqlite_fk,

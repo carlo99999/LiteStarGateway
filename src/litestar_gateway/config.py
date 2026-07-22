@@ -172,6 +172,12 @@ class Settings:
     salt_key: str | None
     # Deployment environment. "production"/"prod" enables fail-fast config checks.
     environment: str = DEFAULT_ENVIRONMENT
+    # Create the schema from ORM metadata on startup (zero-config dev/test).
+    # Off in production — migrations own the schema. Also turned off in the dev
+    # container, which runs `database upgrade`: doing both races to create the
+    # same new tables ("relation already exists"). Defaults on for direct
+    # construction (tests); `from_env` defaults it to `not is_production`.
+    auto_create_schema: bool = True
     # Connection-pool sizing (applied only to Postgres; SQLite ignores it).
     db_pool_size: int = DEFAULT_DB_POOL_SIZE
     db_max_overflow: int = DEFAULT_DB_MAX_OVERFLOW
@@ -306,6 +312,7 @@ class Settings:
         load_dotenv()  # no-op if .env is absent
         environment = os.environ.get("ENVIRONMENT", DEFAULT_ENVIRONMENT)
         is_local = environment.strip().lower() in _LOCAL_ENVIRONMENTS
+        is_production = environment.strip().lower() in _PRODUCTION_ENVIRONMENTS
         return cls(
             database_url=os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL),
             admin_email=os.environ.get("ADMIN_EMAIL", DEFAULT_ADMIN_EMAIL),
@@ -313,6 +320,7 @@ class Settings:
             jwt_secret=os.environ.get("JWT_SECRET", DEFAULT_JWT_SECRET),
             salt_key=os.environ.get("SALT_KEY"),
             environment=environment,
+            auto_create_schema=_env_bool("AUTO_CREATE_SCHEMA", not is_production),
             db_pool_size=_env_int("DB_POOL_SIZE", DEFAULT_DB_POOL_SIZE, minimum=1),
             db_max_overflow=_env_int("DB_MAX_OVERFLOW", DEFAULT_DB_MAX_OVERFLOW, minimum=0),
             request_timeout=_env_float("REQUEST_TIMEOUT", DEFAULT_REQUEST_TIMEOUT, minimum=0.0),

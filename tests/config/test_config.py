@@ -299,3 +299,27 @@ def test_team_mapping_rejects_malformed_input(monkeypatch: pytest.MonkeyPatch, r
     monkeypatch.setenv("SSO_TEAM_MAPPING", raw)
     with pytest.raises(InsecureConfigurationError):
         _env_team_mapping("SSO_TEAM_MAPPING")
+
+
+def test_dev_auto_creates_schema_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.delenv("AUTO_CREATE_SCHEMA", raising=False)
+    assert Settings.from_env().auto_create_schema is True
+
+
+def test_dev_container_can_disable_auto_create(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The migration-managed dev container sets this off so create_all and
+    # `database upgrade` don't both try to create the same new tables.
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("AUTO_CREATE_SCHEMA", "false")
+    assert Settings.from_env().auto_create_schema is False
+
+
+def test_production_disables_auto_create(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("DATABASE_URL", POSTGRES_URL)
+    monkeypatch.setenv("JWT_SECRET", "x" * 40)
+    monkeypatch.setenv("SALT_KEY", "y" * 40)
+    monkeypatch.setenv("MASTER_KEY", "z" * 40)
+    monkeypatch.delenv("AUTO_CREATE_SCHEMA", raising=False)
+    assert Settings.from_env().auto_create_schema is False
