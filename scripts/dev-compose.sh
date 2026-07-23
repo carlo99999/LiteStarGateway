@@ -103,6 +103,27 @@ for key in MASTER_KEY JWT_SECRET SALT_KEY; do
 done
 chmod 600 "$ENV_FILE"
 
+DOCKER_RUNTIME_PLATFORM=${DOCKER_DEFAULT_PLATFORM:-}
+if [ -z "$DOCKER_RUNTIME_PLATFORM" ]; then
+  DOCKER_RUNTIME_PLATFORM=$(docker info --format '{{.OSType}}-{{.Architecture}}' 2>/dev/null || true)
+fi
+if [ -z "$DOCKER_RUNTIME_PLATFORM" ]; then
+  DOCKER_RUNTIME_PLATFORM=unknown
+fi
+UI_DEPENDENCY_FINGERPRINT=$(
+  {
+    cksum \
+      "$ROOT/ui/package.json" \
+      "$ROOT/ui/pnpm-lock.yaml" \
+      "$ROOT/ui/pnpm-workspace.yaml" \
+      "$ROOT/Dockerfile.dev"
+    printf '%s\n' "$DOCKER_RUNTIME_PLATFORM"
+  } |
+    cksum |
+    awk '{print $1}'
+)
+UI_NODE_MODULES_VOLUME="litestar-gateway-dev_ui-dev-node-modules-$UI_DEPENDENCY_FINGERPRINT"
+
 if [ "$#" -eq 0 ]; then
   set -- up --build
 fi
@@ -112,4 +133,5 @@ exec env \
   -u MASTER_KEY \
   -u JWT_SECRET \
   -u SALT_KEY \
+  UI_NODE_MODULES_VOLUME="$UI_NODE_MODULES_VOLUME" \
   docker compose --env-file "$ENV_FILE" -f "$ROOT/docker-compose.dev.yml" "$@"

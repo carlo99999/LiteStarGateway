@@ -118,11 +118,10 @@ services:
       GATEWAY_URL: http://backend:8000
       CHOKIDAR_USEPOLLING: ${CHOKIDAR_USEPOLLING:-false}
     command:
-      - sh
-      - -c
-      - >
-        pnpm install --frozen-lockfile --config.strict-dep-builds=false &&
-        exec pnpm dev --host 0.0.0.0
+      - pnpm
+      - dev
+      - --host
+      - 0.0.0.0
     volumes:
       - ./ui:/app/ui:ro
       - ui-dev-node-modules:/app/ui/node_modules
@@ -146,3 +145,7 @@ volumes:
   pg-dev-data:
   mlflow-dev-data:
   ui-dev-node-modules:
+    # The launcher fingerprints the UI manifests, build toolchain, and target
+    # platform. A dependency/toolchain change therefore creates a fresh volume,
+    # seeded from the dependencies already installed in the rebuilt image.
+    name: ${UI_NODE_MODULES_VOLUME:-litestar-gateway-dev_ui-dev-node-modules}
