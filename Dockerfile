@@ -62,17 +62,6 @@ RUN pnpm install --frozen-lockfile --config.strict-dep-builds=false
 COPY ui/ ./
 RUN pnpm run build
 
-# ---- MLflow: non-root observability service used by local Compose ----
-FROM ghcr.io/mlflow/mlflow:v3.14.0@sha256:967de3ca34b6a5751718e380a0a383eb0ce1a6f5b484f363bd0da7559117a5f8 AS mlflow
-
-RUN useradd --create-home --uid 10001 mlflow \
-    && mkdir -p /mlflow \
-    && chown -R mlflow:mlflow /mlflow
-
-WORKDIR /mlflow
-USER mlflow
-EXPOSE 5000
-
 # ---- Runtime: slim image with just the venv + source ----
 FROM python:3.14-slim-bookworm AS runtime
 

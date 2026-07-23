@@ -19,6 +19,7 @@ from litestar_gateway.infrastructure.web.rate_limit import (
     AUTH_RATE_LIMIT,
     SCIM_RATE_LIMIT,
     _inference_identifier,
+    build_inference_rate_limit,
 )
 
 
@@ -64,6 +65,24 @@ async def test_scim_is_rate_limited_per_ip(client: AsyncTestClient) -> None:
     assert blocked.status_code == HTTP_429_TOO_MANY_REQUESTS
 
 
+async def test_inference_limit_uses_the_validated_runtime_setting(tmp_path: Path) -> None:
+    settings = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'inference-rl.db'}",
+        admin_email="admin@example.com",
+        master_key="master-secret",
+        jwt_secret="test-secret-key-0123456789-abcdefghij",
+        salt_key="test-salt-key",
+        inference_rate_limit_rpm=1,
+    )
+
+    async with AsyncTestClient(app=create_app(settings)) as test_client:
+        first = await test_client.post("/v1/chat/completions", json={})
+        blocked = await test_client.post("/v1/chat/completions", json={})
+
+    assert first.status_code == HTTP_401_UNAUTHORIZED
+    assert blocked.status_code == HTTP_429_TOO_MANY_REQUESTS
+
+
 class _FakeClient:
     host = "203.0.113.7"
 
@@ -100,6 +119,10 @@ def test_inference_identifier_same_ip_different_tokens_share_bucket() -> None:
     b = _inference_identifier(_request("Bearer garbage-two"))
     c = _inference_identifier(_request(None))
     assert a == b == c
+
+
+def test_inference_rate_limit_accepts_a_validated_runtime_limit() -> None:
+    assert build_inference_rate_limit(36_000).rate_limit == ("minute", 36_000)
 
 
 def test_rate_limit_uses_memory_store_by_default(tmp_path: Path) -> None:

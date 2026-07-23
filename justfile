@@ -183,6 +183,49 @@ run:
 serve:
     uv run uvicorn {{app}} --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
 
+# Small infrastructure baseline against the production readiness endpoint.
+load-prod-up:
+    ./scripts/load-compose.sh up
+
+load-prod-down:
+    ./scripts/load-compose.sh down
+
+_load-deps:
+    env -u LOAD_API_KEY -u LOAD_MODEL uv sync --locked --group load
+
+load-smoke: _load-deps
+    mkdir -p load-results
+    LOAD_MODE=readiness LOAD_TARGET_RPS=10 LOAD_EXPECTED_LATENCY_SECONDS=0.1 \
+      LOAD_DURATION_SECONDS=60 LOAD_RAMP_SECONDS=10 LOAD_SETTLE_SECONDS=2 \
+      LOAD_MAX_P95_MS=250 \
+      env -u LOAD_API_KEY -u LOAD_MODEL \
+      uv run --locked --no-sync --group load locust -f scripts/locustfile.py \
+      --headless --host http://127.0.0.1:8000 \
+      --csv load-results/readiness --html load-results/readiness.html
+
+# Progressive authenticated gates for complete responses and SSE streams. Each
+# stage gets an independent report and the profile stops at the first failure.
+load-300: _load-deps
+    #!/usr/bin/env bash
+    set -euo pipefail
+    : "${LOAD_API_KEY:?export a team API key before running just load-300}"
+    : "${LOAD_MODEL:?export an existing model or router alias before running just load-300}"
+    : "${LOAD_CONFIRM_PROVIDER_COST:?set LOAD_CONFIRM_PROVIDER_COST=YES after checking provider quotas and cost}"
+    if [[ "$LOAD_CONFIRM_PROVIDER_COST" != "YES" ]]; then
+      echo "LOAD_CONFIRM_PROVIDER_COST must be exactly YES" >&2
+      exit 2
+    fi
+    LOAD_STAGES="${LOAD_STAGES:-25,50,100,150,200,250,300}" \
+      LOAD_CHAT_EXPECTED_LATENCY_SECONDS="${LOAD_CHAT_EXPECTED_LATENCY_SECONDS:-1}" \
+      LOAD_STREAM_EXPECTED_LATENCY_SECONDS="${LOAD_STREAM_EXPECTED_LATENCY_SECONDS:-3}" \
+      LOAD_DURATION_SECONDS="${LOAD_DURATION_SECONDS:-60}" \
+      LOAD_RAMP_SECONDS="${LOAD_RAMP_SECONDS:-10}" \
+      LOAD_SETTLE_SECONDS="${LOAD_SETTLE_SECONDS:-5}" \
+      LOAD_MIN_RPS_RATIO="${LOAD_MIN_RPS_RATIO:-0.98}" \
+      LOAD_MAX_P95_MS="${LOAD_MAX_P95_MS:-30000}" \
+      LOAD_MAX_TTFT_MS="${LOAD_MAX_TTFT_MS:-10000}" \
+      uv run --locked --no-sync --group load python scripts/run_load_profile.py
+
 # ── Documentation ─────────────────────────────────────────────────────────────
 
 # Prepare the MkDocs source projection without duplicating canonical docs.

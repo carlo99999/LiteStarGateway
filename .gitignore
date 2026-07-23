@@ -1,5 +1,7 @@
 .env
 .env.docker-dev
+docker-compose.load.yml
+.docker-compose.load.tmp.*
 *.db
 .venv/
 __pycache__/
@@ -13,6 +15,7 @@ __pycache__/
 .coverage
 .coverage.*
 htmlcov/
+load-results/
 
 ## Graphify: track only graph.json + GRAPH_REPORT.md; everything else is
 ## generated/local snapshot data (rebuilt by `graphify update .`).

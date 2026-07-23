@@ -51,6 +51,9 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.15.20",
 ]
+load = [
+    "locust==2.44.4",
+]
 
 [tool.ruff]
 line-length = 100

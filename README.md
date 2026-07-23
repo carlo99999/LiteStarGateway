@@ -53,7 +53,7 @@ The alias resolves to a team `Model`, which selects the provider and a
 platform-managed, encrypted `Credential`. Providers: **OpenAI, Azure OpenAI,
 Anthropic, Vertex/Gemini, AWS Bedrock, Databricks**.
 
-For a local prod-like stack (app + Postgres + Redis + MLflow):
+For a local prod-like stack (app + Postgres + Redis, with optional external MLflow):
 `MASTER_KEY=… JWT_SECRET=… SALT_KEY=… POSTGRES_PASSWORD=… docker compose up --build`.
 For full-stack development with live reload: `just dev` (see the
 [operations guide](docs/operations.md)).
@@ -191,7 +191,9 @@ The app ships as a container (multi-stage `Dockerfile`, non-root, uvicorn with
 `--proxy-headers`), built and pushed to GHCR on each release tag. Production
 requires Postgres; the container applies migrations on start (disable with
 `MIGRATE_ON_START=false` when running many replicas). Run it behind a TLS
-reverse proxy with `FORWARDED_ALLOW_IPS` set.
+reverse proxy with `FORWARDED_ALLOW_IPS` set. The production image includes the
+pre-built admin UI at `/ui`; the default Compose stack runs without reload or a
+bundled MLflow server and reserves/limits the app to 1 CPU and 4 GiB of memory.
 
 Everything operational — proxy/TLS checklist, database and pool sizing,
 migrations with replicas, MLflow, Redis and scaling, the local dev stack — is

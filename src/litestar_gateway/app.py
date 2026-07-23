@@ -109,7 +109,7 @@ def create_app(
     llm_gateway = build_llm_gateway(settings)  # shared, stateless; built once
     metrics_aggregator, trace_dispatcher = _build_observability(settings)
 
-    route_handlers = _build_route_handlers(database)
+    route_handlers = _build_route_handlers(database, settings)
     dependencies = _build_dependencies(settings, database, trace_dispatcher, llm_gateway)
 
     docs_router = create_docs_router()  # built MkDocs site at /docs, if present
@@ -220,11 +220,14 @@ def _make_shadow_repos_provider(session_maker_state_key: str, keyring_provider):
     return provide_shadow_repos_factory
 
 
-def _build_route_handlers(database: Database) -> list:
+def _build_route_handlers(database: Database, settings: Settings) -> list:
     return [
         health,  # public liveness
         readiness,  # public readiness (DB check)
-        create_api_router(database.config),  # the protected "api-endpoint" group
+        create_api_router(
+            database.config,
+            inference_rate_limit_rpm=settings.inference_rate_limit_rpm,
+        ),  # the protected "api-endpoint" group
         create_users_router(),  # signup (public) + invites (admin JWT)
         create_session_router(),  # login (public) + /me (JWT)
         OrganizationController,  # platform-admin: orgs + team creation

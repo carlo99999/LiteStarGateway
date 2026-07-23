@@ -156,6 +156,23 @@ def test_from_env_rejects_negative_pool_size(monkeypatch: pytest.MonkeyPatch) ->
         Settings.from_env()
 
 
+def test_from_env_configures_inference_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("INFERENCE_RATE_LIMIT_RPM", "36000")
+
+    assert Settings.from_env().inference_rate_limit_rpm == 36000
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_from_env_rejects_non_positive_inference_rate_limit(
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+) -> None:
+    monkeypatch.setenv("INFERENCE_RATE_LIMIT_RPM", value)
+
+    with pytest.raises(InsecureConfigurationError):
+        Settings.from_env()
+
+
 def test_from_env_zero_metrics_interval_disables_the_publisher(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

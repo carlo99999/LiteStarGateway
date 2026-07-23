@@ -44,9 +44,11 @@ def _inference_identifier(request: Request[Any, Any, Any]) -> str:
     return f"ip::{get_remote_address(request)}"
 
 
-def build_inference_rate_limit() -> RateLimitConfig:
+def build_inference_rate_limit(
+    requests_per_minute: int = INFERENCE_RATE_LIMIT[1],
+) -> RateLimitConfig:
     return RateLimitConfig(
-        rate_limit=INFERENCE_RATE_LIMIT,
+        rate_limit=("minute", requests_per_minute),
         identifier_for_request=_inference_identifier,
         store="rate_limit_inference",
     )

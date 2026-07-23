@@ -22,6 +22,9 @@ DEFAULT_MAX_RETRIES = 2
 # explicit + tunable: lower it to tighten the DoS bound, raise it for large
 # multimodal payloads (inline base64 images push vision requests past a few MB).
 DEFAULT_MAX_BODY_SIZE = 10_000_000
+# Pre-auth inference flood guard. Production may raise this explicitly when a
+# trusted ingress provides its own limit; the conservative default stays intact.
+DEFAULT_INFERENCE_RATE_LIMIT_RPM = 120
 # Daily key rotation (UTC time, "HH:MM"). Opt-in via KEY_ROTATION_ENABLED.
 DEFAULT_ROTATION_TIME = "03:00"
 # Observability. No tracking URI ⇒ tracing disabled (NullSink).
@@ -148,6 +151,7 @@ class Settings:
     max_retries: int = DEFAULT_MAX_RETRIES
     # Reject request bodies larger than this many bytes (413) before they're read.
     max_body_size: int = DEFAULT_MAX_BODY_SIZE
+    inference_rate_limit_rpm: int = DEFAULT_INFERENCE_RATE_LIMIT_RPM
     # Daily automatic key rotation (opt-in), at rotation_time (UTC, "HH:MM").
     rotation_enabled: bool = False
     rotation_time: str = DEFAULT_ROTATION_TIME
@@ -299,6 +303,11 @@ class Settings:
             request_timeout=_env_float("REQUEST_TIMEOUT", DEFAULT_REQUEST_TIMEOUT, minimum=0.0),
             max_retries=_env_int("MAX_RETRIES", DEFAULT_MAX_RETRIES, minimum=0),
             max_body_size=_env_int("MAX_BODY_SIZE", DEFAULT_MAX_BODY_SIZE, minimum=1),
+            inference_rate_limit_rpm=_env_int(
+                "INFERENCE_RATE_LIMIT_RPM",
+                DEFAULT_INFERENCE_RATE_LIMIT_RPM,
+                minimum=1,
+            ),
             rotation_enabled=_env_bool("KEY_ROTATION_ENABLED", False),
             rotation_time=os.environ.get("KEY_ROTATION_TIME", DEFAULT_ROTATION_TIME),
             mlflow_tracking_uri=os.environ.get("MLFLOW_TRACKING_URI"),

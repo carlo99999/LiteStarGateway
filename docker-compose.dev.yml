@@ -26,33 +26,6 @@ services:
       timeout: 3s
       retries: 10
 
-  mlflow:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-      target: mlflow
-    command: >
-      mlflow server --host 0.0.0.0 --port 5000
-      --backend-store-uri sqlite:////mlflow/mlflow.db
-      --artifacts-destination /mlflow/artifacts
-      --allowed-hosts mlflow:5000,localhost,127.0.0.1
-    volumes:
-      - mlflow-dev-data:/mlflow
-    expose:
-      - "5000"
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - >
-          import urllib.request;
-          urllib.request.urlopen('http://127.0.0.1:5000/health').read()
-      interval: 5s
-      timeout: 3s
-      start_period: 10s
-      retries: 12
-
   backend:
     build:
       context: .
@@ -64,8 +37,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      mlflow:
-        condition: service_healthy
     environment:
       ENVIRONMENT: development
       # This container owns the schema via `database upgrade` (below), so the app
@@ -76,7 +47,7 @@ services:
       MASTER_KEY: ${MASTER_KEY:?run `just dev` or provide MASTER_KEY}
       JWT_SECRET: ${JWT_SECRET:?run `just dev` or provide JWT_SECRET}
       SALT_KEY: ${SALT_KEY:?run `just dev` or provide SALT_KEY}
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
       REDIS_URL: redis://redis:6379
       WATCHFILES_FORCE_POLLING: ${WATCHFILES_FORCE_POLLING:-false}
     command:
@@ -143,7 +114,6 @@ services:
 
 volumes:
   pg-dev-data:
-  mlflow-dev-data:
   ui-dev-node-modules:
     # The launcher fingerprints the UI manifests, build toolchain, and target
     # platform. A dependency/toolchain change therefore creates a fresh volume,
