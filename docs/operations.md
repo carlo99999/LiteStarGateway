@@ -20,8 +20,9 @@ The app expects to sit behind a reverse proxy that terminates TLS.
   It also enables the `Strict-Transport-Security` (HSTS) response header — the
   app emits it only when this signal is set, so a plain-HTTP run never pins the
   host to HTTPS.
-- Set `OIDC_REDIRECT_URI` to the public callback URL so the IdP redirect
-  matches what's registered.
+- Configure the public OIDC callback URL from **Console → SSO** so it matches
+  what is registered at the IdP. `OIDC_REDIRECT_URI` remains the legacy env
+  fallback when no enabled DB-backed SSO configuration exists.
 - The app sets static security response headers (`X-Content-Type-Options`,
   `X-Frame-Options`, `Referrer-Policy`) on every response. It does **not** emit
   a Content-Security-Policy — set one at the proxy if you want it, since a

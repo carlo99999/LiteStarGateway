@@ -1,8 +1,12 @@
 # Plan 03 — Admin UI
 
-**Design doc:** none yet (write a short one before phase 1 if the surface grows).
-**Depends on:** backend only — the REST surface already exists; `ui/` is currently
-empty.
+**Status:** ✅ SHIPPED. The full React/Vite console is served at `/ui`, its
+resource mutations are live, route-based code splitting is enabled, and CI runs
+unit tests, lint, typecheck and the production build. Browser E2E and OpenAPI
+schema-drift enforcement continue in
+[`plans/11-platform-quality-gates.md`](11-platform-quality-gates.md).
+**Design doc:** [`docs/admin-console.md`](../docs/admin-console.md).
+**Depends on:** backend only — the REST surface is the source of truth.
 **Theme:** a React/Vite admin console so non-developers can operate the gateway
 (teams, budgets, keys, usage) without curl.
 
@@ -55,6 +59,15 @@ Thin admin client over the existing controllers under `infrastructure/web/`:
   `docker-compose.yml`); decide auth-cookie vs bearer for the browser context.
 - Add a UI build/lint job to CI (path-gated to `ui/`).
 
+## Post-ship follow-ups
+
+- **Usage analytics:** temporal endpoint and cost/token/call charts are Plan 10.
+- **Browser E2E:** Playwright coverage for login, RBAC, Usage/Budgets and critical
+  mutations is Plan 11.
+- **Schema drift:** CI regeneration/diff of `ui/openapi.json` and
+  `ui/src/lib/api/schema.ts` is Plan 11. This completes the single-source-of-truth
+  promise below; generated files must never drift silently.
+
 ## Conventions
 
 - Match the repo's coding-style rules on the frontend too: many small files,
@@ -70,8 +83,7 @@ Thin admin client over the existing controllers under `infrastructure/web/`:
 - **RBAC leakage in the UI** → treat the API as the source of truth; the UI hides
   affordances for convenience but the server still enforces every permission.
 
-## Execution
+## Execution (historical)
 
-Fully backend-independent → can run in a parallel track whenever capacity allows,
-without blocking Plans 01/02. Phase 0 is one slice; phases 1–2 slice naturally by
-resource (teams, models, keys, budgets, usage) across worktrees.
+Delivered independently of Plans 01/02. Future console surfaces are owned by
+their feature plans; shared browser/schema reliability work belongs to Plan 11.

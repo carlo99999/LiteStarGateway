@@ -20,7 +20,11 @@ every line, sane levels, and a guarantee that **5xx responses never leak interna
   the stdlib `LoggingConfig`) to emit JSON in production, human-readable in dev.
 - **Request id**: generate/propagate a correlation id per request (accept an
   inbound `X-Request-ID`, else generate one), bind it to the log context, and
-  echo it in the response header. Litestar has request-lifecycle hooks for this.
+  echo it in the response header. Accept inbound values only from configured
+  trusted proxies and validate their length/character set; otherwise replace
+  them. Carry the same opaque ID into traces, audit, usage and routing decisions
+  so one inference can be followed end-to-end. Litestar has request-lifecycle
+  hooks for this.
 - **Access logs**: method, path, status, latency, team_id (from auth), request id
   — **never** the API key or credential values.
 - **Error hygiene**: ensure the exception handlers return generic messages for
@@ -43,6 +47,8 @@ every line, sane levels, and a guarantee that **5xx responses never leak interna
 
 - A 500 path returns a generic body (no stack trace) and logs the detail.
 - The response carries a request id; the same id appears in the emitted log.
+- The same id links the emitted trace, audit event, usage event and routing
+  decision where those records are created.
 - Assert Authorization / key values are absent from log output.
 
 ## 5. Rollout

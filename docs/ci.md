@@ -20,23 +20,23 @@ gate is enforced (80%).
   markdown linter) → `uv run pyrefly check` → `uv run --with pip-audit pip-audit`
   (dependency CVE scan) → `uv run pytest -q --cov … --cov-fail-under=80`.
 - Run on `ubuntu-latest`; matrix on Python is optional (single version to start).
-- Fast: the suite runs against SQLite in-process (~9s today), no external
-  services needed.
+- The primary coverage job runs against SQLite in-process with no external
+  services.
 - A second `postgres` job runs alongside it with a `services: postgres`
   container: it applies migrations via the same `litestar … database upgrade`
-  command prod runs on every deploy, then runs the persistence-focused subset
-  (`tests/models`) with `DATABASE_URL` pointed at that container. This is what
+  command prod runs on every deploy, then runs the **full test suite** with
+  `DATABASE_URL` pointed at that container. This is what
   catches a migration that's valid under SQLite's permissive typing but broken
   under Postgres (type/constraint/JSON semantics) before it reaches production.
 
 ## 3. Open decisions
 
 1. **Postgres in CI**: done — see the `postgres` job in
-   `.github/workflows/ci.yml`. Only a subset of the suite (`tests/models`) runs
-   against it today; widening that subset is a follow-up, not blocking.
+   `.github/workflows/ci.yml`; it applies the full migration chain and runs the
+   full suite against Postgres.
 2. **Coverage gate**: enforced at 80% (`--cov --cov-fail-under=80`) on the
-   SQLite job; the Postgres job doesn't gate on coverage since it only runs a
-   subset.
+   SQLite job; the Postgres job is a dialect/integration gate and does not
+   collect coverage a second time.
 3. **Branch protection**: require the CI check to pass before merge (repo setting,
    not code) — recommended once the workflow is stable.
 4. **Caching**: uv cache keyed on `uv.lock` for fast runs.

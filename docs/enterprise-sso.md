@@ -6,8 +6,11 @@
 > wired into invites / password-reset / unlock / set-active), SCIM 2.0 Users
 > provisioning is implemented (`application/scim_service.py`,
 > `infrastructure/web/scim/`), SSO group→team mapping is implemented
-> (`SSO_TEAM_MAPPING`, §5), and extended RBAC is implemented
-> (`domain/authorization.py`, §6). SAML remains parked. The rest of this doc is
+> (§5), and extended RBAC is implemented (`domain/authorization.py`, §6).
+> OIDC settings are DB-backed, encrypted, hot-reloadable and managed from the
+> admin console (`/ui/sso-settings`) through the
+> `/platform/sso-settings` API; an enabled DB row takes precedence over legacy
+> `OIDC_*` environment variables. SAML remains parked. The rest of this doc is
 > the broader enterprise plan.
 
 ## 0. OIDC SSO — implementation plan (refined after studying LiteLLM)
@@ -47,24 +50,28 @@ claim access (incl. `groups`), OIDC discovery, PKCE, and JWKS verification.
   `nonce`) and `GET /sso/callback` (exchange → map → JIT upsert → **issue our own
   JWT** via the existing keyring; rate-limited, non-revealing). The web layer lives
   in `infrastructure/web/session/sso.py`.
-- **Pure mapping**: the platform-admin flag is derived from an admin-group set
-  (`OIDC_ADMIN_GROUPS`), upgrade-only. Team membership is managed inside the
+- **Pure mapping**: the platform-admin flag is derived from the configured
+  admin-group set (`OIDC_ADMIN_GROUPS` in the legacy env surface), upgrade-only.
+  Team membership is managed inside the
   gateway (see §4) unless a team is put under IdP governance via
   `SSO_TEAM_MAPPING` (§5).
 - **JIT upsert** in `UserService`: create/update the SSO user (no password),
   apply the platform role, bump `token_version` if disabled. `User` gains
   `sso_subject`/`external_id` and `is_active`.
-- **Config**: OIDC discovery URL, client id/secret, scopes, `OIDC_ADMIN_GROUPS`,
-  `DEFAULT_ROLE` (§4), `SSO_TEAM_MAPPING` (§5). **`OIDC_REDIRECT_URI` is required when SSO is enabled
-  outside local dev** (`config.py` fails fast if unset) — otherwise the redirect is
-  derived from the request `Host` header, which a forged Host could steer.
+- **Config**: the platform-admin console/API stores discovery URL,
+  client id/secret, scopes, admin groups, default-admin policy, team mapping and
+  redirect URI in an encrypted DB-backed singleton. Changes are hot-reloaded on
+  the next login. Legacy `OIDC_*`, `DEFAULT_ROLE` and `SSO_TEAM_MAPPING` env vars
+  remain the fallback when no enabled DB row exists. A fixed redirect URI is
+  required outside local dev — otherwise a forged Host could steer it.
 - **Reuse**: the existing JWT session + keyring — SSO federates identity, then
   mints our token (no second session system).
 
 **First PR scope:** generic OIDC (+ Google/Microsoft presets), login+callback, JIT
 upsert, group→admin, tests with a fake `IdentityProvider`.
-**Follow-ups:** SCIM (deprovisioning), SAML (python3-saml), audit log, per-org
-SSO, fine-grained RBAC (§ below).
+**Follow-ups:** SAML (python3-saml), per-org SSO/admin-group configuration and
+custom DB-defined roles. SCIM, audit, group→team mapping and fine-grained RBAC
+are shipped.
 
 ## 1. Goal
 
@@ -98,9 +105,9 @@ Flow: `/sso/{provider}/login` → IdP → `/sso/{provider}/callback` → validat
 7-day JWT (or the refreshed model from the account-recovery doc). SSO **reuses the
 existing session layer** — it only changes *how identity is established*.
 
-Config: providers registered per deployment (or per organization for true
-multi-tenant SSO) — client id/secret, discovery URL / SAML metadata, allowed
-domains.
+Config: one OIDC provider is registered per deployment through the DB-backed
+console/API, with legacy env fallback. Per-organization providers remain future
+work for true multi-tenant SSO.
 
 ## 3. SCIM — provisioning / deprovisioning — **implemented (Users)**
 
@@ -135,9 +142,10 @@ domains.
 **Design principle: SSO authenticates, the gateway authorizes.** SSO answers *who
 you are* (JIT-provisions your account, binds it to the IdP `sub`). *What you can
 do* — teams, memberships, the platform-admin flag — lives in the gateway. By
-default there is no IdP→team mapping to maintain: you create teams in the gateway
-and manage membership there, exactly as for a password user. (Optionally,
-`SSO_TEAM_MAPPING` puts specific teams under IdP governance — see §5.)
+default there is no IdP→team mapping to maintain: you create teams in the
+gateway and manage membership there, exactly as for a password user.
+Optionally, the active SSO team mapping puts specific teams under IdP
+governance — see §5.
 
 The one authorization signal SSO carries is the **platform-admin flag**
 (`User.is_admin`), which is binary: you are either a platform admin or a regular
@@ -147,8 +155,8 @@ member. (Team-level admin/member roles are separate and managed via the team API
 
 | Lever | Where | What it does |
 |-------|-------|--------------|
-| `OIDC_ADMIN_GROUPS` | env, comma-separated | Membership in any listed IdP group **grants** platform admin at login. |
-| `DEFAULT_ROLE` | env, `member` (default) / `admin` | Platform role a **brand-new** SSO account is created with at first login, when not matched by `OIDC_ADMIN_GROUPS`. |
+| Admin groups | Console/API; `OIDC_ADMIN_GROUPS` env fallback | Membership in any listed IdP group **grants** platform admin at login. |
+| Default admin | Console/API; `DEFAULT_ROLE` env fallback | Whether a **brand-new** SSO account becomes platform admin when no admin group matches. |
 | `PATCH /users/{id}/admin` | admin API | A platform admin **grants or revokes** another user's admin flag. The only way to **demote**. |
 
 ### The rule (upgrade-only)
@@ -156,18 +164,19 @@ member. (Team-level admin/member roles are separate and managed via the team API
 On every SSO login the gateway computes the admin flag like this:
 
 ```text
-group_admin   = (user's IdP groups) ∩ OIDC_ADMIN_GROUPS ≠ ∅
-default_admin = (DEFAULT_ROLE == "admin")
+group_admin   = (user's IdP groups) ∩ configured admin groups ≠ ∅
+default_admin = configured default role is "admin"
 
 brand-new account (JIT):   is_admin = group_admin OR default_admin
 returning account:         is_admin = current is_admin OR group_admin   ← upgrade-only
 ```
 
-**Upgrade-only** is the key property: groups and `DEFAULT_ROLE` only ever *grant*
-admin. A re-login **never revokes** it — leaving the admin group does *not* demote
-you, and a manual grant is never silently undone by the next login. Demotion is
-done **only** through `PATCH /users/{id}/admin`. This is deliberate: it keeps the
-IdP and the gateway from fighting over the same flag on every login.
+**Upgrade-only** is the key property: groups and the configured default role
+only ever *grant* admin. A re-login **never revokes** it — leaving the admin
+group does *not* demote you, and a manual grant is never silently undone by the
+next login. Demotion is done **only** through `PATCH /users/{id}/admin`. This is
+deliberate: it keeps the IdP and the gateway from fighting over the same flag
+on every login.
 
 The flag is read **live from the database on every request** (see
 `provide_current_admin`) and is not carried in the JWT, so both a group-driven
@@ -176,23 +185,23 @@ re-login or token refresh needed.
 
 ### How to configure it — common setups
 
-- **Admins governed by the IdP (recommended for larger orgs).** Put the admin
-  group in `OIDC_ADMIN_GROUPS` and add people to that group in your IdP; they
-  become admins on their next login. Leave `DEFAULT_ROLE=member` so everyone else
-  is a regular user. To remove an admin, remove them from the group **and** run
-  `PATCH /users/{id}/admin {"is_admin": false}` (the group alone won't demote —
-  upgrade-only).
-- **Admins managed in the gateway.** Leave `OIDC_ADMIN_GROUPS` empty. New SSO users
-  get `DEFAULT_ROLE` (usually `member`); promote/demote with the endpoint. SSO
-  never touches the flag again.
-- **Small trusted deployment.** `DEFAULT_ROLE=admin` — everyone who can SSO in is
-  created as an admin.
+- **Admins governed by the IdP (recommended for larger orgs).** Add the admin
+  group in **Console → SSO** and add people to that group in your IdP; they
+  become admins on their next login. Keep the default role as `member` so
+  everyone else is a regular user. To remove an admin, remove them from the
+  group **and** run `PATCH /users/{id}/admin {"is_admin": false}` (the group
+  alone won't demote — upgrade-only).
+- **Admins managed in the gateway.** Leave admin groups empty. New SSO users
+  get the configured default role (usually `member`); promote/demote with the
+  endpoint. SSO never touches the flag again.
+- **Small trusted deployment.** Set the default role to `admin` — everyone who
+  can SSO in is created as an admin.
 
-### ⚠️ What `OIDC_ADMIN_GROUPS` must contain (Entra/Azure AD gotcha)
+### ⚠️ What the admin-groups setting must contain (Entra/Azure AD gotcha)
 
-The gateway matches the values your IdP puts in the token's `groups` claim. **Entra
-ID by default emits group *object IDs* (GUIDs), not display names.** So with the
-default Entra config you list the GUID, not the name:
+The gateway matches the values your IdP puts in the token's `groups` claim.
+**Entra ID by default emits group *object IDs* (GUIDs), not display names.**
+Enter those IDs in Console → SSO. The equivalent legacy env fallback is:
 
 ```env
 OIDC_ADMIN_GROUPS=a1b2c3d4-e5f6-7890-abcd-ef1234567890
@@ -204,8 +213,11 @@ on-prem AD). Okta/Keycloak/Google typically emit the name directly.
 
 ### Internals (where the logic lives)
 
-- `config.py` — parses `DEFAULT_ROLE` (`_env_choice`, validated to `member|admin`,
-  fails fast on a typo) and exposes `Settings.default_admin`.
+- `infrastructure/persistence/sso_settings_repository.py` and
+  `infrastructure/web/sso_settings/` — persist and expose the encrypted,
+  DB-backed settings managed by the console.
+- `config.py` — validates the legacy environment fallback, including
+  `DEFAULT_ROLE` (`member|admin`).
 - `infrastructure/web/session/sso.py` (`sso_callback`) — computes `group_admin`
   from the groups claim and calls the service with `group_admin` + `default_admin`.
 - `application/user_service.py` (`upsert_sso_user`) — applies the upgrade-only rule
@@ -220,10 +232,11 @@ provisioning/deprovisioning is implemented (§3).
 
 ## 5. Group → team / role mapping — **implemented**
 
-Configured via `SSO_TEAM_MAPPING` (env, JSON): IdP group → list of
+Configured from **Console → SSO** as a JSON mapping from IdP group to a list of
 `{team: <team-uuid>, role: admin|member}` grants (`role` defaults to `member`).
-Malformed JSON fails fast at startup. Teams are referenced by UUID (names are not
-globally unique); name-based resolution could be a follow-up.
+`SSO_TEAM_MAPPING` provides the legacy environment fallback. Malformed JSON
+fails fast. Teams are referenced by UUID (names are not globally unique);
+name-based resolution could be a follow-up.
 
 On each SSO login the callback derives the desired `(team → role)` grants and the
 set of **SSO-governed** teams (the mapping's codomain), then
@@ -248,7 +261,7 @@ truth for what each role may do. Enforcement is centralized in
 management endpoint declares the one permission it needs; no role names are
 re-checked inline.
 
-**Team roles** (per-membership, also assignable via `SSO_TEAM_MAPPING` §5):
+**Team roles** (per-membership, also assignable via the SSO team mapping in §5):
 
 | Role | Permissions |
 |------|-------------|
@@ -271,7 +284,8 @@ Not yet done: custom (DB-defined) roles, per-org roles.
 
 - Append-only record of privileged actions (login, SSO/SCIM events, key/credential
   create/revoke, team/member/role changes, budget changes): who, what, when, from
-  where, result. Written off the hot path (like the trace sink / usage events).
+  where, result. Written synchronously on management paths; it is separate from
+  the inference trace-export queue.
 - Exposed to platform/org admins; retained per policy.
 
 ## 8. Compliance (process, not just code)

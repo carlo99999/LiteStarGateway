@@ -31,9 +31,11 @@ server), which is not a production setup.
 
 ## 3. Multi-process implications (call out)
 
-Rate-limit and any future cache use an in-memory store per process. With multiple
-workers, back them with a **shared store (Redis)** or limits are per-worker. Tie
-this to the rate-limit/observability docs.
+Rate limiting uses Redis when `REDIS_URL` is configured and otherwise falls back
+to an in-memory store per process. Multi-worker or multi-replica deployments
+therefore need Redis for globally consistent limits. Future shared caches should
+reuse the same explicit adapter boundary rather than assuming process-local
+state is global.
 
 ## 4. Decisions (as implemented)
 

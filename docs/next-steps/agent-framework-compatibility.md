@@ -130,6 +130,20 @@ Level A compatibility depends on getting these details right:
 The gateway should not need to know that the caller is Pydantic AI or LangChain.
 If the wire protocol is correct, framework compatibility follows naturally.
 
+## Level B — remaining Responses fidelity
+
+The Level A and provider-native contracts are delivered. The remaining Level B
+work is tracked in
+[`docs/next-steps/responses-level-b.md`](responses-level-b.md) and
+[`plans/09-responses-level-b.md`](../../plans/09-responses-level-b.md):
+
+1. fail loudly on every Responses field the chat-emulation path cannot represent
+   faithfully — accepting then ignoring a field is forbidden;
+2. add function tools, `function_call` output items, `function_call_output` input
+   and the ordered streaming argument/item events;
+3. keep multimodal, stored/stateful, built-in-tool and reasoning features at a
+   precise 501 until a faithful mapping exists.
+
 ## Documentation deliverables
 
 Add a user-facing "Agent frameworks" page with copy-paste snippets:
@@ -181,8 +195,8 @@ lossy; fail clearly and document the native path.
    real gateway HTTP app with fake upstream providers.
 3. **Tool-call hardening** — close gaps found by the harness, especially
    provider paths that currently cannot carry tools faithfully.
-4. **Responses gap analysis** — decide what Level B means for this gateway and
-   document unsupported Responses features explicitly.
+4. **Responses Level B** — execute Plan 09: fail-loud gate first, then buffered
+   and streaming function-call fidelity with SDK canaries.
 5. **Provider-native track** — implement
    `docs/next-steps/native-provider-endpoints.md` for Claude/Gemini users who
    need native semantics.

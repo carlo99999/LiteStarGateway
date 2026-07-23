@@ -142,6 +142,7 @@ docs-prepare:
     ln -sfn ../SECURITY.md .mkdocs-docs/SECURITY.md
     ln -sfn ../docs .mkdocs-docs/docs
     ln -sfn ../issues .mkdocs-docs/issues
+    ln -sfn ../plans .mkdocs-docs/plans
 
 # Build the MkDocs documentation site.
 docs-build: docs-prepare

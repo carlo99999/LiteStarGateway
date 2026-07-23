@@ -51,7 +51,8 @@ Still open:
 
 4. **CI check**: add a test/CI step asserting "no pending autogenerate diff"
    (models and migrations are in sync), to catch forgotten migrations — not yet
-   in the CI workflow.
+   in the CI workflow. Plan 11 promotes this to a release gate: run the existing
+   `just migration-check` command and fail on any diff.
 
 ## 5. Testing
 

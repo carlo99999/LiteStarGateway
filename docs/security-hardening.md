@@ -39,8 +39,7 @@ already shipped (moved here from the README as the list grew).
   (single-writer, weak concurrency); the test suite runs on it. Production
   **requires** the Postgres backend (the compose default) — the app fails fast
   at startup on SQLite there. A Postgres job in CI covers the migration chain
-  and the persistence subset; running the *full* suite on Postgres in CI is a
-  follow-up.
+  and runs the full suite against the production dialect.
 - **No branch protection / CI merge gate (single maintainer)** — `main` is not
   protected and there is no required CI check on merge. This is an accepted
   limit while the project has a single contributor: every change is still

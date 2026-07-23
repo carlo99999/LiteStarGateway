@@ -65,52 +65,70 @@ validation:
 
 nav:
   - Overview:
-      - README: index.md
-      - Examples: EXAMPLES.md
-      - Contributing: CONTRIBUTING.md
-      - Security policy: SECURITY.md
-      - Security model & hardening: docs/security-hardening.md
-  - Admin console:
-      - Console guide: docs/admin-console.md
-  - Operations:
-      - Operations guide: docs/operations.md
-      - Deployment (design): docs/deployment.md
-      - PostgreSQL: docs/postgres.md
-      - Database migrations: docs/db-migrations.md
-      - CI: docs/ci.md
-      - Logging: docs/logging.md
-      - Secrets rotation: docs/secrets-rotation.md
-  - Gateway:
+      - Home: index.md
+      - Copy-paste examples: EXAMPLES.md
+      - Admin console: docs/admin-console.md
+  - Use the gateway:
       - API reference (interactive): docs/api-reference.md
       - OpenAI-compatible API: docs/openai-compatible.md
       - Agent frameworks: docs/agent-frameworks.md
+      - Provider APIs:
+          - Native Anthropic: docs/native-anthropic.md
+          - Native Gemini: docs/native-gemini.md
+          - AWS Bedrock: docs/bedrock.md
+  - Admin and governance:
       - Usage and cost: docs/usage-cost.md
-      - Observability: docs/observability.md
       - Parameter allowlist: docs/param-allowlist.md
-      - Provider resilience: docs/provider-resilience.md
-      - Bedrock: docs/bedrock.md
-      - Native Anthropic endpoint: docs/native-anthropic.md
-      - Native Gemini endpoint: docs/native-gemini.md
-  - Identity and access:
       - Enterprise SSO: docs/enterprise-sso.md
       - Account recovery: docs/account-recovery.md
   - Routing:
       - Smart routing: docs/next-steps/smart-routing.md
-      - Semantic embeddings: docs/routing-embeddings.md
-      - Webhook routing: docs/routing-webhook.md
       - Weighted routing: docs/weighted-routing.md
-  - Next steps:
-      - Agent framework compatibility: docs/next-steps/agent-framework-compatibility.md
-      - Provider-native endpoints: docs/next-steps/native-provider-endpoints.md
-  - Review issues:
-      - Index: issues/INDEX.md
-      - Round 10: issues/round-10.md
-      - Round 9: issues/round-9.md
-      - Round 8: issues/round-8.md
-      - Round 7: issues/round-7.md
-      - Round 6: issues/round-6.md
-      - Round 5: issues/round-5.md
-      - Round 4: issues/round-4.md
-      - Round 3: issues/round-3.md
-      - Round 2: issues/round-2.md
-      - Round 1: issues/round-1.md
+      - Semantic routing: docs/routing-embeddings.md
+      - Webhook routing: docs/routing-webhook.md
+  - Observe and operate:
+      - Observability: docs/observability.md
+      - Logging: docs/logging.md
+      - Provider resilience: docs/provider-resilience.md
+      - Operations guide: docs/operations.md
+      - Deployment design: docs/deployment.md
+      - PostgreSQL: docs/postgres.md
+      - Database migrations: docs/db-migrations.md
+      - Secrets rotation: docs/secrets-rotation.md
+      - Security hardening: docs/security-hardening.md
+      - Security policy: SECURITY.md
+  - Roadmap:
+      - Priorities and status: plans/README.md
+      - Active execution plans:
+          - 04 · Response caching: plans/04-response-caching.md
+          - 05 · Cross-provider failover: plans/05-cross-provider-failover.md
+          - 06 · Guardrails: plans/06-guardrails.md
+          - 07 · Budget alerts: plans/07-budget-alerts.md
+          - 08 · Extended endpoints: plans/08-extended-endpoints.md
+          - 09 · Responses API Level B: plans/09-responses-level-b.md
+          - 10 · Usage analytics: plans/10-usage-analytics.md
+          - 11 · Platform quality gates: plans/11-platform-quality-gates.md
+          - 12 · Routing evolution: plans/12-routing-evolution.md
+          - 13 · Billing integrity: plans/13-billing-integrity.md
+      - Design proposals:
+          - Response caching: docs/next-steps/response-caching.md
+          - Cross-provider failover: docs/next-steps/cross-provider-failover.md
+          - Guardrails: docs/next-steps/guardrails.md
+          - Budget alerts: docs/next-steps/budget-alerts.md
+          - Extended endpoints: docs/next-steps/extended-endpoints.md
+          - Responses API Level B: docs/next-steps/responses-level-b.md
+          - Usage analytics: docs/next-steps/usage-analytics.md
+          - Routing evolution: docs/next-steps/routing-evolution.md
+          - Billing integrity and retention: docs/next-steps/billing-integrity.md
+      - Shipped milestones:
+          - 01 · Provider-native endpoints: plans/01-native-provider-endpoints.md
+          - 01a · Anthropic Messages: plans/01a-anthropic-messages-phase1.md
+          - 02 · Agent frameworks: plans/02-agent-frameworks.md
+          - 03 · Admin UI: plans/03-admin-ui.md
+      - Background designs:
+          - Agent framework compatibility: docs/next-steps/agent-framework-compatibility.md
+          - Provider-native endpoints: docs/next-steps/native-provider-endpoints.md
+  - Engineering:
+      - Contributing: CONTRIBUTING.md
+      - Continuous integration: docs/ci.md
+      - Review archive: issues/INDEX.md
