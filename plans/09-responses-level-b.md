@@ -4,19 +4,25 @@
 
 **Depends on:** Plan 02 (complete) and the existing Responses emulation adapter.
 
+**Status:** Phase 0 complete; Phase 1 is next.
+
 **Theme:** eliminate silent feature drops, then add faithful tool-call items and
 events for chat-only upstreams.
 
-## Phase 0 — Fail loudly
+## Phase 0 — Fail loudly — ✅ complete
 
-- Add a pure emulation-capability validator.
-- Add a provider-aware preparation hook after model resolution and before
+- Added a pure emulation-capability validator.
+- Added a provider-aware preparation hook after model resolution and before
   `UsageMeter.admit`; use it for emulation capability checks.
-- Reject `tools` only until Phase 1 lands; always reject still-lossy multimodal,
+- Rejects `tools` only until Phase 1 lands; always rejects still-lossy multimodal,
   stateful, built-in-tool and reasoning inputs.
-- Audit the native Responses allowlist and retain every field the native
-  adapters support.
-- Map the rejection to the existing OpenAI-shaped 501 response.
+- Audited the native Responses allowlist and retained every synchronous,
+  stateless field the adapters can bill and isolate safely.
+- Forces native `store=false`; hosted tools, extended cache retention and
+  provider-owned resource IDs remain fail-closed until their cost and ownership
+  are governed.
+- Maps rejection to the existing OpenAI-shaped 501 response, including before
+  an SSE stream opens.
 - **Done when:** every Responses field accepted by the sanitizer is either
   translated or rejected before the fake provider is invoked.
 
@@ -49,7 +55,8 @@ events for chat-only upstreams.
 ## TDD and risk gates
 
 - Write translator/event tests first; then endpoint integration; then SDK canary.
-- Regression: native Responses passthrough stays byte/shape compatible.
+- Regression: governed native Responses passthrough stays byte/shape compatible;
+  background, tier selection and opaque stored-state IDs remain fail-closed.
 - Regression: unsupported features fail before provider invocation and before
   budget admission.
 - Run the full Python gate and conformance suite after every phase.

@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from litestar_gateway.domain.entities.enums import Provider
-from litestar_gateway.domain.exceptions import UnsupportedNativeField
+from litestar_gateway.domain.entities import Model, Provider
+from litestar_gateway.domain.exceptions import UnsupportedNativeField, UnsupportedOperation
 
 # Accepted fields per operation. Anything else (including transport overrides
 # like extra_headers/extra_body/extra_query/timeout/api_key) is dropped.
@@ -49,10 +49,15 @@ _ALLOWED: dict[str, frozenset[str]] = {
     ),
     "responses": frozenset(
         {
+            "background",
+            "context_management",
+            "conversation",
+            "include",
             "model",
             "input",
             "instructions",
             "max_output_tokens",
+            "max_tool_calls",
             "temperature",
             "top_p",
             "tools",
@@ -61,9 +66,19 @@ _ALLOWED: dict[str, frozenset[str]] = {
             "text",
             "reasoning",
             "metadata",
+            "moderation",
+            "prompt",
+            "prompt_cache_key",
+            "prompt_cache_options",
+            "prompt_cache_retention",
+            "safety_identifier",
+            "service_tier",
             "store",
             "previous_response_id",
             "stream",
+            "stream_options",
+            "top_logprobs",
+            "truncation",
             "user",
         }
     ),
@@ -97,6 +112,40 @@ _OUTPUT_TOKEN_FIELD = {
     "responses": "max_output_tokens",
 }
 
+_NATIVE_RESPONSES_PROVIDERS = frozenset({Provider.OPENAI, Provider.AZURE_OPENAI})
+_EMULATED_RESPONSES_FIELDS = frozenset(
+    {
+        "model",
+        "input",
+        "instructions",
+        "max_output_tokens",
+        "temperature",
+        "top_p",
+        "text",
+        "store",
+        "stream",
+    }
+)
+_EMULATED_TEXT_FORMATS = frozenset({"text", "json_object", "json_schema"})
+_EMULATED_TEXT_PARTS = frozenset({"text", "input_text", "output_text"})
+_EMULATED_MESSAGE_FIELDS = frozenset({"type", "role", "content"})
+_EMULATED_MESSAGE_ROLES = frozenset({"user", "assistant", "system"})
+_EMULATED_CONTENT_FIELDS = frozenset({"type", "text"})
+_EMULATED_CHAT_CONFIG_FIELDS_REQUIRING_TOOL_FIDELITY = frozenset(
+    {"tools", "tool_choice", "parallel_tool_calls"}
+)
+_NATIVE_RESPONSES_GOVERNANCE_FIELDS = frozenset(
+    {
+        "context_management",
+        "conversation",
+        "previous_response_id",
+        "prompt",
+        "prompt_cache_retention",
+        "service_tier",
+    }
+)
+_NATIVE_RESPONSES_LOCAL_TOOL_TYPES = frozenset({"function", "custom"})
+
 
 def _clamp_int(value: Any, ceiling: int) -> Any:
     # bool is an int subclass; leave non-ints for the provider to validate.
@@ -119,6 +168,245 @@ def sanitize_request(operation: str, request: dict[str, Any]) -> dict[str, Any]:
         if field in cleaned:
             cleaned[field] = _clamp_int(cleaned[field], MAX_TOKENS)
     return cleaned
+
+
+def _unsupported_responses_fields(request: dict[str, Any]) -> list[str]:
+    unsupported = [
+        field
+        for field, value in request.items()
+        if field not in _EMULATED_RESPONSES_FIELDS and value is not None
+    ]
+    if request.get("store") not in (None, False):
+        unsupported.append("store")
+    return sorted(set(unsupported))
+
+
+def _validate_emulated_text(provider: Provider, text: Any) -> None:
+    if text is None:
+        return
+    if not isinstance(text, dict):
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses field 'text' with this shape"
+        )
+    unsupported = sorted(set(text) - {"format"})
+    if unsupported:
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses field(s): "
+            f"{', '.join(f'text.{field}' for field in unsupported)}"
+        )
+    fmt = text.get("format")
+    if fmt is None:
+        return
+    format_type = fmt.get("type") if isinstance(fmt, dict) else None
+    if (
+        not isinstance(fmt, dict)
+        or not isinstance(format_type, str)
+        or format_type not in _EMULATED_TEXT_FORMATS
+    ):
+        format_type = fmt.get("type") if isinstance(fmt, dict) else type(fmt).__name__
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses text format '{format_type}'"
+        )
+    allowed_fields = (
+        {"type", "name", "schema", "strict"} if format_type == "json_schema" else {"type"}
+    )
+    unsupported = sorted(set(fmt) - allowed_fields)
+    if unsupported:
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses field(s): "
+            f"{', '.join(f'text.format.{field}' for field in unsupported)}"
+        )
+
+
+def _validate_emulated_input(provider: Provider, value: Any) -> None:
+    if value is None or isinstance(value, str):
+        return
+    if not isinstance(value, list):
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses input shape "
+            f"'{type(value).__name__}'"
+        )
+    for item in value:
+        if not isinstance(item, dict):
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' cannot emulate Responses input item "
+                f"'{type(item).__name__}'"
+            )
+        item_type = item.get("type")
+        if item_type not in (None, "message"):
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' cannot emulate Responses input item "
+                f"type '{item_type}'"
+            )
+        unsupported = sorted(set(item) - _EMULATED_MESSAGE_FIELDS)
+        if unsupported:
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' cannot emulate Responses field(s): "
+                f"{', '.join(f'input.{field}' for field in unsupported)}"
+            )
+        role = item.get("role", "user")
+        if not isinstance(role, str) or role not in _EMULATED_MESSAGE_ROLES:
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' cannot emulate Responses input role '{role}'"
+            )
+        _validate_emulated_content(provider, item.get("content"))
+
+
+def _validate_emulated_content(provider: Provider, content: Any) -> None:
+    if content is None or isinstance(content, str):
+        return
+    if not isinstance(content, list):
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses input content shape "
+            f"'{type(content).__name__}'"
+        )
+    for part in content:
+        if isinstance(part, str):
+            continue
+        part_type = part.get("type") if isinstance(part, dict) else type(part).__name__
+        if (
+            not isinstance(part, dict)
+            or not isinstance(part_type, str)
+            or part_type not in _EMULATED_TEXT_PARTS
+            or not isinstance(part.get("text"), str)
+        ):
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' cannot emulate Responses input content "
+                f"type '{part_type}'"
+            )
+        if isinstance(part, dict):
+            unsupported = sorted(set(part) - _EMULATED_CONTENT_FIELDS)
+            if unsupported:
+                raise UnsupportedOperation(
+                    f"Provider '{provider.value}' cannot emulate Responses field(s): "
+                    f"{', '.join(f'input.content.{field}' for field in unsupported)}"
+                )
+
+
+def _input_resource_paths(request: dict[str, Any]) -> list[str]:
+    paths: list[str] = []
+    items = request.get("input")
+    if not isinstance(items, list):
+        return paths
+    for item_index, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        item_type = item.get("type")
+        if item_type == "item_reference":
+            paths.append(f"input[{item_index}].item_reference")
+        elif "id" in item and item_type is None:
+            paths.append(f"input[{item_index}].id")
+        content = item.get("content")
+        if not isinstance(content, list):
+            continue
+        for content_index, part in enumerate(content):
+            part_type = part.get("type") if isinstance(part, dict) else None
+            if (
+                isinstance(part, dict)
+                and isinstance(part_type, str)
+                and part_type in {"input_file", "input_image"}
+                and part.get("file_id") is not None
+            ):
+                paths.append(f"input[{item_index}].content[{content_index}].file_id")
+    return paths
+
+
+def _malformed_native_discriminator_paths(request: dict[str, Any]) -> list[str]:
+    paths: list[str] = []
+    tools = request.get("tools")
+    if isinstance(tools, list):
+        for index, tool in enumerate(tools):
+            if isinstance(tool, dict) and "type" in tool and not isinstance(tool["type"], str):
+                paths.append(f"tools[{index}].type")
+    items = request.get("input")
+    if not isinstance(items, list):
+        return paths
+    for item_index, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        if "type" in item and not isinstance(item["type"], str):
+            paths.append(f"input[{item_index}].type")
+        content = item.get("content")
+        if not isinstance(content, list):
+            continue
+        for content_index, part in enumerate(content):
+            if isinstance(part, dict) and "type" in part and not isinstance(part["type"], str):
+                paths.append(f"input[{item_index}].content[{content_index}].type")
+    return paths
+
+
+def _hosted_tool_paths(request: dict[str, Any]) -> list[str]:
+    tools = request.get("tools")
+    if not isinstance(tools, list):
+        return []
+    paths: list[str] = []
+    for index, tool in enumerate(tools):
+        tool_type = tool.get("type") if isinstance(tool, dict) else None
+        if isinstance(tool_type, str) and tool_type not in _NATIVE_RESPONSES_LOCAL_TOOL_TYPES:
+            paths.append(f"tools[{index}].{tool_type}")
+    return paths
+
+
+def _validate_native_responses_governance(model: Model, request: dict[str, Any]) -> dict[str, Any]:
+    effective = model.merge_params(request)
+    unsupported = [
+        field for field in _NATIVE_RESPONSES_GOVERNANCE_FIELDS if effective.get(field) is not None
+    ]
+    if effective.get("background") not in (None, False):
+        unsupported.append("background")
+    if effective.get("store") not in (None, False):
+        unsupported.append("store")
+    unsupported.extend(_malformed_native_discriminator_paths(effective))
+    unsupported.extend(_hosted_tool_paths(effective))
+    unsupported.extend(_input_resource_paths(effective))
+    if unsupported:
+        raise UnsupportedOperation(
+            f"Provider '{model.provider.value}' cannot accept Responses field(s) through "
+            f"this multi-tenant gateway: {', '.join(sorted(unsupported))}; asynchronous "
+            "billing, tier-aware pricing, and tenant-bound provider state are not yet "
+            "available"
+        )
+    return {**request, "store": False}
+
+
+def _validate_emulated_model_config(model: Model) -> None:
+    configured = {**model.params, **model.params_enforced}
+    unsupported = sorted(
+        field
+        for field in _EMULATED_CHAT_CONFIG_FIELDS_REQUIRING_TOOL_FIDELITY
+        if configured.get(field) is not None
+    )
+    n = configured.get("n")
+    if isinstance(n, int) and not isinstance(n, bool) and n > 1:
+        unsupported.append("n")
+    if unsupported:
+        raise UnsupportedOperation(
+            f"Provider '{model.provider.value}' cannot emulate Responses with configured "
+            f"model field(s): {', '.join(sorted(set(unsupported)))}"
+        )
+
+
+def validate_responses_request(model: Model, request: dict[str, Any]) -> dict[str, Any]:
+    """Return a governed copy, failing when Responses data or policy would be lost."""
+    if model.provider in _NATIVE_RESPONSES_PROVIDERS:
+        return _validate_native_responses_governance(model, request)
+    _validate_emulated_model_config(model)
+    instructions = request.get("instructions")
+    if instructions is not None and not isinstance(instructions, str):
+        raise UnsupportedOperation(
+            f"Provider '{model.provider.value}' cannot emulate Responses field "
+            f"'instructions' with shape '{type(instructions).__name__}'"
+        )
+    unsupported = _unsupported_responses_fields(request)
+    if unsupported:
+        raise UnsupportedOperation(
+            f"Provider '{model.provider.value}' cannot emulate Responses field(s): "
+            f"{', '.join(unsupported)}; use a native Responses provider or remove "
+            "the unsupported fields"
+        )
+    _validate_emulated_text(model.provider, request.get("text"))
+    _validate_emulated_input(model.provider, request.get("input"))
+    return dict(request)
 
 
 # --- Native passthrough governance ---------------------------------------------

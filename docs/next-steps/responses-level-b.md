@@ -1,19 +1,20 @@
 # Design doc — Responses API Level B
 
-> **Status:** proposed. `/v1/responses` is native for the current allowlisted
-> subset on providers with a Responses API and supports text +
-> structured-output emulation over chat-only providers. The remaining contract
-> gap is faithful tool/function-call items and streaming events on those
-> chat-only providers, plus an allowlist parity audit for native passthrough.
+> **Status:** Phase 0 shipped. `/v1/responses` preserves the governed,
+> synchronous and stateless OpenAI SDK request surface for OpenAI/Azure and
+> supports text + structured-output emulation over chat-only providers.
+> Unsupported fields now fail with 501 before router side effects, budget
+> admission or provider dispatch. The remaining contract gap is faithful
+> tool/function-call items and streaming events on chat-only providers.
 > Execution plan:
 > [`plans/09-responses-level-b.md`](../../plans/09-responses-level-b.md).
 
 ## 1. Problem
 
-`domain/request_policy.py` currently accepts Responses fields such as `tools`,
-`tool_choice`, `parallel_tool_calls`, `reasoning`, `store` and
-`previous_response_id`. `infrastructure/llm/responses_emulation.py` only maps
-text/instructions/structured output; its unsupported fields are ignored.
+`domain/request_policy.py` accepts the native Responses SDK surface, while
+`infrastructure/llm/responses_emulation.py` maps only the faithful chat subset:
+text, instructions, sampling controls and structured output. Phase 0 added a
+provider-aware gate so unsupported fields are rejected rather than ignored.
 
 That is incompatible with the gateway's fail-loud contract: an accepted feature
 must be represented faithfully or rejected clearly before the provider call.
@@ -34,17 +35,21 @@ Native Responses providers remain passthrough and must not regress.
 
 ## 3. Fail-loud capability gate
 
-Introduce one explicit, provider-aware Responses capability validator. Extend
-the preparation pipeline with a hook that runs after model resolution and output
-clamping but before `UsageMeter.admit`; emulated paths then validate before
-`to_chat_completions()`. It owns the supported subset and returns a precise 501
-for unsupported multimodal input, stateful conversations, built-in tools or
-reasoning items.
+The provider-aware Responses capability validator runs after model resolution
+and output clamping but before `UsageMeter.admit`; emulated paths therefore
+validate before `to_chat_completions()`. It owns the supported subset and
+returns a precise 501 for unsupported multimodal input, stateful conversations,
+built-in tools or reasoning items.
 
 Error text must name the unsupported field and, where useful, point to a native
 endpoint. No unsupported request may reserve budget or reach an adapter after a
 field has been silently discarded. Native providers also get an allowlist
-parity audit so supported passthrough fields are not stripped prematurely.
+parity test against the installed SDK so supported passthrough fields are not
+stripped prematurely. A separate governance gate rejects background execution,
+client-selected service tiers, hosted tools with non-token fees, extended cache
+retention and opaque stored-state references until asynchronous settlement,
+tier-aware pricing and tenant-bound provider resources exist. Native calls
+force `store=false` when the client omits it.
 
 ## 4. Tool translation
 

@@ -37,8 +37,17 @@ Keep it a **pure function** in the domain (no I/O) → trivially unit-testable.
   - chat.completions: `messages, model, temperature, top_p, max_tokens, max_completion_tokens,
     stop, n, presence_penalty, frequency_penalty, logit_bias, response_format,
     tools, tool_choice, seed, stream, stream_options, user`.
-  - responses: `input, instructions, model, max_output_tokens, temperature, top_p,
-    tools, tool_choice, text, reasoning, metadata, stream`.
+  - responses: the request-body fields exposed by the installed OpenAI SDK,
+    including `input`, `instructions`, `tools`, `text`, `reasoning`,
+    `background`, conversation/state fields, caching controls and `stream`.
+    OpenAI/Azure receive synchronous stateless fields unchanged; asynchronous
+    background work, selectable pricing tiers and opaque provider-state
+    references are rejected until billing and tenant ownership can be enforced.
+    Native calls always carry `store=false`; hosted tools with non-token fees and
+    extended prompt-cache retention are also fail-closed.
+    Chat-only providers accept only text, sampling and structured-output fields;
+    every unsupported field is rejected with 501 before budget admission or
+    provider dispatch.
   - embeddings: `input, model, dimensions, encoding_format, user`.
   - images: `prompt, model, size, quality, style, n, response_format, user`.
 - **Numeric caps** (configurable): cap `n`, `max_tokens`/`max_completion_tokens`

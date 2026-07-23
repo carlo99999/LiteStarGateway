@@ -7,12 +7,14 @@ into a Responses object. Pure translators + a thin wrapper adapter.
 The client keeps using the stock OpenAI SDK (`client.responses.create`), so it
 "just works" — text-in/text-out plus structured outputs (`text.format` is
 translated to the chat `response_format`, which each adapter maps per provider).
-NOT supported (the corresponding request fields are ignored):
+NOT supported (the provider-aware request policy rejects these before budget
+admission and dispatch):
   * tools / function calling
   * multimodal input (images, files, audio)
   * stateful conversations (`previous_response_id`, `store`)
   * reasoning items / built-in tools (web search, file search, ...)
-Natively-supported providers (OpenAI, Azure) get the full Responses feature set.
+Natively-supported providers (OpenAI, Azure) receive the governed synchronous,
+stateless native SDK request surface unchanged.
 """
 
 from __future__ import annotations

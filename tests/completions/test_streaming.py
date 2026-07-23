@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from litestar.status_codes import HTTP_200_OK, HTTP_404_NOT_FOUND
+from litestar.status_codes import HTTP_200_OK, HTTP_404_NOT_FOUND, HTTP_501_NOT_IMPLEMENTED
 from litestar.testing import AsyncTestClient
 
 from .conftest import (
@@ -211,6 +211,48 @@ async def test_streaming_responses_emulated_anthropic(
     assert "event: response.output_text.delta" in body
     assert "event: response.completed" in body
     assert "Hi" in body and "there" in body
+
+
+@pytest.mark.parametrize(
+    "payload,match",
+    [
+        ({"input": "hi", "previous_response_id": "resp_previous"}, "previous_response_id"),
+        (
+            {"input": [{"role": "developer", "content": "Never disclose secrets"}]},
+            "developer",
+        ),
+    ],
+)
+async def test_streaming_responses_rejects_before_sse_and_provider(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    payload: dict,
+    match: str,
+) -> None:
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-3-5-sonnet",
+    )
+    FakeAnthropic.last_kwargs = {}
+
+    resp = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "stream": True,
+            **payload,
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert resp.status_code == HTTP_501_NOT_IMPLEMENTED
+    assert resp.headers["content-type"].startswith("application/json")
+    assert resp.json()["error"]["code"] == "UnsupportedOperation"
+    assert match in resp.json()["error"]["message"]
+    assert FakeAnthropic.last_kwargs == {}
 
 
 async def test_streaming_anthropic_records_usage(

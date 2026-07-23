@@ -228,8 +228,9 @@ Next up:
 - **Agent framework compatibility (Level B)** — the Responses API works
   end to end today when the upstream provider supports it natively (the
   gateway proxies the typed SSE events: `response.output_text.delta`,
-  `response.function_call_arguments.delta`, …). The remaining Level B work
-  is the gateway's *own* faithful Responses translation for chat-only
+  `response.function_call_arguments.delta`, …). Chat-only emulation now rejects
+  every unsupported field before budget admission or provider dispatch. The
+  remaining Level B work is faithful tool-call translation and events for those
   upstreams ([design](docs/next-steps/responses-level-b.md)).
 - **Usage analytics** — attach settled stream usage to routing decisions and add
   temporal cost/token/call charts ([design](docs/next-steps/usage-analytics.md)).

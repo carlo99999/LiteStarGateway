@@ -66,10 +66,11 @@ async def chat_completions(
     "/v1/responses",
     summary="OpenAI-compatible Responses API",
     description=(
-        "OpenAI and Azure use the provider's native Responses API (full feature "
-        "set). Providers without one (e.g. Databricks) are **emulated** over "
-        "chat.completions: text-in/text-out works, but tools, structured outputs, "
-        "multimodal input and stateful conversations are not supported."
+        "OpenAI and Azure use the provider's native Responses API for the "
+        "governed synchronous, stateless SDK surface. Providers without one are "
+        "**emulated** over chat.completions: text and structured outputs work; "
+        "tools, multimodal input, stateful conversations, background execution "
+        "and client-selected service tiers fail explicitly with 501."
     ),
     status_code=HTTP_200_OK,
 )

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import weakref
 from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import replace
 from time import perf_counter
 from typing import Any
 from uuid import UUID
@@ -39,7 +40,11 @@ from litestar_gateway.domain.request_policy import (
     native_reservation_view,
     reject_native_control_kwargs,
     sanitize_request,
+    validate_responses_request,
 )
+from litestar_gateway.domain.routing import CandidateModel, RouterConfig
+
+RequestValidator = Callable[[Model, dict[str, Any]], dict[str, Any]]
 
 
 def _reject_unsupported_n(operation: str, model: Model, request: dict[str, Any]) -> None:
@@ -131,6 +136,58 @@ class CompletionService:
         self._meter = meter
         self._router_service = router_service
         self._callable_resolver = callable_resolver
+
+    async def _candidate_model(self, team_id: UUID, candidate: CandidateModel) -> Model | None:
+        if self._callable_resolver is not None:
+            if candidate.model_id is not None:
+                return await self._callable_resolver.resolve_model_id(team_id, candidate.model_id)
+            resolved = await self._callable_resolver.resolve(team_id, candidate.model_name)
+            if resolved is not None and resolved.kind is CallableKind.MODEL:
+                assert isinstance(resolved.resource, Model)
+                return resolved.resource
+            return None
+        return await self._models.get_by_name(team_id, candidate.model_name)
+
+    async def _validated_router(
+        self,
+        router: RouterConfig,
+        team_id: UUID,
+        operation: str,
+        request: dict[str, Any],
+        request_validator: RequestValidator | None,
+    ) -> RouterConfig:
+        """Remove candidates that cannot honor the request before routing side effects."""
+        if request_validator is None:
+            return router
+        accepted: list[CandidateModel] = []
+        rejected: list[UnsupportedOperation] = []
+        for candidate in router.candidates:
+            model = await self._candidate_model(team_id, candidate)
+            if model is None:
+                raise ModelNotFound(candidate.model_name)
+            candidate_request = clamp_output_tokens(operation, request, model.max_output_tokens)
+            try:
+                request_validator(model, candidate_request)
+            except UnsupportedOperation as exc:
+                rejected.append(exc)
+            else:
+                accepted.append(candidate)
+        if not accepted:
+            if rejected:
+                raise rejected[0]
+            return router
+        if len(accepted) == len(router.candidates):
+            return router
+        accepted_default = next(
+            (candidate for candidate in accepted if candidate.model_name == router.default_model),
+            accepted[0],
+        )
+        return replace(
+            router,
+            candidates=tuple(accepted),
+            default_model=accepted_default.model_name,
+            default_model_id=accepted_default.model_id,
+        )
 
     async def _dispatch(
         self,
@@ -501,6 +558,7 @@ class CompletionService:
         request: dict[str, Any],
         expected_type: ModelType,
         api_key_id: UUID | None,
+        request_validator: RequestValidator | None = None,
     ) -> tuple[Model, dict[str, str], float, dict[str, Any], UsageAttribution]:
         # Gate the caller before router strategies: judge/embedding strategies
         # may make billable provider calls while resolving a virtual model.
@@ -524,10 +582,11 @@ class CompletionService:
             and expected_type is ModelType.CHAT
         ):
             router = resolved.resource
-            from litestar_gateway.domain.routing import RouterConfig
-
             assert isinstance(router, RouterConfig)
             if router.enabled:
+                router = await self._validated_router(
+                    router, team_id, operation, request, request_validator
+                )
                 decision = await self._router_service.route(
                     router, request, acting_team_id=team_id, api_key_id=api_key_id
                 )
@@ -555,6 +614,9 @@ class CompletionService:
             # (clamping, budget admission, metering) runs on the chosen model.
             router = await self._router_service.get_enabled_by_name(team_id, alias)
             if router is not None:
+                router = await self._validated_router(
+                    router, team_id, operation, request, request_validator
+                )
                 decision = await self._router_service.route(
                     router, request, acting_team_id=team_id, api_key_id=api_key_id
                 )
@@ -564,6 +626,8 @@ class CompletionService:
         # Per-model output ceiling: clamp/inject now that the model is known, and
         # reserve from the clamped request so admission and the provider call agree.
         clean = clamp_output_tokens(operation, request, model.max_output_tokens)
+        if request_validator is not None:
+            clean = request_validator(model, clean)
         reservation = await self._meter.admit(team_id, model, clean)
         try:
             values = await self._credentials.get_values(model.credential_id)
@@ -598,7 +662,12 @@ class CompletionService:
     ) -> dict[str, Any]:
         clean = sanitize_request("responses", request)
         model, values, reservation, clean, attribution = await self._prepare(
-            team_id, "responses", clean, ModelType.CHAT, api_key_id
+            team_id,
+            "responses",
+            clean,
+            ModelType.CHAT,
+            api_key_id,
+            validate_responses_request,
         )
         return await self._dispatch(
             team_id,
@@ -645,7 +714,12 @@ class CompletionService:
         Responses-API stream events, metered for usage."""
         clean = sanitize_request("responses", request)
         model, values, reservation, clean, attribution = await self._prepare(
-            team_id, "responses", clean, ModelType.CHAT, api_key_id
+            team_id,
+            "responses",
+            clean,
+            ModelType.CHAT,
+            api_key_id,
+            validate_responses_request,
         )
         try:
             stream = await self._gateway.astream_responses(clean, model, values)

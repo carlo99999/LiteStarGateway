@@ -2,12 +2,59 @@
 
 from __future__ import annotations
 
+import inspect
+from datetime import UTC, datetime
+from uuid import uuid4
+
+import pytest
+from openai.resources.responses.responses import AsyncResponses
+
+from litestar_gateway.domain.entities import Model, ModelType, Provider
+from litestar_gateway.domain.exceptions import UnsupportedOperation
 from litestar_gateway.domain.request_policy import (
     MAX_N,
     MAX_TOKENS,
     clamp_output_tokens,
     sanitize_request,
+    validate_responses_request,
 )
+
+
+def _model(
+    provider: Provider,
+    *,
+    params: dict[str, object] | None = None,
+    params_enforced: dict[str, object] | None = None,
+) -> Model:
+    return Model(
+        id=uuid4(),
+        team_id=uuid4(),
+        name="m",
+        provider=provider,
+        credential_id=uuid4(),
+        type=ModelType.CHAT,
+        provider_model_id="upstream",
+        params=params or {},
+        params_enforced=params_enforced or {},
+        api_version=None,
+        input_cost_per_token=None,
+        output_cost_per_token=None,
+        enabled=True,
+        created_at=datetime.now(UTC),
+    )
+
+
+def _validate_responses_request(
+    provider: Provider,
+    request: dict[str, object],
+    *,
+    params: dict[str, object] | None = None,
+    params_enforced: dict[str, object] | None = None,
+) -> dict[str, object]:
+    return validate_responses_request(
+        _model(provider, params=params, params_enforced=params_enforced),
+        request,
+    )
 
 
 def test_drops_transport_and_unknown_keys() -> None:
@@ -62,6 +109,339 @@ def test_per_operation_allowlists() -> None:
     assert "max_output_tokens" in sanitize_request(
         "responses", {"input": "hi", "max_output_tokens": 10}
     )
+
+
+def test_responses_allowlist_matches_native_sdk_body_fields() -> None:
+    transport_fields = {"self", "extra_headers", "extra_query", "extra_body", "timeout"}
+    sdk_body_fields = set(inspect.signature(AsyncResponses.create).parameters) - transport_fields
+    request = {field: object() for field in sdk_body_fields}
+
+    clean = sanitize_request("responses", request)
+
+    assert set(clean) == sdk_body_fields
+    assert all(field not in clean for field in transport_fields)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("tools", []),
+        ("tool_choice", "auto"),
+        ("parallel_tool_calls", False),
+        ("reasoning", {"effort": "medium"}),
+        ("metadata", {"tenant": "acme"}),
+        ("store", True),
+        ("previous_response_id", "resp_123"),
+        ("user", "user_123"),
+        ("background", True),
+        ("include", ["reasoning.encrypted_content"]),
+    ],
+)
+def test_chat_only_responses_reject_fields_the_emulator_drops(field: str, value: object) -> None:
+    with pytest.raises(UnsupportedOperation, match=field):
+        _validate_responses_request(
+            Provider.DATABRICKS,
+            {"model": "m", "input": "hi", field: value},
+        )
+
+
+def test_chat_only_responses_accept_text_and_structured_output_subset() -> None:
+    _validate_responses_request(
+        Provider.ANTHROPIC,
+        {
+            "model": "m",
+            "instructions": "Be concise",
+            "input": [
+                {
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "hello"}],
+                }
+            ],
+            "max_output_tokens": 200,
+            "temperature": 0.2,
+            "top_p": 0.9,
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "answer",
+                    "schema": {"type": "object"},
+                    "strict": True,
+                }
+            },
+            "store": False,
+            "stream": False,
+        },
+    )
+
+
+def test_chat_only_responses_reject_multimodal_input() -> None:
+    with pytest.raises(UnsupportedOperation, match="input_image"):
+        _validate_responses_request(
+            Provider.VERTEX_AI,
+            {
+                "model": "m",
+                "input": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "input_text", "text": "describe"},
+                            {"type": "input_image", "image_url": "https://example.com/cat.png"},
+                        ],
+                    }
+                ],
+            },
+        )
+
+
+def test_chat_only_responses_reject_function_call_output_input() -> None:
+    with pytest.raises(UnsupportedOperation, match="function_call_output"):
+        _validate_responses_request(
+            Provider.BEDROCK,
+            {
+                "model": "m",
+                "input": [
+                    {
+                        "type": "function_call_output",
+                        "call_id": "call_123",
+                        "output": "sunny",
+                    }
+                ],
+            },
+        )
+
+
+def test_chat_only_responses_reject_unsupported_text_options() -> None:
+    with pytest.raises(UnsupportedOperation, match=r"text\.verbosity"):
+        _validate_responses_request(
+            Provider.ANTHROPIC,
+            {
+                "model": "m",
+                "input": "hi",
+                "text": {"format": {"type": "text"}, "verbosity": "low"},
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    "payload,match",
+    [
+        (
+            {"input": [{"role": "developer", "content": "Never disclose secrets"}]},
+            "developer",
+        ),
+        (
+            {"input": [{"role": "user", "content": "hi", "phase": "commentary"}]},
+            r"input\.phase",
+        ),
+        (
+            {
+                "input": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hi",
+                                "prompt_cache_breakpoint": {"type": "ephemeral"},
+                            }
+                        ],
+                    }
+                ]
+            },
+            r"input\.content\.prompt_cache_breakpoint",
+        ),
+        (
+            {
+                "input": "hi",
+                "text": {
+                    "format": {
+                        "type": "json_schema",
+                        "name": "answer",
+                        "schema": {"type": "object"},
+                        "description": "The answer payload",
+                    }
+                },
+            },
+            r"text\.format\.description",
+        ),
+    ],
+)
+def test_chat_only_responses_reject_nested_fields_that_translation_would_drop(
+    payload: dict[str, object], match: str
+) -> None:
+    with pytest.raises(UnsupportedOperation, match=match):
+        _validate_responses_request(Provider.ANTHROPIC, {"model": "m", **payload})
+
+
+@pytest.mark.parametrize(
+    "payload,match",
+    [
+        ({"input": "hi", "text": {"format": {"type": []}}}, "text format"),
+        ({"input": [{"role": [], "content": "hi"}]}, "input role"),
+        (
+            {"input": [{"role": "user", "content": [{"type": [], "text": "hi"}]}]},
+            "input content type",
+        ),
+    ],
+)
+def test_chat_only_responses_rejects_non_string_discriminators(
+    payload: dict[str, object], match: str
+) -> None:
+    with pytest.raises(UnsupportedOperation, match=match):
+        _validate_responses_request(Provider.ANTHROPIC, {"model": "m", **payload})
+
+
+@pytest.mark.parametrize("instructions", [123, {"text": "hi"}, ["hi"]])
+def test_chat_only_responses_rejects_non_string_instructions(instructions: object) -> None:
+    with pytest.raises(UnsupportedOperation, match="instructions"):
+        _validate_responses_request(
+            Provider.ANTHROPIC,
+            {"model": "m", "input": "hi", "instructions": instructions},
+        )
+
+
+@pytest.mark.parametrize("configured_in", ["params", "params_enforced"])
+def test_chat_only_responses_reject_tool_configured_on_model(configured_in: str) -> None:
+    config: dict[str, object] = {"tools": [{"type": "function", "function": {"name": "weather"}}]}
+    with pytest.raises(UnsupportedOperation, match=r"configured model field\(s\): tools"):
+        if configured_in == "params":
+            _validate_responses_request(
+                Provider.DATABRICKS,
+                {"model": "m", "input": "hi"},
+                params=config,
+            )
+        else:
+            _validate_responses_request(
+                Provider.DATABRICKS,
+                {"model": "m", "input": "hi"},
+                params_enforced=config,
+            )
+
+
+@pytest.mark.parametrize("provider", [Provider.OPENAI, Provider.AZURE_OPENAI])
+def test_native_responses_bypass_emulation_capability_gate(provider: Provider) -> None:
+    _validate_responses_request(
+        provider,
+        {
+            "model": "m",
+            "input": [{"type": "input_image", "image_url": "https://example.com/cat.png"}],
+            "tools": [{"type": "function", "name": "weather", "parameters": {}}],
+            "include": ["reasoning.encrypted_content"],
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("background", True),
+        ("context_management", [{"type": "compaction", "compact_threshold": 1000}]),
+        ("conversation", "conv_123"),
+        ("previous_response_id", "resp_123"),
+        ("prompt", {"id": "pmpt_123"}),
+        ("prompt_cache_retention", "24h"),
+        ("service_tier", "flex"),
+        ("store", True),
+    ],
+)
+@pytest.mark.parametrize("provider", [Provider.OPENAI, Provider.AZURE_OPENAI])
+def test_native_responses_reject_unmetered_or_cross_tenant_state(
+    provider: Provider, field: str, value: object
+) -> None:
+    with pytest.raises(UnsupportedOperation, match=field):
+        _validate_responses_request(
+            provider,
+            {"model": "m", "input": "hi", field: value},
+        )
+
+
+@pytest.mark.parametrize(
+    "tools,match",
+    [
+        ([{"type": "web_search"}], r"tools\[0\]\.web_search"),
+        (
+            [{"type": "file_search", "vector_store_ids": ["vs_other_tenant"]}],
+            r"tools\[0\]\.file_search",
+        ),
+        (
+            [{"type": "code_interpreter", "container": {"type": "auto"}}],
+            r"tools\[0\]\.code_interpreter",
+        ),
+    ],
+)
+def test_native_responses_reject_hosted_tools_with_unmetered_fees(
+    tools: list[dict[str, object]], match: str
+) -> None:
+    with pytest.raises(UnsupportedOperation, match=match):
+        _validate_responses_request(
+            Provider.OPENAI,
+            {"model": "m", "input": "hi", "tools": tools},
+        )
+
+
+def test_native_responses_reject_nested_provider_resource_ids() -> None:
+    with pytest.raises(UnsupportedOperation, match=r"input\[0\]\.content\[0\]\.file_id"):
+        _validate_responses_request(
+            Provider.OPENAI,
+            {
+                "model": "m",
+                "input": [
+                    {
+                        "role": "user",
+                        "content": [{"type": "input_file", "file_id": "file_other_tenant"}],
+                    }
+                ],
+            },
+        )
+
+
+def test_native_responses_reject_implicit_item_reference() -> None:
+    with pytest.raises(UnsupportedOperation, match=r"input\[0\]\.id"):
+        _validate_responses_request(
+            Provider.OPENAI,
+            {"model": "m", "input": [{"id": "item_other_tenant"}]},
+        )
+
+
+def test_native_responses_rejects_non_string_nested_discriminator() -> None:
+    with pytest.raises(UnsupportedOperation, match=r"input\[0\]\.content\[0\]\.type"):
+        _validate_responses_request(
+            Provider.OPENAI,
+            {
+                "model": "m",
+                "input": [
+                    {
+                        "role": "user",
+                        "content": [{"type": [], "file_id": "file_other_tenant"}],
+                    }
+                ],
+            },
+        )
+
+
+def test_native_responses_allows_function_tools_and_forces_stateless_mode() -> None:
+    governed = _validate_responses_request(
+        Provider.OPENAI,
+        {
+            "model": "m",
+            "input": "hi",
+            "tools": [
+                {
+                    "type": "function",
+                    "name": "weather",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "file_id": {"type": "string"},
+                            "container": {"type": "string"},
+                        },
+                    },
+                }
+            ],
+        },
+    )
+
+    assert governed["store"] is False
 
 
 def test_does_not_mutate_input() -> None:
