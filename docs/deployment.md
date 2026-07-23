@@ -15,9 +15,10 @@ server), which is not a production setup.
 - **Dockerfile** (multi-stage): build stage installs deps with `uv` from
   `uv.lock` (reproducible); slim runtime stage copies the venv + source. Non-root
   user. `.dockerignore` to keep the image lean.
-- **ASGI server**: run under **uvicorn** (or gunicorn+uvicorn workers) with
-  multiple workers, `--proxy-headers`, `--forwarded-allow-ips` so the real client
-  IP reaches the app — **required** for the per-IP rate limiting to be meaningful.
+- **ASGI server**: run under **uvicorn** with one worker per container,
+  `--proxy-headers`, `--forwarded-allow-ips` so the real client IP reaches the
+  app — **required** for the per-IP rate limiting to be meaningful. Scale with
+  replicas rather than adding workers to the same container.
 - **TLS**: terminate at a reverse proxy / ingress; document that the app expects
   to sit behind one.
 - **Config**: all via env (already the case). Document required vars
@@ -28,6 +29,14 @@ server), which is not a production setup.
   probe was added.
 - **Docs**: a "Deploy" section in the README + an example `docker-compose.yml`
   (app + Postgres) for local prod-like runs.
+- **Admin UI**: build the React application in a dedicated image stage and copy
+  its static output into the runtime image; the app serves it at `/ui`.
+- **Resource baseline**: reserve and limit each one-worker app container to
+  1 CPU and 4 GiB, matching
+  [LiteLLM's published production baseline](https://docs.litellm.ai/docs/proxy/prod#machine-specifications).
+- **Observability**: do not bundle an MLflow server. `MLFLOW_TRACKING_URI`
+  remains an optional pointer to an externally operated service; empty disables
+  MLflow.
 
 ## 3. Multi-process implications (call out)
 
@@ -49,6 +58,9 @@ state is global.
 4. **Redis**: shipped as a `docker-compose.yml` service and enabled via
    `REDIS_URL` (needed for multi-worker rate limiting; falls back to in-memory
    when unset).
+5. **Production Compose**: app + Postgres + Redis, without reload or MLflow.
+   The same app container serves the pre-built UI and has a 1 CPU / 4 GiB
+   reservation and limit.
 
 ## 5. Rollout
 

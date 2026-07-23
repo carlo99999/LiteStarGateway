@@ -35,8 +35,12 @@ from litestar_gateway.infrastructure.web.rate_limit import build_inference_rate_
 API_PREFIX = "/"
 
 
-def create_api_router(config: SQLAlchemyAsyncConfig) -> Router:
-    # Rate limit (per API key) runs before auth, so floods are throttled cheaply.
+def create_api_router(
+    config: SQLAlchemyAsyncConfig,
+    *,
+    inference_rate_limit_rpm: int,
+) -> Router:
+    # The per-client-IP limit runs before auth, so floods are throttled cheaply.
     return Router(
         path=API_PREFIX,
         route_handlers=[
@@ -50,7 +54,7 @@ def create_api_router(config: SQLAlchemyAsyncConfig) -> Router:
             generate_content,
         ],
         middleware=[
-            build_inference_rate_limit().middleware,
+            build_inference_rate_limit(inference_rate_limit_rpm).middleware,
             DefineMiddleware(APIKeyAuthMiddleware, config=config),
         ],
         # Router-level handlers override the app-level {"detail": ...} shape for

@@ -41,6 +41,7 @@ def _compose_config(
         "MASTER_KEY": "compose-test-master-key",  # pragma: allowlist secret
         "JWT_SECRET": "compose-test-jwt-secret",  # pragma: allowlist secret
         "SALT_KEY": "compose-test-salt-key",  # pragma: allowlist secret
+        "MLFLOW_TRACKING_URI": "",
         **(extra_environment or {}),
     }
     result = subprocess.run(
@@ -71,7 +72,7 @@ def test_dev_compose_provides_live_backend_frontend_and_dependencies() -> None:
     config = _compose_config()
     services = config["services"]
 
-    assert {"db", "redis", "mlflow", "backend", "frontend"} <= services.keys()
+    assert set(services) == {"db", "redis", "backend", "frontend"}
 
     db = services["db"]
     assert db["image"].startswith("postgres:17@sha256:")
@@ -80,13 +81,6 @@ def test_dev_compose_provides_live_backend_frontend_and_dependencies() -> None:
 
     redis = services["redis"]
     assert redis["image"].startswith("redis:7-alpine@sha256:")
-
-    mlflow = services["mlflow"]
-    assert mlflow["build"]["dockerfile"] == DEV_DOCKERFILE.name
-    assert mlflow["build"]["target"] == "mlflow"
-    assert "--allowed-hosts mlflow:5000,localhost,127.0.0.1" in " ".join(mlflow["command"])
-    assert "/health" in " ".join(mlflow["healthcheck"]["test"])
-    assert "ports" not in mlflow
 
     backend = services["backend"]
     assert backend["build"]["dockerfile"] == DEV_DOCKERFILE.name
@@ -99,7 +93,8 @@ def test_dev_compose_provides_live_backend_frontend_and_dependencies() -> None:
     assert "--host 0.0.0.0" in backend_command
     assert "/health/ready" in " ".join(backend["healthcheck"]["test"])
     assert backend["depends_on"]["db"]["condition"] == "service_healthy"
-    assert backend["depends_on"]["mlflow"]["condition"] == "service_healthy"
+    assert set(backend["depends_on"]) == {"db", "redis"}
+    assert backend["environment"]["MLFLOW_TRACKING_URI"] == ""
     assert backend["ports"] == [
         {
             "host_ip": "127.0.0.1",
@@ -149,7 +144,7 @@ def test_dev_compose_provides_live_backend_frontend_and_dependencies() -> None:
     assert "/ui/" in " ".join(frontend["healthcheck"]["test"])
 
 
-def test_prod_compose_starts_hardened_observability_before_the_app() -> None:
+def test_prod_compose_keeps_the_ui_without_bundling_mlflow() -> None:
     config = _compose_config(PROD_COMPOSE_FILE)
     dev_config = _compose_config()
     services = config["services"]
@@ -161,26 +156,26 @@ def test_prod_compose_starts_hardened_observability_before_the_app() -> None:
     assert postgres_image == dev_config["services"]["db"]["image"]
     assert redis_image == dev_config["services"]["redis"]["image"]
 
-    mlflow_init = services["mlflow-init"]
-    assert re.fullmatch(
-        r"ghcr\.io/mlflow/mlflow:v3\.14\.0@sha256:[0-9a-f]{64}",
-        mlflow_init["image"],
-    )
-    assert mlflow_init["user"] == "0:0"
-    assert "chown -R 10001:10001 /mlflow" in " ".join(mlflow_init["command"])
-    assert _volume_for(mlflow_init, "/mlflow")["source"] == "mlflow-data"
-
-    mlflow = services["mlflow"]
-    assert mlflow["build"]["dockerfile"] == PROD_DOCKERFILE.name
-    assert mlflow["build"]["target"] == "mlflow"
-    assert "--allowed-hosts mlflow:5000,localhost,127.0.0.1" in " ".join(mlflow["command"])
-    assert "/health" in " ".join(mlflow["healthcheck"]["test"])
-    assert "ports" not in mlflow
-    assert mlflow["depends_on"]["mlflow-init"]["condition"] == "service_completed_successfully"
+    assert "mlflow-init" not in services
+    assert "mlflow" not in services
+    assert "mlflow-data" not in config["volumes"]
 
     app = services["app"]
     assert app["build"]["target"] == "runtime"
-    assert app["depends_on"]["mlflow"]["condition"] == "service_healthy"
+    assert set(app["depends_on"]) == {"db", "redis"}
+    assert app["environment"]["MLFLOW_TRACKING_URI"] == ""
+    assert app["deploy"]["resources"] == {
+        "limits": {"cpus": 1, "memory": str(4 * 1024**3)},
+        "reservations": {"cpus": 1, "memory": str(4 * 1024**3)},
+    }
+    external_mlflow = _compose_config(
+        PROD_COMPOSE_FILE,
+        {"MLFLOW_TRACKING_URI": "https://mlflow.example.com"},
+    )
+    assert (
+        external_mlflow["services"]["app"]["environment"]["MLFLOW_TRACKING_URI"]
+        == "https://mlflow.example.com"
+    )
     assert "/health/ready" in " ".join(app["healthcheck"]["test"])
     assert app["ports"] == [
         {
@@ -193,8 +188,9 @@ def test_prod_compose_starts_hardened_observability_before_the_app() -> None:
     ]
 
     dockerfile_source = PROD_DOCKERFILE.read_text(encoding="utf-8")
-    assert "AS mlflow" in dockerfile_source
-    assert "USER mlflow" in dockerfile_source
+    assert "AS mlflow" not in dockerfile_source
+    assert "AS ui" in dockerfile_source
+    assert "COPY --from=ui --chown=app:app /app/ui/dist /app/ui/dist" in dockerfile_source
 
     custom_port_config = _compose_config(PROD_COMPOSE_FILE, {"APP_PORT": "18080"})
     assert custom_port_config["services"]["app"]["ports"] == [
@@ -217,7 +213,7 @@ def test_dev_compose_requires_secrets_instead_of_storing_them() -> None:
     dockerfile_source = DEV_DOCKERFILE.read_text(encoding="utf-8")
     assert "USER app" in dockerfile_source
     assert "USER node" in dockerfile_source
-    assert "USER mlflow" in dockerfile_source
+    assert "AS mlflow" not in dockerfile_source
 
     dockerignore_source = (ROOT / ".dockerignore").read_text(encoding="utf-8")
     assert ".env*" in dockerignore_source
@@ -298,6 +294,20 @@ def test_ui_dependency_fingerprint_includes_toolchain_and_platform() -> None:
 
     assert '"$ROOT/Dockerfile.dev"' in launcher
     assert "docker info --format" in launcher
+
+
+def test_load_script_generates_the_ignored_prod_overlay() -> None:
+    launcher = (ROOT / "scripts" / "load-compose.sh").read_text(encoding="utf-8")
+    gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+    justfile = (ROOT / "justfile").read_text(encoding="utf-8")
+
+    assert "docker-compose.load.yml" in gitignore
+    assert "litestar-gateway-dev_pg-dev-data" in launcher
+    assert "INFERENCE_RATE_LIMIT_RPM" in launcher
+    assert "MAX_RETRIES" in launcher
+    assert '"$ROOT/scripts/dev-compose.sh" down' in launcher
+    assert "load-prod-up:" in justfile
+    assert "./scripts/load-compose.sh up" in justfile
 
 
 def test_dev_script_rejects_symlinked_secret_file(tmp_path: Path) -> None:
