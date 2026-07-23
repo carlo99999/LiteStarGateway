@@ -16,7 +16,7 @@ PROJECTIONS = (
 )
 
 
-@pytest.mark.parametrize("build_file", ["justfile", "Dockerfile"])
+@pytest.mark.parametrize("build_file", ["justfile", "Dockerfile", "Dockerfile.dev"])
 def test_mkdocs_projection_includes_every_nav_source(build_file: str) -> None:
     contents = (ROOT / build_file).read_text()
 
