@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import gc
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -17,6 +18,7 @@ import pytest
 from litestar_gateway.application.completion_service import CompletionService
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.budget import window_start
+from litestar_gateway.domain.callable_alias import CallableKind
 from litestar_gateway.domain.entities import (
     Budget,
     BudgetWindow,
@@ -27,12 +29,18 @@ from litestar_gateway.domain.entities import (
     UsageEvent,
 )
 from litestar_gateway.domain.exceptions import BudgetExceeded, UnsupportedOperation
+from litestar_gateway.domain.routing import CandidateModel, QualityTier, RouterConfig
 
 TEAM_ID = uuid4()
 KEY_ID = uuid4()
 
 
-def _model(provider: Provider = Provider.OPENAI) -> Model:
+def _model(
+    provider: Provider = Provider.OPENAI,
+    *,
+    params: dict[str, Any] | None = None,
+    params_enforced: dict[str, Any] | None = None,
+) -> Model:
     return Model(
         id=uuid4(),
         team_id=TEAM_ID,
@@ -41,7 +49,8 @@ def _model(provider: Provider = Provider.OPENAI) -> Model:
         credential_id=uuid4(),
         type=ModelType.CHAT,
         provider_model_id="gpt-4o",
-        params={},
+        params=params or {},
+        params_enforced=params_enforced or {},
         api_version=None,
         input_cost_per_token=0.01,
         output_cost_per_token=0.01,
@@ -108,6 +117,10 @@ class CountingGateway:
         self.calls += 1
         return {"usage": {"prompt_tokens": 1, "completion_tokens": 1}}
 
+    async def aresponses(self, request, model, credentials) -> dict[str, Any]:
+        self.calls += 1
+        return {"usage": {"input_tokens": 1, "output_tokens": 1}}
+
     async def astream_chat_completion(self, request, model, credentials):
         self.calls += 1
 
@@ -115,6 +128,29 @@ class CountingGateway:
             yield {"choices": [{"index": 0, "delta": {"content": "hi"}}]}
 
         return _stream()
+
+
+class FakeCallableResolver:
+    def __init__(self, router: RouterConfig, model: Model) -> None:
+        self._router = router
+        self._model = model
+
+    async def resolve(self, team_id: UUID, alias: str):
+        if alias == self._router.name:
+            return SimpleNamespace(kind=CallableKind.ROUTER, resource=self._router)
+        return None
+
+    async def resolve_model_id(self, team_id: UUID, model_id: UUID) -> Model | None:
+        return self._model if model_id == self._model.id else None
+
+
+class NoSideEffectRouter:
+    def __init__(self) -> None:
+        self.route_calls = 0
+
+    async def route(self, *args, **kwargs):
+        self.route_calls += 1
+        raise AssertionError("router strategy must not run for a rejected Responses request")
 
 
 def _service(
@@ -158,6 +194,123 @@ async def test_over_budget_blocks_before_dispatch() -> None:
 
     assert gateway.calls == 0  # never reached the provider
     assert usage.events == []  # nothing billed for a blocked call
+
+
+async def test_unsupported_responses_fail_before_budget_admission() -> None:
+    gateway = CountingGateway()
+    usage = FakeUsage(spent=0.0)
+    service = _service(
+        gateway,
+        usage,
+        FakeBudgets(_budget(1.0)),
+        model=_model(Provider.DATABRICKS),
+    )
+
+    with pytest.raises(UnsupportedOperation, match="tools"):
+        await service.responses(
+            TEAM_ID,
+            KEY_ID,
+            {
+                "model": "m",
+                "input": "hi",
+                "tools": [{"type": "function", "name": "weather", "parameters": {}}],
+            },
+        )
+
+    assert usage.spend_since_calls == []
+    assert gateway.calls == 0
+
+
+async def test_unsupported_model_config_fails_before_budget_admission() -> None:
+    gateway = CountingGateway()
+    usage = FakeUsage(spent=0.0)
+    service = _service(
+        gateway,
+        usage,
+        FakeBudgets(_budget(1.0)),
+        model=_model(
+            Provider.DATABRICKS,
+            params_enforced={
+                "tools": [{"type": "function", "function": {"name": "weather", "parameters": {}}}]
+            },
+        ),
+    )
+
+    with pytest.raises(UnsupportedOperation, match=r"configured model field\(s\): tools"):
+        await service.responses(TEAM_ID, KEY_ID, {"model": "m", "input": "hi"})
+
+    assert usage.spend_since_calls == []
+    assert gateway.calls == 0
+
+
+async def test_native_background_fails_before_budget_admission() -> None:
+    gateway = CountingGateway()
+    usage = FakeUsage(spent=0.0)
+    service = _service(gateway, usage, FakeBudgets(_budget(1.0)))
+
+    with pytest.raises(UnsupportedOperation, match="background"):
+        await service.responses(
+            TEAM_ID,
+            KEY_ID,
+            {"model": "m", "input": "hi", "background": True},
+        )
+
+    assert usage.spend_since_calls == []
+    assert gateway.calls == 0
+
+
+async def test_router_is_prefiltered_before_strategy_side_effects() -> None:
+    gateway = CountingGateway()
+    usage = FakeUsage(spent=0.0)
+    model = _model(Provider.DATABRICKS)
+    router = RouterConfig(
+        id=uuid4(),
+        team_id=TEAM_ID,
+        name="auto",
+        candidates=(
+            CandidateModel(
+                model_name=model.name,
+                model_id=model.id,
+                description="chat-only candidate",
+                quality_tier=QualityTier.MEDIUM,
+                supports_tools=True,
+            ),
+        ),
+        default_model=model.name,
+        default_model_id=model.id,
+        strategy="judge",
+        strategy_config={},
+        enabled=True,
+        created_at=datetime.now(UTC),
+    )
+    router_service = NoSideEffectRouter()
+    service = CompletionService(
+        models=FakeModels(model),  # type: ignore[arg-type]
+        credentials=FakeCredentials(),  # type: ignore[arg-type]
+        gateway=gateway,  # type: ignore[arg-type]
+        meter=UsageMeter(
+            usage=usage,  # type: ignore[arg-type]
+            emit_trace=lambda trace: None,
+            budgets=FakeBudgets(_budget(1.0)),  # type: ignore[arg-type]
+        ),
+        router_service=router_service,  # type: ignore[arg-type]
+        callable_resolver=FakeCallableResolver(router, model),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(UnsupportedOperation, match="tools"):
+        await service.responses(
+            TEAM_ID,
+            KEY_ID,
+            {
+                "model": "auto",
+                "input": "hi",
+                "tools": [{"type": "function", "name": "weather", "parameters": {}}],
+            },
+        )
+
+    assert router_service.route_calls == 0
+    assert usage.spend_since_calls == []
+    assert gateway.calls == 0
 
 
 async def test_spend_exactly_at_limit_blocks() -> None:

@@ -137,11 +137,13 @@ work is tracked in
 [`docs/next-steps/responses-level-b.md`](responses-level-b.md) and
 [`plans/09-responses-level-b.md`](../../plans/09-responses-level-b.md):
 
-1. fail loudly on every Responses field the chat-emulation path cannot represent
-   faithfully — accepting then ignoring a field is forbidden;
-2. add function tools, `function_call` output items, `function_call_output` input
+The fail-loud capability gate is shipped: every Responses field the
+chat-emulation path cannot represent is rejected before budget admission and
+provider dispatch. Remaining work:
+
+1. add function tools, `function_call` output items, `function_call_output` input
    and the ordered streaming argument/item events;
-3. keep multimodal, stored/stateful, built-in-tool and reasoning features at a
+2. keep multimodal, stored/stateful, built-in-tool and reasoning features at a
    precise 501 until a faithful mapping exists.
 
 ## Documentation deliverables
