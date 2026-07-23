@@ -122,7 +122,7 @@ def test_dev_compose_provides_live_backend_frontend_and_dependencies() -> None:
     assert frontend["build"]["target"] == "frontend"
     assert frontend["environment"]["GATEWAY_URL"] == "http://backend:8000"
     frontend_command = " ".join(frontend["command"])
-    assert "pnpm install --frozen-lockfile" in frontend_command
+    assert "pnpm install" not in frontend_command
     assert "pnpm dev --host 0.0.0.0" in frontend_command
     assert frontend["depends_on"]["backend"]["condition"] == "service_healthy"
     assert frontend["ports"] == [
@@ -136,7 +136,16 @@ def test_dev_compose_provides_live_backend_frontend_and_dependencies() -> None:
     ]
     assert _volume_for(frontend, "/app/ui")["type"] == "bind"
     assert _volume_for(frontend, "/app/ui")["read_only"] is True
-    assert _volume_for(frontend, "/app/ui/node_modules")["type"] == "volume"
+    node_modules = _volume_for(frontend, "/app/ui/node_modules")
+    assert node_modules["type"] == "volume"
+    assert node_modules["source"] == "ui-dev-node-modules"
+    assert config["volumes"]["ui-dev-node-modules"]["name"] == (
+        "litestar-gateway-dev_ui-dev-node-modules"
+    )
+    fingerprinted = _compose_config(
+        extra_environment={"UI_NODE_MODULES_VOLUME": "litestar-gateway-dev_ui-dev-node-modules-123"}
+    )
+    assert fingerprinted["volumes"]["ui-dev-node-modules"]["name"].endswith("-123")
     assert "/ui/" in " ".join(frontend["healthcheck"]["test"])
 
 
@@ -235,10 +244,11 @@ def test_dev_script_drops_shell_secret_overrides(tmp_path: Path) -> None:
     fake_docker.write_text(
         """#!/bin/sh
 if [ "$1" = "info" ]; then
+  printf '%s\\n' 'linux-arm64'
   exit 0
 fi
 printf '%s\\n' "${POSTGRES_PASSWORD-unset}" "${MASTER_KEY-unset}" \
-  "${JWT_SECRET-unset}" "${SALT_KEY-unset}"
+  "${JWT_SECRET-unset}" "${SALT_KEY-unset}" "${UI_NODE_MODULES_VOLUME-unset}"
 """,
         encoding="utf-8",
     )
@@ -263,7 +273,31 @@ printf '%s\\n' "${POSTGRES_PASSWORD-unset}" "${MASTER_KEY-unset}" \
     )
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines() == ["unset", "unset", "unset", "unset"]
+    output = result.stdout.splitlines()
+    assert output[:4] == ["unset", "unset", "unset", "unset"]
+    assert re.fullmatch(
+        r"litestar-gateway-dev_ui-dev-node-modules-\d+",
+        output[4],
+    )
+
+    forced_platform_result = subprocess.run(
+        [str(ROOT / "scripts" / "dev-compose.sh"), "config"],
+        cwd=ROOT,
+        env={**environment, "DOCKER_DEFAULT_PLATFORM": "linux/amd64"},
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert forced_platform_result.returncode == 0, forced_platform_result.stderr
+    assert forced_platform_result.stdout.splitlines()[4] != output[4]
+
+
+def test_ui_dependency_fingerprint_includes_toolchain_and_platform() -> None:
+    launcher = (ROOT / "scripts" / "dev-compose.sh").read_text(encoding="utf-8")
+
+    assert '"$ROOT/Dockerfile.dev"' in launcher
+    assert "docker info --format" in launcher
 
 
 def test_dev_script_rejects_symlinked_secret_file(tmp_path: Path) -> None:
