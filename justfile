@@ -71,13 +71,65 @@ test-postgres:
     uv run litestar --app {{app}} database upgrade --no-prompt
     uv run pytest -q
 
-# Runs all the pr coverage checks (pre-commit, typecheck, pip-audit, pytest coverage).
+# Run the GitHub Actions `ui` job locally.
+ui-ci:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export CI=true
+    cd ui
+    pnpm install --frozen-lockfile --config.strict-dep-builds=false
+    pnpm test
+    pnpm lint
+    pnpm build
+
+# Run the GitHub Actions `docker` job locally: build the production image, boot
+# it with the CI configuration, and exercise the same /health smoke test.
+docker-ci:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    name=lsg-citest
+    image=lsg-citest
+    port="${DOCKER_CI_PORT:-18000}"
+    database_url="sqlite+aiosqlite:////data/citest.db"  # pragma: allowlist secret
+    master_key="change-me-please"  # pragma: allowlist secret
+    salt_key="change-me-strong-random"  # pragma: allowlist secret
+    cleanup() {
+        if docker inspect "$name" >/dev/null 2>&1; then
+            docker logs "$name" || true
+            docker rm -f "$name" >/dev/null || true
+        fi
+    }
+    trap cleanup EXIT
+    docker rm -f "$name" >/dev/null 2>&1 || true
+    docker build -t "$image" .
+    docker run -d --name "$name" \
+        -p "$port:8000" \
+        -e ENVIRONMENT=development \
+        -e DATABASE_URL="$database_url" \
+        -e MIGRATE_ON_START=false \
+        -e MASTER_KEY="$master_key" \
+        -e SALT_KEY="$salt_key" \
+        "$image"
+    for _ in $(seq 1 30); do
+        if curl -fsS "http://127.0.0.1:$port/health"; then
+            echo "health check passed"
+            exit 0
+        fi
+        sleep 1
+    done
+    echo "container failed to become healthy" >&2
+    exit 1
+
+# Run every GitHub Actions PR job locally: Python checks/coverage, UI,
+# production-dialect Postgres, and the built-container health smoke test.
 pr-coverage:
     uv run pre-commit run --all-files
     uv run pyrefly check
     uv run --with pip-audit pip-audit
-    uv run pytest --cov=src/litestar_gateway --cov-fail-under=80
+    uv run pytest -q --cov=src/litestar_gateway --cov-report=term --cov-fail-under=80
+    just ui-ci
     just test-postgres
+    just docker-ci
 
 # ── Migrations (advanced-alchemy / Alembic via the Litestar CLI) ────────────────
 
