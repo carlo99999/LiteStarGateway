@@ -15,6 +15,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from litestar_gateway.domain.chat_tool_policy import (
+    MAX_TOOL_COUNT,
+    MAX_TOOL_SCHEMA_BYTES,
+    json_object,
+    serialized_json_size,
+    validate_anthropic_tool_name,
+)
 from litestar_gateway.domain.entities import Model, Provider
 from litestar_gateway.domain.exceptions import UnsupportedNativeField, UnsupportedOperation
 
@@ -127,7 +134,7 @@ _EMULATED_RESPONSES_FIELDS = frozenset(
     }
 )
 _EMULATED_RESPONSES_TOOL_FIELDS = frozenset({"tools", "tool_choice", "parallel_tool_calls"})
-_EMULATED_RESPONSES_TOOL_PROVIDERS = frozenset({Provider.DATABRICKS})
+_EMULATED_RESPONSES_TOOL_PROVIDERS = frozenset({Provider.DATABRICKS, Provider.ANTHROPIC})
 _EMULATED_TEXT_FORMATS = frozenset({"text", "json_object", "json_schema"})
 _EMULATED_TEXT_PARTS = frozenset({"text", "input_text", "output_text"})
 _EMULATED_MESSAGE_FIELDS = frozenset({"type", "role", "content"})
@@ -255,6 +262,7 @@ def _validate_function_call(
     provider: Provider,
     item: dict[str, Any],
     seen_call_ids: set[str],
+    declared_tool_names: set[str] | None,
 ) -> None:
     _unsupported_nested_fields(
         provider,
@@ -277,9 +285,19 @@ def _validate_function_call(
         raise UnsupportedOperation(
             f"Provider '{provider.value}' cannot emulate Responses function_call name"
         )
+    if declared_tool_names is not None and name not in declared_tool_names:
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot replay a function_call for an undeclared tool name"
+        )
     if not isinstance(arguments, str):
         raise UnsupportedOperation(
             f"Provider '{provider.value}' cannot emulate Responses function_call arguments"
+        )
+    if provider is Provider.ANTHROPIC:
+        json_object(
+            arguments,
+            field="Responses function_call arguments",
+            provider=provider,
         )
     item_id = item.get("id")
     if item_id is not None and not isinstance(item_id, str):
@@ -329,7 +347,13 @@ def _validate_function_call_output(
     completed_call_ids.add(call_id)
 
 
-def _validate_emulated_input(provider: Provider, value: Any, *, allow_tools: bool) -> None:
+def _validate_emulated_input(
+    provider: Provider,
+    value: Any,
+    *,
+    allow_tools: bool,
+    declared_tool_names: set[str] | None = None,
+) -> None:
     if value is None or isinstance(value, str):
         return
     if not isinstance(value, list):
@@ -356,7 +380,7 @@ def _validate_emulated_input(provider: Provider, value: Any, *, allow_tools: boo
                 )
             if not pending_call_ids:
                 output_group_started = False
-            _validate_function_call(provider, item, seen_call_ids)
+            _validate_function_call(provider, item, seen_call_ids, declared_tool_names)
             pending_call_ids.add(item["call_id"])
             continue
         if item_type == "function_call_output" and allow_tools:
@@ -399,14 +423,20 @@ def _validate_emulated_input(provider: Provider, value: Any, *, allow_tools: boo
         )
 
 
-def _validate_emulated_tools(provider: Provider, request: dict[str, Any]) -> None:
+def _validate_emulated_tools(provider: Provider, request: dict[str, Any]) -> set[str]:
     tools = request.get("tools")
+    tool_names: set[str] = set()
     if tools is not None:
         if not isinstance(tools, list):
             raise UnsupportedOperation(
                 f"Provider '{provider.value}' cannot emulate Responses field 'tools' "
                 f"with shape '{type(tools).__name__}'"
             )
+        if provider is Provider.ANTHROPIC and len(tools) > MAX_TOOL_COUNT:
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' accepts at most {MAX_TOOL_COUNT} tools"
+            )
+        schema_bytes = 0
         for index, tool in enumerate(tools):
             if not isinstance(tool, dict):
                 raise UnsupportedOperation(
@@ -428,6 +458,14 @@ def _validate_emulated_tools(provider: Provider, request: dict[str, Any]) -> Non
                 raise UnsupportedOperation(
                     f"Provider '{provider.value}' cannot emulate Responses tools[{index}].name"
                 )
+            name = tool["name"]
+            if provider is Provider.ANTHROPIC:
+                name = validate_anthropic_tool_name(name, field=f"tools[{index}].name")
+            if name in tool_names:
+                raise UnsupportedOperation(
+                    f"Provider '{provider.value}' cannot emulate duplicate tool name '{name}'"
+                )
+            tool_names.add(name)
             description = tool.get("description")
             if description is not None and not isinstance(description, str):
                 raise UnsupportedOperation(
@@ -440,11 +478,22 @@ def _validate_emulated_tools(provider: Provider, request: dict[str, Any]) -> Non
                     f"Provider '{provider.value}' cannot emulate Responses "
                     f"tools[{index}].parameters"
                 )
+            if provider is Provider.ANTHROPIC:
+                schema_bytes += serialized_json_size(
+                    parameters if parameters is not None else {"type": "object"},
+                    field=f"tools[{index}].parameters",
+                    provider=provider,
+                )
             strict = tool.get("strict")
             if strict is not None and not isinstance(strict, bool):
                 raise UnsupportedOperation(
                     f"Provider '{provider.value}' cannot emulate Responses tools[{index}].strict"
                 )
+        if provider is Provider.ANTHROPIC and schema_bytes > MAX_TOOL_SCHEMA_BYTES:
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' accepts at most {MAX_TOOL_SCHEMA_BYTES} bytes "
+                "of tool schemas"
+            )
 
     tool_choice = request.get("tool_choice")
     if tool_choice is not None:
@@ -461,6 +510,11 @@ def _validate_emulated_tools(provider: Provider, request: dict[str, Any]) -> Non
                 f"Provider '{provider.value}' cannot emulate Responses field 'tool_choice' "
                 "with this shape"
             )
+        if valid_named and tool_choice["name"] not in tool_names:
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' cannot emulate Responses tool_choice "
+                "for an undefined tool name"
+            )
 
     parallel = request.get("parallel_tool_calls")
     if parallel is not None and not isinstance(parallel, bool):
@@ -468,6 +522,7 @@ def _validate_emulated_tools(provider: Provider, request: dict[str, Any]) -> Non
             f"Provider '{provider.value}' cannot emulate Responses field "
             "'parallel_tool_calls' with a non-boolean value"
         )
+    return tool_names
 
 
 def _validate_emulated_content(provider: Provider, content: Any) -> None:
@@ -588,7 +643,7 @@ def _validate_native_responses_governance(model: Model, request: dict[str, Any])
 
 
 def _validate_emulated_model_config(model: Model) -> None:
-    configured = {**model.params, **model.params_enforced}
+    configured = model.merge_params({})
     unsupported = sorted(
         field
         for field in _EMULATED_CHAT_CONFIG_FIELDS_REQUIRING_TOOL_FIDELITY
@@ -597,6 +652,8 @@ def _validate_emulated_model_config(model: Model) -> None:
     n = configured.get("n")
     if isinstance(n, int) and not isinstance(n, bool) and n > 1:
         unsupported.append("n")
+    if configured.get("stream") not in (None, False):
+        unsupported.append("stream")
     if unsupported:
         raise UnsupportedOperation(
             f"Provider '{model.provider.value}' cannot emulate Responses with configured "
@@ -642,13 +699,34 @@ def validate_responses_request(model: Model, request: dict[str, Any]) -> dict[st
             f"Provider '{model.provider.value}' cannot emulate Responses streaming tool "
             "calls until the Phase 2 event contract is available"
         )
-    if supports_tools:
-        _validate_emulated_tools(model.provider, request)
+    tool_names = _validate_emulated_tools(model.provider, request) if supports_tools else set()
+    if model.provider is Provider.ANTHROPIC and has_tool_request and not tool_names:
+        raise UnsupportedOperation(
+            "Provider 'anthropic' requires a non-empty declared tools list for "
+            "Responses tool requests"
+        )
     _validate_emulated_text(model.provider, request.get("text"))
+    text_format = request["text"].get("format") if isinstance(request.get("text"), dict) else None
+    if (
+        model.provider is Provider.ANTHROPIC
+        and has_tool_request
+        and (
+            (
+                isinstance(text_format, dict)
+                and text_format.get("type") in {"json_object", "json_schema"}
+            )
+            or model.merge_params({}).get("response_format") is not None
+        )
+    ):
+        raise UnsupportedOperation(
+            "Provider 'anthropic' cannot combine Responses text.format or configured "
+            "response_format with client tools"
+        )
     _validate_emulated_input(
         model.provider,
         request.get("input"),
         allow_tools=supports_tools,
+        declared_tool_names=tool_names if model.provider is Provider.ANTHROPIC else None,
     )
     return dict(request)
 

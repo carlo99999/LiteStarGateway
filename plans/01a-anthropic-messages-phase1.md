@@ -22,9 +22,10 @@ Phase 1 replaces that 501 with a real, metered native dispatch.
 
 1. **Native passthrough bypasses the translators.** The client already sends the
    native Anthropic Messages body and expects the native response, so we do NOT
-   call `to_anthropic_request` / `from_anthropic_response`. We send `data` (the raw
-   body) to `client.messages.create(**data)` and return `message.model_dump()`
-   verbatim.
+   call `to_anthropic_request` / `from_anthropic_response`. After rejecting
+   reserved SDK kwargs and applying the output-token ceiling, we send the
+   governed body to `client.messages.create(**data)` and return
+   `message.model_dump()` verbatim.
 2. **Metering reuses the money core with zero new billing path.** Anthropic's native
    `usage` block is `{"input_tokens", "output_tokens", ...}`. `UsageMeter._parse_usage`
    **already** reads `input_tokens`/`output_tokens` (it handles the Responses API).

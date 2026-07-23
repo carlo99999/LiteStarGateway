@@ -353,6 +353,392 @@ async def test_databricks_responses_non_streaming_tool_loop_is_faithful_and_bill
     assert final_usage[0]["cost"] == pytest.approx(0.52)
 
 
+async def test_anthropic_responses_non_streaming_tool_loop_is_faithful_and_billed_once_per_call(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-sonnet-4-5",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+
+    first = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": "Weather in Paris?",
+            "tools": [WEATHER_TOOL],
+            "tool_choice": {"type": "function", "name": "get_weather"},
+            "parallel_tool_calls": False,
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert first.status_code == HTTP_200_OK
+    first_body = first.json()
+    assert first_body["output"] == [
+        {
+            "type": "message",
+            "role": "assistant",
+            "status": "completed",
+            "content": [
+                {
+                    "type": "output_text",
+                    "text": "I'll check.",
+                    "annotations": [],
+                }
+            ],
+        },
+        {
+            "id": "fc_toolu-weather",
+            "type": "function_call",
+            "status": "completed",
+            "call_id": "toolu-weather",
+            "name": "get_weather",
+            "arguments": '{"city":"Paris"}',
+        },
+    ]
+    assert first_body["output_text"] == "I'll check."
+    assert FakeAnthropic.last_kwargs["tools"] == [
+        {
+            "name": "get_weather",
+            "description": "Get weather for a city.",
+            "input_schema": WEATHER_TOOL["parameters"],
+            "strict": True,
+        }
+    ]
+    assert FakeAnthropic.last_kwargs["tool_choice"] == {
+        "type": "tool",
+        "name": "get_weather",
+        "disable_parallel_tool_use": True,
+    }
+    assert FakeAnthropic.calls == 1
+
+    first_usage = await _team_usage(client, team, admin)
+    assert len(first_usage) == 1
+    assert first_usage[0]["calls"] == 1
+    assert first_usage[0]["prompt_tokens"] == 4
+    assert first_usage[0]["completion_tokens"] == 6
+    assert first_usage[0]["cost"] == pytest.approx(0.16)
+
+    second = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": [
+                {"role": "user", "content": "Weather in Paris?"},
+                first_body["output"][1],
+                {
+                    "type": "function_call_output",
+                    "call_id": "toolu-weather",
+                    "output": "18C and sunny",
+                },
+            ],
+            "tools": [WEATHER_TOOL],
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert second.status_code == HTTP_200_OK
+    assert second.json()["output_text"] == "hi there"
+    assert FakeAnthropic.last_kwargs["messages"] == [
+        {"role": "user", "content": "Weather in Paris?"},
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "toolu-weather",
+                    "name": "get_weather",
+                    "input": {"city": "Paris"},
+                }
+            ],
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": "toolu-weather",
+                    "content": "18C and sunny",
+                }
+            ],
+        },
+    ]
+    assert FakeAnthropic.calls == 2
+
+    final_usage = await _team_usage(client, team, admin)
+    assert len(final_usage) == 1
+    assert final_usage[0]["calls"] == 2
+    assert final_usage[0]["prompt_tokens"] == 7
+    assert final_usage[0]["completion_tokens"] == 11
+    assert final_usage[0]["cost"] == pytest.approx(0.29)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "input": "Weather in Paris?",
+            "tools": [WEATHER_TOOL],
+            "stream": True,
+        },
+        {
+            "input": [
+                {
+                    "type": "function_call",
+                    "call_id": "toolu-weather",
+                    "name": "get_weather",
+                    "arguments": '{"city":NaN}',
+                },
+                {
+                    "type": "function_call_output",
+                    "call_id": "toolu-weather",
+                    "output": "sunny",
+                },
+            ],
+            "tools": [WEATHER_TOOL],
+        },
+        {
+            "input": [
+                {
+                    "type": "function_call",
+                    "call_id": "toolu-weather",
+                    "name": "undeclared",
+                    "arguments": "{}",
+                },
+                {
+                    "type": "function_call_output",
+                    "call_id": "toolu-weather",
+                    "output": "sunny",
+                },
+            ],
+            "tools": [WEATHER_TOOL],
+        },
+    ],
+)
+async def test_anthropic_responses_rejects_unfaithful_tool_requests_before_provider_and_billing(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    payload: dict[str, object],
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-sonnet-4-5",
+    )
+
+    response = await client.post(
+        "/v1/responses",
+        json={"model": "m", **payload},
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_501_NOT_IMPLEMENTED
+    assert FakeAnthropic.calls == 0
+    assert await _team_usage(client, team, admin) == []
+
+
+async def test_anthropic_responses_rejects_configured_response_format_with_tools_before_billing(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-sonnet-4-5",
+        params_enforced={
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "answer",
+                    "schema": {"type": "object"},
+                },
+            }
+        },
+    )
+
+    response = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "Weather?", "tools": [WEATHER_TOOL]},
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_501_NOT_IMPLEMENTED
+    assert FakeAnthropic.calls == 0
+    assert await _team_usage(client, team, admin) == []
+
+
+async def test_malformed_anthropic_tool_response_fails_closed_but_is_billed(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-sonnet-4-5",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+
+    async def malformed_tool_response(_client: FakeAnthropic, **kwargs: object) -> object:
+        return SimpleNamespace(
+            model_dump=lambda: {
+                "id": "msg-malformed",
+                "model": kwargs.get("model"),
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "toolu-bad",
+                        "name": "get_weather",
+                        "input": "not-an-object",
+                    }
+                ],
+                "stop_reason": "tool_use",
+                "usage": {"input_tokens": 4, "output_tokens": 6},
+            }
+        )
+
+    monkeypatch.setattr(FakeAnthropic, "create", malformed_tool_response)
+    response = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "Weather?", "tools": [WEATHER_TOOL]},
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_502_BAD_GATEWAY
+    usage = await _team_usage(client, team, admin)
+    assert usage[0]["calls"] == 1
+    assert usage[0]["prompt_tokens"] == 4
+    assert usage[0]["completion_tokens"] == 6
+    assert usage[0]["cost"] == pytest.approx(0.16)
+
+
+async def test_anthropic_pre_output_refusal_is_empty_success_and_not_billed(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-sonnet-4-5",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+
+    async def refusal(_client: FakeAnthropic, **kwargs: object) -> object:
+        FakeAnthropic.calls += 1
+        return SimpleNamespace(
+            model_dump=lambda: {
+                "id": "msg-refusal",
+                "model": kwargs.get("model"),
+                "content": [{"type": "text", "text": "discard me"}],
+                "stop_reason": "refusal",
+                "usage": {"input_tokens": 4, "output_tokens": 0},
+            }
+        )
+
+    monkeypatch.setattr(FakeAnthropic, "create", refusal)
+    response = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": "Weather?",
+            "tools": [WEATHER_TOOL],
+            "tool_choice": "required",
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_200_OK
+    assert response.json()["output_text"] == ""
+    settled = await _team_usage(client, team, admin)
+    assert settled[0]["calls"] == 1
+    assert settled[0]["prompt_tokens"] == 0
+    assert settled[0]["completion_tokens"] == 0
+    assert settled[0]["cost"] == 0
+
+
+@pytest.mark.parametrize(
+    ("content", "usage", "authoritative_usage"),
+    [
+        (
+            [{"type": "text", "text": 123}],
+            {"input_tokens": 4, "output_tokens": 6},
+            True,
+        ),
+        (
+            [{"type": "text", "text": "done"}],
+            "malformed",
+            False,
+        ),
+        (
+            [{"type": "text", "text": "done"}],
+            {"input_tokens": -4, "output_tokens": 6},
+            False,
+        ),
+    ],
+)
+async def test_malformed_anthropic_content_or_usage_fails_closed_and_never_bills_negative(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    content: list[dict[str, object]],
+    usage: object,
+    authoritative_usage: bool,
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-sonnet-4-5",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+
+    async def malformed_response(_client: FakeAnthropic, **kwargs: object) -> object:
+        FakeAnthropic.calls += 1
+        return SimpleNamespace(
+            model_dump=lambda: {
+                "id": "msg-malformed",
+                "model": kwargs.get("model"),
+                "content": content,
+                "stop_reason": "end_turn",
+                "usage": usage,
+            }
+        )
+
+    monkeypatch.setattr(FakeAnthropic, "create", malformed_response)
+    response = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "Hello"},
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_502_BAD_GATEWAY
+    assert FakeAnthropic.calls == 1
+    settled = await _team_usage(client, team, admin)
+    assert settled[0]["calls"] == 1
+    assert settled[0]["prompt_tokens"] >= 0
+    assert settled[0]["completion_tokens"] >= 0
+    assert settled[0]["cost"] >= 0
+    if authoritative_usage:
+        assert settled[0]["prompt_tokens"] == 4
+        assert settled[0]["completion_tokens"] == 6
+
+
 @pytest.mark.parametrize("stream", [1, "true"])
 async def test_databricks_responses_reject_non_boolean_stream_before_provider_and_billing(
     client: AsyncTestClient,
@@ -501,6 +887,57 @@ async def test_malformed_databricks_usage_fails_closed_and_uses_billing_fallback
     assert usage[0]["cost"] > 0
 
 
+async def test_ordinary_all_zero_usage_still_uses_billing_fallback(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="databricks",
+        values=DATABRICKS_VALUES,
+        provider_model_id="my-endpoint",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+
+    async def zero_usage_response(_client: FakeClient, **kwargs: object) -> object:
+        return SimpleNamespace(
+            model_dump=lambda: {
+                "id": "chatcmpl-zero-usage",
+                "object": "chat.completion",
+                "created": 123,
+                "model": kwargs.get("model"),
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "done"},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                },
+            }
+        )
+
+    monkeypatch.setattr(FakeClient, "create", zero_usage_response)
+    response = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "Weather in Paris?"},
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_200_OK
+    usage = await _team_usage(client, team, admin)
+    assert usage[0]["calls"] == 1
+    assert usage[0]["prompt_tokens"] > 0
+    assert usage[0]["completion_tokens"] == 0
+    assert usage[0]["cost"] > 0
+
+
 @pytest.mark.parametrize(
     "payload,match",
     [
@@ -619,6 +1056,53 @@ async def test_anthropic_chat_translation(
     assert body["choices"][0]["finish_reason"] == "stop"
     assert body["usage"]["prompt_tokens"] == 3
     assert body["usage"]["completion_tokens"] == 5
+
+
+@pytest.mark.parametrize(
+    ("stream", "params_enforced"),
+    [
+        (1, None),
+        ("true", None),
+        (True, {"stream": False}),
+    ],
+)
+async def test_anthropic_chat_rejects_tool_stream_selector_bypasses_before_billing(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    stream: object,
+    params_enforced: dict[str, object] | None,
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-sonnet-4-5",
+        params_enforced=params_enforced,
+    )
+
+    response = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "weather?"}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "parameters": {"type": "object"},
+                    },
+                }
+            ],
+            "stream": stream,
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_501_NOT_IMPLEMENTED
+    assert FakeAnthropic.calls == 0
+    assert await _team_usage(client, team, admin) == []
 
 
 async def test_anthropic_responses_emulated(

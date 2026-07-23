@@ -218,6 +218,7 @@ class FakeAnthropic:
 
     last_init: dict = {}
     last_kwargs: dict = {}
+    calls: int = 0
 
     def __init__(self, **kwargs) -> None:
         FakeAnthropic.last_init = kwargs
@@ -228,7 +229,24 @@ class FakeAnthropic:
 
     async def create(self, **kwargs):
         FakeAnthropic.last_kwargs = kwargs
-        if kwargs.get("stream") and kwargs.get("tool_choice"):
+        FakeAnthropic.calls += 1
+        choice = kwargs.get("tool_choice") or {}
+        tools = kwargs.get("tools") or []
+        is_structured = (
+            choice.get("type") == "tool"
+            and len(tools) == 1
+            and tools[0].get("description") == "Return the result as JSON matching the schema."
+        )
+        has_tool_result = any(
+            isinstance(message, dict)
+            and isinstance(message.get("content"), list)
+            and any(
+                isinstance(block, dict) and block.get("type") == "tool_result"
+                for block in message["content"]
+            )
+            for message in kwargs.get("messages") or []
+        )
+        if kwargs.get("stream") and is_structured:
             # Structured output streamed as a forced tool: the JSON arrives via
             # input_json_delta events (partial_json), not text_delta.
             return _FakeStream(
@@ -261,7 +279,7 @@ class FakeAnthropic:
                     {"type": "message_stop"},
                 ]
             )
-        if kwargs.get("tool_choice"):
+        if is_structured:
             # Forced structured-output tool: return the JSON as a tool_use input.
             return _Result(
                 {
@@ -272,12 +290,37 @@ class FakeAnthropic:
                     "content": [
                         {
                             "type": "tool_use",
+                            "id": "toolu-structured",
                             "name": kwargs["tool_choice"]["name"],
                             "input": {"answer": 42},
                         }
                     ],
                     "stop_reason": "tool_use",
                     "usage": {"input_tokens": 3, "output_tokens": 5},
+                }
+            )
+        if tools and choice.get("type") != "none" and not has_tool_result:
+            selected = choice.get("name") or tools[0]["name"]
+            return _Result(
+                {
+                    "id": "msg-tool",
+                    "type": "message",
+                    "role": "assistant",
+                    "model": kwargs.get("model"),
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "I'll check.",
+                        },
+                        {
+                            "type": "tool_use",
+                            "id": "toolu-weather",
+                            "name": selected,
+                            "input": {"city": "Paris"},
+                        },
+                    ],
+                    "stop_reason": "tool_use",
+                    "usage": {"input_tokens": 4, "output_tokens": 6},
                 }
             )
         if kwargs.get("stream"):
@@ -456,6 +499,7 @@ def _patch(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeClient.calls = 0
     FakeAnthropic.last_init = {}
     FakeAnthropic.last_kwargs = {}
+    FakeAnthropic.calls = 0
     FakeGenaiClient.last_init = {}
     FakeGenaiClient.last_kwargs = {}
     FakeGenaiClient.closed = False

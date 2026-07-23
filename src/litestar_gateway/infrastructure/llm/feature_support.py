@@ -1,13 +1,11 @@
 """Guard the text-in/text-out chat translators against request features they
 cannot express.
 
-The Anthropic, Vertex and Bedrock chat translators handle text messages plus
-structured output (`response_format`). They do **not** translate real tool /
-function calling (`tools`/`tool_choice`) or non-text (e.g. image) message
-content — those get silently dropped, so the model would answer a
-quietly-stripped request and the client would never know its feature was
-ignored. Rather than lie, fail loudly with `UnsupportedOperation` (→ 501) so the
-caller routes such requests to a provider that supports them (OpenAI/Azure).
+The Vertex and Bedrock chat translators handle text messages plus structured
+output (`response_format`) but not real tool/function calling. Anthropic also
+handles the governed non-streaming tool subset. None translates non-text (e.g.
+image) message content. Features outside those subsets must fail loudly with
+`UnsupportedOperation` (→ 501), never be silently dropped.
 
 Structured output is intentionally *not* rejected here: it arrives via
 `response_format`, not `tools`, and each translator maps it natively.
@@ -35,13 +33,25 @@ def _has_non_text_content(request: dict[str, Any]) -> bool:
     return False
 
 
-def ensure_translatable_chat_request(request: dict[str, Any], provider: str) -> None:
+def ensure_translatable_chat_request(
+    request: dict[str, Any], provider: str, *, allow_tools: bool = False
+) -> None:
     """Reject chat-request features these text-only translators would drop.
 
     `request` is the effective (post-`merge_params`) request. Raises
     `UnsupportedOperation` for tool/function calling or non-text content; returns
     None otherwise."""
-    if request.get("tools") is not None or request.get("tool_choice") is not None:
+    has_tool_messages = any(
+        isinstance(message, dict)
+        and (message.get("role") in {"tool", "function"} or message.get("tool_calls") is not None)
+        for message in request.get("messages") or []
+    )
+    if not allow_tools and (
+        request.get("tools") is not None
+        or request.get("tool_choice") is not None
+        or request.get("parallel_tool_calls") is not None
+        or has_tool_messages
+    ):
         raise UnsupportedOperation(
             f"Provider '{provider}' does not support tool/function calling; "
             "route this request to an OpenAI or Azure model."

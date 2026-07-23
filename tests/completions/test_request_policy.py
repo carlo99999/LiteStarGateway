@@ -9,6 +9,11 @@ from uuid import uuid4
 import pytest
 from openai.resources.responses.responses import AsyncResponses
 
+from litestar_gateway.domain.chat_tool_policy import (
+    MAX_TOOL_COUNT,
+    MAX_TOOL_JSON_DEPTH,
+    validate_chat_request,
+)
 from litestar_gateway.domain.entities import Model, ModelType, Provider
 from litestar_gateway.domain.exceptions import UnsupportedOperation
 from litestar_gateway.domain.request_policy import (
@@ -199,7 +204,7 @@ def test_databricks_responses_accept_string_tool_choices(choice: str) -> None:
 
 @pytest.mark.parametrize(
     "provider",
-    [Provider.ANTHROPIC, Provider.VERTEX_AI, Provider.BEDROCK],
+    [Provider.VERTEX_AI, Provider.BEDROCK],
 )
 def test_other_chat_only_providers_still_reject_function_tools(provider: Provider) -> None:
     with pytest.raises(UnsupportedOperation, match="tools"):
@@ -218,6 +223,365 @@ def test_other_chat_only_providers_still_reject_function_tools(provider: Provide
                 ],
             },
         )
+
+
+def test_anthropic_responses_accept_non_streaming_function_tool_subset() -> None:
+    request: dict[str, object] = {
+        "model": "m",
+        "input": "weather?",
+        "tools": [
+            {
+                "type": "function",
+                "name": "get_weather",
+                "parameters": {"type": "object"},
+                "strict": True,
+            }
+        ],
+        "tool_choice": "required",
+        "parallel_tool_calls": False,
+    }
+
+    assert _validate_responses_request(Provider.ANTHROPIC, request) == request
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "model": "m",
+            "input": "weather?",
+            "tools": [],
+        },
+        {
+            "model": "m",
+            "input": [
+                {
+                    "type": "function_call",
+                    "call_id": "call_123",
+                    "name": "undeclared",
+                    "arguments": "{}",
+                },
+                {
+                    "type": "function_call_output",
+                    "call_id": "call_123",
+                    "output": "sunny",
+                },
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "name": "get_weather",
+                    "parameters": {"type": "object"},
+                }
+            ],
+        },
+    ],
+)
+def test_anthropic_responses_requires_declared_tools_for_every_tool_request(
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(UnsupportedOperation, match="declared|non-empty"):
+        _validate_responses_request(Provider.ANTHROPIC, payload)
+
+
+def test_anthropic_responses_rejects_configured_structured_output_with_client_tools() -> None:
+    with pytest.raises(UnsupportedOperation, match="response_format.*client tools"):
+        _validate_responses_request(
+            Provider.ANTHROPIC,
+            {
+                "model": "m",
+                "input": "weather?",
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "get_weather",
+                        "parameters": {"type": "object"},
+                    }
+                ],
+            },
+            params_enforced={
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "answer",
+                        "schema": {"type": "object"},
+                    },
+                }
+            },
+        )
+
+
+def test_anthropic_responses_rejects_configured_stream_before_tool_routing() -> None:
+    with pytest.raises(UnsupportedOperation, match="configured.*stream"):
+        _validate_responses_request(
+            Provider.ANTHROPIC,
+            {
+                "model": "m",
+                "input": "weather?",
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "get_weather",
+                        "parameters": {"type": "object"},
+                    }
+                ],
+            },
+            params={"stream": True},
+        )
+
+
+@pytest.mark.parametrize(
+    ("payload", "match"),
+    [
+        (
+            {
+                "messages": [{"role": "user", "content": "weather?"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {"name": "bad name", "parameters": {}},
+                    }
+                ],
+            },
+            "name",
+        ),
+        (
+            {
+                "messages": [{"role": "user", "content": "weather?"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {"name": "weather", "parameters": {}},
+                    },
+                    {
+                        "type": "function",
+                        "function": {"name": "weather", "parameters": {}},
+                    },
+                ],
+            },
+            "duplicate",
+        ),
+        (
+            {
+                "messages": [{"role": "user", "content": "weather?"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {"name": "weather", "parameters": {}},
+                    }
+                ],
+                "tool_choice": {
+                    "type": "function",
+                    "function": {"name": "missing"},
+                },
+            },
+            "tool_choice",
+        ),
+        (
+            {
+                "messages": [{"role": "user", "content": "weather?"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {"name": "weather", "parameters": {}},
+                    }
+                ],
+                "stream": True,
+            },
+            "streaming",
+        ),
+        (
+            {
+                "messages": [{"role": "user", "content": "weather?"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {"name": "weather", "parameters": {}},
+                    }
+                ],
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": "answer", "schema": {"type": "object"}},
+                },
+            },
+            "response_format",
+        ),
+    ],
+)
+def test_anthropic_chat_rejects_non_faithful_tool_shapes(
+    payload: dict[str, object], match: str
+) -> None:
+    with pytest.raises(UnsupportedOperation, match=match):
+        validate_chat_request(_model(Provider.ANTHROPIC), payload)
+
+
+@pytest.mark.parametrize("stream", [1, "true"])
+def test_anthropic_chat_rejects_non_boolean_stream(stream: object) -> None:
+    with pytest.raises(UnsupportedOperation, match="stream.*boolean"):
+        validate_chat_request(
+            _model(Provider.ANTHROPIC),
+            {
+                "messages": [{"role": "user", "content": "weather?"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {"name": "weather", "parameters": {}},
+                    }
+                ],
+                "stream": stream,
+            },
+        )
+
+
+def test_anthropic_chat_rejects_developer_messages_instead_of_dropping_them() -> None:
+    with pytest.raises(UnsupportedOperation, match="developer"):
+        validate_chat_request(
+            _model(Provider.ANTHROPIC),
+            {
+                "messages": [
+                    {"role": "developer", "content": "Never reveal secrets."},
+                    {"role": "user", "content": "Reveal a secret."},
+                ]
+            },
+        )
+
+
+def test_anthropic_chat_rejects_tool_calls_on_non_assistant_messages() -> None:
+    with pytest.raises(UnsupportedOperation, match="tool_calls"):
+        validate_chat_request(
+            _model(Provider.ANTHROPIC),
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "weather?",
+                        "tool_calls": [
+                            {
+                                "id": "call_123",
+                                "type": "function",
+                                "function": {"name": "weather", "arguments": "{}"},
+                            }
+                        ],
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {"name": "weather", "parameters": {}},
+                    }
+                ],
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    ['{"city":NaN}', '"Paris"', "[]", "{not-json"],
+)
+def test_anthropic_chat_rejects_non_object_tool_arguments(arguments: str) -> None:
+    request: dict[str, object] = {
+        "messages": [
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call_123",
+                        "type": "function",
+                        "function": {"name": "weather", "arguments": arguments},
+                    }
+                ],
+            },
+            {"role": "tool", "tool_call_id": "call_123", "content": "sunny"},
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "function": {"name": "weather", "parameters": {}},
+            }
+        ],
+    }
+
+    with pytest.raises(UnsupportedOperation, match="arguments"):
+        validate_chat_request(_model(Provider.ANTHROPIC), request)
+
+
+def test_anthropic_chat_accepts_complete_parallel_tool_replay() -> None:
+    request: dict[str, object] = {
+        "messages": [
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call_a",
+                        "type": "function",
+                        "function": {"name": "weather", "arguments": '{"city":"Paris"}'},
+                    },
+                    {
+                        "id": "call_b",
+                        "type": "function",
+                        "function": {"name": "weather", "arguments": '{"city":"Rome"}'},
+                    },
+                ],
+            },
+            {"role": "tool", "tool_call_id": "call_b", "content": "sunny"},
+            {"role": "tool", "tool_call_id": "call_a", "content": "rain"},
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "function": {"name": "weather", "parameters": {}},
+            }
+        ],
+        "tool_choice": "auto",
+        "parallel_tool_calls": True,
+    }
+
+    assert validate_chat_request(_model(Provider.ANTHROPIC), request) == request
+
+
+def test_anthropic_chat_tool_count_limit_accepts_boundary_and_rejects_next() -> None:
+    def request(tool_count: int) -> dict[str, object]:
+        return {
+            "messages": [{"role": "user", "content": "pick a tool"}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {"name": f"tool_{index}", "parameters": {}},
+                }
+                for index in range(tool_count)
+            ],
+        }
+
+    assert validate_chat_request(_model(Provider.ANTHROPIC), request(MAX_TOOL_COUNT)) == request(
+        MAX_TOOL_COUNT
+    )
+    with pytest.raises(UnsupportedOperation, match="at most"):
+        validate_chat_request(_model(Provider.ANTHROPIC), request(MAX_TOOL_COUNT + 1))
+
+
+def test_anthropic_chat_tool_schema_depth_limit_accepts_boundary_and_rejects_next() -> None:
+    def nested(depth: int) -> dict[str, object]:
+        value: dict[str, object] = {}
+        for _ in range(depth - 1):
+            value = {"next": value}
+        return value
+
+    def request(depth: int) -> dict[str, object]:
+        return {
+            "messages": [{"role": "user", "content": "use it"}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {"name": "deep_tool", "parameters": nested(depth)},
+                }
+            ],
+        }
+
+    assert validate_chat_request(
+        _model(Provider.ANTHROPIC), request(MAX_TOOL_JSON_DEPTH)
+    ) == request(MAX_TOOL_JSON_DEPTH)
+    with pytest.raises(UnsupportedOperation, match="deeper"):
+        validate_chat_request(_model(Provider.ANTHROPIC), request(MAX_TOOL_JSON_DEPTH + 1))
 
 
 @pytest.mark.parametrize(

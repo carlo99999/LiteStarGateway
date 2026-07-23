@@ -126,6 +126,11 @@ endpoints are available too — see the
 [docs](docs/openai-compatible.md) and the copy-paste
 [examples](EXAMPLES.md).
 
+Non-streaming function-tool loops work through Chat Completions on OpenAI,
+Azure, Databricks and Anthropic. They also work through native Responses on
+OpenAI/Azure and emulated Responses on Databricks/Anthropic. Vertex/Bedrock
+translated tools and emulated streaming tool events remain fail-closed.
+
 ## Admin console
 
 Everything is manageable from the browser at **`/ui`** — served by the gateway
@@ -230,9 +235,10 @@ Next up:
   gateway proxies the typed SSE events: `response.output_text.delta`,
   `response.function_call_arguments.delta`, …). Databricks chat emulation also
   supports faithful non-streaming function-tool loops with stable call IDs and
-  stateless result replay. Other unsupported fields fail before budget admission
-  or provider dispatch. The remaining Level B work is non-streaming tool
-  translation for Anthropic/Vertex/Bedrock and streaming tool events
+  stateless result replay; Anthropic now supports the same contract with native
+  strict/choice/parallel mappings. Other unsupported fields fail before budget
+  admission or provider dispatch. The remaining Level B work is capability-gated
+  Bedrock translation, Vertex thought-signature replay and streaming tool events
   ([design](docs/next-steps/responses-level-b.md)).
 - **Usage analytics** — attach settled stream usage to routing decisions and add
   temporal cost/token/call charts ([design](docs/next-steps/usage-analytics.md)).

@@ -2,9 +2,8 @@
 
 A compliant client must be able to *fail loudly* — the SDK raises a typed
 `APIStatusError` carrying the HTTP status, never a hang or a fabricated answer.
-Includes the R7-H23 behavior: tools/vision on a provider whose translator cannot
-express them (Anthropic/Vertex/Bedrock) returns 501, which the SDK surfaces as an
-error.
+Includes the R7-H23 behavior: vision on a provider whose translator cannot
+express it returns 501, which the SDK surfaces as an error.
 
 The OpenAI-shaped error *envelope* (`{"error": {...}}`) is asserted below for
 both a route-level domain error (unknown model) and a middleware-level error
@@ -21,7 +20,7 @@ from litestar.testing import AsyncTestClient
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
-from .conftest import WEATHER_TOOL, _patch_upstream
+from .conftest import _patch_upstream
 
 IMAGE_MESSAGE: ChatCompletionMessageParam = {
     "role": "user",
@@ -92,30 +91,6 @@ async def test_auth_error_body_is_openai_envelope(
     body = exc.value.response.json()
     assert body["error"]["message"]
     assert body["error"]["type"] == "authentication_error"
-
-
-async def test_h23_tools_on_anthropic_surfaces_501(
-    client: AsyncTestClient,
-    sdk: Callable[[str], AsyncOpenAI],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # R7-H23: Anthropic's chat translator cannot express tool calling. The gateway
-    # rejects with 501 *before* dispatch — the SDK raises, so the client fails
-    # loudly instead of getting a silently text-only (fabricated) answer.
-    _patch_upstream(monkeypatch)
-    api_key = await _setup(
-        client,
-        provider="anthropic",
-        values=ANTHROPIC_VALUES,
-        provider_model_id="claude-3-5-sonnet",
-    )
-    with pytest.raises(openai.APIStatusError) as exc:
-        await sdk(api_key).chat.completions.create(
-            model="m",
-            messages=[{"role": "user", "content": "weather?"}],
-            tools=[WEATHER_TOOL],
-        )
-    assert exc.value.status_code == 501
 
 
 async def test_h23_vision_on_anthropic_surfaces_501(

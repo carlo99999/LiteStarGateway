@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from typing import cast
+
 import pytest
 
+from litestar_gateway.domain.entities import Model
 from litestar_gateway.domain.exceptions import UpstreamResponseInvalid, UpstreamUnavailable
 from litestar_gateway.infrastructure.llm.responses_emulation import (
+    ChatToResponsesAdapter,
     to_chat_completions,
     to_responses,
 )
@@ -315,18 +320,93 @@ def test_non_list_upstream_tool_calls_fail_closed(tool_calls: object) -> None:
         to_responses(response)
 
 
-@pytest.mark.parametrize("finish_reason", ["length", "content_filter"])
+@pytest.mark.parametrize(
+    ("finish_reason", "match"),
+    [
+        ("length", "incomplete"),
+        ("content_filter", "malformed tool call response"),
+    ],
+)
 def test_incomplete_upstream_tool_response_fails_closed_and_carries_usage(
     finish_reason: str,
+    match: str,
 ) -> None:
     response = _chat_tool_response()
     response["choices"][0]["finish_reason"] = finish_reason  # type: ignore[index]
 
-    with pytest.raises(UpstreamUnavailable, match="incomplete") as raised:
+    with pytest.raises(UpstreamUnavailable, match=match) as raised:
         to_responses(response)
 
     assert isinstance(raised.value, UpstreamResponseInvalid)
     assert raised.value.billable_response == {"usage": response["usage"]}
+
+
+def test_content_filter_becomes_an_explicit_incomplete_response_and_discards_partial_text() -> None:
+    response = _chat_tool_response(content="discard partial", tool_calls=[])
+    response["choices"][0]["finish_reason"] = "content_filter"  # type: ignore[index]
+    response["usage"] = {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+    }
+
+    translated = to_responses(response)
+
+    assert translated["status"] == "incomplete"
+    assert translated["incomplete_details"] == {"reason": "content_filter"}
+    assert translated["output_text"] == ""
+    assert translated["output"][0]["status"] == "incomplete"
+    assert translated["output"][0]["content"][0]["text"] == ""
+
+
+async def test_streaming_content_filter_finishes_incomplete_and_discards_final_snapshot() -> None:
+    class RefusalStream:
+        async def astream_chat_completion(self, request, model, credentials):
+            for chunk in (
+                {
+                    "choices": [
+                        {
+                            "delta": {"content": "discard partial"},
+                            "finish_reason": None,
+                        }
+                    ]
+                },
+                {
+                    "choices": [
+                        {
+                            "delta": {},
+                            "finish_reason": "content_filter",
+                        }
+                    ]
+                },
+                {
+                    "choices": [],
+                    "usage": {
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                        "total_tokens": 0,
+                    },
+                },
+            ):
+                yield chunk
+
+    adapter = ChatToResponsesAdapter(RefusalStream())
+    events = [
+        event
+        async for event in adapter.astream_responses(
+            {"input": "unsafe"},
+            cast(Model, SimpleNamespace(provider_model_id="claude")),
+            {},
+        )
+    ]
+
+    assert any(event["type"] == "response.output_text.delta" for event in events)
+    terminal = events[-1]
+    assert terminal["type"] == "response.incomplete"
+    assert terminal["response"]["status"] == "incomplete"
+    assert terminal["response"]["incomplete_details"] == {"reason": "content_filter"}
+    assert terminal["response"]["output_text"] == ""
+    assert terminal["response"]["output"][0]["content"][0]["text"] == ""
 
 
 @pytest.mark.parametrize(

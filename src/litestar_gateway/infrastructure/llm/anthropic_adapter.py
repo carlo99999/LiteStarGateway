@@ -4,10 +4,9 @@ Pure translators (`to_anthropic_request` / `from_anthropic_response`) do the
 schema work; the adapter is a thin client wrapper. Responses are provided by
 wrapping this adapter in `ChatToResponsesAdapter`.
 
-Scope: text-in/text-out, plus structured outputs (`response_format`) translated
-to a forced tool — streaming included (the tool's `input_json_delta` events are
-relayed as content). Not yet translated: general tool/function calling and
-multimodal content.
+Scope: text-in/text-out, structured outputs (`response_format`) translated to a
+forced tool (streaming included), and faithful non-streaming client tool calls.
+Streaming client tools and multimodal content remain fail-closed.
 """
 
 from __future__ import annotations
@@ -19,7 +18,9 @@ from typing import Any
 
 from anthropic import Anthropic, AsyncAnthropic
 
+from litestar_gateway.domain.chat_tool_policy import validate_chat_request
 from litestar_gateway.domain.entities import Model
+from litestar_gateway.domain.exceptions import UpstreamResponseInvalid
 from litestar_gateway.infrastructure.llm.feature_support import ensure_translatable_chat_request
 from litestar_gateway.infrastructure.llm.openai_adapter import require_api_key
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
@@ -32,11 +33,9 @@ _FINISH_REASON = {
     "end_turn": "stop",
     "max_tokens": "length",
     "stop_sequence": "stop",
-    # We force a tool only for structured output (general tool-calling isn't
-    # translated yet), and surface its JSON as message.content — so from the
-    # client's view this is a normal completion, not a tool call: report "stop",
-    # not "tool_calls" (which would make a strict OpenAI client look for an
-    # absent message.tool_calls). Revisit when real tool-calling is added.
+    "refusal": "content_filter",
+    # Structured-output tool responses are handled explicitly by
+    # `from_anthropic_response`; real client tools become `tool_calls`.
     "tool_use": "stop",
 }
 
@@ -51,21 +50,113 @@ def _text(content: Any) -> str:
     return ""
 
 
+def _tool_input(arguments: str) -> dict[str, Any]:
+    # `validate_chat_request` already proved this is finite JSON and an object.
+    value = json.loads(arguments)
+    assert isinstance(value, dict)
+    return value
+
+
+def _anthropic_messages(messages: list[Any]) -> list[dict[str, Any]]:
+    translated: list[dict[str, Any]] = []
+    index = 0
+    while index < len(messages):
+        message = messages[index]
+        index += 1
+        if not isinstance(message, dict):
+            continue
+        role = message.get("role")
+        if role == "system":
+            continue
+        if role == "tool":
+            results: list[dict[str, Any]] = []
+            current = message
+            while True:
+                results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": current["tool_call_id"],
+                        "content": current["content"],
+                    }
+                )
+                if index >= len(messages):
+                    break
+                candidate = messages[index]
+                if not isinstance(candidate, dict) or candidate.get("role") != "tool":
+                    break
+                current = candidate
+                index += 1
+            translated.append({"role": "user", "content": results})
+            continue
+        if role not in {"user", "assistant"}:
+            continue
+        text = _text(message.get("content"))
+        tool_calls = message.get("tool_calls")
+        if role == "assistant" and isinstance(tool_calls, list):
+            content: list[dict[str, Any]] = []
+            if text:
+                content.append({"type": "text", "text": text})
+            content.extend(
+                {
+                    "type": "tool_use",
+                    "id": call["id"],
+                    "name": call["function"]["name"],
+                    "input": _tool_input(call["function"]["arguments"]),
+                }
+                for call in tool_calls
+            )
+            translated.append({"role": "assistant", "content": content})
+        else:
+            translated.append({"role": role, "content": text})
+    return translated
+
+
+def _anthropic_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    translated: list[dict[str, Any]] = []
+    for tool in tools:
+        function = tool["function"]
+        parameters = function.get("parameters")
+        mapped: dict[str, Any] = {
+            "name": function["name"],
+            "input_schema": parameters if parameters is not None else {"type": "object"},
+        }
+        for field in ("description", "strict"):
+            if field in function:
+                mapped[field] = function[field]
+        translated.append(mapped)
+    return translated
+
+
+def _anthropic_tool_choice(effective: dict[str, Any]) -> dict[str, Any] | None:
+    choice = effective.get("tool_choice")
+    parallel = effective.get("parallel_tool_calls")
+    mapped: dict[str, Any] | None = None
+    if choice == "auto":
+        mapped = {"type": "auto"}
+    elif choice == "required":
+        mapped = {"type": "any"}
+    elif choice == "none":
+        mapped = {"type": "none"}
+    elif isinstance(choice, dict):
+        mapped = {"type": "tool", "name": choice["function"]["name"]}
+    elif parallel is not None:
+        mapped = {"type": "auto"}
+    if mapped is not None and parallel is not None and mapped["type"] != "none":
+        mapped["disable_parallel_tool_use"] = not parallel
+    return mapped
+
+
 def to_anthropic_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
     effective = model.merge_params(request)
-    ensure_translatable_chat_request(effective, model.provider.value)
+    validate_chat_request(model, request)
+    ensure_translatable_chat_request(effective, model.provider.value, allow_tools=True)
     structured = parse_response_format(effective)
 
     system_parts: list[str] = []
-    messages: list[dict[str, Any]] = []
     for message in effective.get("messages", []):
-        role = message.get("role")
-        text = _text(message.get("content"))
-        if role == "system":
-            system_parts.append(text)
-        elif role in ("user", "assistant"):
-            messages.append({"role": role, "content": text})
-        # tool/function messages are ignored in this first cut
+        if isinstance(message, dict) and message.get("role") == "system":
+            system_parts.append(_text(message.get("content")))
+    messages = _anthropic_messages(effective.get("messages") or [])
 
     # json_object (no schema): Anthropic has no JSON mode, so nudge via system.
     if structured is not None and structured.schema is None:
@@ -97,27 +188,166 @@ def to_anthropic_request(request: dict[str, Any], model: Model) -> dict[str, Any
             }
         ]
         kwargs["tool_choice"] = {"type": "tool", "name": structured.name}
+    elif isinstance(effective.get("tools"), list):
+        kwargs["tools"] = _anthropic_tools(effective["tools"])
+        if choice := _anthropic_tool_choice(effective):
+            kwargs["tool_choice"] = choice
     return kwargs
 
 
-def from_anthropic_response(message: dict[str, Any]) -> dict[str, Any]:
+def _billable_response(message: dict[str, Any]) -> dict[str, Any]:
+    raw = message.get("usage")
+    if not isinstance(raw, dict):
+        return {"usage": {}}
+    prompt = raw.get("input_tokens")
+    completion = raw.get("output_tokens")
+    if (
+        not isinstance(prompt, int)
+        or isinstance(prompt, bool)
+        or prompt < 0
+        or not isinstance(completion, int)
+        or isinstance(completion, bool)
+        or completion < 0
+    ):
+        return {"usage": {}}
+    usage = {
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "total_tokens": prompt + completion,
+    }
+    return {"usage": usage}
+
+
+def _invalid_response(message: dict[str, Any], detail: str) -> UpstreamResponseInvalid:
+    return UpstreamResponseInvalid(detail, _billable_response(message))
+
+
+def _validated_usage(message: dict[str, Any]) -> dict[str, int]:
+    billable = _billable_response(message)["usage"]
+    if not billable:
+        raise _invalid_response(message, "Anthropic returned malformed usage")
+    return billable
+
+
+def _tool_calls(
+    message: dict[str, Any],
+    blocks: list[Any],
+    expected_tool_names: set[str] | None,
+) -> list[dict[str, Any]]:
+    calls: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for block in blocks:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        call_id = block.get("id")
+        name = block.get("name")
+        tool_input = block.get("input")
+        if (
+            not isinstance(call_id, str)
+            or not call_id
+            or call_id in seen_ids
+            or not isinstance(name, str)
+            or not name
+            or (expected_tool_names is not None and name not in expected_tool_names)
+            or not isinstance(tool_input, dict)
+        ):
+            raise _invalid_response(message, "Anthropic returned a malformed tool call")
+        try:
+            arguments = json.dumps(
+                tool_input,
+                allow_nan=False,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        except (TypeError, ValueError) as exc:
+            raise _invalid_response(message, "Anthropic returned non-JSON tool arguments") from exc
+        seen_ids.add(call_id)
+        calls.append(
+            {
+                "id": call_id,
+                "type": "function",
+                "function": {"name": name, "arguments": arguments},
+            }
+        )
+    return calls
+
+
+def from_anthropic_response(
+    message: dict[str, Any],
+    *,
+    expected_tool_names: set[str] | None = None,
+    require_tool_call: bool = False,
+    max_tool_calls: int | None = None,
+    structured_tool_name: str | None = None,
+) -> dict[str, Any]:
     blocks = message.get("content", [])
-    text = "".join(
-        block.get("text", "")
-        for block in blocks
-        if isinstance(block, dict) and block.get("type") == "text"
-    )
-    # Forced structured-output tool: the JSON is the tool_use input, not a text
-    # block. Serialize it into content so the client sees the same JSON-in-content
-    # shape it gets natively from OpenAI's response_format.
-    if not text:
+    if not isinstance(blocks, list):
+        raise _invalid_response(message, "Anthropic returned malformed content")
+    stop_reason = message.get("stop_reason", "")
+    if stop_reason == "pause_turn":
+        raise _invalid_response(message, "Anthropic returned an incomplete paused turn")
+    if not isinstance(stop_reason, str) or stop_reason not in _FINISH_REASON:
+        raise _invalid_response(message, "Anthropic returned an invalid stop reason")
+    usage = _validated_usage(message)
+    if stop_reason == "refusal":
+        # Classifier refusals invalidate every partial block. A refusal before
+        # output reports token counts but Anthropic does not charge them.
+        text = ""
+        calls: list[dict[str, Any]] = []
+        if usage["completion_tokens"] == 0:
+            usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    else:
+        text_parts: list[str] = []
         for block in blocks:
-            if isinstance(block, dict) and block.get("type") == "tool_use":
-                text = json.dumps(block.get("input") or {})
-                break
-    usage = message.get("usage") or {}
-    input_tokens = usage.get("input_tokens")
-    output_tokens = usage.get("output_tokens")
+            if not isinstance(block, dict) or block.get("type") not in {"text", "tool_use"}:
+                raise _invalid_response(message, "Anthropic returned malformed content")
+            if block["type"] == "text":
+                block_text = block.get("text")
+                if not isinstance(block_text, str):
+                    raise _invalid_response(message, "Anthropic returned malformed text content")
+                text_parts.append(block_text)
+        text = "".join(text_parts)
+        allowed_names = expected_tool_names if structured_tool_name is None else None
+        calls = _tool_calls(message, blocks, allowed_names)
+        # Forced structured-output tool: serialize the input into content and
+        # never expose the synthetic tool to the client.
+        if structured_tool_name is not None:
+            if (
+                text_parts
+                or len(calls) != 1
+                or calls[0]["function"]["name"] != structured_tool_name
+            ):
+                raise _invalid_response(message, "Anthropic returned malformed structured output")
+            for block in blocks:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    try:
+                        text = json.dumps(
+                            block.get("input") or {},
+                            allow_nan=False,
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                            sort_keys=True,
+                        )
+                    except (TypeError, ValueError) as exc:
+                        raise _invalid_response(
+                            message, "Anthropic returned malformed structured output"
+                        ) from exc
+                    break
+            calls = []
+        elif max_tool_calls is not None and len(calls) > max_tool_calls:
+            raise _invalid_response(
+                message, "Anthropic violated the requested parallel tool-call constraint"
+            )
+        elif require_tool_call and not calls:
+            raise _invalid_response(message, "Anthropic omitted a required tool call")
+        if structured_tool_name is None and bool(calls) != (stop_reason == "tool_use"):
+            raise _invalid_response(message, "Anthropic returned an inconsistent tool response")
+        if structured_tool_name is not None and stop_reason != "tool_use":
+            raise _invalid_response(message, "Anthropic returned malformed structured output")
+    chat_message: dict[str, Any] = {"role": "assistant", "content": text}
+    if calls:
+        chat_message["tool_calls"] = calls
     return {
         "id": message.get("id"),
         "object": "chat.completion",
@@ -126,15 +356,11 @@ def from_anthropic_response(message: dict[str, Any]) -> dict[str, Any]:
         "choices": [
             {
                 "index": 0,
-                "message": {"role": "assistant", "content": text},
-                "finish_reason": _FINISH_REASON.get(message.get("stop_reason", ""), "stop"),
+                "message": chat_message,
+                "finish_reason": "tool_calls" if calls else _FINISH_REASON.get(stop_reason, "stop"),
             }
         ],
-        "usage": {
-            "prompt_tokens": input_tokens,
-            "completion_tokens": output_tokens,
-            "total_tokens": (input_tokens or 0) + (output_tokens or 0),
-        },
+        "usage": usage,
     }
 
 
@@ -159,14 +385,58 @@ def anthropic_event_to_delta(event: dict[str, Any]) -> tuple[dict[str, Any] | No
         return None, None
     if etype == "message_delta":
         reason = (event.get("delta") or {}).get("stop_reason")
+        if reason == "pause_turn":
+            raise UpstreamResponseInvalid(
+                "Anthropic returned an incomplete paused stream",
+                {"usage": {}},
+            )
         if reason:
-            return {}, _FINISH_REASON.get(reason, "stop")
+            finish = _FINISH_REASON.get(reason)
+            if finish is None:
+                raise UpstreamResponseInvalid(
+                    "Anthropic returned an invalid streaming stop reason",
+                    {"usage": {}},
+                )
+            return {}, finish
     return None, None
 
 
 def _base_url(credentials: dict[str, str]) -> str | None:
     # Endpoint from the (admin-managed) credential only, never from the model.
     return credentials.get("api_base")
+
+
+def _response_tool_contract(
+    request: dict[str, Any],
+    model: Model,
+) -> tuple[set[str], bool, int | None, str | None]:
+    effective = model.merge_params(request)
+    tools = effective.get("tools")
+    expected_tool_names = (
+        {
+            tool["function"]["name"]
+            for tool in tools
+            if isinstance(tool, dict) and isinstance(tool.get("function"), dict)
+        }
+        if isinstance(tools, list)
+        else set()
+    )
+    structured = parse_response_format(effective)
+    structured_tool_name = (
+        structured.name if structured is not None and structured.schema is not None else None
+    )
+    if structured_tool_name is not None:
+        return set(), True, 1, structured_tool_name
+    choice = effective.get("tool_choice")
+    require_tool_call = choice == "required" or isinstance(choice, dict)
+    if choice == "none":
+        expected_tool_names = set()
+    elif isinstance(choice, dict):
+        expected_tool_names = {choice["function"]["name"]}
+    max_tool_calls = (
+        0 if choice == "none" else 1 if effective.get("parallel_tool_calls") is False else None
+    )
+    return expected_tool_names, require_tool_call, max_tool_calls, None
 
 
 class AnthropicAdapter:
@@ -184,7 +454,16 @@ class AnthropicAdapter:
         )
         try:
             message: Any = client.messages.create(**to_anthropic_request(request, model))
-            return from_anthropic_response(message.model_dump())
+            expected_tool_names, require_tool_call, max_tool_calls, structured_tool_name = (
+                _response_tool_contract(request, model)
+            )
+            return from_anthropic_response(
+                message.model_dump(),
+                expected_tool_names=expected_tool_names,
+                require_tool_call=require_tool_call,
+                max_tool_calls=max_tool_calls,
+                structured_tool_name=structured_tool_name,
+            )
         finally:
             client.close()
 
@@ -198,7 +477,16 @@ class AnthropicAdapter:
         )
         try:
             message: Any = await client.messages.create(**to_anthropic_request(request, model))
-            return from_anthropic_response(message.model_dump())
+            expected_tool_names, require_tool_call, max_tool_calls, structured_tool_name = (
+                _response_tool_contract(request, model)
+            )
+            return from_anthropic_response(
+                message.model_dump(),
+                expected_tool_names=expected_tool_names,
+                require_tool_call=require_tool_call,
+                max_tool_calls=max_tool_calls,
+                structured_tool_name=structured_tool_name,
+            )
         finally:
             await client.close()
 
@@ -264,6 +552,7 @@ class AnthropicAdapter:
         # OpenAI-style usage chunk so streamed calls can be metered.
         input_tokens = 0
         output_tokens = 0
+        refused = False
         # Keep the client open for the whole stream; close on completion/disconnect.
         try:
             stream: Any = await client.messages.create(**kwargs)
@@ -276,6 +565,7 @@ class AnthropicAdapter:
                 elif raw.get("type") == "message_delta":
                     delta_usage = raw.get("usage") or {}
                     output_tokens = delta_usage.get("output_tokens") or output_tokens
+                    refused = (raw.get("delta") or {}).get("stop_reason") == "refusal"
                 delta, finish = anthropic_event_to_delta(raw)
                 if delta is None and finish is None:
                     continue
@@ -287,9 +577,13 @@ class AnthropicAdapter:
                 **base,
                 "choices": [],
                 "usage": {
-                    "prompt_tokens": input_tokens,
+                    "prompt_tokens": 0 if refused and output_tokens == 0 else input_tokens,
                     "completion_tokens": output_tokens,
-                    "total_tokens": input_tokens + output_tokens,
+                    "total_tokens": (
+                        output_tokens
+                        if refused and output_tokens == 0
+                        else input_tokens + output_tokens
+                    ),
                 },
             }
         finally:

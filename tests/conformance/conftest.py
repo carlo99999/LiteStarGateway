@@ -227,13 +227,14 @@ class FakeUpstream:
 
 def _patch_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
     """Point the adapters' upstream SDK clients at the fake. OpenAI and Azure
-    share the OpenAI-compatible surface (`FakeUpstream`); Anthropic is stubbed so
-    the H23 guard's rejection is proven without any accidental network call (the
-    guard fires before the client is even built)."""
+    share the OpenAI-compatible surface (`FakeUpstream`); Anthropic uses its
+    provider-shaped fake so the same external Chat contract can be exercised."""
     monkeypatch.setattr(openai_adapter, "AsyncOpenAI", FakeUpstream)
     monkeypatch.setattr(azure_adapter, "AsyncAzureOpenAI", FakeUpstream)
     monkeypatch.setattr(anthropic_adapter, "AsyncAnthropic", FakeAnthropic)
     FakeUpstream.last_kwargs = {}
+    FakeAnthropic.last_kwargs = {}
+    FakeAnthropic.calls = 0
 
 
 def _sdk_for(test_client: AsyncTestClient, api_key: str) -> AsyncOpenAI:

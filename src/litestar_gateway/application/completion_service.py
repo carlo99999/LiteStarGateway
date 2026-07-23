@@ -20,6 +20,7 @@ from litestar_gateway.application.callable_aliases import CallableAliasResolver,
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.callable_alias import CallableKind
+from litestar_gateway.domain.chat_tool_policy import validate_chat_request
 from litestar_gateway.domain.entities import Model, ModelType, Provider, UsageAttribution
 from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
@@ -644,7 +645,11 @@ class CompletionService:
         clean = clamp_output_tokens(operation, request, model.max_output_tokens)
         if request_validator is not None:
             clean = request_validator(model, clean)
-        reservation = await self._meter.admit(team_id, model, clean)
+        # Adapters merge trusted model defaults/enforced policy before dispatch.
+        # Reserve from that same effective prompt so configured tools/schemas are
+        # never invisible to admission, while still dispatching the governed
+        # client request for the adapter to merge exactly once.
+        reservation = await self._meter.admit(team_id, model, model.merge_params(clean))
         try:
             values = await self._credentials.get_values(model.credential_id)
             if values is None:
@@ -660,7 +665,12 @@ class CompletionService:
     ) -> dict[str, Any]:
         clean = sanitize_request("chat.completions", request)
         model, values, reservation, clean, attribution = await self._prepare(
-            team_id, "chat.completions", clean, ModelType.CHAT, api_key_id
+            team_id,
+            "chat.completions",
+            clean,
+            ModelType.CHAT,
+            api_key_id,
+            validate_chat_request,
         )
         return await self._dispatch(
             team_id,
@@ -704,7 +714,12 @@ class CompletionService:
         streaming starts so resolution errors surface as HTTP status codes."""
         clean = sanitize_request("chat.completions", request)
         model, values, reservation, clean, attribution = await self._prepare(
-            team_id, "chat.completions", clean, ModelType.CHAT, api_key_id
+            team_id,
+            "chat.completions",
+            clean,
+            ModelType.CHAT,
+            api_key_id,
+            validate_chat_request,
         )
         try:
             stream = await self._gateway.astream_chat_completion(clean, model, values)

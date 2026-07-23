@@ -15,7 +15,7 @@ from collections.abc import Callable
 from typing import cast
 
 import pytest
-from completions.conftest import _setup
+from completions.conftest import ANTHROPIC_VALUES, FakeAnthropic, _setup
 from litestar.testing import AsyncTestClient
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
@@ -99,3 +99,67 @@ async def test_tool_result_round_trip(
     )
     assert second.choices[0].finish_reason == "stop"
     assert second.choices[0].message.content == "It is sunny in Paris."
+
+
+async def test_anthropic_tool_result_round_trip_uses_the_same_openai_sdk_contract(
+    client: AsyncTestClient,
+    sdk: Callable[[str], AsyncOpenAI],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_upstream(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="anthropic",
+        values=ANTHROPIC_VALUES,
+        provider_model_id="claude-sonnet-4-5",
+    )
+    openai_client = sdk(api_key)
+    messages: list[ChatCompletionMessageParam] = [{"role": "user", "content": "weather in Paris?"}]
+
+    first = await openai_client.chat.completions.create(
+        model="m",
+        messages=messages,
+        tools=[WEATHER_TOOL],
+        tool_choice="required",
+        parallel_tool_calls=False,
+    )
+
+    assistant = first.choices[0].message
+    assert first.choices[0].finish_reason == "tool_calls"
+    assert assistant.content == "I'll check."
+    assert assistant.tool_calls is not None
+    tool_call = assistant.tool_calls[0]
+    assert tool_call.id == "toolu-weather"
+    assert tool_call.type == "function"
+    assert json.loads(tool_call.function.arguments) == {"city": "Paris"}
+    assert FakeAnthropic.last_kwargs["tool_choice"] == {
+        "type": "any",
+        "disable_parallel_tool_use": True,
+    }
+
+    messages.append(cast(ChatCompletionMessageParam, assistant.model_dump(exclude_none=True)))
+    messages.append(
+        {
+            "role": "tool",
+            "tool_call_id": tool_call.id,
+            "content": "18C and sunny",
+        }
+    )
+    second = await openai_client.chat.completions.create(
+        model="m",
+        messages=messages,
+        tools=[WEATHER_TOOL],
+    )
+
+    assert second.choices[0].finish_reason == "stop"
+    assert second.choices[0].message.content == "hi there"
+    assert FakeAnthropic.last_kwargs["messages"][-1] == {
+        "role": "user",
+        "content": [
+            {
+                "type": "tool_result",
+                "tool_use_id": "toolu-weather",
+                "content": "18C and sunny",
+            }
+        ],
+    }
