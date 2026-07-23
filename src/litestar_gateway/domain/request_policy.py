@@ -126,11 +126,18 @@ _EMULATED_RESPONSES_FIELDS = frozenset(
         "stream",
     }
 )
+_EMULATED_RESPONSES_TOOL_FIELDS = frozenset({"tools", "tool_choice", "parallel_tool_calls"})
+_EMULATED_RESPONSES_TOOL_PROVIDERS = frozenset({Provider.DATABRICKS})
 _EMULATED_TEXT_FORMATS = frozenset({"text", "json_object", "json_schema"})
 _EMULATED_TEXT_PARTS = frozenset({"text", "input_text", "output_text"})
 _EMULATED_MESSAGE_FIELDS = frozenset({"type", "role", "content"})
 _EMULATED_MESSAGE_ROLES = frozenset({"user", "assistant", "system"})
 _EMULATED_CONTENT_FIELDS = frozenset({"type", "text"})
+_EMULATED_FUNCTION_TOOL_FIELDS = frozenset({"type", "name", "description", "parameters", "strict"})
+_EMULATED_FUNCTION_CALL_FIELDS = frozenset({"type", "id", "call_id", "name", "arguments", "status"})
+_EMULATED_FUNCTION_OUTPUT_FIELDS = frozenset({"type", "id", "call_id", "output", "status"})
+_EMULATED_ITEM_STATUSES = frozenset({"completed"})
+_EMULATED_TOOL_CHOICES = frozenset({"auto", "none", "required"})
 _EMULATED_CHAT_CONFIG_FIELDS_REQUIRING_TOOL_FIDELITY = frozenset(
     {"tools", "tool_choice", "parallel_tool_calls"}
 )
@@ -170,11 +177,12 @@ def sanitize_request(operation: str, request: dict[str, Any]) -> dict[str, Any]:
     return cleaned
 
 
-def _unsupported_responses_fields(request: dict[str, Any]) -> list[str]:
+def _unsupported_responses_fields(provider: Provider, request: dict[str, Any]) -> list[str]:
+    allowed = _EMULATED_RESPONSES_FIELDS
+    if provider in _EMULATED_RESPONSES_TOOL_PROVIDERS:
+        allowed |= _EMULATED_RESPONSES_TOOL_FIELDS
     unsupported = [
-        field
-        for field, value in request.items()
-        if field not in _EMULATED_RESPONSES_FIELDS and value is not None
+        field for field, value in request.items() if field not in allowed and value is not None
     ]
     if request.get("store") not in (None, False):
         unsupported.append("store")
@@ -218,7 +226,110 @@ def _validate_emulated_text(provider: Provider, text: Any) -> None:
         )
 
 
-def _validate_emulated_input(provider: Provider, value: Any) -> None:
+def _unsupported_nested_fields(
+    provider: Provider,
+    value: dict[str, Any],
+    allowed: frozenset[str],
+    prefix: str,
+) -> None:
+    unsupported = sorted(set(value) - allowed)
+    if unsupported:
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses field(s): "
+            f"{', '.join(f'{prefix}.{field}' for field in unsupported)}"
+        )
+
+
+def _validate_item_status(provider: Provider, item: dict[str, Any], prefix: str) -> None:
+    status = item.get("status")
+    if status is not None and (
+        not isinstance(status, str) or status not in _EMULATED_ITEM_STATUSES
+    ):
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses field "
+            f"'{prefix}.status' with value '{status}'"
+        )
+
+
+def _validate_function_call(
+    provider: Provider,
+    item: dict[str, Any],
+    seen_call_ids: set[str],
+) -> None:
+    _unsupported_nested_fields(
+        provider,
+        item,
+        _EMULATED_FUNCTION_CALL_FIELDS,
+        "input.function_call",
+    )
+    call_id = item.get("call_id")
+    name = item.get("name")
+    arguments = item.get("arguments")
+    if not isinstance(call_id, str) or not call_id:
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses function_call call_id"
+        )
+    if call_id in seen_call_ids:
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses duplicate call_id"
+        )
+    if not isinstance(name, str) or not name:
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses function_call name"
+        )
+    if not isinstance(arguments, str):
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses function_call arguments"
+        )
+    item_id = item.get("id")
+    if item_id is not None and not isinstance(item_id, str):
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses function_call id"
+        )
+    _validate_item_status(provider, item, "input.function_call")
+    seen_call_ids.add(call_id)
+
+
+def _validate_function_call_output(
+    provider: Provider,
+    item: dict[str, Any],
+    seen_call_ids: set[str],
+    completed_call_ids: set[str],
+) -> None:
+    _unsupported_nested_fields(
+        provider,
+        item,
+        _EMULATED_FUNCTION_OUTPUT_FIELDS,
+        "input.function_call_output",
+    )
+    call_id = item.get("call_id")
+    if not isinstance(call_id, str) or not call_id:
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses function_call_output call_id"
+        )
+    if call_id not in seen_call_ids:
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses function_call_output "
+            "without a matching function_call in the stateless input"
+        )
+    if call_id in completed_call_ids:
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses duplicate function_call_output"
+        )
+    if not isinstance(item.get("output"), str):
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses function_call_output output"
+        )
+    item_id = item.get("id")
+    if item_id is not None and not isinstance(item_id, str):
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses function_call_output id"
+        )
+    _validate_item_status(provider, item, "input.function_call_output")
+    completed_call_ids.add(call_id)
+
+
+def _validate_emulated_input(provider: Provider, value: Any, *, allow_tools: bool) -> None:
     if value is None or isinstance(value, str):
         return
     if not isinstance(value, list):
@@ -226,6 +337,10 @@ def _validate_emulated_input(provider: Provider, value: Any) -> None:
             f"Provider '{provider.value}' cannot emulate Responses input shape "
             f"'{type(value).__name__}'"
         )
+    seen_call_ids: set[str] = set()
+    completed_call_ids: set[str] = set()
+    pending_call_ids: set[str] = set()
+    output_group_started = False
     for item in value:
         if not isinstance(item, dict):
             raise UnsupportedOperation(
@@ -233,6 +348,33 @@ def _validate_emulated_input(provider: Provider, value: Any) -> None:
                 f"'{type(item).__name__}'"
             )
         item_type = item.get("type")
+        if item_type == "function_call" and allow_tools:
+            if output_group_started and pending_call_ids:
+                raise UnsupportedOperation(
+                    f"Provider '{provider.value}' cannot emulate Responses function_call "
+                    "while a prior unresolved function_call has no output"
+                )
+            if not pending_call_ids:
+                output_group_started = False
+            _validate_function_call(provider, item, seen_call_ids)
+            pending_call_ids.add(item["call_id"])
+            continue
+        if item_type == "function_call_output" and allow_tools:
+            _validate_function_call_output(
+                provider,
+                item,
+                seen_call_ids,
+                completed_call_ids,
+            )
+            pending_call_ids.discard(item["call_id"])
+            output_group_started = True
+            continue
+        if pending_call_ids:
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' cannot emulate Responses message with an "
+                "unresolved function_call"
+            )
+        output_group_started = False
         if item_type not in (None, "message"):
             raise UnsupportedOperation(
                 f"Provider '{provider.value}' cannot emulate Responses input item "
@@ -250,6 +392,82 @@ def _validate_emulated_input(provider: Provider, value: Any) -> None:
                 f"Provider '{provider.value}' cannot emulate Responses input role '{role}'"
             )
         _validate_emulated_content(provider, item.get("content"))
+    if pending_call_ids:
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses input ending with an "
+            "unresolved function_call"
+        )
+
+
+def _validate_emulated_tools(provider: Provider, request: dict[str, Any]) -> None:
+    tools = request.get("tools")
+    if tools is not None:
+        if not isinstance(tools, list):
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' cannot emulate Responses field 'tools' "
+                f"with shape '{type(tools).__name__}'"
+            )
+        for index, tool in enumerate(tools):
+            if not isinstance(tool, dict):
+                raise UnsupportedOperation(
+                    f"Provider '{provider.value}' cannot emulate Responses tools[{index}] "
+                    f"with shape '{type(tool).__name__}'"
+                )
+            _unsupported_nested_fields(
+                provider,
+                tool,
+                _EMULATED_FUNCTION_TOOL_FIELDS,
+                f"tools[{index}]",
+            )
+            if tool.get("type") != "function":
+                raise UnsupportedOperation(
+                    f"Provider '{provider.value}' cannot emulate Responses "
+                    f"tools[{index}].type '{tool.get('type')}'"
+                )
+            if not isinstance(tool.get("name"), str) or not tool["name"]:
+                raise UnsupportedOperation(
+                    f"Provider '{provider.value}' cannot emulate Responses tools[{index}].name"
+                )
+            description = tool.get("description")
+            if description is not None and not isinstance(description, str):
+                raise UnsupportedOperation(
+                    f"Provider '{provider.value}' cannot emulate Responses "
+                    f"tools[{index}].description"
+                )
+            parameters = tool.get("parameters")
+            if parameters is not None and not isinstance(parameters, dict):
+                raise UnsupportedOperation(
+                    f"Provider '{provider.value}' cannot emulate Responses "
+                    f"tools[{index}].parameters"
+                )
+            strict = tool.get("strict")
+            if strict is not None and not isinstance(strict, bool):
+                raise UnsupportedOperation(
+                    f"Provider '{provider.value}' cannot emulate Responses tools[{index}].strict"
+                )
+
+    tool_choice = request.get("tool_choice")
+    if tool_choice is not None:
+        valid_string = isinstance(tool_choice, str) and tool_choice in _EMULATED_TOOL_CHOICES
+        valid_named = (
+            isinstance(tool_choice, dict)
+            and set(tool_choice) == {"type", "name"}
+            and tool_choice.get("type") == "function"
+            and isinstance(tool_choice.get("name"), str)
+            and bool(tool_choice["name"])
+        )
+        if not valid_string and not valid_named:
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' cannot emulate Responses field 'tool_choice' "
+                "with this shape"
+            )
+
+    parallel = request.get("parallel_tool_calls")
+    if parallel is not None and not isinstance(parallel, bool):
+        raise UnsupportedOperation(
+            f"Provider '{provider.value}' cannot emulate Responses field "
+            "'parallel_tool_calls' with a non-boolean value"
+        )
 
 
 def _validate_emulated_content(provider: Provider, content: Any) -> None:
@@ -388,6 +606,11 @@ def _validate_emulated_model_config(model: Model) -> None:
 
 def validate_responses_request(model: Model, request: dict[str, Any]) -> dict[str, Any]:
     """Return a governed copy, failing when Responses data or policy would be lost."""
+    stream = request.get("stream")
+    if stream is not None and not isinstance(stream, bool):
+        raise UnsupportedOperation(
+            f"Provider '{model.provider.value}' requires Responses field 'stream' to be boolean"
+        )
     if model.provider in _NATIVE_RESPONSES_PROVIDERS:
         return _validate_native_responses_governance(model, request)
     _validate_emulated_model_config(model)
@@ -397,15 +620,36 @@ def validate_responses_request(model: Model, request: dict[str, Any]) -> dict[st
             f"Provider '{model.provider.value}' cannot emulate Responses field "
             f"'instructions' with shape '{type(instructions).__name__}'"
         )
-    unsupported = _unsupported_responses_fields(request)
+    supports_tools = model.provider in _EMULATED_RESPONSES_TOOL_PROVIDERS
+    unsupported = _unsupported_responses_fields(model.provider, request)
     if unsupported:
         raise UnsupportedOperation(
             f"Provider '{model.provider.value}' cannot emulate Responses field(s): "
             f"{', '.join(unsupported)}; use a native Responses provider or remove "
             "the unsupported fields"
         )
+    has_tool_request = any(
+        request.get(field) is not None for field in _EMULATED_RESPONSES_TOOL_FIELDS
+    ) or (
+        isinstance(request.get("input"), list)
+        and any(
+            isinstance(item, dict) and item.get("type") in {"function_call", "function_call_output"}
+            for item in request["input"]
+        )
+    )
+    if supports_tools and request.get("stream") is True and has_tool_request:
+        raise UnsupportedOperation(
+            f"Provider '{model.provider.value}' cannot emulate Responses streaming tool "
+            "calls until the Phase 2 event contract is available"
+        )
+    if supports_tools:
+        _validate_emulated_tools(model.provider, request)
     _validate_emulated_text(model.provider, request.get("text"))
-    _validate_emulated_input(model.provider, request.get("input"))
+    _validate_emulated_input(
+        model.provider,
+        request.get("input"),
+        allow_tools=supports_tools,
+    )
     return dict(request)
 
 

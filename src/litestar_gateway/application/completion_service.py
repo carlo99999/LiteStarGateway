@@ -28,6 +28,7 @@ from litestar_gateway.domain.exceptions import (
     ModelTypeMismatch,
     ProviderMismatch,
     UnsupportedOperation,
+    UpstreamResponseInvalid,
 )
 from litestar_gateway.domain.ports import (
     CredentialRepository,
@@ -213,6 +214,21 @@ class CompletionService:
         try:
             try:
                 response = await call()
+            except UpstreamResponseInvalid as exc:
+                latency_ms = (perf_counter() - start) * 1000
+                await self._meter.settle_error(
+                    team_id,
+                    api_key_id,
+                    model,
+                    operation,
+                    exc.billable_response,
+                    latency_ms,
+                    exc,
+                    request,
+                    attribution,
+                )
+                await self._attach_routing_usage(exc.billable_response)
+                raise
             except Exception as exc:
                 self._meter.trace_error(
                     team_id, api_key_id, model, operation, (perf_counter() - start) * 1000, exc

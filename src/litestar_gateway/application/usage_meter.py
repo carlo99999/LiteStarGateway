@@ -10,6 +10,7 @@ collaborator. Request-scoped like the service (it holds the request's
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
@@ -67,6 +68,13 @@ def _request_text(request: dict[str, Any]) -> str:
             continue
         if not isinstance(item, dict):
             continue
+        for field in ("call_id", "name", "arguments", "output"):
+            field_value = item.get(field)
+            if isinstance(field_value, str):
+                parts.append(field_value)
+        tool_calls = item.get("tool_calls")
+        if isinstance(tool_calls, list):
+            parts.append(_serialized_prompt_value(tool_calls))
         content = item.get("content")
         if isinstance(content, str):
             parts.append(content)
@@ -76,7 +84,18 @@ def _request_text(request: dict[str, Any]) -> str:
                 for c in content
                 if isinstance(c, dict) and isinstance(c.get("text"), str)
             )
+    for field in ("tools", "tool_choice"):
+        if request.get(field) is not None:
+            parts.append(_serialized_prompt_value(request[field]))
     return "\n".join(parts)
+
+
+def _serialized_prompt_value(value: Any) -> str:
+    """Stable text approximation for JSON-shaped prompt metadata."""
+    try:
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    except TypeError, ValueError:
+        return ""
 
 
 def _chunk_output_text(chunk: dict[str, Any]) -> str:
@@ -326,6 +345,77 @@ class UsageMeter:
         If the provider reported no usable token counts (e.g. an adapter that
         omits usage), estimate the prompt from the request rather than billing
         zero silently — the non-streaming mirror of the stream estimate (H14)."""
+        prompt, completion, cost, now = await self._settle_usage(
+            team_id,
+            api_key_id,
+            model,
+            operation,
+            response,
+            request,
+            attribution,
+        )
+        # Trace = observability (latency/analytics), fire-and-forget off the path.
+        self._emit_trace(
+            TraceRecord(
+                team_id=team_id,
+                api_key_id=api_key_id,
+                model_name=model.name,
+                provider=model.provider.value,
+                operation=operation,
+                prompt_tokens=prompt,
+                completion_tokens=completion,
+                cost=cost,
+                latency_ms=latency_ms,
+                status="ok",
+                created_at=now,
+            )
+        )
+
+    async def settle_error(
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        operation: str,
+        response: dict[str, Any],
+        latency_ms: float,
+        exc: BaseException,
+        request: dict[str, Any] | None = None,
+        attribution: UsageAttribution | None = None,
+    ) -> tuple[int, int, float]:
+        """Bill a completed provider invocation whose response is unusable."""
+        prompt, completion, cost, _ = await self._settle_usage(
+            team_id,
+            api_key_id,
+            model,
+            operation,
+            response,
+            request,
+            attribution,
+        )
+        self.trace_error(
+            team_id,
+            api_key_id,
+            model,
+            operation,
+            latency_ms,
+            exc,
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            cost=cost,
+        )
+        return prompt, completion, cost
+
+    async def _settle_usage(
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        operation: str,
+        response: dict[str, Any],
+        request: dict[str, Any] | None,
+        attribution: UsageAttribution | None,
+    ) -> tuple[int, int, float, datetime]:
         usage = response.get("usage") or {}
         if not _has_tokens(usage) and request is not None:
             estimate = {"prompt_tokens": _estimate_tokens(len(_request_text(request)))}
@@ -352,22 +442,7 @@ class UsageMeter:
             now,
             attribution,
         )
-        # Trace = observability (latency/analytics), fire-and-forget off the path.
-        self._emit_trace(
-            TraceRecord(
-                team_id=team_id,
-                api_key_id=api_key_id,
-                model_name=model.name,
-                provider=model.provider.value,
-                operation=operation,
-                prompt_tokens=prompt,
-                completion_tokens=completion,
-                cost=cost,
-                latency_ms=latency_ms,
-                status="ok",
-                created_at=now,
-            )
-        )
+        return prompt, completion, cost, now
 
     def trace_error(
         self,

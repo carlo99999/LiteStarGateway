@@ -125,9 +125,6 @@ def test_responses_allowlist_matches_native_sdk_body_fields() -> None:
 @pytest.mark.parametrize(
     "field,value",
     [
-        ("tools", []),
-        ("tool_choice", "auto"),
-        ("parallel_tool_calls", False),
         ("reasoning", {"effort": "medium"}),
         ("metadata", {"tenant": "acme"}),
         ("store", True),
@@ -143,6 +140,395 @@ def test_chat_only_responses_reject_fields_the_emulator_drops(field: str, value:
             Provider.DATABRICKS,
             {"model": "m", "input": "hi", field: value},
         )
+
+
+def test_databricks_responses_accept_non_streaming_function_tool_subset() -> None:
+    request: dict[str, object] = {
+        "model": "m",
+        "input": [
+            {"role": "user", "content": "weather in Paris?"},
+            {
+                "id": "fc_call_123",
+                "type": "function_call",
+                "status": "completed",
+                "call_id": "call_123",
+                "name": "get_weather",
+                "arguments": '{"city":"Paris"}',
+            },
+            {
+                "type": "function_call_output",
+                "call_id": "call_123",
+                "output": "18C and sunny",
+            },
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "name": "get_weather",
+                "description": "Get weather for a city.",
+                "parameters": {"type": "object"},
+                "strict": True,
+            }
+        ],
+        "tool_choice": {"type": "function", "name": "get_weather"},
+        "parallel_tool_calls": False,
+        "stream": False,
+    }
+
+    assert _validate_responses_request(Provider.DATABRICKS, request) == request
+
+
+@pytest.mark.parametrize("choice", ["auto", "none", "required"])
+def test_databricks_responses_accept_string_tool_choices(choice: str) -> None:
+    request: dict[str, object] = {
+        "model": "m",
+        "input": "weather?",
+        "tools": [
+            {
+                "type": "function",
+                "name": "get_weather",
+                "parameters": {"type": "object"},
+                "strict": False,
+            }
+        ],
+        "tool_choice": choice,
+    }
+
+    assert _validate_responses_request(Provider.DATABRICKS, request) == request
+
+
+@pytest.mark.parametrize(
+    "provider",
+    [Provider.ANTHROPIC, Provider.VERTEX_AI, Provider.BEDROCK],
+)
+def test_other_chat_only_providers_still_reject_function_tools(provider: Provider) -> None:
+    with pytest.raises(UnsupportedOperation, match="tools"):
+        _validate_responses_request(
+            provider,
+            {
+                "model": "m",
+                "input": "weather?",
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "get_weather",
+                        "parameters": {"type": "object"},
+                        "strict": False,
+                    }
+                ],
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    "payload,match",
+    [
+        ({"tools": [{"type": "web_search"}]}, r"tools\[0\]\.type"),
+        ({"tools": [{"type": "custom", "name": "shell"}]}, r"tools\[0\]\.type"),
+        (
+            {
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "weather",
+                        "parameters": {},
+                        "allowed_callers": ["direct"],
+                    }
+                ]
+            },
+            r"tools\[0\]\.allowed_callers",
+        ),
+        (
+            {
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "weather",
+                        "parameters": {},
+                        "defer_loading": True,
+                    }
+                ]
+            },
+            r"tools\[0\]\.defer_loading",
+        ),
+        (
+            {
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "weather",
+                        "parameters": {},
+                        "output_schema": {"type": "string"},
+                    }
+                ]
+            },
+            r"tools\[0\]\.output_schema",
+        ),
+        ({"tools": [], "tool_choice": {"type": "custom", "name": "shell"}}, "tool_choice"),
+        ({"tools": [], "parallel_tool_calls": "yes"}, "parallel_tool_calls"),
+        (
+            {
+                "input": [
+                    {
+                        "type": "function_call",
+                        "call_id": "call_123",
+                        "name": "weather",
+                        "arguments": {},
+                    }
+                ]
+            },
+            "arguments",
+        ),
+        (
+            {
+                "input": [
+                    {
+                        "type": "function_call",
+                        "call_id": "call_123",
+                        "name": "weather",
+                        "arguments": "{}",
+                    },
+                    {
+                        "type": "function_call_output",
+                        "call_id": "call_123",
+                        "output": [{"type": "input_text", "text": "sunny"}],
+                    },
+                ]
+            },
+            "output",
+        ),
+        (
+            {
+                "input": [
+                    {
+                        "type": "function_call_output",
+                        "call_id": "call_missing",
+                        "output": "sunny",
+                    }
+                ]
+            },
+            "matching function_call",
+        ),
+        (
+            {
+                "input": [
+                    {
+                        "type": "function_call",
+                        "call_id": "call_123",
+                        "name": "weather",
+                        "arguments": "{}",
+                    },
+                    {
+                        "type": "function_call",
+                        "call_id": "call_123",
+                        "name": "weather",
+                        "arguments": "{}",
+                    },
+                ]
+            },
+            "duplicate call_id",
+        ),
+    ],
+)
+def test_databricks_responses_reject_lossy_or_malformed_tool_shapes(
+    payload: dict[str, object], match: str
+) -> None:
+    with pytest.raises(UnsupportedOperation, match=match):
+        _validate_responses_request(
+            Provider.DATABRICKS,
+            {"model": "m", "input": "hi", **payload},
+        )
+
+
+def test_databricks_responses_reject_streaming_tools_until_phase_2() -> None:
+    with pytest.raises(UnsupportedOperation, match="streaming tool"):
+        _validate_responses_request(
+            Provider.DATABRICKS,
+            {
+                "model": "m",
+                "input": "weather?",
+                "stream": True,
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "get_weather",
+                        "parameters": {"type": "object"},
+                    }
+                ],
+            },
+        )
+
+
+@pytest.mark.parametrize("stream", [1, "true"])
+def test_responses_reject_non_boolean_stream_before_dispatch(stream: object) -> None:
+    with pytest.raises(UnsupportedOperation, match="stream.*boolean"):
+        _validate_responses_request(
+            Provider.DATABRICKS,
+            {
+                "model": "m",
+                "input": "weather?",
+                "stream": stream,
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "get_weather",
+                        "parameters": {"type": "object"},
+                    }
+                ],
+            },
+        )
+
+
+@pytest.mark.parametrize("status", ["in_progress", "incomplete"])
+def test_databricks_responses_reject_incomplete_replayed_tool_items(status: str) -> None:
+    with pytest.raises(UnsupportedOperation, match="status"):
+        _validate_responses_request(
+            Provider.DATABRICKS,
+            {
+                "model": "m",
+                "input": [
+                    {
+                        "type": "function_call",
+                        "call_id": "call_123",
+                        "name": "weather",
+                        "arguments": "{}",
+                        "status": status,
+                    }
+                ],
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    "input_items,match",
+    [
+        (
+            [
+                {
+                    "type": "function_call",
+                    "call_id": "call_123",
+                    "name": "weather",
+                    "arguments": "{}",
+                },
+                {
+                    "type": "function_call_output",
+                    "call_id": "call_123",
+                    "output": "sunny",
+                },
+                {
+                    "type": "function_call_output",
+                    "call_id": "call_123",
+                    "output": "sunny again",
+                },
+            ],
+            "duplicate function_call_output",
+        ),
+        (
+            [
+                {
+                    "type": "function_call",
+                    "call_id": "call_123",
+                    "name": "weather",
+                    "arguments": "{}",
+                },
+                {"role": "user", "content": "continue"},
+                {
+                    "type": "function_call_output",
+                    "call_id": "call_123",
+                    "output": "sunny",
+                },
+            ],
+            "unresolved function_call",
+        ),
+        (
+            [
+                {
+                    "type": "function_call",
+                    "call_id": "call_123",
+                    "name": "weather",
+                    "arguments": "{}",
+                },
+                {
+                    "type": "function_call",
+                    "call_id": "call_456",
+                    "name": "weather",
+                    "arguments": "{}",
+                },
+                {
+                    "type": "function_call_output",
+                    "call_id": "call_123",
+                    "output": "sunny",
+                },
+                {
+                    "type": "function_call",
+                    "call_id": "call_789",
+                    "name": "weather",
+                    "arguments": "{}",
+                },
+            ],
+            "unresolved function_call",
+        ),
+        (
+            [
+                {
+                    "type": "function_call",
+                    "call_id": "call_123",
+                    "name": "weather",
+                    "arguments": "{}",
+                }
+            ],
+            "unresolved function_call",
+        ),
+        (
+            [
+                {
+                    "type": "function_call",
+                    "call_id": "call_123",
+                    "name": "weather",
+                    "arguments": "{}",
+                },
+                {
+                    "type": "function_call",
+                    "call_id": "call_456",
+                    "name": "weather",
+                    "arguments": "{}",
+                },
+            ],
+            "unresolved function_call",
+        ),
+    ],
+)
+def test_databricks_responses_reject_ambiguous_tool_replay_order(
+    input_items: list[dict[str, object]], match: str
+) -> None:
+    with pytest.raises(UnsupportedOperation, match=match):
+        _validate_responses_request(
+            Provider.DATABRICKS,
+            {"model": "m", "input": input_items},
+        )
+
+
+def test_databricks_responses_validates_large_parallel_replay() -> None:
+    calls = [
+        {
+            "type": "function_call",
+            "call_id": f"call_{index}",
+            "name": "lookup",
+            "arguments": "{}",
+        }
+        for index in range(2_000)
+    ]
+    outputs = [
+        {
+            "type": "function_call_output",
+            "call_id": f"call_{index}",
+            "output": str(index),
+        }
+        for index in range(2_000)
+    ]
+    request: dict[str, object] = {"model": "m", "input": [*calls, *outputs]}
+
+    assert _validate_responses_request(Provider.DATABRICKS, request) == request
 
 
 def test_chat_only_responses_accept_text_and_structured_output_subset() -> None:

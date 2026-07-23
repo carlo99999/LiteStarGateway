@@ -213,7 +213,7 @@ async def test_unsupported_responses_fail_before_budget_admission() -> None:
             {
                 "model": "m",
                 "input": "hi",
-                "tools": [{"type": "function", "name": "weather", "parameters": {}}],
+                "tools": [{"type": "web_search"}],
             },
         )
 
@@ -304,7 +304,7 @@ async def test_router_is_prefiltered_before_strategy_side_effects() -> None:
             {
                 "model": "auto",
                 "input": "hi",
-                "tools": [{"type": "function", "name": "weather", "parameters": {}}],
+                "tools": [{"type": "web_search"}],
             },
         )
 

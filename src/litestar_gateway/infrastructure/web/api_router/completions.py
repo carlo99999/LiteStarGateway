@@ -69,8 +69,10 @@ async def chat_completions(
         "OpenAI and Azure use the provider's native Responses API for the "
         "governed synchronous, stateless SDK surface. Providers without one are "
         "**emulated** over chat.completions: text and structured outputs work; "
-        "tools, multimodal input, stateful conversations, background execution "
-        "and client-selected service tiers fail explicitly with 501."
+        "Databricks also supports non-streaming function-tool loops. Streaming "
+        "tools, other providers' emulated tools, multimodal input, stateful "
+        "conversations, background execution and client-selected service tiers "
+        "fail explicitly with 501."
     ),
     status_code=HTTP_200_OK,
 )
@@ -80,7 +82,7 @@ async def responses(
     completion_service: NamedDependency[CompletionService],
 ) -> Response[Any]:
     team_id = UUID(request.user)
-    if data.get("stream"):
+    if data.get("stream") is True:
         events = await completion_service.open_responses_stream(team_id, request.auth.id, data)
         return ServerSentEvent(_sse_response_events(events))
     return Response(await completion_service.responses(team_id, request.auth.id, data))

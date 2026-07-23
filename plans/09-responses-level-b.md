@@ -4,7 +4,7 @@
 
 **Depends on:** Plan 02 (complete) and the existing Responses emulation adapter.
 
-**Status:** Phase 0 complete; Phase 1 is next.
+**Status:** Phase 0 and Phase 1a complete; Phase 1b is next.
 
 **Theme:** eliminate silent feature drops, then add faithful tool-call items and
 events for chat-only upstreams.
@@ -26,15 +26,30 @@ events for chat-only upstreams.
 - **Done when:** every Responses field accepted by the sanitizer is either
   translated or rejected before the fake provider is invoked.
 
-## Phase 1 — Non-streaming tools
+## Phase 1a — Non-streaming tools over OpenAI-compatible chat — ✅ complete
 
 - Translate function tool definitions, selection and parallel-call intent to the
   chat request.
-- Translate `function_call_output` input to matching tool-result messages.
+- Translate replayed `function_call` items and matching
+  `function_call_output` input to assistant/tool messages, enabling stateless
+  loops while provider-owned response state remains disabled.
 - Convert chat `tool_calls` to Responses `function_call` output items with stable
   IDs and arguments.
-- **Done when:** a complete tool loop succeeds through `/v1/responses` against a
-  chat-only fake provider and bills exactly once.
+- Keep streaming tools fail-closed until Phase 2.
+- **Done:** a complete two-turn loop succeeds through `/v1/responses` against a
+  fake Databricks/OpenAI-compatible chat provider. Each upstream invocation is
+  billed exactly once; parallel calls preserve order, IDs and argument strings.
+
+## Phase 1b — Provider-native chat tool adapters
+
+- Add faithful non-streaming Chat tool contracts to the Anthropic, Vertex and
+  Bedrock adapters before enabling their Responses capability.
+- Preserve provider call IDs across tool-use/tool-result representations.
+- Keep each provider at a pre-admission 501 until its direct Chat tool loop is
+  conformance-tested; do not let the generic Responses translator outrun the
+  wrapped adapter.
+- **Done when:** the same Phase 1a pure and endpoint contract passes for all
+  emulated providers without weakening structured-output behavior.
 
 ## Phase 2 — Streaming tool events
 
