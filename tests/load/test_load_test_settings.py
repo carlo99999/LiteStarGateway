@@ -19,13 +19,14 @@ build_locust_command = run_load_profile.build_locust_command
 build_stage_environment = run_load_profile.build_stage_environment
 estimate_provider_budget = run_load_profile.estimate_provider_budget
 validate_load_host = run_load_profile.validate_load_host
+FAKE_API_KEY = "not-a-real-load-test-key"  # pragma: allowlist secret
 
 
 def test_chat_settings_size_users_from_rps_latency_and_headroom() -> None:
     settings = LoadTestSettings.from_environment(
         {
             "LOAD_MODE": "chat",
-            "LOAD_API_KEY": "lsk-load-test-secret",
+            "LOAD_API_KEY": FAKE_API_KEY,
             "LOAD_MODEL": "configured-model",
             "LOAD_TARGET_RPS": "300",
             "LOAD_EXPECTED_LATENCY_SECONDS": "0.25",
@@ -38,14 +39,14 @@ def test_chat_settings_size_users_from_rps_latency_and_headroom() -> None:
     assert settings.user_count == math.ceil(300 * 0.25 * 1.25)
     assert settings.per_user_rps == pytest.approx(300 / settings.user_count)
     assert settings.total_duration_seconds == 75
-    assert "lsk-load-test-secret" not in repr(settings)
+    assert FAKE_API_KEY not in repr(settings)
 
 
 def test_streaming_chat_uses_the_same_authenticated_capacity_sizing() -> None:
     settings = LoadTestSettings.from_environment(
         {
             "LOAD_MODE": "chat-stream",
-            "LOAD_API_KEY": "lsk-load-test-secret",
+            "LOAD_API_KEY": FAKE_API_KEY,
             "LOAD_MODEL": "configured-model",
             "LOAD_TARGET_RPS": "300",
             "LOAD_EXPECTED_LATENCY_SECONDS": "2",
@@ -101,9 +102,9 @@ def test_invalid_numeric_settings_fail_fast(name: str, value: str) -> None:
     "environment",
     [
         {"LOAD_MODE": "chat", "LOAD_MODEL": "configured-model"},
-        {"LOAD_MODE": "chat", "LOAD_API_KEY": "lsk-load-test-secret"},
+        {"LOAD_MODE": "chat", "LOAD_API_KEY": FAKE_API_KEY},
         {"LOAD_MODE": "chat-stream", "LOAD_MODEL": "configured-model"},
-        {"LOAD_MODE": "chat-stream", "LOAD_API_KEY": "lsk-load-test-secret"},
+        {"LOAD_MODE": "chat-stream", "LOAD_API_KEY": FAKE_API_KEY},
         {"LOAD_MODE": "unknown"},
     ],
 )
@@ -196,13 +197,13 @@ def test_progressive_runner_builds_locked_secret_free_commands(tmp_path: Path) -
         "load",
         "locust",
     ]
-    assert "lsk-load-test-secret" not in " ".join(command)
+    assert FAKE_API_KEY not in " ".join(command)
     assert str(tmp_path / "chat-stream-300") in command
 
 
 def test_stage_environment_is_new_and_selects_mode_and_target() -> None:
     original = {
-        "LOAD_API_KEY": "lsk-load-test-secret",
+        "LOAD_API_KEY": FAKE_API_KEY,
         "LOAD_MODEL": "configured-model",
     }
 
@@ -212,7 +213,7 @@ def test_stage_environment_is_new_and_selects_mode_and_target() -> None:
     assert original.get("LOAD_MODE") is None
     assert stage["LOAD_MODE"] == "chat-stream"
     assert stage["LOAD_TARGET_RPS"] == "150"
-    assert stage["LOAD_API_KEY"] == "lsk-load-test-secret"
+    assert stage["LOAD_API_KEY"] == FAKE_API_KEY
 
 
 @pytest.mark.parametrize(
@@ -231,7 +232,7 @@ def test_load_host_accepts_loopback_http_or_remote_https(raw: str, expected: str
     "raw",
     [
         "http://gateway.example.com",
-        "https://user:password@gateway.example.com",
+        "https://user:password@gateway.example.com",  # pragma: allowlist secret
         "https://gateway.example.com/path",
         "ftp://gateway.example.com",
     ],
