@@ -48,15 +48,17 @@ The core deliverable, buildable now against what already ships.
   - tool calling: `tool_calls` request echo + response shape, `tool_choice`,
     `finish_reason == "tool_calls"`, and a tool-result round-trip;
   - streaming: chunk/delta shape, incremental tool-call deltas, terminal chunk;
-  - errors: OpenAI-shaped error envelope + correct HTTP status (incl. the H23
-    501 for untranslatable tools/vision on non-OpenAI providers).
+  - errors: OpenAI-shaped error envelope + correct HTTP status (including H23
+    501 responses for tool/vision combinations a selected adapter cannot
+    translate).
 - **Canary, not matrix:** drive the assertions with the **official `openai`
   Python SDK** pointed at an in-process gateway with a **faked upstream provider**
   (reuse the `Fake*` client patterns in `tests/completions/`) — deterministic, no
   live keys. One real client proves the wire works; the contract tests define done.
 - **Done when:** `tests/conformance/` is green in CI and a change to the
   request/response/stream/error shape breaks a **contract** test (not just a
-  low-level unit test), for OpenAI/Azure/Databricks-backed models.
+  low-level unit test), for OpenAI/Azure/Databricks-backed models and the
+  non-streaming Anthropic tool-loop subset.
 
 ## Phase 2 — Close OpenAI-shape contract gaps
 
@@ -71,7 +73,8 @@ adapter/emulation layer — never a per-framework special case.
   `openai` SDK; note that any framework layering on it (Pydantic AI, LangChain,
   OpenAI Agents SDK) inherits this for free.
 - The surface-selection note: OpenAI surface for OpenAI-target/provider-agnostic
-  clients; **native endpoints (Plan 01)** for Anthropic/Gemini tool-calling.
+  clients, including non-streaming Anthropic tool loops; **native endpoints
+  (Plan 01)** for full-fidelity Anthropic/Gemini features and streaming tools.
 
 ## After Plan 01 — extend conformance to the native contracts
 

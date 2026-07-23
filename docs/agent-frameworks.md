@@ -110,8 +110,9 @@ everything else.
   OpenAI-compatible loops.
 - **Level B — Responses-API agent compatible**: `/v1/responses` with faithful
   response items and tool events. Native Responses providers are usable today;
-  Databricks also supports non-streaming function loops. Provider-native Chat
-  translations and emulated streaming tools remain in progress.
+  Databricks and Anthropic also support non-streaming function loops. Bedrock
+  capability gating, Vertex thought-signature replay and emulated streaming
+  tools remain in progress.
 - **Level C — provider-native**: native Anthropic/Gemini endpoints for
   provider features OpenAI-shaped APIs can't express (see
   [OpenAI-compatible API](openai-compatible.md) and the native-endpoint docs).

@@ -1,13 +1,13 @@
 # Design doc — Responses API Level B
 
-> **Status:** Phase 0 and Phase 1a shipped. `/v1/responses` preserves the governed,
+> **Status:** Phase 0, Phase 1a and Phase 1b-A shipped. `/v1/responses` preserves the governed,
 > synchronous and stateless OpenAI SDK request surface for OpenAI/Azure and
 > supports text + structured-output emulation over chat-only providers.
-> Databricks additionally supports faithful non-streaming function-tool loops
-> over its OpenAI-compatible Chat surface. Unsupported fields now fail with 501
+> Databricks and Anthropic additionally support faithful non-streaming
+> function-tool loops over their translated Chat surfaces. Unsupported fields fail with 501
 > before router side effects, budget admission or provider dispatch. The
-> remaining gap is non-streaming tool support in the Anthropic/Vertex/Bedrock
-> Chat adapters, followed by streaming tool events.
+> remaining provider gaps are capability-gated Bedrock tools and a faithful
+> Vertex thought-signature carrier, followed by streaming tool events.
 > Execution plan:
 > [`plans/09-responses-level-b.md`](../../plans/09-responses-level-b.md).
 
@@ -35,10 +35,10 @@ For chat-only upstreams:
 
 Native Responses providers remain passthrough and must not regress.
 
-Phase 1a enables this subset only where the wrapped Chat adapter already speaks
-the OpenAI tool contract (currently Databricks). Anthropic, Vertex and Bedrock
-remain fail-closed until Phase 1b adds and conformance-tests their native Chat
-tool translations.
+Phase 1a enabled this subset for Databricks. Phase 1b-A adds Anthropic with
+native choice/strict/parallel mappings, exact call IDs and grouped parallel
+results. Bedrock and Vertex remain fail-closed until their narrower capability
+contracts are conformance-tested.
 
 ## 3. Fail-loud capability gate
 
@@ -70,6 +70,12 @@ The supported request mapping includes:
   `tool_calls` (consecutive calls stay grouped);
 - `function_call_output` input → a `role="tool"` message with the matching
   `tool_call_id`.
+
+For Anthropic, those Chat messages become native `tool_use` blocks and
+consecutive results become one user turn containing all matching `tool_result`
+blocks. `required` maps to `any`; a named choice maps to `tool`; disabled
+parallelism maps to `disable_parallel_tool_use=true` as documented in
+[Anthropic parallel tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use).
 
 The reverse mapping turns chat `message.tool_calls` into Responses
 `function_call` output items. Preserve provider-issued IDs when present; generate
@@ -107,7 +113,19 @@ The definition of done is wire-level:
 Framework-specific branches remain forbidden. The SDKs are canaries; the wire
 contract is the specification.
 
-## 7. Non-goals
+## 7. Provider blockers after Phase 1b-A
+
+- **Bedrock:** [Converse ToolChoice](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ToolChoice.html)
+  has no general equivalent for `tool_choice=none` or
+  `parallel_tool_calls=false`; forcing a named tool is documented only for
+  Claude 3 and Nova. Enable only the model/choice matrix proved faithful.
+- **Vertex:** [Gemini thinking models](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/thought-signatures)
+  attach opaque `thought_signature` metadata
+  to function-call parts and require exact replay. The normalized Responses
+  function-call item has no carrier for it, so generic Vertex tool emulation
+  remains 501 rather than using the provider's degraded validator bypass.
+
+## 8. Non-goals
 
 - Emulating provider-native reasoning, web/file search, stored conversations or
   multimodal items when the selected chat protocol cannot carry them faithfully.

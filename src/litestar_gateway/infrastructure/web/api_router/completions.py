@@ -69,8 +69,8 @@ async def chat_completions(
         "OpenAI and Azure use the provider's native Responses API for the "
         "governed synchronous, stateless SDK surface. Providers without one are "
         "**emulated** over chat.completions: text and structured outputs work; "
-        "Databricks also supports non-streaming function-tool loops. Streaming "
-        "tools, other providers' emulated tools, multimodal input, stateful "
+        "Databricks and Anthropic also support non-streaming function-tool "
+        "loops. Streaming tools, other providers' emulated tools, multimodal input, stateful "
         "conversations, background execution and client-selected service tiers "
         "fail explicitly with 501."
     ),

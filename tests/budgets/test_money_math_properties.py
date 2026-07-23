@@ -232,3 +232,29 @@ def test_request_text_and_reservation_include_tool_payloads() -> None:
     assert "y" * 400 in _request_text(request)
     assert "z" * 400 in _request_text(request)
     assert _reservation_cost(model, request) > _reservation_cost(model, {"input": []})
+
+
+def test_request_text_includes_chat_and_responses_structured_output_schemas() -> None:
+    chat_marker = "chat-schema-marker"
+    responses_marker = "responses-schema-marker"
+    request = {
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "chat_answer",
+                "schema": {"description": chat_marker},
+            },
+        },
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "responses_answer",
+                "schema": {"description": responses_marker},
+            }
+        },
+    }
+
+    estimated = _request_text(request)
+
+    assert chat_marker in estimated
+    assert responses_marker in estimated

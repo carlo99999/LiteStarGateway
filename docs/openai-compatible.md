@@ -36,15 +36,16 @@ regression breaks a contract test rather than surfacing in your agent.
 
 ## Tool calling
 
-Tool/function calling over this surface works for models backed by **OpenAI, Azure
-OpenAI, and Databricks** — `tools`/`tool_choice` are forwarded and the response
-carries `tool_calls` with `finish_reason == "tool_calls"`.
+Tool/function calling over this surface works for models backed by **OpenAI,
+Azure OpenAI, Databricks, and Anthropic**. Anthropic supports faithful
+non-streaming definitions, `strict`, choice/parallel intent, exact call IDs and
+tool-result replay.
 
-For **Anthropic, Vertex (Gemini), and Bedrock**, the OpenAI→provider translation
-cannot faithfully carry tools or vision content, so the gateway **rejects the
-request with `501 Not Implemented`** rather than silently returning a degraded
-answer. Your client sees a clear error, not a wrong result. For full-fidelity tool
-calling on those providers, use the native endpoints (below).
+Anthropic streaming tool calls, all translated tool calls on **Vertex (Gemini)**
+and **Bedrock**, and vision content on these translated adapters remain
+`501 Not Implemented` rather than silently degrading. For unrestricted
+Anthropic and Gemini features, use the native endpoints below; Bedrock has no
+gateway-native endpoint.
 
 ## Errors
 
@@ -60,7 +61,7 @@ expected:
 | Use the **OpenAI-compatible** surface (`/v1/chat/completions`) | Use a **native** endpoint |
 |---|---|
 | Provider-agnostic or OpenAI-targeted clients/agents | Anthropic or Gemini tool-calling agents that need full fidelity |
-| Text and OpenAI/Azure/Databricks tool calling | Provider-specific features the OpenAI shape can't express |
+| Text and non-streaming OpenAI/Azure/Databricks/Anthropic tool calling | Provider-specific features the OpenAI shape can't express |
 | You want one client shape across many providers | You already use the native `anthropic` / `google-genai` SDK |
 
 Native endpoints:

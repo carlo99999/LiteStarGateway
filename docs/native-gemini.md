@@ -134,9 +134,10 @@ only a client that additionally inspects the response body should key on
 
 ## Notes and limits
 
-- **Native passthrough only.** The Gemini body flows upstream unchanged and the
-  native response is returned verbatim — there is no OpenAI translation on this
-  endpoint. Use `/v1/chat/completions` for the OpenAI-compatible surface.
+- **Native passthrough only.** Apart from the documented governance controls
+  (reserved-kwarg rejection and output-token ceilings), the Gemini body flows
+  upstream unchanged and the native response is returned verbatim. There is no
+  OpenAI translation on this endpoint.
 - **Vertex models only.** The alias must resolve to a Vertex-backed model;
   otherwise the request is rejected with `400`.
 - **No smart routing.** The alias resolves to one concrete Vertex model; a

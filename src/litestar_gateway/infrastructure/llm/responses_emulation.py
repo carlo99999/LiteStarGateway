@@ -8,7 +8,7 @@ The client keeps using the stock OpenAI SDK (`client.responses.create`), so it
 "just works" — text-in/text-out plus structured outputs (`text.format` is
 translated to the chat `response_format`, which each adapter maps per provider).
 Non-streaming function calls are also translated when the wrapped chat adapter
-supports the OpenAI Chat tool contract (currently Databricks). The
+supports the OpenAI Chat tool contract (currently Databricks and Anthropic). The
 provider-aware request policy rejects these before budget admission and
 dispatch when unsupported:
   * streaming tools / function calling
@@ -185,7 +185,7 @@ def to_responses(chat_response: dict[str, Any]) -> dict[str, Any]:
             "upstream provider returned a malformed tool call response",
         )
     finish_reason = choice.get("finish_reason")
-    if finish_reason not in {"stop", "tool_calls"}:
+    if finish_reason not in {"stop", "tool_calls", "content_filter"}:
         raise _invalid_response(
             chat_response,
             "upstream provider returned an incomplete response",
@@ -195,24 +195,27 @@ def to_responses(chat_response: dict[str, Any]) -> dict[str, Any]:
             chat_response,
             "upstream provider returned a malformed tool call response",
         )
+    refused = finish_reason == "content_filter"
+    if refused:
+        text = ""
     output: list[dict[str, Any]] = []
     if text or not tool_calls:
         output.append(
             {
                 "type": "message",
                 "role": "assistant",
-                "status": "completed",
+                "status": "incomplete" if refused else "completed",
                 "content": [{"type": "output_text", "text": text, "annotations": []}],
             }
         )
     output.extend(_function_call_items(tool_calls, chat_response))
     usage = _validated_usage(chat_response)
-    return {
+    translated = {
         "id": chat_response.get("id"),
         "object": "response",
         "created_at": chat_response.get("created"),
         "model": chat_response.get("model"),
-        "status": "completed",
+        "status": "incomplete" if refused else "completed",
         "output": output,
         "output_text": text,
         "usage": {
@@ -221,6 +224,9 @@ def to_responses(chat_response: dict[str, Any]) -> dict[str, Any]:
             "total_tokens": usage.get("total_tokens"),
         },
     }
+    if refused:
+        translated["incomplete_details"] = {"reason": "content_filter"}
+    return translated
 
 
 def _invalid_response(
@@ -344,37 +350,48 @@ class ChatToResponsesAdapter:
 
         parts: list[str] = []
         usage: dict[str, Any] = {}
+        finish_reason: str | None = None
         async for chunk in self._inner.astream_chat_completion(chat_request, model, credentials):
             # Inner chat streams end with a usage-bearing chunk (adapters force
             # it); carry it into response.completed so the call can be metered.
             if chunk.get("usage"):
                 usage = chunk["usage"]
-            content = (chunk.get("choices") or [{}])[0].get("delta", {}).get("content")
+            choice = (chunk.get("choices") or [{}])[0]
+            chunk_finish = choice.get("finish_reason")
+            if isinstance(chunk_finish, str):
+                finish_reason = chunk_finish
+            content = choice.get("delta", {}).get("content")
             if content:
                 parts.append(content)
                 yield {"type": "response.output_text.delta", "delta": content}
 
-        text = "".join(parts)
-        yield {
-            "type": "response.completed",
-            "response": {
-                **meta,
-                "status": "completed",
-                "output": [
-                    {
-                        "type": "message",
-                        "role": "assistant",
-                        "status": "completed",
-                        "content": [{"type": "output_text", "text": text, "annotations": []}],
-                    }
-                ],
-                "output_text": text,
-                "usage": {
-                    "input_tokens": usage.get("prompt_tokens"),
-                    "output_tokens": usage.get("completion_tokens"),
-                    "total_tokens": usage.get("total_tokens"),
-                },
+        refused = finish_reason == "content_filter"
+        text = "" if refused else "".join(parts)
+        terminal_type = "response.incomplete" if refused else "response.completed"
+        response_status = "incomplete" if refused else "completed"
+        response = {
+            **meta,
+            "status": response_status,
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "status": response_status,
+                    "content": [{"type": "output_text", "text": text, "annotations": []}],
+                }
+            ],
+            "output_text": text,
+            "usage": {
+                "input_tokens": usage.get("prompt_tokens"),
+                "output_tokens": usage.get("completion_tokens"),
+                "total_tokens": usage.get("total_tokens"),
             },
+        }
+        if refused:
+            response["incomplete_details"] = {"reason": "content_filter"}
+        yield {
+            "type": terminal_type,
+            "response": response,
         }
 
     async def anative_messages(

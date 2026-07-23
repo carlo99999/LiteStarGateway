@@ -2,11 +2,11 @@
 
 The gateway exposes Anthropic's **native** Messages wire protocol at
 `POST /v1/messages`. Point the stock `anthropic` SDK at the gateway `base_url`
-and everything the OpenAI-compatible surface can't express on Claude — tool
-calling, tool-result turns, multimodal input, prompt caching, extended thinking
-— passes through **natively**, while the gateway keeps enforcing the same
-governance it applies to `/v1/chat/completions` (auth, per-team budget, usage
-metering, rate limiting).
+for full-fidelity Claude behavior — streaming tool calls, multimodal input,
+prompt caching and extended thinking — while the gateway keeps enforcing the
+same governance it applies to `/v1/chat/completions` (auth, per-team budget,
+usage metering, rate limiting). The OpenAI-compatible surface also supports a
+bounded non-streaming Anthropic function-tool subset.
 
 The request's `model` is your **team model alias** (resolved to a Claude-backed
 model), never the upstream `provider_model_id` and never a raw Anthropic
@@ -127,15 +127,17 @@ client that additionally inspects the response body should key on
 
 ## Notes and limits
 
-- **Native passthrough only.** The Anthropic body flows upstream unchanged and
-  the native response is returned verbatim — there is no OpenAI translation on
-  this endpoint. Use `/v1/chat/completions` for the OpenAI-compatible surface.
+- **Native passthrough only.** Apart from the documented governance controls
+  (reserved-kwarg rejection and output-token ceilings), the Anthropic body flows
+  upstream unchanged and the native response is returned verbatim. There is no
+  OpenAI translation on this endpoint.
 - **Anthropic models only.** The alias must resolve to a Claude-backed model;
   otherwise the request is rejected with `400`.
 - **No smart routing (phase 1).** The alias resolves to one concrete Anthropic
   model; a router alias on this endpoint is not supported.
-- **Transport overrides are stripped.** Client-supplied `base_url` / `api_key`
-  overrides never change how the gateway calls upstream with its own credential.
+- **Transport controls stay gateway-owned.** Reserved body kwargs such as
+  `extra_headers`, `extra_query`, `extra_body` and `timeout` are rejected. The
+  upstream `base_url` and API key come only from the stored credential.
 
 See the design rationale in
 [Provider-native endpoints](next-steps/native-provider-endpoints.md).

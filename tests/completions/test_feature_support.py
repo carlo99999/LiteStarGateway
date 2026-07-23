@@ -1,7 +1,8 @@
-"""R7-H23: the Anthropic/Vertex/Bedrock chat translators are text-in/text-out
-(+ structured output). A request that uses real tool/function calling or
-non-text (image) content must fail loudly with UnsupportedOperation (501),
-not be silently stripped and answered as plain text."""
+"""Fail-loud feature boundaries for translated provider Chat adapters.
+
+Anthropic supports governed non-streaming tools; Vertex/Bedrock tools and
+non-text content on all three translators remain explicit 501s.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ TRANSLATORS = [
     (to_gemini_request, Provider.VERTEX_AI, "gemini-1.5-pro"),
     (to_converse_request, Provider.BEDROCK, "anthropic.claude-3-5-sonnet-v2:0"),
 ]
+TOOL_UNSUPPORTED_TRANSLATORS = TRANSLATORS[1:]
 
 
 def _model(provider: Provider, provider_model_id: str) -> Model:
@@ -51,7 +53,7 @@ IMAGE_MESSAGE = {
 }
 
 
-@pytest.mark.parametrize("translate,provider,model_id", TRANSLATORS)
+@pytest.mark.parametrize("translate,provider,model_id", TOOL_UNSUPPORTED_TRANSLATORS)
 def test_tools_are_rejected(translate, provider, model_id) -> None:
     with pytest.raises(UnsupportedOperation):
         translate(
@@ -60,7 +62,7 @@ def test_tools_are_rejected(translate, provider, model_id) -> None:
         )
 
 
-@pytest.mark.parametrize("translate,provider,model_id", TRANSLATORS)
+@pytest.mark.parametrize("translate,provider,model_id", TOOL_UNSUPPORTED_TRANSLATORS)
 def test_tool_choice_is_rejected(translate, provider, model_id) -> None:
     with pytest.raises(UnsupportedOperation):
         translate(

@@ -4,7 +4,7 @@
 
 **Depends on:** Plan 02 (complete) and the existing Responses emulation adapter.
 
-**Status:** Phase 0 and Phase 1a complete; Phase 1b is next.
+**Status:** Phase 0, Phase 1a and Phase 1b-A (Anthropic) complete; Bedrock is next.
 
 **Theme:** eliminate silent feature drops, then add faithful tool-call items and
 events for chat-only upstreams.
@@ -40,16 +40,44 @@ events for chat-only upstreams.
   fake Databricks/OpenAI-compatible chat provider. Each upstream invocation is
   billed exactly once; parallel calls preserve order, IDs and argument strings.
 
-## Phase 1b — Provider-native chat tool adapters
+## Phase 1b-A — Anthropic Chat tools — ✅ complete
 
-- Add faithful non-streaming Chat tool contracts to the Anthropic, Vertex and
-  Bedrock adapters before enabling their Responses capability.
-- Preserve provider call IDs across tool-use/tool-result representations.
-- Keep each provider at a pre-admission 501 until its direct Chat tool loop is
-  conformance-tested; do not let the generic Responses translator outrun the
-  wrapped adapter.
-- **Done when:** the same Phase 1a pure and endpoint contract passes for all
-  emulated providers without weakening structured-output behavior.
+- Maps OpenAI function definitions, `strict`, all four tool choices and
+  `parallel_tool_calls` to the Anthropic Messages contract.
+- Preserves provider `tool_use` IDs; groups parallel `tool_result` blocks in one
+  user turn as required by Anthropic.
+- Validates names, schema size/depth, JSON arguments and replay correlation
+  before routing, budget admission and provider dispatch.
+- Keeps client tools + structured output and streaming tools fail-closed.
+- **Done:** the direct Chat two-turn loop passes through the stock OpenAI SDK;
+  the emulated Responses loop passes an endpoint integration test. Malformed
+  billable upstream tool output settles usage once and returns a sanitized 502.
+
+## Phase 1b-B — Bedrock Converse tools
+
+- Map tools, `strict`, assistant `toolUse`, user `toolResult`, `auto`, `any` and
+  supported named choices.
+- Add a model-family capability gate: Bedrock documents named choice only for
+  Claude 3 and Nova.
+- Keep `tool_choice=none` and `parallel_tool_calls=false` at 501 because Converse
+  has no general equivalent.
+- **Done when:** every enabled model/choice combination has a direct Chat and
+  Responses conformance loop; all other combinations fail before routing.
+
+## Phase 1b-C — Vertex/Gemini tool state
+
+- Implement direct Chat replay through Google's documented
+  `tool_calls[].extra_content.google.thought_signature` carrier, preserving the
+  opaque value exactly in both directions.
+- Keep generic Responses tool loops fail-closed: normalized Responses
+  function-call items still have no thought-signature carrier. Choose an
+  explicit Responses solution: a wire-compatible stateless extension,
+  tenant-bound gateway state, or a conservative model allowlist proven not to
+  require signatures.
+- Keep unsupported per-tool `strict` and disabled-parallel semantics fail-closed.
+- **Done when:** direct Chat multi-step and parallel loops replay exact
+  signatures through `extra_content`; Responses either gains an explicit safe
+  carrier or remains 501, without using the degraded signature-validator bypass.
 
 ## Phase 2 — Streaming tool events
 

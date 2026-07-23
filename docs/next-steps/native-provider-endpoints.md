@@ -2,14 +2,14 @@
 
 > **Status — implemented.** Phase 1 (Anthropic Messages) and Phase 2 (Gemini
 > generateContent) are shipped, metered, documented and conformance-locked.
-> The rationale below is retained as the design record. Motivated by R7-H23: the OpenAI-compatible
-> surface cannot express tool/function calling or multimodal input on Anthropic,
-> Vertex or Bedrock (those translators are text-in/text-out + structured output),
-> so such requests now fail with `UnsupportedOperation` (501) instead of being
-> silently stripped. Rather than emulate OpenAI tool-calling on top of each
-> provider (lossy, high-maintenance — you maintain a mapping between *two*
-> evolving APIs), expose each provider's **native** wire protocol as a
-> first-class gateway endpoint and let clients use the provider's **native SDK**
+> The rationale below is retained as the design record. Motivated by R7-H23: the
+> OpenAI-compatible surface could not originally express tool/function calling
+> or multimodal input on Anthropic, Vertex or Bedrock, so such requests failed
+> with `UnsupportedOperation` (501) instead of being silently stripped.
+> Non-streaming Anthropic tools have since gained a bounded, conformance-tested
+> translation; Anthropic streaming tools, Vertex/Bedrock tools and translated
+> multimodal input remain fail-closed. The native wire protocols remain
+> first-class gateway endpoints and let clients use the provider's **native SDK**
 > pointed at the gateway `base_url`. The workload stays inside the gateway, so
 > budget, keys, usage metering, audit, routing and rate-limiting all still apply —
 > and tools/caching/multimodal/thinking pass through natively with nothing to get
@@ -33,10 +33,11 @@ behaviour** — tool calling, parallel tool calls, tool-result turns, multimodal
 input, prompt caching, extended thinking — while the gateway keeps enforcing the
 same governance it enforces on `/v1/chat/completions`.
 
-Non-goal: cross-protocol translation. An Anthropic-shaped request is served only
-by an Anthropic-backed model; a Gemini-shaped request only by a Gemini-backed
-model. No OpenAI↔provider tool-calling emulation (that is what R7-H23 deliberately
-declined to build).
+Non-goal for the native endpoints: cross-protocol translation. An
+Anthropic-shaped request is served only by an Anthropic-backed model; a
+Gemini-shaped request only by a Gemini-backed model. The separate
+OpenAI-compatible adapter now translates a bounded non-streaming Anthropic tool
+subset; that does not change these passthrough endpoints.
 
 ## Endpoints (phase 1: Anthropic; phase 2: Gemini)
 
@@ -69,12 +70,12 @@ The new endpoints are new attack surface. The recurring theme of the review is
   `CredentialRepository.get_values`; the upstream `base_url` comes only from the
   credential (`_base_url`), never from the client — preserve the exfiltration
   guard that already exists in the adapters.
-- **Param sanitization**: `request_policy` is OpenAI-shaped and cannot be reused
-  as-is. Add a native allowlist per protocol that, at minimum, strips SDK
-  transport overrides (`extra_headers`/`extra_body`/`extra_query`/`timeout`/
-  `api_key`/`base_url`) so a tenant can't manipulate how we call upstream with
-  *our* credential. `model.params_enforced` must still be merged in as trusted
-  admin policy the client cannot override.
+- **Native-body governance**: `request_policy` is OpenAI-shaped and is not
+  reused wholesale. The shipped native path rejects reserved SDK body kwargs
+  (`extra_headers`/`extra_body`/`extra_query`/`timeout` and private keys), clamps
+  the provider output-token field and otherwise preserves the body verbatim.
+  It deliberately does not merge `model.params` or `model.params_enforced`;
+  native callers own provider-shaped inference fields.
 - **Errors**: reuse `translate_upstream_error` / `errors.py` so upstream
   4xx/5xx map to the same gateway statuses; SCIM-style native error bodies are
   not required, but a 501 for an unsupported model/protocol combination must use
@@ -124,13 +125,12 @@ That later phase is now designed in `routing-evolution.md` / Plan 12: Anthropic
 may route only to Anthropic and Gemini only to Gemini, with config-time and
 dispatch-time validation. It never introduces cross-protocol translation.
 
-Note the capability mismatch this resolves: `CandidateModel.supports_tools`
-currently means "the underlying model supports tools," but the OpenAI path can
-only honour it for OpenAI/Azure. With native endpoints, an admin who wants tools
-on Claude routes the client to the Anthropic model via `/v1/messages`, and
-`supports_tools` on the OpenAI routing path keeps meaning "OpenAI/Azure tool
-passthrough." Keep the R7-H23 501 on the OpenAI path and update its message to
-point at the native endpoint.
+`CandidateModel.supports_tools` means that both the model and the selected
+surface can honor the requested tool contract. The OpenAI path now honors its
+bounded non-streaming contract for OpenAI/Azure/Databricks/Anthropic; native
+Anthropic remains the route for unrestricted or streaming Claude tool use.
+Vertex and Bedrock translations stay fail-closed until their narrower contracts
+are implemented.
 
 ## Suggested slicing
 
@@ -141,16 +141,17 @@ point at the native endpoint.
    `UsageMeter` wiring; native param sanitizer. Tests: tool call round-trips
    (request `tools` → response `tool_use`), tool-result turn accepted, usage
    billed to `usage_event`, over-budget → 402/`BudgetExceeded`, tenant isolation,
-   transport-override fields stripped.
+   reserved transport-control fields rejected.
 2. **Anthropic `/v1/messages`, streaming** — raw SSE relay through
    `metered_stream` with native tail-usage extraction and R7-H24 first-frame
    priming.
 3. **Gemini `generateContent` + `:streamGenerateContent`** — same pattern with
    the `google-genai` SDK.
-4. **Docs**: a capability matrix page — "OpenAI-compatible surface: text +
-   structured output on all providers; tools/multimodal on OpenAI/Azure only.
-   For tools/multimodal on Anthropic/Gemini use the native endpoints with the
-   provider SDK." Update the R7-H23 501 message to reference `/v1/messages`.
+4. **Docs**: maintain a capability matrix page. The current
+   OpenAI-compatible surface supports text + structured output on all providers
+   and non-streaming tools on OpenAI/Azure/Databricks/Anthropic. For
+   full-fidelity tools/multimodal on Anthropic/Gemini, use the native endpoints
+   with the provider SDK; Bedrock has no gateway-native endpoint.
 
 ## Acceptance
 
@@ -159,9 +160,9 @@ point at the native endpoint.
   spend recorded in `usage_event` and gated by the team budget.
 - No new auth/tenant/transport-override hole (mirror the OpenAI path's guard
   tests for the native router).
-- The OpenAI-compatible surface is unchanged; the R7-H23 501 still fires for
-  OpenAI-shaped tool requests to non-OpenAI models, now pointing at the native
-  endpoint.
+- The OpenAI-compatible surface fails loudly for unsupported provider/feature
+  combinations. Its bounded non-streaming Anthropic tool subset is supported;
+  Anthropic streaming tools and all Vertex/Bedrock translated tools remain 501.
 
 ## Usage
 

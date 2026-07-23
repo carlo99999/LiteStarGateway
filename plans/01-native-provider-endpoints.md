@@ -10,10 +10,11 @@ lossy OpenAI translation layer.
 **Status: ✅ COMPLETE.** Phase 1 (Anthropic `/v1/messages` — 1a non-streaming, 1b
 streaming, 1c real-SDK validation + docs) and Phase 2 (Gemini `generateContent` /
 `streamGenerateContent` — dispatch + real-SDK validation + docs) are shipped:
-verbatim passthrough, native metering, provider guards, real-SDK-validated,
-documented, and locked by native conformance contracts. Auth was extended to accept
-`x-api-key` (Anthropic) and `x-goog-api-key` (Gemini). Deferred: smart routing on the
-native endpoints (backlog), Anthropic cache-token billing.
+governed passthrough, native metering, provider guards, real-SDK validation,
+documentation and native conformance contracts. Reserved SDK kwargs are rejected
+and output-token ceilings are applied; other provider fields remain verbatim.
+Auth accepts `x-api-key` (Anthropic) and `x-goog-api-key` (Gemini). Deferred:
+smart routing on native endpoints (backlog), Anthropic cache-token billing.
 
 ## Guardrails (from the design doc — non-negotiable)
 
@@ -58,8 +59,8 @@ proven once and reused.
 - Accept the native Anthropic Messages request shape; resolve the model; fetch
   credentials (server-side `base_url`).
 - Dispatch to `infrastructure/llm/anthropic_adapter.py` in **native passthrough**
-  mode (send the native body, return the native response) — distinct from the
-  OpenAI-translating path.
+  mode (after reserved-kwarg rejection and output-token clamping, send the body
+  and return the native response) — distinct from the OpenAI-translating path.
 - **Metering:** derive `(input_tokens, output_tokens)` from the native
   `usage` block (invert `from_anthropic_response`) and run
   `admit → settle_ok → release` around the call, labelled e.g.

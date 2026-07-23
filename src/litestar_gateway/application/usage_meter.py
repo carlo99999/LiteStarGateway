@@ -84,7 +84,7 @@ def _request_text(request: dict[str, Any]) -> str:
                 for c in content
                 if isinstance(c, dict) and isinstance(c.get("text"), str)
             )
-    for field in ("tools", "tool_choice"):
+    for field in ("tools", "tool_choice", "response_format", "text"):
         if request.get(field) is not None:
             parts.append(_serialized_prompt_value(request[field]))
     return "\n".join(parts)
@@ -150,6 +150,47 @@ def _has_tokens(usage: dict[str, Any]) -> bool:
     return any(
         int(usage.get(key) or 0)
         for key in ("prompt_tokens", "completion_tokens", "input_tokens", "output_tokens")
+    )
+
+
+def _has_authoritative_usage(usage: dict[str, Any]) -> bool:
+    """Whether a provider explicitly reported a complete, non-negative token pair.
+
+    Unlike `_has_tokens`, an authoritative all-zero pair is meaningful: for
+    example, Anthropic pre-output refusals are successful but uncharged and must
+    not fall back to a request-size billing estimate.
+    """
+    for prompt_key, completion_key in (
+        ("prompt_tokens", "completion_tokens"),
+        ("input_tokens", "output_tokens"),
+    ):
+        prompt = usage.get(prompt_key)
+        completion = usage.get(completion_key)
+        if (
+            isinstance(prompt, int)
+            and not isinstance(prompt, bool)
+            and prompt >= 0
+            and isinstance(completion, int)
+            and not isinstance(completion, bool)
+            and completion >= 0
+        ):
+            return True
+    return False
+
+
+def _is_uncharged_refusal(response: dict[str, Any], usage: dict[str, Any]) -> bool:
+    chat_refusal = any(
+        isinstance(choice, dict) and choice.get("finish_reason") == "content_filter"
+        for choice in response.get("choices") or []
+    )
+    responses_refusal = (
+        response.get("status") == "incomplete"
+        and (response.get("incomplete_details") or {}).get("reason") == "content_filter"
+    )
+    return (
+        (chat_refusal or responses_refusal)
+        and _has_authoritative_usage(usage)
+        and not _has_tokens(usage)
     )
 
 
@@ -417,7 +458,8 @@ class UsageMeter:
         attribution: UsageAttribution | None,
     ) -> tuple[int, int, float, datetime]:
         usage = response.get("usage") or {}
-        if not _has_tokens(usage) and request is not None:
+        uncharged_refusal = _is_uncharged_refusal(response, usage)
+        if not _has_tokens(usage) and not uncharged_refusal and request is not None:
             estimate = {"prompt_tokens": _estimate_tokens(len(_request_text(request)))}
             if _has_tokens(estimate):
                 usage = estimate
@@ -575,6 +617,8 @@ class UsageMeter:
         usage: dict[str, Any] = {}
         streamed_chars = 0
         error: Exception | None = None
+        refusal_seen = False
+        authoritative_zero = False
         try:
             async for chunk in stream:
                 # OpenAI chat puts usage at the top level (final chunk); the
@@ -582,6 +626,23 @@ class UsageMeter:
                 found = chunk.get("usage") or (chunk.get("response") or {}).get("usage")
                 if found:
                     usage = found
+                refusal_seen = (
+                    refusal_seen
+                    or any(
+                        isinstance(choice, dict) and choice.get("finish_reason") == "content_filter"
+                        for choice in chunk.get("choices") or []
+                    )
+                    or (
+                        chunk.get("type") == "response.incomplete"
+                        and (chunk.get("response") or {})
+                        .get("incomplete_details", {})
+                        .get("reason")
+                        == "content_filter"
+                    )
+                )
+                authoritative_zero = (
+                    refusal_seen and _has_authoritative_usage(usage) and not _has_tokens(usage)
+                )
                 streamed_chars += len(_chunk_output_text(chunk))
                 yield chunk
         except Exception as exc:
@@ -610,6 +671,7 @@ class UsageMeter:
                     error,
                     start,
                     attribution,
+                    authoritative_zero=authoritative_zero,
                 )
 
     async def metered_native_stream(
@@ -743,6 +805,8 @@ class UsageMeter:
         error: Exception | None,
         start: float,
         attribution: UsageAttribution | None,
+        *,
+        authoritative_zero: bool = False,
     ) -> None:
         """Post-stream settlement: estimate usage if none arrived, bill, and
         trace. Runs inside `metered_stream`'s shielded finally — callers must
@@ -755,7 +819,7 @@ class UsageMeter:
         # there the provider did consume the prompt. A mid-stream failure
         # after some output also bills — those tokens were paid upstream.
         produced_nothing = error is not None and streamed_chars == 0 and not _has_tokens(usage)
-        if not _has_tokens(usage) and not produced_nothing:
+        if not _has_tokens(usage) and not produced_nothing and not authoritative_zero:
             estimate = {
                 "prompt_tokens": _estimate_tokens(len(_request_text(request))),
                 "completion_tokens": _estimate_tokens(streamed_chars),
