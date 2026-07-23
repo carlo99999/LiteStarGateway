@@ -8,9 +8,10 @@ Credential `values`: `vertex_project`, `vertex_location`, and (in production)
 `vertex_credentials` — the service-account JSON. Without it, Application Default
 Credentials are used.
 
-Scope: text-in/text-out, plus structured outputs (`response_format`) translated
-to `response_mime_type` + `response_schema`, streaming included (the same request
-builder feeds both paths). Not yet translated: tools, multimodal.
+Scope: text-in/text-out, structured outputs (`response_format`) translated to
+`response_mime_type` + `response_schema`, and faithful non-streaming function
+tools with thought-signature replay. Streaming tools and multimodal input remain
+fail-closed.
 """
 
 from __future__ import annotations
@@ -20,13 +21,21 @@ import json
 import time
 from collections.abc import AsyncIterator
 from typing import Any
+from uuid import uuid4
 
 from google import genai
 from google.genai.types import HttpOptions
 from google.oauth2 import service_account
 
+from litestar_gateway.domain.chat_tool_policy import (
+    MAX_VERTEX_THOUGHT_SIGNATURE_BYTES,
+    VERTEX_GATEWAY_CALL_ID_PREFIX,
+    VERTEX_THOUGHT_SIGNATURE_BYPASS,
+    decode_vertex_thought_signature,
+    validate_chat_request,
+)
 from litestar_gateway.domain.entities import Model
-from litestar_gateway.domain.exceptions import CredentialMisconfigured
+from litestar_gateway.domain.exceptions import CredentialMisconfigured, UpstreamResponseInvalid
 from litestar_gateway.infrastructure.llm.feature_support import ensure_translatable_chat_request
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.llm.structured_output import parse_response_format
@@ -51,21 +60,144 @@ def _text(content: Any) -> str:
     return ""
 
 
-def to_gemini_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
-    effective = model.merge_params(request)
-    ensure_translatable_chat_request(effective, model.provider.value)
+def _tool_input(arguments: str) -> dict[str, Any]:
+    value = json.loads(arguments)
+    assert isinstance(value, dict)
+    return value
 
-    system_parts: list[str] = []
-    contents: list[dict[str, Any]] = []
-    for message in effective.get("messages", []):
+
+def _reject_non_finite_json(value: str) -> None:
+    raise ValueError(f"non-finite JSON constant: {value}")
+
+
+def _tool_result(content: str) -> dict[str, Any]:
+    try:
+        decoded = json.loads(content, parse_constant=_reject_non_finite_json)
+    except TypeError, ValueError:
+        return {"output": content}
+    return decoded if isinstance(decoded, dict) else {"output": content}
+
+
+def _provider_call_id(call_id: str, extra_content: Any) -> str | None:
+    gateway = extra_content.get("litestar_gateway") if isinstance(extra_content, dict) else None
+    synthetic = (
+        isinstance(gateway, dict)
+        and set(gateway) == {"synthetic_call_id"}
+        and gateway.get("synthetic_call_id") is True
+    )
+    return None if synthetic else call_id
+
+
+def _gemini_contents(messages: list[Any]) -> list[dict[str, Any]]:
+    translated: list[dict[str, Any]] = []
+    call_names: dict[str, str] = {}
+    provider_call_ids: dict[str, str | None] = {}
+    index = 0
+    while index < len(messages):
+        message = messages[index]
+        index += 1
+        if not isinstance(message, dict):
+            continue
         role = message.get("role")
-        text = _text(message.get("content"))
         if role == "system":
-            system_parts.append(text)
-        else:  # Gemini uses "model" for the assistant role
-            contents.append(
+            continue
+        if role == "tool":
+            parts: list[dict[str, Any]] = []
+            current = message
+            while True:
+                call_id = current["tool_call_id"]
+                function_response: dict[str, Any] = {
+                    "name": call_names[call_id],
+                    "response": _tool_result(current["content"]),
+                }
+                if provider_call_id := provider_call_ids[call_id]:
+                    function_response["id"] = provider_call_id
+                parts.append({"function_response": function_response})
+                if index >= len(messages):
+                    break
+                candidate = messages[index]
+                if not isinstance(candidate, dict) or candidate.get("role") != "tool":
+                    break
+                current = candidate
+                index += 1
+            translated.append({"role": "user", "parts": parts})
+            continue
+        if role not in {"user", "assistant"}:
+            continue
+        text = _text(message.get("content"))
+        tool_calls = message.get("tool_calls")
+        if role == "assistant" and isinstance(tool_calls, list):
+            parts = []
+            if text:
+                parts.append({"text": text})
+            for call in tool_calls:
+                call_id = call["id"]
+                name = call["function"]["name"]
+                call_names[call_id] = name
+                extra_content = call.get("extra_content")
+                provider_call_ids[call_id] = _provider_call_id(call_id, extra_content)
+                function_call: dict[str, Any] = {
+                    "name": name,
+                    "args": _tool_input(call["function"]["arguments"]),
+                }
+                if provider_call_id := provider_call_ids[call_id]:
+                    function_call["id"] = provider_call_id
+                part: dict[str, Any] = {"function_call": function_call}
+                if isinstance(extra_content, dict):
+                    google = extra_content.get("google")
+                    if isinstance(google, dict):
+                        part["thought_signature"] = decode_vertex_thought_signature(
+                            google["thought_signature"],
+                            field="tool_calls.extra_content.google.thought_signature",
+                        )
+                parts.append(part)
+            translated.append({"role": "model", "parts": parts})
+        else:
+            translated.append(
                 {"role": "model" if role == "assistant" else "user", "parts": [{"text": text}]}
             )
+    return translated
+
+
+def _gemini_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    declarations: list[dict[str, Any]] = []
+    for tool in tools:
+        function = tool["function"]
+        declaration: dict[str, Any] = {"name": function["name"]}
+        if "description" in function:
+            declaration["description"] = function["description"]
+        declaration["parameters_json_schema"] = function.get("parameters", {"type": "object"})
+        declarations.append(declaration)
+    return [{"function_declarations": declarations}]
+
+
+def _gemini_tool_config(effective: dict[str, Any]) -> dict[str, Any]:
+    choice = effective.get("tool_choice")
+    function_calling: dict[str, Any]
+    if choice == "none":
+        function_calling = {"mode": "NONE"}
+    elif choice == "required":
+        function_calling = {"mode": "ANY"}
+    elif isinstance(choice, dict):
+        function_calling = {
+            "mode": "ANY",
+            "allowed_function_names": [choice["function"]["name"]],
+        }
+    else:
+        function_calling = {"mode": "AUTO"}
+    return {"function_calling_config": function_calling}
+
+
+def to_gemini_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
+    effective = model.merge_params(request)
+    validate_chat_request(model, request)
+    ensure_translatable_chat_request(effective, model.provider.value, allow_tools=True)
+
+    system_parts: list[str] = []
+    for message in effective.get("messages", []):
+        if isinstance(message, dict) and message.get("role") == "system":
+            system_parts.append(_text(message.get("content")))
+    contents = _gemini_contents(effective.get("messages") or [])
 
     config: dict[str, Any] = {}
     if system_parts:
@@ -87,17 +219,173 @@ def to_gemini_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
         config["response_mime_type"] = "application/json"
         if structured.schema is not None:
             config["response_schema"] = structured.schema
+    if isinstance(effective.get("tools"), list):
+        config["tools"] = _gemini_tools(effective["tools"])
+        config["tool_config"] = _gemini_tool_config(effective)
 
     return {"model": model.provider_model_id, "contents": contents, "config": config}
 
 
-def from_gemini_response(response: dict[str, Any]) -> dict[str, Any]:
-    candidate = (response.get("candidates") or [{}])[0]
-    parts = (candidate.get("content") or {}).get("parts") or []
+def _billable_response(response: dict[str, Any]) -> dict[str, Any]:
+    usage = response.get("usage_metadata")
+    if not isinstance(usage, dict):
+        return {"usage": {}}
+    prompt = usage.get("prompt_token_count")
+    completion = usage.get("candidates_token_count")
+    total = usage.get("total_token_count")
+    if (
+        not isinstance(prompt, int)
+        or isinstance(prompt, bool)
+        or prompt < 0
+        or not isinstance(completion, int)
+        or isinstance(completion, bool)
+        or completion < 0
+        or not isinstance(total, int)
+        or isinstance(total, bool)
+        or total < 0
+    ):
+        return {"usage": {}}
+    return {
+        "usage": {
+            "prompt_tokens": prompt,
+            "completion_tokens": completion,
+            "total_tokens": total,
+        }
+    }
+
+
+def _invalid_response(response: dict[str, Any], detail: str) -> UpstreamResponseInvalid:
+    return UpstreamResponseInvalid(detail, _billable_response(response))
+
+
+def _gemini_tool_calls(
+    response: dict[str, Any],
+    parts: list[Any],
+    expected_tool_names: set[str] | None,
+) -> list[dict[str, Any]]:
+    calls: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for part in parts:
+        if not isinstance(part, dict):
+            raise _invalid_response(response, "Vertex returned malformed content")
+        function_call = part.get("function_call")
+        signature = part.get("thought_signature")
+        if function_call is None:
+            if signature is not None and (
+                not isinstance(part.get("text"), str)
+                or not isinstance(signature, bytes)
+                or not signature
+                or len(signature) > MAX_VERTEX_THOUGHT_SIGNATURE_BYTES
+                or signature == VERTEX_THOUGHT_SIGNATURE_BYPASS
+            ):
+                raise _invalid_response(
+                    response,
+                    "Vertex returned a malformed non-function thought signature",
+                )
+            continue
+        if not isinstance(function_call, dict):
+            raise _invalid_response(response, "Vertex returned a malformed function call")
+        name = function_call.get("name")
+        arguments = function_call.get("args")
+        call_id = function_call.get("id")
+        synthetic_call_id = call_id is None
+        if call_id is None:
+            call_id = f"{VERTEX_GATEWAY_CALL_ID_PREFIX}{uuid4().hex}"
+        if (
+            not isinstance(call_id, str)
+            or not call_id
+            or call_id in seen_ids
+            or not isinstance(name, str)
+            or not name
+            or (expected_tool_names is not None and name not in expected_tool_names)
+            or not isinstance(arguments, dict)
+        ):
+            raise _invalid_response(response, "Vertex returned a malformed function call")
+        if signature is not None and (
+            not isinstance(signature, bytes)
+            or not signature
+            or len(signature) > MAX_VERTEX_THOUGHT_SIGNATURE_BYTES
+            or signature == VERTEX_THOUGHT_SIGNATURE_BYPASS
+            or bool(calls)
+        ):
+            raise _invalid_response(
+                response,
+                "Vertex returned a malformed function-call thought signature",
+            )
+        try:
+            serialized_arguments = json.dumps(
+                arguments,
+                allow_nan=False,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        except (TypeError, ValueError) as exc:
+            raise _invalid_response(response, "Vertex returned non-JSON tool arguments") from exc
+        seen_ids.add(call_id)
+        call: dict[str, Any] = {
+            "id": call_id,
+            "type": "function",
+            "function": {"name": name, "arguments": serialized_arguments},
+        }
+        extra_content: dict[str, Any] = {}
+        if signature is not None:
+            extra_content["google"] = {
+                "thought_signature": base64.b64encode(signature).decode("ascii")
+            }
+        if synthetic_call_id:
+            extra_content["litestar_gateway"] = {"synthetic_call_id": True}
+        if extra_content:
+            call["extra_content"] = extra_content
+        calls.append(call)
+    return calls
+
+
+def from_gemini_response(
+    response: dict[str, Any],
+    *,
+    expected_tool_names: set[str] | None = None,
+    require_tool_call: bool = False,
+    forbid_tool_call: bool = False,
+    require_thought_signature: bool = False,
+) -> dict[str, Any]:
+    candidates = response.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        raise _invalid_response(response, "Vertex returned malformed candidates")
+    candidate = candidates[0]
+    if not isinstance(candidate, dict):
+        raise _invalid_response(response, "Vertex returned a malformed candidate")
+    content = candidate.get("content")
+    if not isinstance(content, dict) or content.get("role") not in (None, "model"):
+        raise _invalid_response(response, "Vertex returned malformed content")
+    finish_raw = candidate.get("finish_reason")
+    if not isinstance(finish_raw, str) or finish_raw not in _FINISH_REASON:
+        raise _invalid_response(response, "Vertex returned an invalid finish reason")
+    finish_reason = _FINISH_REASON[finish_raw]
+    parts = content.get("parts")
+    if not isinstance(parts, list):
+        raise _invalid_response(response, "Vertex returned malformed content")
+    usage = _billable_response(response)["usage"]
+    if not usage:
+        raise _invalid_response(response, "Vertex returned malformed usage")
+    tool_calls = _gemini_tool_calls(response, parts, expected_tool_names)
+    if require_tool_call and not tool_calls:
+        raise _invalid_response(response, "Vertex omitted a required tool call")
+    if forbid_tool_call and tool_calls:
+        raise _invalid_response(response, "Vertex returned a tool call for tool_choice='none'")
+    if require_thought_signature and tool_calls:
+        first_extra = tool_calls[0].get("extra_content")
+        if not isinstance(first_extra, dict) or "google" not in first_extra:
+            raise _invalid_response(
+                response,
+                "Vertex omitted the required Gemini 3 function-call thought signature",
+            )
     text = "".join(
         p.get("text", "") for p in parts if isinstance(p, dict) and isinstance(p.get("text"), str)
     )
-    usage = response.get("usage_metadata") or {}
+    message: dict[str, Any] = {"role": "assistant", "content": text}
+    if tool_calls:
+        message["tool_calls"] = tool_calls
     return {
         "id": response.get("response_id"),
         "object": "chat.completion",
@@ -106,16 +394,35 @@ def from_gemini_response(response: dict[str, Any]) -> dict[str, Any]:
         "choices": [
             {
                 "index": 0,
-                "message": {"role": "assistant", "content": text},
-                "finish_reason": _FINISH_REASON.get(candidate.get("finish_reason"), "stop"),
+                "message": message,
+                "finish_reason": ("tool_calls" if tool_calls else finish_reason),
             }
         ],
-        "usage": {
-            "prompt_tokens": usage.get("prompt_token_count"),
-            "completion_tokens": usage.get("candidates_token_count"),
-            "total_tokens": usage.get("total_token_count"),
-        },
+        "usage": usage,
     }
+
+
+def _tool_response_contract(
+    request: dict[str, Any], model: Model
+) -> tuple[set[str], bool, bool, bool]:
+    effective = model.merge_params(request)
+    tools = effective.get("tools")
+    names = (
+        {
+            tool["function"]["name"]
+            for tool in tools
+            if isinstance(tool, dict) and isinstance(tool.get("function"), dict)
+        }
+        if isinstance(tools, list)
+        else set()
+    )
+    choice = effective.get("tool_choice")
+    if isinstance(choice, dict):
+        names = {choice["function"]["name"]}
+    require_tool_call = choice == "required" or isinstance(choice, dict)
+    forbid_tool_call = choice == "none"
+    require_signature = bool(names) and model.provider_model_id.lower().startswith("gemini-3")
+    return names, require_tool_call, forbid_tool_call, require_signature
 
 
 def gemini_chunk_to_delta(chunk: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
@@ -241,7 +548,16 @@ class VertexAdapter:
         client = self._client(credentials)
         try:
             response = client.models.generate_content(**to_gemini_request(request, model))
-            return from_gemini_response(response.model_dump())
+            names, require_call, forbid_call, require_signature = _tool_response_contract(
+                request, model
+            )
+            return from_gemini_response(
+                response.model_dump(),
+                expected_tool_names=names,
+                require_tool_call=require_call,
+                forbid_tool_call=forbid_call,
+                require_thought_signature=require_signature,
+            )
         finally:
             client.close()
 
@@ -251,7 +567,16 @@ class VertexAdapter:
         client = self._client(credentials)
         try:
             response = await client.aio.models.generate_content(**to_gemini_request(request, model))
-            return from_gemini_response(response.model_dump())
+            names, require_call, forbid_call, require_signature = _tool_response_contract(
+                request, model
+            )
+            return from_gemini_response(
+                response.model_dump(),
+                expected_tool_names=names,
+                require_tool_call=require_call,
+                forbid_tool_call=forbid_call,
+                require_thought_signature=require_signature,
+            )
         finally:
             await client.aio.aclose()
 

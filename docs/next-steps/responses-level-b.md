@@ -6,9 +6,11 @@
 > the selected provider contract can enforce it.
 > Databricks, Anthropic and capability-gated Bedrock Claude 3/Nova models
 > additionally support faithful non-streaming function-tool loops over their
-> translated Chat surfaces. Unsupported fields fail with 501 before router side
-> effects, budget admission or provider dispatch. The remaining provider gap is
-> a faithful Vertex thought-signature carrier, followed by streaming tool events.
+> translated Chat surfaces. Validated Vertex Gemini 2.5/3 text models now
+> support the direct Chat loop with byte-exact thought-signature replay.
+> Unsupported fields fail with 501 before router side effects, budget admission
+> or provider dispatch. Generic Vertex Responses tool state and streaming tool
+> events remain.
 > Execution plan:
 > [`plans/09-responses-level-b.md`](../../plans/09-responses-level-b.md).
 
@@ -39,8 +41,10 @@ Native Responses providers remain passthrough and must not regress.
 Phase 1a enabled this subset for Databricks. Phase 1b-A added Anthropic with
 native choice/strict/parallel mappings. Phase 1b-B added non-strict Bedrock
 `toolSpec`/`toolUse`/`toolResult` mappings for validated Claude 3/Nova model IDs.
-Both preserve exact call IDs and grouped parallel results. Vertex remains
-fail-closed until its thought-signature contract is conformance-tested.
+Both preserve exact call IDs and grouped parallel results. Vertex direct Chat
+now does the same while preserving Google's signature carrier; generic Vertex
+Responses tools remain fail-closed because normalized function-call items
+cannot carry that state.
 
 ## 3. Fail-loud capability gate
 
@@ -139,6 +143,9 @@ contract is the specification.
   to function-call parts and require exact replay. The normalized Responses
   function-call item has no carrier for it, so generic Vertex tool emulation
   remains 501 rather than using the provider's degraded validator bypass.
+  Direct Chat is shipped for validated Gemini 2.5/3 text models through
+  `tool_calls[].extra_content.google.thought_signature`, with byte-exact
+  replay, ordered parallel results and mandatory Gemini 3 step signatures.
 
 ## 8. Non-goals
 

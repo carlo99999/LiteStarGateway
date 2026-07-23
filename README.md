@@ -129,10 +129,16 @@ Anthropic (`/v1/messages`) and Gemini passthrough endpoints are available too �
 [examples](EXAMPLES.md).
 
 Non-streaming function-tool loops work through Chat Completions on OpenAI,
-Azure, Databricks, Anthropic and capability-gated Bedrock Claude 3/Nova models.
+Azure, Databricks, Anthropic, validated Vertex Gemini 2.5/3 text models, and
+capability-gated Bedrock Claude 3/Nova models. Vertex preserves Gemini
+thought signatures through Google's documented
+`tool_calls[].extra_content.google.thought_signature` carrier.
+When Vertex omits a call ID, the gateway adds one and marks it with
+`tool_calls[].extra_content.litestar_gateway.synthetic_call_id` so replay can
+omit only gateway-generated IDs without guessing from their text.
 They also work through native Responses on OpenAI/Azure and emulated Responses
-on Databricks/Anthropic/Bedrock. Vertex translated tools and emulated streaming
-tool events remain fail-closed.
+on Databricks/Anthropic/Bedrock. Generic Vertex Responses tool loops and
+translated streaming tool events remain fail-closed.
 
 ## Admin console
 
@@ -238,10 +244,14 @@ Next up:
   gateway proxies the typed SSE events: `response.output_text.delta`,
   `response.function_call_arguments.delta`, …). Databricks chat emulation also
   supports faithful non-streaming function-tool loops with stable call IDs and
-  stateless result replay; Anthropic and capability-gated Bedrock now support
-  the same contract with native schema/choice/replay mappings. Other unsupported
-  fields fail before budget admission or provider dispatch. The remaining Level
-  B work is Vertex thought-signature replay and streaming tool events
+  stateless result replay; Anthropic and capability-gated Bedrock support the
+  same contract with native schema/choice/replay mappings. Validated Vertex
+  Gemini 2.5/3 text models now support the direct Chat loop with byte-exact
+  thought-signature replay, while generic Vertex Responses tools remain 501
+  because normalized function-call items have no safe signature carrier. Other
+  unsupported fields fail before budget admission or provider dispatch. The
+  remaining Level B work is an explicit Vertex Responses state contract and
+  streaming tool events
   ([design](docs/next-steps/responses-level-b.md)).
 - **Usage analytics** — attach settled stream usage to routing decisions and add
   temporal cost/token/call charts ([design](docs/next-steps/usage-analytics.md)).

@@ -55,7 +55,9 @@ Keep it a **pure function** in the domain (no I/O) → trivially unit-testable.
     Bedrock accepts omitted/`auto`/`required`/supported named choices and
     omitted/true parallel intent; `none`, disabled parallelism, unknown families
     opaque ARNs and `strict=true` remain 501. Nova also enforces its documented
-    top-level schema subset. Vertex remains 501 for translated tool calls.
+    top-level schema subset. Validated Vertex Gemini 2.5/3 text models accept
+    direct non-streaming Chat tools with bounded schemas and exact
+    thought-signature replay; generic Vertex Responses tools remain 501.
     Every unsupported field is rejected before budget admission or provider
     dispatch.
   - embeddings: `input, model, dimensions, encoding_format, user`.
@@ -63,10 +65,12 @@ Keep it a **pure function** in the domain (no I/O) → trivially unit-testable.
 - **Numeric caps** (configurable): cap `n`, `max_tokens`/`max_completion_tokens`
   to a server maximum (global `MAX_TOKENS`, plus an optional per-model ceiling —
   see below).
-- **Translated Anthropic/Bedrock tool caps:** at most 64 unique function names matching
+- **Translated Anthropic/Vertex/Bedrock tool caps:** at most 64 unique function names matching
   `^[a-zA-Z0-9_-]{1,64}$`, 256 KiB of serialized schemas, and 32 JSON nesting
   levels. Arguments must be finite JSON objects and replayed call IDs/results
-  must form a complete, correlated turn.
+  must form a complete, correlated turn. Vertex additionally accepts only the
+  documented schema subset, caps decoded thought signatures at 64 KiB, rejects
+  the validator-bypass sentinel, and requires signatures on Gemini 3 replay.
 - **Always stripped/blocked**: transport overrides — `extra_headers`,
   `extra_query`, `extra_body`, `base_url`, `api_key`, `organization`. (These are
   how a caller could exfiltrate the credential or inject headers.)

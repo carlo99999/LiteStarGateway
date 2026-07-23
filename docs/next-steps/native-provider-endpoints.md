@@ -6,9 +6,10 @@
 > OpenAI-compatible surface could not originally express tool/function calling
 > or multimodal input on Anthropic, Vertex or Bedrock, so such requests failed
 > with `UnsupportedOperation` (501) instead of being silently stripped.
-> Non-streaming Anthropic tools and capability-gated Bedrock Claude 3/Nova
-> tools have since gained bounded, conformance-tested translations. Translated
-> streaming tools, Vertex tools and multimodal input remain fail-closed. The
+> Non-streaming Anthropic tools, validated Vertex Gemini 2.5/3 text tools and
+> capability-gated Bedrock Claude 3/Nova tools have since gained bounded,
+> conformance-tested translations. Translated streaming tools, generic Vertex
+> Responses tools and multimodal input remain fail-closed. The
 > native wire protocols remain
 > first-class gateway endpoints and let clients use the provider's **native SDK**
 > pointed at the gateway `base_url`. The workload stays inside the gateway, so
@@ -129,10 +130,11 @@ dispatch-time validation. It never introduces cross-protocol translation.
 
 `CandidateModel.supports_tools` means that both the model and the selected
 surface can honor the requested tool contract. The OpenAI path now honors its
-bounded non-streaming contract for OpenAI/Azure/Databricks/Anthropic and
-validated Bedrock Claude 3/Nova IDs; native Anthropic remains the route for
-unrestricted or streaming Claude tool use. Vertex translation stays fail-closed
-until its thought-signature contract is implemented.
+bounded non-streaming contract for OpenAI/Azure/Databricks/Anthropic, validated
+Vertex Gemini 2.5/3 text models and validated Bedrock Claude 3/Nova IDs; native
+Anthropic remains the route for unrestricted or streaming Claude tool use.
+Native Gemini remains the route for unrestricted tools, thinking and multimodal
+content.
 
 ## Suggested slicing
 
