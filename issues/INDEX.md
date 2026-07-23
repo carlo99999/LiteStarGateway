@@ -10,7 +10,7 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 | Round | Focus | New findings (C·H·M·L) | Status |
 |---|---|---|---|
-| [Round 12](round-12.md) — 2026-07-22 | Post-R11 delta (verification of remediation PRs #313–#321: alias registry, router revisions, playground governance, downgrade contract) | 0·0·2·0 | Open |
+| [Round 12](round-12.md) — 2026-07-22 | Post-R11 delta (verification of remediation PRs #313–#321: alias registry, router revisions, playground governance, downgrade contract) | 0·0·2·0 | Fully remediated |
 | [Round 11](round-11.md) — 2026-07-22 | Post-R10 delta (global/extended routers & models, Playground, credential lifecycle, reasoning params, admin console) | 0·4·6·0 | Fully remediated |
 | [Round 10](round-10.md) — 2026-07-21 | Post-R9 delta (console completa, savings/me-teams endpoints, R9-fix verification) | 0·2·4·3 | Fully remediated |
 | [Round 9](round-9.md) — 2026-07-14 | Full-tree post-R8 (admin UI, org/team CRUD, invites, RPM, API-key rotation) | 1·4·6·2 | Fully remediated |
@@ -31,10 +31,11 @@ current tree with six independent lenses plus an adversarial cross-feature pass:
 security findings**, all ten Round 11 issues hold, and all ten probed cross-feature combinations
 (team/global homonyms, alias tombstone/reclaim, post-grant edits, credential rotation in flight,
 playground fan-out, deletions with historical usage, webhook re-approval, candidate identity,
-promotions) verified SAFE. The two open MEDIUMs are non-uniform tails of the remediation itself:
-deleting a granted model silently cascade-revokes other teams' access where routers raise
-`RouterShared` (ISSUE-020), and the Usage/Budgets console surfaces remain unreachable for
-`billing-viewer` and platform auditors — the exact roles the backend authorizes (ISSUE-021).
+promotions) verified SAFE. The two MEDIUMs were non-uniform tails of the remediation itself and
+are now **fixed and merged**: deleting a granted model silently cascade-revoked other teams'
+access where routers raise `RouterShared` (ISSUE-020, fixed by #332), and the Usage/Budgets
+console surfaces were unreachable for `billing-viewer` and platform auditors — the exact roles
+the backend authorizes (ISSUE-021, fixed by #333). No findings remain open.
 
 Previous: as of Round 10, 7.8/10 — see [round-10.md](round-10.md#category-scores-this-round) for the
 category breakdown. Round 10 produced **zero security findings**: a dedicated adversarial pass

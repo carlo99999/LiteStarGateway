@@ -31,8 +31,10 @@
 > in signals), and the S6 distillation export
 > (`GET .../decisions/export`, JSONL of judge/escalation decisions with the
 > stored text — the intended path is judge → dataset → small local classifier).
-> Remaining: §8 semantic cache (optional; assess reuse of the S3 embedding
-> path) — training/serving a distilled classifier stays out of scope.
+> Remaining: attach settled stream usage to the routing decision (Plan 10), plus
+> §8 semantic cache (now superseded by the gateway-wide Plan 04 design).
+> Evidence-based shadow promotion, simulation and native-family routing continue
+> in Plan 12; training/serving a distilled classifier stays out of scope.
 >
 > **Weighted routing added** (not part of the original phased plan — folded
 > into this router/strategy infrastructure instead of the standalone
@@ -153,10 +155,33 @@ Persist every decision (new table via Alembic migration): router name, strategy,
 - decision list with filters (router, strategy, model, shadow, date range) + pagination (reuse the existing pagination envelope)
 - aggregate stats: request distribution per chosen model / tier over time
 - **estimated savings**: for each request, (cost it would have had on the most expensive capable candidate) − (cost on chosen model), using the request's actual token usage joined from existing usage metering. Expose the total per router per period. This is the headline metric.
+- **stream parity (remaining):** after stream settlement, attach the same
+  authoritative or estimated token pair written to `usage_event` to the request's
+  routing decision. An analytics-write failure is logged and swallowed; it never
+  breaks billing or the client stream. See Plan 10.
 
 ### 8. Semantic cache (optional — build last, only if trivial after S3)
 
 Behind a per-router flag, **off by default**. Before routing: embed user text (reuse S3 infrastructure), compare against recent cached (embedding, response) entries for the same router + same api key scope; above a high threshold (default 0.97) return the cached response without calling any model. TTL-bound, in-memory, bounded size (LRU). Mark cached responses in the decision log (`cache_hit`). If this cannot be done cleanly reusing S3's embedding path, skip it and note why.
+
+The standalone gateway-wide design in `response-caching.md` supersedes the
+storage/metering details here. A router cache is a scoped caller of that shared
+service, not a second implementation.
+
+### 9. Shadow-to-active revision promotion (future)
+
+Compare active and shadow outcomes by immutable router revision: agreement,
+distribution, latency, estimated cost and labelled accuracy when labels exist.
+The system may recommend a revision after a minimum sample and configured
+thresholds, but promotion is always an explicit, audited admin action with CAS
+and rollback. Agreement alone is never presented as quality.
+
+### 10. Router cost/policy simulator (future)
+
+Dry-run a selected revision over a bounded historical metadata sample or uploaded
+evaluation corpus. Report capability-filter rejects, predicted distribution and
+estimated cost without provider calls, decision writes or new prompt retention.
+Full design and execution are in Plan 12.
 
 ---
 

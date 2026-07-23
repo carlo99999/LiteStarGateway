@@ -72,6 +72,8 @@ the service never guesses them.
 > logic bug; when image traffic matters, add a per-image price to `Model` (e.g.
 > `image_cost_per_call`, optionally by size/quality) and bill it in settlement.
 > Until then, treat image usage as out of budget scope.
+> Plan 13 turns this into an implementation slice and also gives Anthropic cache
+> creation/read tokens separate rates instead of folding them into normal input.
 
 ### 2b. Budgets / quotas (enforce)
 
@@ -88,13 +90,15 @@ domain/entities.py      UsageEvent, Budget
 domain/ports.py         UsageRepository, BudgetRepository
 application/completion_service.py
     pre-call: budget check (fail fast if over)
-    post-call: record UsageEvent (off hot path, like the trace sink)
+    post-call: settle and record UsageEvent before completing the response
 infrastructure/web       GET /usage, budget CRUD (admin/team-admin)
 ```
 
-Recording goes **off the hot path** (background task), like the observability
-sink; budget checks are **on** the path (they must gate the call) but must be
-cheap (running counter, not a full SUM per request).
+The primary ledger write is **on the response path** so usage remains immediately
+consistent. A durable outbox recovers transient write failures in the background;
+trace export is the separate off-path sink. Budget checks are also on the path
+(they must gate the call) but remain cheap through a running counter rather than
+a full SUM per request.
 
 ## 4. Open decisions
 
@@ -107,6 +111,17 @@ cheap (running counter, not a full SUM per request).
 4. **Enforcement counter store**: DB vs Redis; must be atomic under concurrency.
 5. **Overlap with MLflow**: confirm the split — `UsageEvent` = billing truth,
    MLflow = analytics/traces.
+6. **Money representation**: migrate authoritative rates, costs, budgets and
+   savings from binary `float` to fixed-precision `Decimal`/SQL `NUMERIC`, with
+   one documented rounding rule.
+7. **Cross-replica admission**: replace process-local in-flight spend with an
+   atomic reservation port (Redis in multi-replica production, in-memory in dev)
+   while keeping Postgres settlement authoritative.
+8. **Time series**: the current endpoint is an all-time grouped view. Plan 10 adds
+   bounded hour/day buckets and model/alias/key filters for charts.
+9. **Retention**: deleting a team currently removes its ledger. Decide explicit
+   soft-delete/anonymization/export/purge semantics rather than relying on FK
+   cascades; see the Round 12 deferred product decision and Plan 13.
 
 ## 5. Testing
 

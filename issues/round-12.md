@@ -65,8 +65,8 @@ Counts: **0 CRITICAL · 0 HIGH · 2 MEDIUM · 0 LOW**.
 
 | ID | Title | Severity | Files | Status |
 |---|---|---|---|---|
-| ISSUE-020 | La delete di un modello con grant attivi li cascade-elimina in silenzio, senza il guard `RouterShared`-equivalente | MEDIUM | `application/model_service.py`; `persistence/model_repository.py`; `persistence/orm.py` | Open |
-| ISSUE-021 | Usage e Budgets della console restano inaccessibili a `billing-viewer` e auditor, ruoli autorizzati dal backend | MEDIUM | `ui/src/features/teams/access.ts`; `ui/src/features/usage/UsagePage.tsx`; `ui/src/features/budgets/BudgetsPage.tsx` | Open |
+| ISSUE-020 | La delete di un modello con grant attivi li cascade-elimina in silenzio, senza il guard `RouterShared`-equivalente | MEDIUM | `application/model_service.py`; `persistence/model_repository.py`; `persistence/orm.py` | Remediated (#332) |
+| ISSUE-021 | Usage e Budgets della console restano inaccessibili a `billing-viewer` e auditor, ruoli autorizzati dal backend | MEDIUM | `ui/src/features/teams/access.ts`; `ui/src/features/usage/UsagePage.tsx`; `ui/src/features/budgets/BudgetsPage.tsx` | Remediated (#333) |
 
 ## Findings
 
@@ -171,8 +171,10 @@ chiamata `GET /teams` da utenti non platform-admin.
 - ISSUE-010–ISSUE-019 (Round 11): restano **fixed on main**; questa review ne
   ha riverificato le correzioni sul tree corrente senza trovare regressioni o
   fix incompleti sulle superfici rimediate.
-- ISSUE-020, ISSUE-021: **Open**, nessuna remediation inclusa in questo round
-  (review-only).
+- ISSUE-020, ISSUE-021: individuati in questo round (review-only) e **rimediati
+  subito dopo su main** — ISSUE-020 con #332 (guard sulla delete di modelli con
+  grant attivi), ISSUE-021 con #333 (Usage/Budgets role-aware per
+  `billing-viewer`/auditor). Nessun finding resta aperto.
 
 ## Deferred / product decision
 

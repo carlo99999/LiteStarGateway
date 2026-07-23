@@ -45,7 +45,7 @@ Point any OpenAI client at the gateway with a team API key:
 
 ```python
 from openai import OpenAI
-client = OpenAI(api_key="lsk_...", base_url="https://<host>/")
+client = OpenAI(api_key="lsk_...", base_url="https://<host>/v1")
 client.chat.completions.create(model="<team-model-alias>", messages=[...])
 ```
 
@@ -60,9 +60,10 @@ For full-stack development with live reload: `just dev` (see the
 
 ## How it works
 
-Every inference call goes through the same pipeline — authentication, spend
-control, and request sanitizing happen **before** the provider is reached;
-metering and tracing happen right after, off the hot path:
+Every inference call goes through the same pipeline — authentication, request
+sanitizing, routing and spend control happen **before** the provider is reached.
+Successful usage is settled to the authoritative ledger before the response
+completes; trace export is dispatched off the hot path:
 
 ```mermaid
 flowchart LR
@@ -70,18 +71,18 @@ flowchart LR
 
     subgraph Gateway["LiteStar Gateway"]
         direction LR
-        Auth["API-key auth<br/>+ scope check"] --> RateLimit["Rate limit<br/>per key + per team"]
-        RateLimit --> Budget["Budget gate<br/>per-team cap → 402"]
-        Budget --> Policy["Param allowlist<br/>sanitize + clamp"]
-        Policy --> Router["Smart routing<br/>(virtual models)"]
-        Router --> Adapter["Provider adapter<br/>official SDK"]
+        Auth["API-key auth<br/>+ scope check"] --> Policy["Param allowlist<br/>sanitize request"]
+        Policy --> KeyLimit["Rate limit<br/>per key"]
+        KeyLimit --> Router["Resolve model / route<br/>(virtual models)"]
+        Router --> Admission["Clamp output + admit<br/>team rate limit · budget"]
+        Admission --> Adapter["Provider adapter<br/>official SDK"]
     end
 
     Adapter <--> Providers["OpenAI · Azure OpenAI<br/>Anthropic · Vertex · Databricks · Bedrock"]
 
     Adapter --> Meter["Usage metering<br/>tokens + cost, streams included"]
-    Meter --> Ledger[("usage_event ledger<br/>+ durable outbox")]
-    Meter --> Trace["MLflow trace<br/>latency · cost · status"]
+    Meter --> Ledger[("usage_event ledger<br/>sync + durable outbox fallback")]
+    Meter -.-> Trace["MLflow trace dispatch<br/>latency · cost · status"]
 ```
 
 Around that data plane sits a multi-tenant management plane — who can
@@ -120,8 +121,8 @@ billing.
 in the OpenAI shape, so stock clients can discover what to pass as `model`.
 
 Structured outputs (`response_format` / `text.format`) work cross-provider,
-streaming included. Native Anthropic (`/anthropic/v1/messages`) and Gemini
-passthrough endpoints are available too — see the
+streaming included. Native Anthropic (`/v1/messages`) and Gemini passthrough
+endpoints are available too — see the
 [docs](docs/openai-compatible.md) and the copy-paste
 [examples](EXAMPLES.md).
 
@@ -204,8 +205,9 @@ an 80% coverage gate + pip-audit + a Postgres migration job):
 - Production core: container + compose, Alembic migrations, Postgres,
   structured logging, secrets/key rotation, provider timeouts + retries,
   usage accounting + budgets with a durable outbox, MLflow tracing.
-- Enterprise identity: OIDC SSO, SCIM 2.0 provisioning, extended RBAC
-  (platform auditor + scoped team roles), account recovery.
+- Enterprise identity: OIDC SSO with hot-reloadable, DB-backed console settings
+  (legacy env fallback), SCIM 2.0 provisioning, extended RBAC (platform auditor +
+  scoped team roles), account recovery.
 - Smart routing: six strategies, shadow mode, decision observability with
   estimated savings, JSONL distillation export.
 - **Full admin console** at `/ui` — every sidebar entry is a real page.
@@ -218,7 +220,8 @@ an 80% coverage gate + pip-audit + a Postgres migration job):
   Pydantic AI / LangChain / LlamaIndex / the OpenAI Agents SDK.
 - The full test suite runs on Postgres in CI (not just a subset).
 - Console: route-based code splitting (each page loads its own chunk) and
-  owner emails on the API-keys table.
+  owner emails on the API-keys table; platform admins configure OIDC without a
+  restart.
 
 Next up:
 
@@ -227,8 +230,15 @@ Next up:
   gateway proxies the typed SSE events: `response.output_text.delta`,
   `response.function_call_arguments.delta`, …). The remaining Level B work
   is the gateway's *own* faithful Responses translation for chat-only
-  upstreams ([design](docs/next-steps/agent-framework-compatibility.md)).
-- Console: richer usage charts.
+  upstreams ([design](docs/next-steps/responses-level-b.md)).
+- **Usage analytics** — attach settled stream usage to routing decisions and add
+  temporal cost/token/call charts ([design](docs/next-steps/usage-analytics.md)).
+- **Platform quality gates** — request correlation, OpenAPI/migration drift
+  checks and critical Playwright flows.
+
+The complete, prioritized execution roadmap — including response caching,
+cross-provider failover, guardrails, budget alerts, extended endpoints, routing
+evolution and billing integrity — lives in [plans/README.md](plans/README.md).
 
 ## Contributing
 

@@ -3,8 +3,8 @@
 The gateway ships with a full admin console — a React SPA served by the gateway
 itself under **`/ui`** (same origin as the API, no separate deployment). Every
 management operation the API offers is available from the browser: tenancy,
-users, models, credentials, API keys, smart routing, budgets, usage, and the
-audit trail.
+users, models, credentials, API keys, smart routing, budgets, usage, OIDC SSO
+settings, and the audit trail.
 
 ## Access & sessions
 
@@ -63,6 +63,19 @@ Team-owned machine identities. A personal API key is deliberately
 inference-only; **management-scoped keys belong to service principals**, so
 automation credentials are never tied to a person's account. Create, disable
 (its keys stop authenticating), or delete (all of its keys are revoked).
+
+### SSO settings
+
+Platform admins configure the deployment's single OIDC identity provider from
+**SSO**: discovery URL, client id, write-only client secret, scopes, admin
+groups, default-admin policy, group→team mapping and public redirect URI.
+
+The settings are encrypted/persisted in the database and take effect on the next
+SSO login without a restart. An enabled DB row takes precedence over legacy
+`OIDC_*` environment variables; env configuration remains a fallback for
+bootstrapping or deployments that prefer immutable config. The client secret is
+never returned — leaving it blank on an update preserves the current encrypted
+value. Every change is platform-admin-only and audit-logged.
 
 ## Gateway plane
 

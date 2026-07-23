@@ -1,6 +1,8 @@
 # Implementation prompt: Provider-native endpoints (Anthropic Messages, Gemini generateContent)
 
-> **Status — proposed (not started).** Motivated by R7-H23: the OpenAI-compatible
+> **Status — implemented.** Phase 1 (Anthropic Messages) and Phase 2 (Gemini
+> generateContent) are shipped, metered, documented and conformance-locked.
+> The rationale below is retained as the design record. Motivated by R7-H23: the OpenAI-compatible
 > surface cannot express tool/function calling or multimodal input on Anthropic,
 > Vertex or Bedrock (those translators are text-in/text-out + structured output),
 > so such requests now fail with `UnsupportedOperation` (501) instead of being
@@ -117,6 +119,10 @@ same-protocol model. Document that a router alias on a native endpoint is
 rejected. (A later phase may allow "same-protocol-family" routing — a native
 Anthropic request routing only over Anthropic candidates — but that needs the
 routing context/strategies to be protocol-aware and is out of scope here.)
+
+That later phase is now designed in `routing-evolution.md` / Plan 12: Anthropic
+may route only to Anthropic and Gemini only to Gemini, with config-time and
+dispatch-time validation. It never introduces cross-protocol translation.
 
 Note the capability mismatch this resolves: `CandidateModel.supports_tools`
 currently means "the underlying model supports tools," but the OpenAI path can
