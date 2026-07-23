@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
-from litestar.status_codes import HTTP_200_OK, HTTP_501_NOT_IMPLEMENTED
+from litestar.status_codes import HTTP_200_OK, HTTP_501_NOT_IMPLEMENTED, HTTP_502_BAD_GATEWAY
 from litestar.testing import AsyncTestClient
 
 from litestar_gateway.config import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
@@ -19,7 +21,22 @@ from .conftest import (
     _bearer,
     _patch,
     _setup,
+    _setup_team,
+    _team_usage,
 )
+
+WEATHER_TOOL = {
+    "type": "function",
+    "name": "get_weather",
+    "description": "Get weather for a city.",
+    "parameters": {
+        "type": "object",
+        "properties": {"city": {"type": "string"}},
+        "required": ["city"],
+        "additionalProperties": False,
+    },
+    "strict": True,
+}
 
 
 async def test_openai_responses(client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -196,7 +213,7 @@ async def test_databricks_responses_emulated_over_chat(
     ]
 
 
-async def test_databricks_responses_rejects_unsupported_fields_before_provider(
+async def test_databricks_responses_rejects_hosted_tools_before_provider(
     client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch(monkeypatch)
@@ -210,23 +227,278 @@ async def test_databricks_responses_rejects_unsupported_fields_before_provider(
         json={
             "model": "m",
             "input": "hi",
-            "tools": [{"type": "function", "name": "weather", "parameters": {}}],
+            "tools": [{"type": "web_search"}],
         },
         headers=_bearer(api_key),
     )
 
     assert resp.status_code == HTTP_501_NOT_IMPLEMENTED
-    assert resp.json() == {
-        "error": {
-            "message": (
-                "Provider 'databricks' cannot emulate Responses field(s): tools; "
-                "use a native Responses provider or remove the unsupported fields"
-            ),
-            "type": "server_error",
-            "code": "UnsupportedOperation",
-        }
-    }
+    assert "tools[0].type" in resp.json()["error"]["message"]
+    assert resp.json()["error"]["code"] == "UnsupportedOperation"
     assert FakeClient.last_kwargs == {}
+
+
+async def test_databricks_responses_non_streaming_tool_loop_is_faithful_and_billed_once_per_call(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="databricks",
+        values=DATABRICKS_VALUES,
+        provider_model_id="my-endpoint",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+
+    first = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": "Weather in Paris?",
+            "tools": [WEATHER_TOOL],
+            "tool_choice": {"type": "function", "name": "get_weather"},
+            "parallel_tool_calls": False,
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert first.status_code == HTTP_200_OK
+    first_body = first.json()
+    assert first_body["output"] == [
+        {
+            "id": "fc_call_abc123",
+            "type": "function_call",
+            "status": "completed",
+            "call_id": "call_abc123",
+            "name": "get_weather",
+            "arguments": '{"city": "Paris"}',
+        }
+    ]
+    assert first_body["output_text"] == ""
+    assert FakeClient.last_kwargs["tools"] == [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get weather for a city.",
+                "parameters": WEATHER_TOOL["parameters"],
+                "strict": True,
+            },
+        }
+    ]
+    assert FakeClient.last_kwargs["tool_choice"] == {
+        "type": "function",
+        "function": {"name": "get_weather"},
+    }
+    assert FakeClient.last_kwargs["parallel_tool_calls"] is False
+    assert FakeClient.calls == 1
+
+    first_usage = await _team_usage(client, team, admin)
+    assert len(first_usage) == 1
+    assert first_usage[0]["calls"] == 1
+    assert first_usage[0]["prompt_tokens"] == 9
+    assert first_usage[0]["completion_tokens"] == 12
+    assert first_usage[0]["cost"] == pytest.approx(0.33)
+
+    second = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": [
+                {"role": "user", "content": "Weather in Paris?"},
+                first_body["output"][0],
+                {
+                    "type": "function_call_output",
+                    "call_id": "call_abc123",
+                    "output": "18C and sunny",
+                },
+            ],
+            "tools": [WEATHER_TOOL],
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert second.status_code == HTTP_200_OK
+    assert second.json()["output_text"] == "It is sunny in Paris."
+    assert FakeClient.last_kwargs["messages"] == [
+        {"role": "user", "content": "Weather in Paris?"},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "call_abc123",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Paris"}',
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call_abc123",
+            "content": "18C and sunny",
+        },
+    ]
+    assert FakeClient.calls == 2
+
+    final_usage = await _team_usage(client, team, admin)
+    assert len(final_usage) == 1
+    assert final_usage[0]["calls"] == 2
+    assert final_usage[0]["prompt_tokens"] == 14
+    assert final_usage[0]["completion_tokens"] == 19
+    assert final_usage[0]["cost"] == pytest.approx(0.52)
+
+
+@pytest.mark.parametrize("stream", [1, "true"])
+async def test_databricks_responses_reject_non_boolean_stream_before_provider_and_billing(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    stream: object,
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="databricks",
+        values=DATABRICKS_VALUES,
+        provider_model_id="my-endpoint",
+    )
+    FakeClient.last_kwargs = {}
+
+    response = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": "Weather in Paris?",
+            "stream": stream,
+            "tools": [WEATHER_TOOL],
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_501_NOT_IMPLEMENTED
+    assert "stream" in response.json()["error"]["message"]
+    assert FakeClient.last_kwargs == {}
+    assert await _team_usage(client, team, admin) == []
+
+
+async def test_malformed_databricks_tool_response_fails_closed_but_is_billed(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="databricks",
+        values=DATABRICKS_VALUES,
+        provider_model_id="my-endpoint",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+
+    async def incomplete_tool_response(_client: FakeClient, **kwargs: object) -> object:
+        FakeClient.calls += 1
+        return SimpleNamespace(
+            model_dump=lambda: {
+                "id": "chatcmpl-incomplete",
+                "object": "chat.completion",
+                "created": 123,
+                "model": kwargs.get("model"),
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call_partial",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "get_weather",
+                                        "arguments": '{"city": "Par',
+                                    },
+                                }
+                            ],
+                        },
+                        "finish_reason": "length",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 9,
+                    "completion_tokens": 12,
+                    "total_tokens": 21,
+                },
+            }
+        )
+
+    monkeypatch.setattr(FakeClient, "create", incomplete_tool_response)
+    response = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": "Weather in Paris?",
+            "tools": [WEATHER_TOOL],
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_502_BAD_GATEWAY
+    usage = await _team_usage(client, team, admin)
+    assert usage[0]["calls"] == 1
+    assert usage[0]["prompt_tokens"] == 9
+    assert usage[0]["completion_tokens"] == 12
+    assert usage[0]["cost"] == pytest.approx(0.33)
+
+
+async def test_malformed_databricks_usage_fails_closed_and_uses_billing_fallback(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="databricks",
+        values=DATABRICKS_VALUES,
+        provider_model_id="my-endpoint",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+
+    async def malformed_usage_response(_client: FakeClient, **kwargs: object) -> object:
+        return SimpleNamespace(
+            model_dump=lambda: {
+                "id": "chatcmpl-bad-usage",
+                "object": "chat.completion",
+                "created": 123,
+                "model": kwargs.get("model"),
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "sunny"},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": "bad",
+            }
+        )
+
+    monkeypatch.setattr(FakeClient, "create", malformed_usage_response)
+    response = await client.post(
+        "/v1/responses",
+        json={"model": "m", "input": "Weather in Paris?"},
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_502_BAD_GATEWAY
+    usage = await _team_usage(client, team, admin)
+    assert usage[0]["calls"] == 1
+    assert usage[0]["prompt_tokens"] > 0
+    assert usage[0]["completion_tokens"] == 0
+    assert usage[0]["cost"] > 0
 
 
 @pytest.mark.parametrize(

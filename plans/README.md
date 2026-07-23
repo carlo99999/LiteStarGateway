@@ -37,7 +37,7 @@ It is deliberately separate from `docs/next-steps/`:
 | 06 | [Guardrails](06-guardrails.md) | ⏳ designed, not started | Enterprise policy — pluggable PII/moderation pre- and post-call |
 | 07 | [Budget alerts](07-budget-alerts.md) | ⏳ designed, not started | Proactive spend notifications at % thresholds, off the hot path |
 | 08 | [Extended endpoints](08-extended-endpoints.md) | ⏳ designed, not started | Surface breadth — audio, moderations, rerank, Batch/Files |
-| 09 | [Responses API Level B](09-responses-level-b.md) | 🚧 Phase 0 complete; Phase 1 next | Contract correctness — faithful tool events on chat-only providers, fail loudly otherwise |
+| 09 | [Responses API Level B](09-responses-level-b.md) | 🚧 Phase 0 + 1a complete; provider-native chat tools next | Contract correctness — faithful tool events on chat-only providers, fail loudly otherwise |
 | 10 | [Usage analytics](10-usage-analytics.md) | ⏳ designed, not started | Accurate streaming savings + temporal cost/token/call charts |
 | 11 | [Platform quality gates](11-platform-quality-gates.md) | ⏳ planned, not started | Request correlation, drift gates, browser E2E, dependency safety |
 | 12 | [Routing evolution](12-routing-evolution.md) | ⏳ designed, not started | Capability discovery, shadow promotion, dry-run simulation, native-family routing |
@@ -45,9 +45,9 @@ It is deliberately separate from `docs/next-steps/`:
 
 ## Recommended order
 
-1. **Correctness now:** Plan 09 Phase 1 (faithful non-streaming tool contract),
-   then its streaming event contract; Plan 10 Phase 0 (attach stream usage to
-   routing decisions).
+1. **Correctness now:** Plan 09 Phase 1b (extend the faithful non-streaming tool
+   contract from Databricks to Anthropic, Vertex and Bedrock), then its streaming
+   event contract; Plan 10 Phase 0 (attach stream usage to routing decisions).
 2. **Trust the delivery pipeline:** Plan 11's OpenAPI/migration drift gates and
    critical Playwright flows. Request correlation can ship independently.
 3. **Money correctness:** Plan 13 image/cache-token pricing and decimal ledger

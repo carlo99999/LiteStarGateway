@@ -109,8 +109,9 @@ everything else.
   broadest target; covers most LangChain / Pydantic AI / LlamaIndex / custom
   OpenAI-compatible loops.
 - **Level B — Responses-API agent compatible**: `/v1/responses` with faithful
-  response-item streaming and tool events. Usable today; full fidelity is
-  in-progress.
+  response items and tool events. Native Responses providers are usable today;
+  Databricks also supports non-streaming function loops. Provider-native Chat
+  translations and emulated streaming tools remain in progress.
 - **Level C — provider-native**: native Anthropic/Gemini endpoints for
   provider features OpenAI-shaped APIs can't express (see
   [OpenAI-compatible API](openai-compatible.md) and the native-endpoint docs).

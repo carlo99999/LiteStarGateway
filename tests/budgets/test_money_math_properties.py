@@ -194,3 +194,41 @@ def test_request_text_includes_anthropic_system_field() -> None:
     with_system = _reservation_cost(model, {"system": "x" * 400, "messages": []})
     without_system = _reservation_cost(model, {"messages": []})
     assert with_system > without_system
+
+
+def test_request_text_and_reservation_include_tool_payloads() -> None:
+    model = _model(input_cost=1.0, output_cost=1.0)
+    call_id = "call_" + ("i" * 400)
+    function_name = "n" * 400
+    request = {
+        "input": [
+            {
+                "type": "function_call",
+                "call_id": call_id,
+                "name": function_name,
+                "arguments": '{"query":"' + ("x" * 400) + '"}',
+            },
+            {
+                "type": "function_call_output",
+                "call_id": call_id,
+                "output": "y" * 400,
+            },
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "name": "lookup",
+                "parameters": {
+                    "type": "object",
+                    "description": "z" * 400,
+                },
+            }
+        ],
+    }
+
+    assert call_id in _request_text(request)
+    assert function_name in _request_text(request)
+    assert "x" * 400 in _request_text(request)
+    assert "y" * 400 in _request_text(request)
+    assert "z" * 400 in _request_text(request)
+    assert _reservation_cost(model, request) > _reservation_cost(model, {"input": []})

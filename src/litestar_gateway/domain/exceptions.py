@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 
 class DomainError(Exception):
     """Base class for domain errors."""
@@ -283,6 +285,18 @@ class UpstreamRequestRejected(UpstreamError):
 
 class UpstreamUnavailable(UpstreamError):
     """The provider returned a 5xx or could not be reached."""
+
+
+class UpstreamResponseInvalid(UpstreamUnavailable):
+    """The provider completed a billable call but returned an unusable payload.
+
+    ``billable_response`` preserves only a sanitized usage view long enough for
+    metering to settle the call before the sanitized 502 reaches the caller.
+    """
+
+    def __init__(self, message: str, billable_response: dict[str, Any]) -> None:
+        super().__init__(message)
+        self.billable_response = billable_response
 
 
 class UpstreamTimeout(UpstreamError):

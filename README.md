@@ -228,10 +228,12 @@ Next up:
 - **Agent framework compatibility (Level B)** — the Responses API works
   end to end today when the upstream provider supports it natively (the
   gateway proxies the typed SSE events: `response.output_text.delta`,
-  `response.function_call_arguments.delta`, …). Chat-only emulation now rejects
-  every unsupported field before budget admission or provider dispatch. The
-  remaining Level B work is faithful tool-call translation and events for those
-  upstreams ([design](docs/next-steps/responses-level-b.md)).
+  `response.function_call_arguments.delta`, …). Databricks chat emulation also
+  supports faithful non-streaming function-tool loops with stable call IDs and
+  stateless result replay. Other unsupported fields fail before budget admission
+  or provider dispatch. The remaining Level B work is non-streaming tool
+  translation for Anthropic/Vertex/Bedrock and streaming tool events
+  ([design](docs/next-steps/responses-level-b.md)).
 - **Usage analytics** — attach settled stream usage to routing decisions and add
   temporal cost/token/call charts ([design](docs/next-steps/usage-analytics.md)).
 - **Platform quality gates** — request correlation, OpenAPI/migration drift

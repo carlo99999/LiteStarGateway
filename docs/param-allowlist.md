@@ -45,9 +45,13 @@ Keep it a **pure function** in the domain (no I/O) → trivially unit-testable.
     references are rejected until billing and tenant ownership can be enforced.
     Native calls always carry `store=false`; hosted tools with non-token fees and
     extended prompt-cache retention are also fail-closed.
-    Chat-only providers accept only text, sampling and structured-output fields;
-    every unsupported field is rejected with 501 before budget admission or
-    provider dispatch.
+    Chat-only providers accept only the subset their wrapped Chat adapter can
+    represent. All accept text, sampling and structured output; Databricks also
+    accepts non-streaming function tools, named/standard tool choice, parallel
+    intent and stateless function-call/result replay. Anthropic, Vertex and
+    Bedrock remain 501 for tool calls until their Chat adapters implement the
+    same contract. Every unsupported field is rejected before budget admission
+    or provider dispatch.
   - embeddings: `input, model, dimensions, encoding_format, user`.
   - images: `prompt, model, size, quality, style, n, response_format, user`.
 - **Numeric caps** (configurable): cap `n`, `max_tokens`/`max_completion_tokens`

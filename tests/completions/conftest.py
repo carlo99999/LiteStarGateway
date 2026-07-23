@@ -77,6 +77,7 @@ class FakeClient:
 
     last_init: dict = {}
     last_kwargs: dict = {}
+    calls: int = 0
 
     def __init__(self, **kwargs) -> None:
         FakeClient.last_init = kwargs
@@ -129,8 +130,71 @@ class FakeClient:
 
     async def create(self, **kwargs):
         FakeClient.last_kwargs = kwargs
+        FakeClient.calls += 1
         if kwargs.get("stream"):
             return _FakeStream(_stream_chunks(kwargs.get("model")))
+        messages = kwargs.get("messages") or []
+        has_tool_result = any(
+            isinstance(message, dict) and message.get("role") == "tool" for message in messages
+        )
+        if kwargs.get("tools") is not None and not has_tool_result:
+            return _Result(
+                {
+                    "id": "chatcmpl-tool",
+                    "object": "chat.completion",
+                    "created": 123,
+                    "model": kwargs.get("model"),
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": None,
+                                "tool_calls": [
+                                    {
+                                        "id": "call_abc123",
+                                        "type": "function",
+                                        "function": {
+                                            "name": "get_weather",
+                                            "arguments": '{"city": "Paris"}',
+                                        },
+                                    }
+                                ],
+                            },
+                            "finish_reason": "tool_calls",
+                        }
+                    ],
+                    "usage": {
+                        "prompt_tokens": 9,
+                        "completion_tokens": 12,
+                        "total_tokens": 21,
+                    },
+                }
+            )
+        if has_tool_result:
+            return _Result(
+                {
+                    "id": "chatcmpl-final",
+                    "object": "chat.completion",
+                    "created": 124,
+                    "model": kwargs.get("model"),
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": "It is sunny in Paris.",
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {
+                        "prompt_tokens": 5,
+                        "completion_tokens": 7,
+                        "total_tokens": 12,
+                    },
+                }
+            )
         return _Result(
             {
                 "id": "cmpl-x",
@@ -389,6 +453,7 @@ def _patch(monkeypatch: pytest.MonkeyPatch) -> None:
     # instead of silently reading a stale value left by the previous test.
     FakeClient.last_init = {}
     FakeClient.last_kwargs = {}
+    FakeClient.calls = 0
     FakeAnthropic.last_init = {}
     FakeAnthropic.last_kwargs = {}
     FakeGenaiClient.last_init = {}

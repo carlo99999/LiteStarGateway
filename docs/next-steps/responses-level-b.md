@@ -1,11 +1,13 @@
 # Design doc — Responses API Level B
 
-> **Status:** Phase 0 shipped. `/v1/responses` preserves the governed,
+> **Status:** Phase 0 and Phase 1a shipped. `/v1/responses` preserves the governed,
 > synchronous and stateless OpenAI SDK request surface for OpenAI/Azure and
 > supports text + structured-output emulation over chat-only providers.
-> Unsupported fields now fail with 501 before router side effects, budget
-> admission or provider dispatch. The remaining contract gap is faithful
-> tool/function-call items and streaming events on chat-only providers.
+> Databricks additionally supports faithful non-streaming function-tool loops
+> over its OpenAI-compatible Chat surface. Unsupported fields now fail with 501
+> before router side effects, budget admission or provider dispatch. The
+> remaining gap is non-streaming tool support in the Anthropic/Vertex/Bedrock
+> Chat adapters, followed by streaming tool events.
 > Execution plan:
 > [`plans/09-responses-level-b.md`](../../plans/09-responses-level-b.md).
 
@@ -33,6 +35,11 @@ For chat-only upstreams:
 
 Native Responses providers remain passthrough and must not regress.
 
+Phase 1a enables this subset only where the wrapped Chat adapter already speaks
+the OpenAI tool contract (currently Databricks). Anthropic, Vertex and Bedrock
+remain fail-closed until Phase 1b adds and conformance-tests their native Chat
+tool translations.
+
 ## 3. Fail-loud capability gate
 
 The provider-aware Responses capability validator runs after model resolution
@@ -59,12 +66,18 @@ The supported request mapping includes:
 - `tool_choice` and `parallel_tool_calls` unchanged where the provider supports
   them;
 - Responses message input → chat messages;
+- replayed Responses `function_call` items → one or more assistant
+  `tool_calls` (consecutive calls stay grouped);
 - `function_call_output` input → a `role="tool"` message with the matching
   `tool_call_id`.
 
 The reverse mapping turns chat `message.tool_calls` into Responses
 `function_call` output items. Preserve provider-issued IDs when present; generate
 stable response item IDs only when the chat protocol does not supply one.
+This stateless replay follows the official
+[function-calling flow](https://developers.openai.com/api/docs/guides/function-calling#function-tool-example):
+the caller appends response output items, then the correlated tool output, to
+the next request.
 
 ## 5. Streaming event contract
 

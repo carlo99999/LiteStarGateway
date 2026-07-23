@@ -139,10 +139,12 @@ work is tracked in
 
 The fail-loud capability gate is shipped: every Responses field the
 chat-emulation path cannot represent is rejected before budget admission and
-provider dispatch. Remaining work:
+provider dispatch. Databricks now supports non-streaming function definitions,
+call items and stateless tool-result replay over its OpenAI-compatible Chat
+adapter. Remaining work:
 
-1. add function tools, `function_call` output items, `function_call_output` input
-   and the ordered streaming argument/item events;
+1. add the same non-streaming function loop to the Anthropic, Vertex and Bedrock
+   Chat adapters, then add ordered streaming argument/item events;
 2. keep multimodal, stored/stateful, built-in-tool and reasoning features at a
    precise 501 until a faithful mapping exists.
 
