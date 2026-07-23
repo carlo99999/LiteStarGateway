@@ -28,7 +28,7 @@ dependencies = [
     "redis>=5.0",
     "rumdl>=0.2.28",
     "structlog>=26.1.0",
-    "types-authlib>=1.6.11.20260518",
+    "types-authlib>=1.7.1.20260722",
 ]
 
 [project.scripts]
