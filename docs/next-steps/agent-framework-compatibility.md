@@ -143,8 +143,9 @@ provider dispatch. Databricks, Anthropic and capability-gated Bedrock Claude
 3/Nova models now support non-streaming function definitions, call items and
 stateless tool-result replay over their Chat adapters. Remaining work:
 
-1. solve exact Vertex thought-signature replay, then add ordered streaming
-   argument/item events;
+1. choose an explicit safe Vertex Responses signature-state contract (or keep it
+   fail-closed), then add ordered streaming argument/item events; direct Vertex
+   Chat replay is complete;
 2. keep multimodal, stored/stateful, built-in-tool and reasoning features at a
    precise 501 until a faithful mapping exists.
 

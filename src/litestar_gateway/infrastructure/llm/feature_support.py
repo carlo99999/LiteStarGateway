@@ -1,11 +1,12 @@
 """Guard the text-in/text-out chat translators against request features they
 cannot express.
 
-The Vertex and Bedrock chat translators handle text messages plus structured
-output (`response_format`) but not real tool/function calling. Anthropic also
-handles the governed non-streaming tool subset. None translates non-text (e.g.
-image) message content. Features outside those subsets must fail loudly with
-`UnsupportedOperation` (→ 501), never be silently dropped.
+The translated chat adapters handle text messages plus structured output
+(`response_format`). Anthropic, validated Vertex Gemini 2.5/3 text models, and
+validated Bedrock Claude 3/Nova models also handle governed non-streaming tool
+subsets. None translates non-text (e.g. image) message content. Features outside
+those subsets must fail loudly with `UnsupportedOperation` (→ 501), never be
+silently dropped.
 
 Structured output is intentionally *not* rejected here: it arrives via
 `response_format`, not `tools`, and each translator maps it natively.

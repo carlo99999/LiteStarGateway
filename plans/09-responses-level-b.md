@@ -5,7 +5,8 @@
 **Depends on:** Plan 02 (complete) and the existing Responses emulation adapter.
 
 **Status:** Phase 0, Phase 1a and Phase 1b-A/B (Anthropic + Bedrock) complete;
-Vertex tool state is next.
+Direct Vertex Chat tool state is complete; generic Vertex Responses state and
+streaming tool events remain.
 
 **Theme:** eliminate silent feature drops, then add faithful tool-call items and
 events for chat-only upstreams.
@@ -75,18 +76,19 @@ events for chat-only upstreams.
 
 ## Phase 1b-C — Vertex/Gemini tool state
 
-- Implement direct Chat replay through Google's documented
+- **Done:** direct Chat replay for validated Gemini 2.5/3 text models uses Google's documented
   `tool_calls[].extra_content.google.thought_signature` carrier, preserving the
-  opaque value exactly in both directions.
+  opaque value byte-exactly in both directions. Parallel and sequential replay
+  preserve call/result ordering; Gemini 3 requires the first call signature.
 - Keep generic Responses tool loops fail-closed: normalized Responses
   function-call items still have no thought-signature carrier. Choose an
   explicit Responses solution: a wire-compatible stateless extension,
   tenant-bound gateway state, or a conservative model allowlist proven not to
   require signatures.
-- Keep unsupported per-tool `strict` and disabled-parallel semantics fail-closed.
-- **Done when:** direct Chat multi-step and parallel loops replay exact
-  signatures through `extra_content`; Responses either gains an explicit safe
-  carrier or remains 501, without using the degraded signature-validator bypass.
+- **Done:** unsupported per-tool `strict`, disabled-parallel semantics,
+  unvalidated model families and streaming tools fail before routing/admission.
+- **Remaining decision:** Responses either gains an explicit safe carrier or
+  remains 501, without using the degraded signature-validator bypass.
 
 ## Phase 2 — Streaming tool events
 

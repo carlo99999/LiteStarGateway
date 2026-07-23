@@ -40,6 +40,7 @@ def _model(
     *,
     params: dict[str, Any] | None = None,
     params_enforced: dict[str, Any] | None = None,
+    provider_model_id: str | None = None,
 ) -> Model:
     return Model(
         id=uuid4(),
@@ -48,9 +49,8 @@ def _model(
         provider=provider,
         credential_id=uuid4(),
         type=ModelType.CHAT,
-        provider_model_id=(
-            "anthropic.claude-3-5-sonnet-v2:0" if provider is Provider.BEDROCK else "gpt-4o"
-        ),
+        provider_model_id=provider_model_id
+        or ("anthropic.claude-3-5-sonnet-v2:0" if provider is Provider.BEDROCK else "gpt-4o"),
         params=params or {},
         params_enforced=params_enforced or {},
         api_version=None,
@@ -313,6 +313,94 @@ async def test_router_is_prefiltered_before_strategy_side_effects() -> None:
     assert router_service.route_calls == 0
     assert usage.spend_since_calls == []
     assert gateway.calls == 0
+
+
+async def test_vertex_malformed_signature_fails_before_router_and_budget_side_effects() -> None:
+    gateway = CountingGateway()
+    usage = FakeUsage(spent=0.0)
+    model = _model(Provider.VERTEX_AI, provider_model_id="gemini-3-pro")
+    router = RouterConfig(
+        id=uuid4(),
+        team_id=TEAM_ID,
+        name="auto",
+        candidates=(
+            CandidateModel(
+                model_name=model.name,
+                model_id=model.id,
+                description="Vertex tool candidate",
+                quality_tier=QualityTier.MEDIUM,
+                supports_tools=True,
+            ),
+        ),
+        default_model=model.name,
+        default_model_id=model.id,
+        strategy="judge",
+        strategy_config={},
+        enabled=True,
+        created_at=datetime.now(UTC),
+    )
+    router_service = NoSideEffectRouter()
+    service = CompletionService(
+        models=FakeModels(model),  # type: ignore[arg-type]
+        credentials=FakeCredentials(),  # type: ignore[arg-type]
+        gateway=gateway,  # type: ignore[arg-type]
+        meter=UsageMeter(
+            usage=usage,  # type: ignore[arg-type]
+            emit_trace=lambda trace: None,
+            budgets=FakeBudgets(_budget(1.0)),  # type: ignore[arg-type]
+        ),
+        router_service=router_service,  # type: ignore[arg-type]
+        callable_resolver=FakeCallableResolver(router, model),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(UnsupportedOperation, match="canonical base64"):
+        await service.chat_completion(
+            TEAM_ID,
+            KEY_ID,
+            {
+                "model": "auto",
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": "call_a",
+                                "type": "function",
+                                "function": {
+                                    "name": "weather",
+                                    "arguments": "{}",
+                                },
+                                "extra_content": {
+                                    "google": {
+                                        "thought_signature": "not base64!",
+                                    }
+                                },
+                            }
+                        ],
+                    },
+                    {
+                        "role": "tool",
+                        "tool_call_id": "call_a",
+                        "content": "{}",
+                    },
+                ],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "weather",
+                            "parameters": {"type": "object"},
+                        },
+                    }
+                ],
+            },
+        )
+
+    assert router_service.route_calls == 0
+    assert usage.spend_since_calls == []
+    assert usage.events == []
+    assert gateway.calls == 0
+    assert service._meter._in_flight.total(TEAM_ID) == 0
 
 
 @pytest.mark.parametrize(

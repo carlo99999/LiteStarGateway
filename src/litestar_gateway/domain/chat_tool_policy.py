@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import re
 from typing import Any
@@ -12,14 +14,28 @@ from litestar_gateway.domain.exceptions import UnsupportedOperation
 MAX_TOOL_COUNT = 64
 MAX_TOOL_SCHEMA_BYTES = 256 * 1024
 MAX_TOOL_JSON_DEPTH = 32
+MAX_VERTEX_THOUGHT_SIGNATURE_BYTES = 64 * 1024
+VERTEX_THOUGHT_SIGNATURE_BYPASS = b"skip_thought_signature_validator"
+VERTEX_GATEWAY_CALL_ID_PREFIX = "function-call-gateway-"
 
 _ANTHROPIC_TOOL_NAME = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+_VERTEX_FUNCTION_NAME = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_.:-]{0,127}$")
+_VERTEX_PARAMETER_NAME = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]{0,63}$")
 _BEDROCK_TOOL_USE_ID = re.compile(r"^[a-zA-Z0-9_.:-]{1,64}$")
 _BEDROCK_TOOL_MODEL_ID = re.compile(
     r"^(?:(?:us|eu|apac|global)\.)?"
     r"(?:anthropic\.claude-3(?:[-.:]|$)|amazon\.nova-)"
 )
 _BEDROCK_NOVA_MODEL_ID = re.compile(r"^(?:(?:us|eu|apac|global)\.)?amazon\.nova-")
+_VERTEX_TOOL_MODEL_ID = re.compile(
+    r"^gemini-(?:"
+    r"2\.5-(?:pro|flash(?:-lite)?)|"
+    r"3-(?:pro|flash)|"
+    r"3\.1-(?:pro|flash-lite)|"
+    r"3\.5-flash(?:-lite)?|"
+    r"3\.6-flash"
+    r")(?:-(?:preview(?:-\d{2}-\d{2})?|\d{3}|latest))?$"
+)
 _CHAT_TOOL_CHOICES = frozenset({"auto", "none", "required"})
 _TRANSLATED_CHAT_PROVIDERS = frozenset({Provider.ANTHROPIC, Provider.VERTEX_AI, Provider.BEDROCK})
 _TEXT_MESSAGE_ROLES = frozenset({"system", "user", "assistant"})
@@ -92,6 +108,14 @@ def validate_anthropic_tool_name(name: Any, *, field: str) -> str:
     return validate_tool_name(name, field=field, provider=Provider.ANTHROPIC)
 
 
+def validate_vertex_tool_name(name: Any, *, field: str) -> str:
+    if not isinstance(name, str) or _VERTEX_FUNCTION_NAME.fullmatch(name) is None:
+        raise UnsupportedOperation(
+            f"Provider 'vertex_ai' requires {field} to match ^[a-zA-Z_][a-zA-Z0-9_.:-]{{0,127}}$"
+        )
+    return name
+
+
 def validate_bedrock_tool_use_id(value: Any, *, field: str) -> str:
     if not isinstance(value, str) or _BEDROCK_TOOL_USE_ID.fullmatch(value) is None:
         raise UnsupportedOperation(
@@ -99,6 +123,30 @@ def validate_bedrock_tool_use_id(value: Any, *, field: str) -> str:
             "^[a-zA-Z0-9_.:-]{1,64}$"
         )
     return value
+
+
+def decode_vertex_thought_signature(value: Any, *, field: str) -> bytes:
+    if not isinstance(value, str) or not value:
+        raise UnsupportedOperation(
+            f"Provider 'vertex_ai' requires {field} to be a non-empty base64 string"
+        )
+    try:
+        decoded = base64.b64decode(value, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise UnsupportedOperation(
+            f"Provider 'vertex_ai' requires {field} to be canonical base64"
+        ) from exc
+    if (
+        not decoded
+        or decoded == VERTEX_THOUGHT_SIGNATURE_BYPASS
+        or len(decoded) > MAX_VERTEX_THOUGHT_SIGNATURE_BYTES
+        or base64.b64encode(decoded).decode("ascii") != value
+    ):
+        raise UnsupportedOperation(
+            f"Provider 'vertex_ai' requires {field} to be canonical base64 no larger than "
+            f"{MAX_VERTEX_THOUGHT_SIGNATURE_BYTES} decoded bytes"
+        )
+    return decoded
 
 
 def _validate_text_content(content: Any, *, provider: Provider, field: str) -> None:
@@ -134,7 +182,11 @@ def _validate_messages(effective: dict[str, Any], provider: Provider) -> None:
                 f"Provider '{provider.value}' cannot translate messages[{index}] role '{role}'"
             )
         if role == "tool":
-            unsupported = sorted(set(message) - {"role", "content", "tool_call_id"})
+            unsupported = sorted(
+                field
+                for field in set(message) - {"role", "content", "tool_call_id"}
+                if message[field] is not None
+            )
             if unsupported:
                 raise UnsupportedOperation(
                     f"Provider '{provider.value}' cannot translate "
@@ -142,7 +194,9 @@ def _validate_messages(effective: dict[str, Any], provider: Provider) -> None:
                 )
             continue
         allowed = {"role", "content", "tool_calls"} if role == "assistant" else {"role", "content"}
-        unsupported = sorted(set(message) - allowed)
+        unsupported = sorted(
+            field for field in set(message) - allowed if message[field] is not None
+        )
         if unsupported:
             raise UnsupportedOperation(
                 f"Provider '{provider.value}' cannot translate messages[{index}].{unsupported[0]}"
@@ -197,6 +251,107 @@ def validate_bedrock_tool_schema(model: Model, schema: Any, *, field: str) -> No
         )
 
 
+_VERTEX_SCHEMA_FIELDS = frozenset(
+    {
+        "type",
+        "nullable",
+        "required",
+        "format",
+        "description",
+        "properties",
+        "items",
+        "enum",
+        "anyOf",
+    }
+)
+_VERTEX_SCHEMA_TYPES = frozenset(
+    {"object", "array", "string", "integer", "number", "boolean", "null"}
+)
+
+
+def _validate_vertex_schema_node(schema: Any, *, field: str) -> None:
+    if not isinstance(schema, dict):
+        raise UnsupportedOperation(f"Provider 'vertex_ai' requires {field} to be an object")
+    unsupported = sorted(set(schema) - _VERTEX_SCHEMA_FIELDS)
+    if unsupported:
+        raise UnsupportedOperation(
+            f"Provider 'vertex_ai' cannot translate {field}.{unsupported[0]}"
+        )
+    schema_type = schema.get("type")
+    if schema_type is not None and (
+        not isinstance(schema_type, str) or schema_type not in _VERTEX_SCHEMA_TYPES
+    ):
+        raise UnsupportedOperation(
+            f"Provider 'vertex_ai' requires {field}.type to be a supported JSON Schema type"
+        )
+    nullable = schema.get("nullable")
+    if nullable is not None and not isinstance(nullable, bool):
+        raise UnsupportedOperation(f"Provider 'vertex_ai' requires {field}.nullable to be boolean")
+    for string_field in ("format", "description"):
+        value = schema.get(string_field)
+        if value is not None and not isinstance(value, str):
+            raise UnsupportedOperation(
+                f"Provider 'vertex_ai' requires {field}.{string_field} to be a string"
+            )
+    enum = schema.get("enum")
+    if enum is not None and (
+        not isinstance(enum, list) or not enum or any(not isinstance(value, str) for value in enum)
+    ):
+        raise UnsupportedOperation(
+            f"Provider 'vertex_ai' requires {field}.enum to be a non-empty list of strings"
+        )
+    properties = schema.get("properties")
+    if properties is not None:
+        if not isinstance(properties, dict):
+            raise UnsupportedOperation(
+                f"Provider 'vertex_ai' requires {field}.properties to be an object"
+            )
+        for name, child in properties.items():
+            if not isinstance(name, str) or _VERTEX_PARAMETER_NAME.fullmatch(name) is None:
+                raise UnsupportedOperation(
+                    f"Provider 'vertex_ai' requires {field}.properties names to match "
+                    "^[a-zA-Z_][a-zA-Z0-9_]{0,63}$"
+                )
+            _validate_vertex_schema_node(child, field=f"{field}.properties.{name}")
+    items = schema.get("items")
+    if items is not None:
+        _validate_vertex_schema_node(items, field=f"{field}.items")
+    any_of = schema.get("anyOf")
+    if any_of is not None:
+        if not isinstance(any_of, list) or not any_of:
+            raise UnsupportedOperation(
+                f"Provider 'vertex_ai' requires {field}.anyOf to be a non-empty list"
+            )
+        for index, child in enumerate(any_of):
+            _validate_vertex_schema_node(child, field=f"{field}.anyOf[{index}]")
+    required = schema.get("required")
+    if required is not None and (
+        not isinstance(required, list)
+        or any(
+            not isinstance(name, str) or _VERTEX_PARAMETER_NAME.fullmatch(name) is None
+            for name in required
+        )
+        or len(required) != len(set(required))
+    ):
+        raise UnsupportedOperation(
+            f"Provider 'vertex_ai' requires {field}.required to contain unique "
+            "Vertex parameter names"
+        )
+
+
+def validate_vertex_tool_schema(schema: Any, *, field: str) -> None:
+    _validate_vertex_schema_node(schema, field=field)
+    if schema.get("type") != "object":
+        raise UnsupportedOperation(f"Provider 'vertex_ai' requires {field}.type to be 'object'")
+
+
+def vertex_supports_tools(model_id: str) -> bool:
+    normalized = model_id.lower()
+    if any(marker in normalized for marker in ("embedding", "image", "live", "tts")):
+        return False
+    return _VERTEX_TOOL_MODEL_ID.match(normalized) is not None
+
+
 def validate_bedrock_tool_strict(strict: Any, *, field: str) -> None:
     if strict is not None and not isinstance(strict, bool):
         raise UnsupportedOperation(f"Provider 'bedrock' requires {field} to be boolean")
@@ -236,11 +391,17 @@ def _validate_tools(effective: dict[str, Any], model: Model) -> set[str]:
             raise UnsupportedOperation(
                 f"Provider '{provider.value}' cannot translate tools[{index}].{unsupported[0]}"
             )
-        name = validate_tool_name(
-            function.get("name"),
-            field=f"tools[{index}].function.name",
-            provider=provider,
-        )
+        if provider is Provider.VERTEX_AI:
+            name = validate_vertex_tool_name(
+                function.get("name"),
+                field=f"tools[{index}].function.name",
+            )
+        else:
+            name = validate_tool_name(
+                function.get("name"),
+                field=f"tools[{index}].function.name",
+                provider=provider,
+            )
         if name in names:
             raise UnsupportedOperation(
                 f"Provider '{provider.value}' cannot translate duplicate tool name '{name}'"
@@ -263,9 +424,19 @@ def _validate_tools(effective: dict[str, Any], model: Model) -> set[str]:
                 f"Provider '{provider.value}' requires tools[{index}].function.parameters "
                 "to be a JSON object"
             )
+        validate_json_complexity(
+            parameters,
+            field=f"tools[{index}].function.parameters",
+            provider=provider,
+        )
         if provider is Provider.BEDROCK:
             validate_bedrock_tool_schema(
                 model,
+                parameters,
+                field=f"tools[{index}].function.parameters",
+            )
+        elif provider is Provider.VERTEX_AI:
+            validate_vertex_tool_schema(
                 parameters,
                 field=f"tools[{index}].function.parameters",
             )
@@ -279,6 +450,10 @@ def _validate_tools(effective: dict[str, Any], model: Model) -> set[str]:
             validate_bedrock_tool_strict(
                 strict,
                 field=f"tools[{index}].function.strict",
+            )
+        elif provider is Provider.VERTEX_AI and strict is not None:
+            raise UnsupportedOperation(
+                f"Provider '{provider.value}' cannot translate tools[{index}].function.strict"
             )
         elif strict is not None and not isinstance(strict, bool):
             raise UnsupportedOperation(
@@ -429,15 +604,63 @@ def _validate_tool_choice(
             "Provider 'bedrock' cannot translate parallel_tool_calls=false; "
             "Converse has no general disabled-parallel setting"
         )
+    if provider is Provider.VERTEX_AI and parallel is False:
+        raise UnsupportedOperation(
+            "Provider 'vertex_ai' cannot translate parallel_tool_calls=false; "
+            "Gemini has no general disabled-parallel setting"
+        )
+
+
+def _validate_vertex_extra_content(
+    extra_content: Any,
+    *,
+    call_id: str,
+    field: str,
+) -> bool:
+    if extra_content is None:
+        return False
+    if (
+        not isinstance(extra_content, dict)
+        or not extra_content
+        or set(extra_content) - {"google", "litestar_gateway"}
+    ):
+        raise UnsupportedOperation(
+            f"Provider 'vertex_ai' requires {field} to contain only documented metadata"
+        )
+    google = extra_content.get("google")
+    if "google" in extra_content:
+        if not isinstance(google, dict) or set(google) != {"thought_signature"}:
+            raise UnsupportedOperation(
+                f"Provider 'vertex_ai' requires {field}.google to contain only thought_signature"
+            )
+        decode_vertex_thought_signature(
+            google["thought_signature"],
+            field=f"{field}.google.thought_signature",
+        )
+    gateway = extra_content.get("litestar_gateway")
+    if "litestar_gateway" in extra_content:
+        if (
+            not isinstance(gateway, dict)
+            or set(gateway) != {"synthetic_call_id"}
+            or gateway.get("synthetic_call_id") is not True
+            or not call_id.startswith(VERTEX_GATEWAY_CALL_ID_PREFIX)
+        ):
+            raise UnsupportedOperation(
+                f"Provider 'vertex_ai' requires {field}.litestar_gateway to mark only "
+                "gateway-generated call IDs"
+            )
+    return "google" in extra_content
 
 
 def _validate_tool_replay(
     effective: dict[str, Any],
     tool_names: set[str],
-    provider: Provider,
+    model: Model,
 ) -> None:
+    provider = model.provider
     seen_call_ids: set[str] = set()
     pending_call_ids: set[str] = set()
+    pending_call_order: list[str] = []
     for index, message in enumerate(effective.get("messages") or []):
         if not isinstance(message, dict):
             continue
@@ -453,9 +676,13 @@ def _validate_tool_replay(
                 call_id = call.get("id") if isinstance(call, dict) else None
                 name = function.get("name") if isinstance(function, dict) else None
                 arguments = function.get("arguments") if isinstance(function, dict) else None
+                allowed_call_fields = {"id", "type", "function"}
+                if provider is Provider.VERTEX_AI:
+                    allowed_call_fields.add("extra_content")
                 if (
                     not isinstance(call, dict)
-                    or set(call) != {"id", "type", "function"}
+                    or set(call) - allowed_call_fields
+                    or not {"id", "type", "function"}.issubset(call)
                     or call.get("type") != "function"
                     or not isinstance(call_id, str)
                     or not call_id
@@ -480,6 +707,31 @@ def _validate_tool_replay(
                 )
                 seen_call_ids.add(call_id)
                 pending_call_ids.add(call_id)
+                pending_call_order.append(call_id)
+                if provider is Provider.VERTEX_AI:
+                    has_signature = _validate_vertex_extra_content(
+                        call.get("extra_content"),
+                        call_id=call_id,
+                        field=f"messages[{index}].tool_calls[{call_index}].extra_content",
+                    )
+                    if has_signature and call_index != 0:
+                        raise UnsupportedOperation(
+                            "Provider 'vertex_ai' requires thought_signature only on "
+                            "the first function call in a parallel group"
+                        )
+            if (
+                provider is Provider.VERTEX_AI
+                and model.provider_model_id.lower().startswith("gemini-3")
+                and isinstance(tool_calls[0], dict)
+                and not (
+                    isinstance(tool_calls[0].get("extra_content"), dict)
+                    and isinstance(tool_calls[0]["extra_content"].get("google"), dict)
+                )
+            ):
+                raise UnsupportedOperation(
+                    "Provider 'vertex_ai' requires thought_signature on the first "
+                    "replayed Gemini 3 function call"
+                )
             continue
         if role == "tool":
             call_id = message.get("tool_call_id")
@@ -488,11 +740,17 @@ def _validate_tool_replay(
                 or not isinstance(call_id, str)
                 or call_id not in pending_call_ids
                 or not isinstance(message.get("content"), str)
+                or (
+                    provider is Provider.VERTEX_AI
+                    and pending_call_order
+                    and call_id != pending_call_order[0]
+                )
             ):
                 raise UnsupportedOperation(
                     f"Provider '{provider.value}' cannot translate messages[{index}] tool result"
                 )
             pending_call_ids.remove(call_id)
+            pending_call_order.remove(call_id)
             continue
         if pending_call_ids:
             raise UnsupportedOperation(
@@ -524,11 +782,10 @@ def validate_chat_request(model: Model, request: dict[str, Any]) -> dict[str, An
     validate_bedrock_response_format(model, effective)
     if not _has_tool_contract(effective):
         return dict(request)
-    if model.provider is Provider.VERTEX_AI:
+    if model.provider is Provider.VERTEX_AI and not vertex_supports_tools(model.provider_model_id):
         raise UnsupportedOperation(
-            f"Provider '{model.provider.value}' does not support tool/function calling; "
-            "route this request to an OpenAI, Azure, Databricks, Anthropic, or "
-            "Bedrock model."
+            "Provider 'vertex_ai' tool calling is enabled only for validated "
+            "Gemini 2.5 and Gemini 3 text model IDs"
         )
     if model.provider is Provider.BEDROCK and not bedrock_supports_tools(model.provider_model_id):
         raise UnsupportedOperation(
@@ -546,5 +803,5 @@ def validate_chat_request(model: Model, request: dict[str, Any]) -> dict[str, An
         )
     tool_names = _validate_tools(effective, model)
     _validate_tool_choice(effective, tool_names, model)
-    _validate_tool_replay(effective, tool_names, model.provider)
+    _validate_tool_replay(effective, tool_names, model)
     return dict(request)
