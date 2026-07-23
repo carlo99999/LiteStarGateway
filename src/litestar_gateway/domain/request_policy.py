@@ -18,9 +18,16 @@ from typing import Any
 from litestar_gateway.domain.chat_tool_policy import (
     MAX_TOOL_COUNT,
     MAX_TOOL_SCHEMA_BYTES,
+    bedrock_supports_named_tool_choice,
+    bedrock_supports_tools,
     json_object,
     serialized_json_size,
-    validate_anthropic_tool_name,
+    validate_bedrock_response_format,
+    validate_bedrock_structured_tool,
+    validate_bedrock_tool_schema,
+    validate_bedrock_tool_strict,
+    validate_bedrock_tool_use_id,
+    validate_tool_name,
 )
 from litestar_gateway.domain.entities import Model, Provider
 from litestar_gateway.domain.exceptions import UnsupportedNativeField, UnsupportedOperation
@@ -134,7 +141,10 @@ _EMULATED_RESPONSES_FIELDS = frozenset(
     }
 )
 _EMULATED_RESPONSES_TOOL_FIELDS = frozenset({"tools", "tool_choice", "parallel_tool_calls"})
-_EMULATED_RESPONSES_TOOL_PROVIDERS = frozenset({Provider.DATABRICKS, Provider.ANTHROPIC})
+_EMULATED_RESPONSES_TOOL_PROVIDERS = frozenset(
+    {Provider.DATABRICKS, Provider.ANTHROPIC, Provider.BEDROCK}
+)
+_BOUNDED_TRANSLATED_TOOL_PROVIDERS = frozenset({Provider.ANTHROPIC, Provider.BEDROCK})
 _EMULATED_TEXT_FORMATS = frozenset({"text", "json_object", "json_schema"})
 _EMULATED_TEXT_PARTS = frozenset({"text", "input_text", "output_text"})
 _EMULATED_MESSAGE_FIELDS = frozenset({"type", "role", "content"})
@@ -277,6 +287,11 @@ def _validate_function_call(
         raise UnsupportedOperation(
             f"Provider '{provider.value}' cannot emulate Responses function_call call_id"
         )
+    if provider is Provider.BEDROCK:
+        validate_bedrock_tool_use_id(
+            call_id,
+            field="Responses function_call call_id",
+        )
     if call_id in seen_call_ids:
         raise UnsupportedOperation(
             f"Provider '{provider.value}' cannot emulate Responses duplicate call_id"
@@ -293,7 +308,7 @@ def _validate_function_call(
         raise UnsupportedOperation(
             f"Provider '{provider.value}' cannot emulate Responses function_call arguments"
         )
-    if provider is Provider.ANTHROPIC:
+    if provider in _BOUNDED_TRANSLATED_TOOL_PROVIDERS:
         json_object(
             arguments,
             field="Responses function_call arguments",
@@ -423,7 +438,8 @@ def _validate_emulated_input(
         )
 
 
-def _validate_emulated_tools(provider: Provider, request: dict[str, Any]) -> set[str]:
+def _validate_emulated_tools(model: Model, request: dict[str, Any]) -> set[str]:
+    provider = model.provider
     tools = request.get("tools")
     tool_names: set[str] = set()
     if tools is not None:
@@ -432,7 +448,7 @@ def _validate_emulated_tools(provider: Provider, request: dict[str, Any]) -> set
                 f"Provider '{provider.value}' cannot emulate Responses field 'tools' "
                 f"with shape '{type(tools).__name__}'"
             )
-        if provider is Provider.ANTHROPIC and len(tools) > MAX_TOOL_COUNT:
+        if provider in _BOUNDED_TRANSLATED_TOOL_PROVIDERS and len(tools) > MAX_TOOL_COUNT:
             raise UnsupportedOperation(
                 f"Provider '{provider.value}' accepts at most {MAX_TOOL_COUNT} tools"
             )
@@ -459,8 +475,12 @@ def _validate_emulated_tools(provider: Provider, request: dict[str, Any]) -> set
                     f"Provider '{provider.value}' cannot emulate Responses tools[{index}].name"
                 )
             name = tool["name"]
-            if provider is Provider.ANTHROPIC:
-                name = validate_anthropic_tool_name(name, field=f"tools[{index}].name")
+            if provider in _BOUNDED_TRANSLATED_TOOL_PROVIDERS:
+                name = validate_tool_name(
+                    name,
+                    field=f"tools[{index}].name",
+                    provider=provider,
+                )
             if name in tool_names:
                 raise UnsupportedOperation(
                     f"Provider '{provider.value}' cannot emulate duplicate tool name '{name}'"
@@ -472,24 +492,40 @@ def _validate_emulated_tools(provider: Provider, request: dict[str, Any]) -> set
                     f"Provider '{provider.value}' cannot emulate Responses "
                     f"tools[{index}].description"
                 )
+            if provider is Provider.BEDROCK and description == "":
+                raise UnsupportedOperation(
+                    f"Provider '{provider.value}' requires Responses "
+                    f"tools[{index}].description to be non-empty when provided"
+                )
             parameters = tool.get("parameters")
             if parameters is not None and not isinstance(parameters, dict):
                 raise UnsupportedOperation(
                     f"Provider '{provider.value}' cannot emulate Responses "
                     f"tools[{index}].parameters"
                 )
-            if provider is Provider.ANTHROPIC:
+            if provider in _BOUNDED_TRANSLATED_TOOL_PROVIDERS:
                 schema_bytes += serialized_json_size(
                     parameters if parameters is not None else {"type": "object"},
                     field=f"tools[{index}].parameters",
                     provider=provider,
                 )
+            if provider is Provider.BEDROCK:
+                validate_bedrock_tool_schema(
+                    model,
+                    parameters if parameters is not None else {"type": "object"},
+                    field=f"Responses tools[{index}].parameters",
+                )
             strict = tool.get("strict")
-            if strict is not None and not isinstance(strict, bool):
+            if provider is Provider.BEDROCK:
+                validate_bedrock_tool_strict(
+                    strict,
+                    field=f"Responses tools[{index}].strict",
+                )
+            elif strict is not None and not isinstance(strict, bool):
                 raise UnsupportedOperation(
                     f"Provider '{provider.value}' cannot emulate Responses tools[{index}].strict"
                 )
-        if provider is Provider.ANTHROPIC and schema_bytes > MAX_TOOL_SCHEMA_BYTES:
+        if provider in _BOUNDED_TRANSLATED_TOOL_PROVIDERS and schema_bytes > MAX_TOOL_SCHEMA_BYTES:
             raise UnsupportedOperation(
                 f"Provider '{provider.value}' accepts at most {MAX_TOOL_SCHEMA_BYTES} bytes "
                 "of tool schemas"
@@ -671,6 +707,7 @@ def validate_responses_request(model: Model, request: dict[str, Any]) -> dict[st
     if model.provider in _NATIVE_RESPONSES_PROVIDERS:
         return _validate_native_responses_governance(model, request)
     _validate_emulated_model_config(model)
+    validate_bedrock_response_format(model, model.merge_params({}))
     instructions = request.get("instructions")
     if instructions is not None and not isinstance(instructions, str):
         raise UnsupportedOperation(
@@ -699,16 +736,56 @@ def validate_responses_request(model: Model, request: dict[str, Any]) -> dict[st
             f"Provider '{model.provider.value}' cannot emulate Responses streaming tool "
             "calls until the Phase 2 event contract is available"
         )
-    tool_names = _validate_emulated_tools(model.provider, request) if supports_tools else set()
-    if model.provider is Provider.ANTHROPIC and has_tool_request and not tool_names:
+    if model.provider is Provider.BEDROCK and has_tool_request:
+        if not bedrock_supports_tools(model.provider_model_id):
+            raise UnsupportedOperation(
+                "Provider 'bedrock' Responses tool emulation is enabled only for "
+                "validated Anthropic Claude 3 and Amazon Nova model IDs"
+            )
+        tool_choice = request.get("tool_choice")
+        if tool_choice == "none":
+            raise UnsupportedOperation(
+                "Provider 'bedrock' cannot translate tool_choice='none'; "
+                "Converse has no disabled-tools choice"
+            )
+        if isinstance(tool_choice, dict) and not bedrock_supports_named_tool_choice(
+            model.provider_model_id
+        ):
+            raise UnsupportedOperation(
+                "Provider 'bedrock' supports a named tool_choice only for "
+                "Anthropic Claude 3 and Amazon Nova models"
+            )
+        if request.get("parallel_tool_calls") is False:
+            raise UnsupportedOperation(
+                "Provider 'bedrock' cannot translate parallel_tool_calls=false; "
+                "Converse has no general disabled-parallel setting"
+            )
+    tool_names = _validate_emulated_tools(model, request) if supports_tools else set()
+    if model.provider in _BOUNDED_TRANSLATED_TOOL_PROVIDERS and has_tool_request and not tool_names:
         raise UnsupportedOperation(
-            "Provider 'anthropic' requires a non-empty declared tools list for "
+            f"Provider '{model.provider.value}' requires a non-empty declared tools list for "
             "Responses tool requests"
         )
     _validate_emulated_text(model.provider, request.get("text"))
     text_format = request["text"].get("format") if isinstance(request.get("text"), dict) else None
     if (
-        model.provider is Provider.ANTHROPIC
+        model.provider is Provider.BEDROCK
+        and isinstance(text_format, dict)
+        and text_format.get("type") == "json_schema"
+    ):
+        strict = text_format.get("strict")
+        if strict is not None and not isinstance(strict, bool):
+            raise UnsupportedOperation(
+                "Provider 'bedrock' requires Responses text.format.strict to be boolean"
+            )
+        validate_bedrock_structured_tool(
+            model,
+            name=text_format.get("name") or "structured_output",
+            schema=text_format.get("schema"),
+            field="Responses text.format",
+        )
+    if (
+        model.provider in _BOUNDED_TRANSLATED_TOOL_PROVIDERS
         and has_tool_request
         and (
             (
@@ -719,14 +796,16 @@ def validate_responses_request(model: Model, request: dict[str, Any]) -> dict[st
         )
     ):
         raise UnsupportedOperation(
-            "Provider 'anthropic' cannot combine Responses text.format or configured "
-            "response_format with client tools"
+            f"Provider '{model.provider.value}' cannot combine Responses text.format "
+            "or configured response_format with client tools"
         )
     _validate_emulated_input(
         model.provider,
         request.get("input"),
         allow_tools=supports_tools,
-        declared_tool_names=tool_names if model.provider is Provider.ANTHROPIC else None,
+        declared_tool_names=(
+            tool_names if model.provider in _BOUNDED_TRANSLATED_TOOL_PROVIDERS else None
+        ),
     )
     return dict(request)
 

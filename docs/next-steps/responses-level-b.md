@@ -1,13 +1,14 @@
 # Design doc — Responses API Level B
 
-> **Status:** Phase 0, Phase 1a and Phase 1b-A shipped. `/v1/responses` preserves the governed,
+> **Status:** Phase 0, Phase 1a and Phase 1b-A/B shipped. `/v1/responses` preserves the governed,
 > synchronous and stateless OpenAI SDK request surface for OpenAI/Azure and
-> supports text + structured-output emulation over chat-only providers.
-> Databricks and Anthropic additionally support faithful non-streaming
-> function-tool loops over their translated Chat surfaces. Unsupported fields fail with 501
-> before router side effects, budget admission or provider dispatch. The
-> remaining provider gaps are capability-gated Bedrock tools and a faithful
-> Vertex thought-signature carrier, followed by streaming tool events.
+> supports text over chat-only providers and structured-output emulation where
+> the selected provider contract can enforce it.
+> Databricks, Anthropic and capability-gated Bedrock Claude 3/Nova models
+> additionally support faithful non-streaming function-tool loops over their
+> translated Chat surfaces. Unsupported fields fail with 501 before router side
+> effects, budget admission or provider dispatch. The remaining provider gap is
+> a faithful Vertex thought-signature carrier, followed by streaming tool events.
 > Execution plan:
 > [`plans/09-responses-level-b.md`](../../plans/09-responses-level-b.md).
 
@@ -35,10 +36,11 @@ For chat-only upstreams:
 
 Native Responses providers remain passthrough and must not regress.
 
-Phase 1a enabled this subset for Databricks. Phase 1b-A adds Anthropic with
-native choice/strict/parallel mappings, exact call IDs and grouped parallel
-results. Bedrock and Vertex remain fail-closed until their narrower capability
-contracts are conformance-tested.
+Phase 1a enabled this subset for Databricks. Phase 1b-A added Anthropic with
+native choice/strict/parallel mappings. Phase 1b-B added non-strict Bedrock
+`toolSpec`/`toolUse`/`toolResult` mappings for validated Claude 3/Nova model IDs.
+Both preserve exact call IDs and grouped parallel results. Vertex remains
+fail-closed until its thought-signature contract is conformance-tested.
 
 ## 3. Fail-loud capability gate
 
@@ -77,6 +79,15 @@ blocks. `required` maps to `any`; a named choice maps to `tool`; disabled
 parallelism maps to `disable_parallel_tool_use=true` as documented in
 [Anthropic parallel tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use).
 
+For Bedrock, definitions become `toolSpec` entries, assistant calls become
+`toolUse` blocks and consecutive results become one user turn with ordered
+`toolResult` blocks. `required` maps to `any`; named choice maps to `tool` for
+validated Claude 3/Nova IDs. `none` and disabled parallelism remain precise 501s
+because Converse has no general equivalents. `strict=true` and `json_schema`
+also remain fail-closed until Bedrock's per-model structured-output capability
+matrix and native `outputConfig.textFormat` mapping are implemented. Nova tool
+schemas use its documented top-level `type`/`properties`/`required` subset.
+
 The reverse mapping turns chat `message.tool_calls` into Responses
 `function_call` output items. Preserve provider-issued IDs when present; generate
 stable response item IDs only when the chat protocol does not supply one.
@@ -113,12 +124,16 @@ The definition of done is wire-level:
 Framework-specific branches remain forbidden. The SDKs are canaries; the wire
 contract is the specification.
 
-## 7. Provider blockers after Phase 1b-A
+## 7. Provider blockers after Phase 1b-B
 
-- **Bedrock:** [Converse ToolChoice](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ToolChoice.html)
+- **Bedrock boundaries:** [Converse ToolChoice](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ToolChoice.html)
   has no general equivalent for `tool_choice=none` or
   `parallel_tool_calls=false`; forcing a named tool is documented only for
-  Claude 3 and Nova. Enable only the model/choice matrix proved faithful.
+  Claude 3 and Nova. Those supported combinations are shipped; everything else
+  stays fail-closed. Bedrock's
+  [structured-output contract](https://docs.aws.amazon.com/bedrock/latest/userguide/structured-output.html)
+  is model-specific, so `strict=true` and `json_schema` are not inferred from
+  family name alone.
 - **Vertex:** [Gemini thinking models](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/thought-signatures)
   attach opaque `thought_signature` metadata
   to function-call parts and require exact replay. The normalized Responses

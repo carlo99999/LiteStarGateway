@@ -120,16 +120,19 @@ billing.
 `GET /v1/models` lists a team's callable models (its enabled models + routers)
 in the OpenAI shape, so stock clients can discover what to pass as `model`.
 
-Structured outputs (`response_format` / `text.format`) work cross-provider,
-streaming included. Native Anthropic (`/v1/messages`) and Gemini passthrough
-endpoints are available too — see the
+Structured outputs (`response_format` / `text.format`) work on OpenAI, Azure,
+Databricks, Anthropic and Vertex, streaming included. Bedrock currently supports
+best-effort `json_object`; schema-enforced output stays fail-closed until its
+model-specific structured-output matrix is represented explicitly. Native
+Anthropic (`/v1/messages`) and Gemini passthrough endpoints are available too — see the
 [docs](docs/openai-compatible.md) and the copy-paste
 [examples](EXAMPLES.md).
 
 Non-streaming function-tool loops work through Chat Completions on OpenAI,
-Azure, Databricks and Anthropic. They also work through native Responses on
-OpenAI/Azure and emulated Responses on Databricks/Anthropic. Vertex/Bedrock
-translated tools and emulated streaming tool events remain fail-closed.
+Azure, Databricks, Anthropic and capability-gated Bedrock Claude 3/Nova models.
+They also work through native Responses on OpenAI/Azure and emulated Responses
+on Databricks/Anthropic/Bedrock. Vertex translated tools and emulated streaming
+tool events remain fail-closed.
 
 ## Admin console
 
@@ -235,10 +238,10 @@ Next up:
   gateway proxies the typed SSE events: `response.output_text.delta`,
   `response.function_call_arguments.delta`, …). Databricks chat emulation also
   supports faithful non-streaming function-tool loops with stable call IDs and
-  stateless result replay; Anthropic now supports the same contract with native
-  strict/choice/parallel mappings. Other unsupported fields fail before budget
-  admission or provider dispatch. The remaining Level B work is capability-gated
-  Bedrock translation, Vertex thought-signature replay and streaming tool events
+  stateless result replay; Anthropic and capability-gated Bedrock now support
+  the same contract with native schema/choice/replay mappings. Other unsupported
+  fields fail before budget admission or provider dispatch. The remaining Level
+  B work is Vertex thought-signature replay and streaming tool events
   ([design](docs/next-steps/responses-level-b.md)).
 - **Usage analytics** — attach settled stream usage to routing decisions and add
   temporal cost/token/call charts ([design](docs/next-steps/usage-analytics.md)).

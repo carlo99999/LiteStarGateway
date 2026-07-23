@@ -139,12 +139,12 @@ work is tracked in
 
 The fail-loud capability gate is shipped: every Responses field the
 chat-emulation path cannot represent is rejected before budget admission and
-provider dispatch. Databricks and Anthropic now support non-streaming function
-definitions, call items and stateless tool-result replay over their Chat
-adapters. Remaining work:
+provider dispatch. Databricks, Anthropic and capability-gated Bedrock Claude
+3/Nova models now support non-streaming function definitions, call items and
+stateless tool-result replay over their Chat adapters. Remaining work:
 
-1. add a capability-gated Bedrock loop; solve exact Vertex thought-signature
-   replay; then add ordered streaming argument/item events;
+1. solve exact Vertex thought-signature replay, then add ordered streaming
+   argument/item events;
 2. keep multimodal, stored/stateful, built-in-tool and reasoning features at a
    precise 501 until a faithful mapping exists.
 

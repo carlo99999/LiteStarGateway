@@ -1,6 +1,6 @@
 """Fail-loud feature boundaries for translated provider Chat adapters.
 
-Anthropic supports governed non-streaming tools; Vertex/Bedrock tools and
+Anthropic and Bedrock support governed non-streaming tools; Vertex tools and
 non-text content on all three translators remain explicit 501s.
 """
 
@@ -22,7 +22,8 @@ TRANSLATORS = [
     (to_gemini_request, Provider.VERTEX_AI, "gemini-1.5-pro"),
     (to_converse_request, Provider.BEDROCK, "anthropic.claude-3-5-sonnet-v2:0"),
 ]
-TOOL_UNSUPPORTED_TRANSLATORS = TRANSLATORS[1:]
+TOOL_UNSUPPORTED_TRANSLATORS = TRANSLATORS[1:2]
+STRUCTURED_OUTPUT_TRANSLATORS = TRANSLATORS[:2]
 
 
 def _model(provider: Provider, provider_model_id: str) -> Model:
@@ -87,7 +88,7 @@ def test_plain_text_still_translates(translate, provider, model_id) -> None:
     assert kwargs  # a dict of provider kwargs, no exception
 
 
-@pytest.mark.parametrize("translate,provider,model_id", TRANSLATORS)
+@pytest.mark.parametrize("translate,provider,model_id", STRUCTURED_OUTPUT_TRANSLATORS)
 def test_structured_output_still_translates(translate, provider, model_id) -> None:
     # Regression: response_format (structured output) is not tool-calling and
     # must keep working — it is translated internally, not rejected.
@@ -102,3 +103,17 @@ def test_structured_output_still_translates(translate, provider, model_id) -> No
         _model(provider, model_id),
     )
     assert kwargs
+
+
+def test_bedrock_json_schema_fails_loud_without_validated_model_capability() -> None:
+    with pytest.raises(UnsupportedOperation, match="json_schema"):
+        to_converse_request(
+            {
+                "messages": [{"role": "user", "content": "hi"}],
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": "answer", "schema": {"type": "object"}},
+                },
+            },
+            _model(Provider.BEDROCK, "anthropic.claude-3-5-sonnet-v2:0"),
+        )

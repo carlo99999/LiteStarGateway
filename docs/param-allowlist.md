@@ -4,8 +4,9 @@
 > `sanitize_request(operation, request)` (deny-by-default allowlist per
 > operation, clamps `n`→`MAX_N` = 8 and token fields →`MAX_TOKENS` = 32000) plus
 > `clamp_output_tokens(operation, request, ceiling)` (per-model output ceiling),
-> both wired into `CompletionService`. Cross-provider structured-output
-> translation is also in (`infrastructure/llm/structured_output.py`, see §3.1).
+> both wired into `CompletionService`. Provider-aware structured-output
+> translation and fail-loud capability gating are also in
+> (`infrastructure/llm/structured_output.py`, see §3.1).
 > The rest of this doc is the original design rationale.
 
 ## 1. Goal
@@ -46,18 +47,23 @@ Keep it a **pure function** in the domain (no I/O) → trivially unit-testable.
     Native calls always carry `store=false`; hosted tools with non-token fees and
     extended prompt-cache retention are also fail-closed.
     Chat-only providers accept only the subset their wrapped Chat adapter can
-    represent. All accept text, sampling and structured output. Databricks and
-    Anthropic accept non-streaming function tools, named/standard tool choice,
-    parallel intent and stateless function-call/result replay; Anthropic also
-    enforces provider name/schema/replay limits before routing. Vertex and
-    Bedrock remain 501 for translated tool calls. Every unsupported field is
-    rejected before budget admission or provider dispatch.
+    represent. All accept text and sampling. Databricks, Anthropic and Vertex
+    accept schema-constrained output; Bedrock accepts best-effort `json_object`
+    and rejects `json_schema` until its per-model capability matrix is explicit.
+    Databricks, Anthropic and capability-gated Bedrock Claude 3/Nova models accept
+    non-streaming function tools and stateless function-call/result replay.
+    Bedrock accepts omitted/`auto`/`required`/supported named choices and
+    omitted/true parallel intent; `none`, disabled parallelism, unknown families
+    opaque ARNs and `strict=true` remain 501. Nova also enforces its documented
+    top-level schema subset. Vertex remains 501 for translated tool calls.
+    Every unsupported field is rejected before budget admission or provider
+    dispatch.
   - embeddings: `input, model, dimensions, encoding_format, user`.
   - images: `prompt, model, size, quality, style, n, response_format, user`.
 - **Numeric caps** (configurable): cap `n`, `max_tokens`/`max_completion_tokens`
   to a server maximum (global `MAX_TOKENS`, plus an optional per-model ceiling —
   see below).
-- **Translated Anthropic tool caps:** at most 64 unique function names matching
+- **Translated Anthropic/Bedrock tool caps:** at most 64 unique function names matching
   `^[a-zA-Z0-9_-]{1,64}$`, 256 KiB of serialized schemas, and 32 JSON nesting
   levels. Arguments must be finite JSON objects and replayed call IDs/results
   must form a complete, correlated turn.
@@ -92,6 +98,9 @@ schema}` (or `None`) — so every adapter shares one interpretation:
 - **Gemini (Vertex)**: mapped to `response_schema`.
 - **Anthropic**: mapped to a forced tool (a tool whose input schema is the
   requested schema, with `tool_choice` forcing it).
+- **Bedrock**: `json_object` is a best-effort system instruction; `json_schema`
+  is rejected until the native `outputConfig.textFormat` model matrix is
+  explicit. A non-strict forced tool is not treated as schema enforcement.
 - **Responses API**: the `text.format` shape carries the same spec.
 
 `{"type": "json_object"}` → schema-less JSON; `{"type": "json_schema", …}` →

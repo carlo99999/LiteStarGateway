@@ -9,16 +9,16 @@ boto3 is synchronous: the async surface delegates to a worker thread on a
 dedicated bounded executor, including the streaming EventStream (iterated one
 event per thread hop so the event loop is never blocked).
 
-Scope: text-in/text-out, plus structured outputs (`response_format`) translated
-to a forced tool — streaming included (partial tool-input JSON is relayed as
-content). Not yet translated: general tool/function calling and multimodal
-content.
+Scope: text-in/text-out, best-effort JSON-object prompting, and faithful
+non-streaming client tool calls. JSON-schema output, streaming client tools,
+and multimodal content remain fail-closed.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from collections.abc import AsyncIterator, Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -27,8 +27,13 @@ from typing import Any
 import boto3
 from botocore.config import Config as BotoConfig
 
+from litestar_gateway.domain.chat_tool_policy import validate_chat_request
 from litestar_gateway.domain.entities import Model
-from litestar_gateway.domain.exceptions import CredentialMisconfigured, UnsupportedOperation
+from litestar_gateway.domain.exceptions import (
+    CredentialMisconfigured,
+    UnsupportedOperation,
+    UpstreamResponseInvalid,
+)
 from litestar_gateway.infrastructure.llm.feature_support import ensure_translatable_chat_request
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.llm.structured_output import parse_response_format
@@ -41,6 +46,7 @@ _TITAN_EMBED_FANOUT = 8
 _FINISH_REASON = {
     "end_turn": "stop",
     "max_tokens": "length",
+    "model_context_window_exceeded": "length",
     "stop_sequence": "stop",
     # Forced structured-output tool only (same rationale as the Anthropic
     # adapter): the JSON is surfaced as message.content, so the client sees a
@@ -49,6 +55,20 @@ _FINISH_REASON = {
     "content_filtered": "content_filter",
     "guardrail_intervened": "content_filter",
 }
+_STREAM_FINISH_REASON = {
+    reason: finish for reason, finish in _FINISH_REASON.items() if reason != "tool_use"
+}
+_STREAM_EVENT_KINDS = frozenset(
+    {
+        "messageStart",
+        "contentBlockStart",
+        "contentBlockDelta",
+        "contentBlockStop",
+        "messageStop",
+        "metadata",
+    }
+)
+_BEDROCK_TOOL_USE_ID = re.compile(r"^[a-zA-Z0-9_.:-]{1,64}$")
 
 
 # Streaming does one thread hop per EventStream event, so a few concurrent
@@ -98,21 +118,114 @@ def _text(content: Any) -> str:
     return ""
 
 
+def _tool_input(arguments: str) -> dict[str, Any]:
+    # `validate_chat_request` already proved this is finite JSON and an object.
+    value = json.loads(arguments)
+    assert isinstance(value, dict)
+    return value
+
+
+def _bedrock_messages(messages: list[Any]) -> list[dict[str, Any]]:
+    translated: list[dict[str, Any]] = []
+    index = 0
+    while index < len(messages):
+        message = messages[index]
+        index += 1
+        if not isinstance(message, dict):
+            continue
+        role = message.get("role")
+        if role == "system":
+            continue
+        if role == "tool":
+            results: list[dict[str, Any]] = []
+            current = message
+            while True:
+                results.append(
+                    {
+                        "toolResult": {
+                            "toolUseId": current["tool_call_id"],
+                            "content": [{"text": current["content"]}],
+                        }
+                    }
+                )
+                if index >= len(messages):
+                    break
+                following = messages[index]
+                if not isinstance(following, dict) or following.get("role") != "tool":
+                    break
+                current = following
+                index += 1
+            translated.append({"role": "user", "content": results})
+            continue
+        if role not in {"user", "assistant"}:
+            continue
+        text = _text(message.get("content"))
+        tool_calls = message.get("tool_calls")
+        if role == "assistant" and isinstance(tool_calls, list):
+            content: list[dict[str, Any]] = []
+            if text:
+                content.append({"text": text})
+            content.extend(
+                {
+                    "toolUse": {
+                        "toolUseId": call["id"],
+                        "name": call["function"]["name"],
+                        "input": _tool_input(call["function"]["arguments"]),
+                    }
+                }
+                for call in tool_calls
+            )
+            translated.append({"role": "assistant", "content": content})
+        else:
+            translated.append({"role": role, "content": [{"text": text}]})
+    return translated
+
+
+def _bedrock_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    translated: list[dict[str, Any]] = []
+    for tool in tools:
+        function = tool["function"]
+        parameters = function.get("parameters")
+        spec: dict[str, Any] = {
+            "name": function["name"],
+            "inputSchema": {"json": parameters if parameters is not None else {"type": "object"}},
+        }
+        if "description" in function:
+            spec["description"] = function["description"]
+        translated.append({"toolSpec": spec})
+    return translated
+
+
+def _bedrock_tool_choice(effective: dict[str, Any]) -> dict[str, Any] | None:
+    choice = effective.get("tool_choice")
+    if choice == "auto":
+        return {"auto": {}}
+    if choice == "required":
+        return {"any": {}}
+    if isinstance(choice, dict):
+        return {"tool": {"name": choice["function"]["name"]}}
+    return None
+
+
+def _client_tool_names(effective: dict[str, Any]) -> set[str] | None:
+    tools = effective.get("tools")
+    if not isinstance(tools, list):
+        return None
+    return {tool["function"]["name"] for tool in tools}
+
+
 def to_converse_request(request: dict[str, Any], model: Model) -> dict[str, Any]:
     effective = model.merge_params(request)
-    ensure_translatable_chat_request(effective, model.provider.value)
+    validate_chat_request(model, request)
+    ensure_translatable_chat_request(effective, model.provider.value, allow_tools=True)
     structured = parse_response_format(effective)
 
     system_parts: list[str] = []
-    messages: list[dict[str, Any]] = []
     for message in effective.get("messages", []):
         role = message.get("role")
-        text = _text(message.get("content"))
         if role == "system":
-            system_parts.append(text)
-        elif role in ("user", "assistant"):
-            messages.append({"role": role, "content": [{"text": text}]})
-        # tool/function messages are ignored in this first cut
+            system_parts.append(_text(message.get("content")))
+    messages = _bedrock_messages(effective.get("messages") or [])
 
     # json_object (no schema): Converse has no JSON mode, so nudge via system.
     if structured is not None and structured.schema is None:
@@ -135,44 +248,140 @@ def to_converse_request(request: dict[str, Any], model: Model) -> dict[str, Any]
     if inference:
         kwargs["inferenceConfig"] = inference
 
-    # json_schema: force a single tool whose input schema is the requested one,
-    # so the model must return a matching toolUse block. from_converse_response
-    # surfaces that input as the (JSON) message content.
-    if structured is not None and structured.schema is not None:
-        kwargs["toolConfig"] = {
-            "tools": [
-                {
-                    "toolSpec": {
-                        "name": structured.name,
-                        "description": "Return the result as JSON matching the schema.",
-                        "inputSchema": {"json": structured.schema},
-                    }
-                }
-            ],
-            "toolChoice": {"tool": {"name": structured.name}},
-        }
+    if isinstance(effective.get("tools"), list):
+        tool_config: dict[str, Any] = {"tools": _bedrock_tools(effective["tools"])}
+        if choice := _bedrock_tool_choice(effective):
+            tool_config["toolChoice"] = choice
+        kwargs["toolConfig"] = tool_config
     return kwargs
 
 
-def from_converse_response(response: dict[str, Any], model_id: str) -> dict[str, Any]:
-    message = (response.get("output") or {}).get("message") or {}
-    blocks = message.get("content") or []
-    text = "".join(
-        block["text"]
-        for block in blocks
-        if isinstance(block, dict) and isinstance(block.get("text"), str)
+def _billable_response(response: dict[str, Any]) -> dict[str, Any]:
+    usage = response.get("usage")
+    if not isinstance(usage, dict):
+        return {"usage": {}}
+    prompt = usage.get("inputTokens")
+    completion = usage.get("outputTokens")
+    if (
+        not isinstance(prompt, int)
+        or isinstance(prompt, bool)
+        or prompt < 0
+        or not isinstance(completion, int)
+        or isinstance(completion, bool)
+        or completion < 0
+    ):
+        return {"usage": {}}
+    return {
+        "usage": {
+            "prompt_tokens": prompt,
+            "completion_tokens": completion,
+            "total_tokens": prompt + completion,
+        }
+    }
+
+
+def _invalid_response(response: dict[str, Any], detail: str) -> UpstreamResponseInvalid:
+    return UpstreamResponseInvalid(detail, _billable_response(response))
+
+
+def _tool_calls(
+    response: dict[str, Any],
+    blocks: list[Any],
+    expected_names: set[str],
+) -> list[dict[str, Any]]:
+    calls: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for block in blocks:
+        tool_use = block.get("toolUse") if isinstance(block, dict) else None
+        if tool_use is None:
+            continue
+        call_id = tool_use.get("toolUseId") if isinstance(tool_use, dict) else None
+        name = tool_use.get("name") if isinstance(tool_use, dict) else None
+        tool_input = tool_use.get("input") if isinstance(tool_use, dict) else None
+        if (
+            not isinstance(call_id, str)
+            or _BEDROCK_TOOL_USE_ID.fullmatch(call_id) is None
+            or call_id in seen_ids
+            or set(tool_use) != {"toolUseId", "name", "input"}
+            or not isinstance(name, str)
+            or name not in expected_names
+            or not isinstance(tool_input, dict)
+        ):
+            raise _invalid_response(response, "Bedrock returned a malformed tool call")
+        try:
+            arguments = json.dumps(
+                tool_input,
+                allow_nan=False,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        except (TypeError, ValueError) as exc:
+            raise _invalid_response(response, "Bedrock returned non-JSON tool arguments") from exc
+        seen_ids.add(call_id)
+        calls.append(
+            {
+                "id": call_id,
+                "type": "function",
+                "function": {"name": name, "arguments": arguments},
+            }
+        )
+    return calls
+
+
+def from_converse_response(
+    response: dict[str, Any],
+    model_id: str,
+    *,
+    client_tool_names: set[str] | None = None,
+    require_tool_call: bool = False,
+    required_tool_name: str | None = None,
+) -> dict[str, Any]:
+    output = response.get("output")
+    message = output.get("message") if isinstance(output, dict) else None
+    if not isinstance(message, dict) or message.get("role") != "assistant":
+        raise _invalid_response(response, "Bedrock returned malformed output")
+    blocks = message.get("content")
+    if not isinstance(blocks, list):
+        raise _invalid_response(response, "Bedrock returned malformed content")
+    stop_reason = response.get("stopReason")
+    if not isinstance(stop_reason, str) or stop_reason not in _FINISH_REASON:
+        raise _invalid_response(response, "Bedrock returned an invalid stop reason")
+    billable = _billable_response(response)["usage"]
+    if not billable:
+        raise _invalid_response(response, "Bedrock returned malformed usage")
+    text_parts: list[str] = []
+    for block in blocks:
+        if not isinstance(block, dict) or set(block) not in ({"text"}, {"toolUse"}):
+            raise _invalid_response(response, "Bedrock returned malformed content")
+        if "text" in block:
+            if not isinstance(block["text"], str):
+                raise _invalid_response(response, "Bedrock returned malformed text content")
+            text_parts.append(block["text"])
+    text = "".join(text_parts)
+    calls = (
+        _tool_calls(response, blocks, client_tool_names) if client_tool_names is not None else []
     )
-    # Forced structured-output tool: the JSON is the toolUse input, not a text
-    # block. Serialize it into content so the client sees the same
-    # JSON-in-content shape it gets natively from OpenAI's response_format.
-    if not text:
-        for block in blocks:
-            if isinstance(block, dict) and isinstance(block.get("toolUse"), dict):
-                text = json.dumps(block["toolUse"].get("input") or {})
-                break
-    usage = response.get("usage") or {}
-    input_tokens = usage.get("inputTokens")
-    output_tokens = usage.get("outputTokens")
+    if required_tool_name is not None and (
+        not calls or any(call["function"]["name"] != required_tool_name for call in calls)
+    ):
+        raise _invalid_response(response, "Bedrock violated the named tool choice")
+    if require_tool_call and not calls:
+        raise _invalid_response(response, "Bedrock omitted a required tool call")
+    if client_tool_names is not None and bool(calls) != (stop_reason == "tool_use"):
+        raise _invalid_response(response, "Bedrock returned an inconsistent tool response")
+    if client_tool_names is None and stop_reason == "tool_use":
+        raise _invalid_response(response, "Bedrock returned an unexpected tool stop")
+    if client_tool_names is None and any(
+        isinstance(block, dict) and "toolUse" in block for block in blocks
+    ):
+        raise _invalid_response(response, "Bedrock returned an unexpected tool call")
+    chat_message: dict[str, Any] = {
+        "role": "assistant",
+        "content": text if text or not calls else None,
+    }
+    if calls:
+        chat_message["tool_calls"] = calls
     return {
         "id": "chatcmpl-bedrock",
         "object": "chat.completion",
@@ -181,39 +390,128 @@ def from_converse_response(response: dict[str, Any], model_id: str) -> dict[str,
         "choices": [
             {
                 "index": 0,
-                "message": {"role": "assistant", "content": text},
-                "finish_reason": _FINISH_REASON.get(response.get("stopReason", ""), "stop"),
+                "message": chat_message,
+                "finish_reason": "tool_calls" if calls else _FINISH_REASON[stop_reason],
             }
         ],
-        "usage": {
-            "prompt_tokens": input_tokens,
-            "completion_tokens": output_tokens,
-            "total_tokens": usage.get("totalTokens") or (input_tokens or 0) + (output_tokens or 0),
-        },
+        "usage": billable,
     }
 
 
-def converse_event_to_delta(event: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+def _invalid_stream(detail: str) -> UpstreamResponseInvalid:
+    return UpstreamResponseInvalid(detail, {"usage": {}})
+
+
+def _stream_event_payload(event: Any) -> tuple[str, dict[str, Any]]:
+    if not isinstance(event, dict) or len(event) != 1:
+        raise _invalid_stream("Bedrock returned a malformed stream event union")
+    kind = next(iter(event))
+    payload = event[kind]
+    if kind not in _STREAM_EVENT_KINDS:
+        raise _invalid_stream("Bedrock returned an unknown stream event")
+    if not isinstance(payload, dict):
+        raise _invalid_stream(f"Bedrock returned malformed {kind}")
+    return kind, payload
+
+
+def _stream_index(payload: dict[str, Any], *, fields: set[str], kind: str) -> None:
+    index = payload.get("contentBlockIndex")
+    if set(payload) != fields or not isinstance(index, int) or isinstance(index, bool) or index < 0:
+        raise _invalid_stream(f"Bedrock returned malformed {kind}")
+
+
+def _validate_stream_metadata(payload: dict[str, Any]) -> None:
+    allowed = {"usage", "metrics", "trace", "performanceConfig", "serviceTier"}
+    usage_allowed = {
+        "inputTokens",
+        "outputTokens",
+        "totalTokens",
+        "cacheReadInputTokens",
+        "cacheWriteInputTokens",
+        "cacheDetails",
+    }
+    usage = payload.get("usage")
+    metrics = payload.get("metrics")
+    if (
+        not {"usage", "metrics"} <= set(payload) <= allowed
+        or not isinstance(usage, dict)
+        or not {"inputTokens", "outputTokens", "totalTokens"} <= set(usage) <= usage_allowed
+        or not isinstance(metrics, dict)
+        or set(metrics) != {"latencyMs"}
+        or not isinstance(metrics.get("latencyMs"), int)
+        or isinstance(metrics.get("latencyMs"), bool)
+        or metrics["latencyMs"] < 0
+    ):
+        raise _invalid_stream("Bedrock returned malformed stream metadata")
+    for field in ("inputTokens", "outputTokens", "totalTokens"):
+        value = usage.get(field)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise _invalid_stream("Bedrock returned malformed stream usage")
+    for field in ("cacheReadInputTokens", "cacheWriteInputTokens"):
+        value = usage.get(field)
+        if value is not None and (
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+        ):
+            raise _invalid_stream("Bedrock returned malformed stream usage")
+    if "cacheDetails" in usage and not isinstance(usage["cacheDetails"], list):
+        raise _invalid_stream("Bedrock returned malformed stream usage")
+    for field in ("trace", "performanceConfig", "serviceTier"):
+        if field in payload and not isinstance(payload[field], dict):
+            raise _invalid_stream("Bedrock returned malformed stream metadata")
+
+
+def converse_event_to_delta(event: Any) -> tuple[dict[str, Any] | None, str | None]:
     """Map one Converse stream event to an OpenAI chunk (delta, finish_reason).
 
     Returns (None, None) for events that produce no chunk (block start/stop,
     metadata — usage is read by the caller).
     """
-    if "messageStart" in event:
-        return {"role": event["messageStart"].get("role", "assistant")}, None
-    if "contentBlockDelta" in event:
-        delta = event["contentBlockDelta"].get("delta") or {}
-        if isinstance(delta.get("text"), str):
+    kind, payload = _stream_event_payload(event)
+    if kind == "messageStart":
+        if set(payload) != {"role"} or payload.get("role") != "assistant":
+            raise _invalid_stream("Bedrock returned an invalid stream message role")
+        return {"role": "assistant"}, None
+    if kind == "contentBlockStart":
+        _stream_index(
+            payload,
+            fields={"start", "contentBlockIndex"},
+            kind=kind,
+        )
+        raise _invalid_stream("Bedrock returned an unsupported streaming content block")
+    if kind == "contentBlockDelta":
+        _stream_index(
+            payload,
+            fields={"delta", "contentBlockIndex"},
+            kind=kind,
+        )
+        delta = payload.get("delta")
+        if not isinstance(delta, dict) or len(delta) != 1:
+            raise _invalid_stream("Bedrock returned malformed contentBlockDelta")
+        if set(delta) == {"text"} and isinstance(delta["text"], str):
             return {"content": delta["text"]}, None
-        tool = delta.get("toolUse")
-        if isinstance(tool, dict) and isinstance(tool.get("input"), str):
-            # Structured output streams as a forced tool: relay its partial JSON
-            # as content deltas so the client reconstructs the same JSON it gets
-            # non-streamed.
-            return {"content": tool["input"]}, None
+        raise _invalid_stream("Bedrock returned an unsupported streaming content delta")
+    if kind == "contentBlockStop":
+        _stream_index(payload, fields={"contentBlockIndex"}, kind=kind)
         return None, None
-    if "messageStop" in event:
-        return {}, _FINISH_REASON.get(event["messageStop"].get("stopReason", ""), "stop")
+    if kind == "messageStop":
+        if (
+            not {"stopReason"}
+            <= set(payload)
+            <= {
+                "stopReason",
+                "additionalModelResponseFields",
+            }
+        ):
+            raise _invalid_stream("Bedrock returned malformed messageStop")
+        if "additionalModelResponseFields" in payload and not isinstance(
+            payload["additionalModelResponseFields"], dict
+        ):
+            raise _invalid_stream("Bedrock returned malformed messageStop")
+        reason = payload.get("stopReason")
+        if not isinstance(reason, str) or reason not in _STREAM_FINISH_REASON:
+            raise _invalid_stream("Bedrock returned an invalid stream stop reason")
+        return {}, _STREAM_FINISH_REASON[reason]
+    _validate_stream_metadata(payload)
     return None, None
 
 
@@ -323,7 +621,17 @@ class BedrockAdapter:
         client = self._client(credentials)
         try:
             response = client.converse(**to_converse_request(request, model))
-            return from_converse_response(response, model.provider_model_id)
+            effective = model.merge_params(request)
+            client_tool_names = _client_tool_names(effective)
+            choice = effective.get("tool_choice")
+            required_tool_name = choice["function"]["name"] if isinstance(choice, dict) else None
+            return from_converse_response(
+                response,
+                model.provider_model_id,
+                client_tool_names=client_tool_names,
+                require_tool_call=choice == "required" or required_tool_name is not None,
+                required_tool_name=required_tool_name,
+            )
         finally:
             client.close()
 
@@ -356,11 +664,11 @@ class BedrockAdapter:
                 event = await _run(_next_event, events)
                 if event is None:
                     break
-                usage = (event.get("metadata") or {}).get("usage") or {}
-                if usage:
-                    input_tokens = usage.get("inputTokens") or input_tokens
-                    output_tokens = usage.get("outputTokens") or output_tokens
                 delta, finish = converse_event_to_delta(event)
+                if "metadata" in event:
+                    usage = event["metadata"]["usage"]
+                    input_tokens = usage["inputTokens"]
+                    output_tokens = usage["outputTokens"]
                 if delta is None and finish is None:
                     continue
                 yield {
