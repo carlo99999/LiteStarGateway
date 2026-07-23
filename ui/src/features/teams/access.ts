@@ -83,6 +83,7 @@ export function canReadDecisions(role: TeamRole | null): boolean {
 }
 
 const MODEL_SURFACES: readonly ConsoleSurface[] = ["models", "routing", "playground"];
+const BILLING_SURFACES: readonly ConsoleSurface[] = ["usage", "budgets"];
 
 /** Navigation is convenience, not authorization. Keep it aligned with the
  * backend capabilities so users do not land on pages guaranteed to return 403. */
@@ -95,6 +96,11 @@ export function canAccessConsoleSurface(
   if (surface === "audit") return access.isAuditor;
   if (MODEL_SURFACES.includes(surface)) {
     return access.teamRoles.some((role) => canReadModels(role));
+  }
+  if (BILLING_SURFACES.includes(surface)) {
+    // The backend also grants a platform auditor USAGE_READ/BUDGET_READ in
+    // every team (AUDITOR_TEAM_PERMISSIONS), independent of membership.
+    return access.isAuditor || access.teamRoles.some((role) => canReadUsage(role));
   }
   return false;
 }

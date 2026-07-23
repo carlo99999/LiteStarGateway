@@ -4,7 +4,8 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { PaginationControls } from "@/components/common/PaginationControls";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { Label } from "@/components/ui/label";
-import { listAllTeams } from "@/features/teams/api";
+import { canReadUsage } from "@/features/teams/access";
+import { useAccessibleTeams } from "@/features/teams/useAccessibleTeams";
 import { listTeamUsagePage, type TeamUsage } from "@/features/usage/api";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
 import { toError } from "@/lib/toError";
@@ -82,11 +83,7 @@ const COLUMNS: Column<TeamUsage>[] = [
 
 /** Per-model usage and spend for one team at a time. */
 export function UsagePage() {
-  const teams = useQuery({
-    queryKey: ["teams", "all"],
-    queryFn: ({ signal }) => listAllTeams(signal),
-    retry: false,
-  });
+  const teams = useAccessibleTeams(canReadUsage);
   const [teamId, setTeamId] = useState("");
   const [offset, setOffset] = useState(0);
   const usage = useQuery({

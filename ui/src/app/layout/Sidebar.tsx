@@ -6,7 +6,9 @@ import { useAccessibleTeams } from "@/features/teams/useAccessibleTeams";
 
 export function Sidebar() {
   const { user } = useAuth();
-  const teams = useAccessibleTeams();
+  // Nav gating needs every membership role (model-manager, billing-viewer, …),
+  // not just the model-readable subset the default filter would give us.
+  const teams = useAccessibleTeams(() => true);
   const teamRoles = (teams.data ?? [])
     .map((team) => team.role)
     .filter((role): role is TeamRole => role !== null);
