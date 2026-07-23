@@ -27,7 +27,11 @@ from .identity import (
     PasswordReset,
     Principal,
     ScimToken,
+    SsoSettings,
+    TeamGrant,
     User,
+    parse_team_mapping,
+    team_mapping_to_json,
 )
 from .model import Credential, Model, ModelGrant
 from .organization import Organization, Team, TeamMembership
@@ -63,7 +67,11 @@ __all__ = [
     "PasswordReset",
     "Principal",
     "ScimToken",
+    "SsoSettings",
+    "TeamGrant",
     "User",
+    "parse_team_mapping",
+    "team_mapping_to_json",
     # Model
     "Credential",
     "Model",

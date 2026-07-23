@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
 from litestar_gateway.domain.entities.access import APIKey, ServicePrincipal
+from litestar_gateway.domain.entities.enums import TeamRole
 
 
 @dataclass(frozen=True)
@@ -17,6 +19,88 @@ class ExternalIdentity:
     email: str
     email_verified: bool  # the IdP asserts it verified this address
     groups: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class TeamGrant:
+    """One (team, role) an IdP group confers via an SSO team mapping."""
+
+    team_id: UUID
+    role: TeamRole
+
+
+def parse_team_mapping(data: Mapping[str, object]) -> dict[str, tuple[TeamGrant, ...]]:
+    """Validate a decoded JSON object mapping each IdP group to a list of
+    ``{"team": "<team-uuid>", "role": "admin"|"member"}`` grants (role defaults
+    to member). Raises `ValueError` on malformed input — callers translate it
+    into whichever error fits their layer (startup config vs an admin API
+    request). Layer-agnostic on purpose: shared by env-var parsing
+    (`config.py`) and the DB-backed SSO settings service."""
+    mapping: dict[str, tuple[TeamGrant, ...]] = {}
+    for group, grants in data.items():
+        if not isinstance(grants, list):
+            raise ValueError(f"{group!r} must map to a list of grants")
+        parsed: list[TeamGrant] = []
+        for grant in grants:
+            if not isinstance(grant, dict) or "team" not in grant:
+                raise ValueError(f"{group!r} entries need a 'team' UUID")
+            try:
+                team_id = UUID(str(grant["team"]))
+                role = TeamRole(grant.get("role", TeamRole.MEMBER))
+            except ValueError as exc:
+                raise ValueError(f"{group!r} has an invalid team or role: {exc}") from exc
+            parsed.append(TeamGrant(team_id=team_id, role=role))
+        mapping[group] = tuple(parsed)
+    # Two different non-admin roles for one team would make the resolved role
+    # depend on the IdP's group ordering (ADMIN always wins, so pairing it with
+    # another role stays deterministic). Reject the ambiguity.
+    non_admin_roles: dict[UUID, TeamRole] = {}
+    for grants_ in mapping.values():
+        for grant_ in grants_:
+            if grant_.role is TeamRole.ADMIN:
+                continue
+            seen = non_admin_roles.setdefault(grant_.team_id, grant_.role)
+            if seen is not grant_.role:
+                raise ValueError(
+                    f"team {grant_.team_id} is mapped to conflicting roles "
+                    f"'{seen}' and '{grant_.role}'; grant one non-admin role per team"
+                )
+    return mapping
+
+
+def team_mapping_to_json(
+    mapping: dict[str, tuple[TeamGrant, ...]],
+) -> dict[str, list[dict[str, str]]]:
+    """Inverse of `parse_team_mapping` — a JSON-serializable form for storage
+    (DB column or env var)."""
+    return {
+        group: [{"team": str(grant.team_id), "role": grant.role.value} for grant in grants]
+        for group, grants in mapping.items()
+    }
+
+
+@dataclass(frozen=True)
+class SsoSettings:
+    """The single OIDC identity provider configured for this deployment
+    (self-hosted, one IdP per instance). Persisted so a platform admin can
+    manage it from the console instead of environment variables + a restart.
+
+    Never carries `client_secret` in the clear — the repository stores it
+    encrypted (envelope encryption, same scheme as provider credentials) and
+    only decrypts it internally to build the OAuth2 client."""
+
+    id: UUID
+    enabled: bool
+    discovery_url: str | None
+    client_id: str | None
+    scopes: str
+    admin_groups: tuple[str, ...]
+    default_admin: bool
+    team_mapping: dict[str, tuple[TeamGrant, ...]]
+    redirect_uri: str | None
+    created_at: datetime
+    updated_at: datetime
+    has_client_secret: bool = False
 
 
 @dataclass(frozen=True)

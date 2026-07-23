@@ -72,6 +72,7 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
   assert.equal(canAccessConsoleSurface("playground", modelManager), true);
   assert.equal(canAccessConsoleSurface("credentials", modelManager), false);
   assert.equal(canAccessConsoleSurface("teams", modelManager), false);
+  assert.equal(canAccessConsoleSurface("sso-settings", modelManager), false);
   assert.equal(canAccessConsoleSurface("usage", modelManager), false);
   assert.equal(canAccessConsoleSurface("budgets", modelManager), false);
   assert.equal(canAccessConsoleSurface("audit", modelManager), false);
@@ -115,6 +116,7 @@ test("platform admins retain every console surface", () => {
     "usage",
     "budgets",
     "audit",
+    "sso-settings",
   ] as const;
 
   assert.equal(surfaces.every((surface) => canAccessConsoleSurface(surface, platformAdmin)), true);

@@ -81,6 +81,17 @@ class SSOExchangeError(DomainError):
     auth failure rather than leaking the underlying provider error."""
 
 
+class SSONotConfigured(DomainError):
+    """No IdP is configured (neither the DB-backed settings nor legacy env
+    vars) — the SSO routes exist unconditionally, but there is nothing to
+    redirect to (→ 404)."""
+
+
+class InvalidSsoSettings(DomainError):
+    """The SSO settings payload is invalid (bad discovery URL, malformed team
+    mapping, ...) — surfaced to the admin API as a 400."""
+
+
 class OrganizationNotFound(DomainError):
     """No organization exists for the given id."""
 

@@ -12,6 +12,7 @@ import {
   BarChart3,
   Wallet,
   ScrollText,
+  Lock,
   type LucideIcon,
 } from "lucide-react";
 import type { ConsoleSurface } from "@/features/teams/access";
@@ -83,6 +84,7 @@ export const NAV_GROUPS: NavGroup[] = [
         surface: "service-principals",
         ready: true,
       },
+      { to: "/sso-settings", label: "sso", icon: Lock, surface: "sso-settings", ready: true },
     ],
   },
   {

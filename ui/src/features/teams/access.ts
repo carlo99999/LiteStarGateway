@@ -28,7 +28,8 @@ export type ConsoleSurface =
   | "service-principals"
   | "usage"
   | "budgets"
-  | "audit";
+  | "audit"
+  | "sso-settings";
 
 export interface ConsoleAccess {
   isPlatformAdmin: boolean;
