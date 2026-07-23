@@ -48,7 +48,9 @@ def _model(
         provider=provider,
         credential_id=uuid4(),
         type=ModelType.CHAT,
-        provider_model_id="gpt-4o",
+        provider_model_id=(
+            "anthropic.claude-3-5-sonnet-v2:0" if provider is Provider.BEDROCK else "gpt-4o"
+        ),
         params=params or {},
         params_enforced=params_enforced or {},
         api_version=None,
@@ -310,6 +312,103 @@ async def test_router_is_prefiltered_before_strategy_side_effects() -> None:
 
     assert router_service.route_calls == 0
     assert usage.spend_since_calls == []
+    assert gateway.calls == 0
+
+
+@pytest.mark.parametrize(
+    ("payload", "match"),
+    [
+        (
+            {
+                "input": "answer",
+                "text": {
+                    "format": {
+                        "type": "json_schema",
+                        "name": "answer",
+                        "schema": {"type": "object"},
+                    }
+                },
+            },
+            "json_schema",
+        ),
+        (
+            {
+                "input": [
+                    {
+                        "type": "function_call",
+                        "call_id": "bad id",
+                        "name": "weather",
+                        "arguments": "{}",
+                    },
+                    {
+                        "type": "function_call_output",
+                        "call_id": "bad id",
+                        "output": "sunny",
+                    },
+                ],
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "weather",
+                        "parameters": {"type": "object"},
+                    }
+                ],
+            },
+            "call_id",
+        ),
+    ],
+)
+async def test_bedrock_responses_validation_precedes_router_and_admission(
+    payload: dict[str, Any],
+    match: str,
+) -> None:
+    gateway = CountingGateway()
+    usage = FakeUsage(spent=0.0)
+    model = _model(Provider.BEDROCK)
+    router = RouterConfig(
+        id=uuid4(),
+        team_id=TEAM_ID,
+        name="auto",
+        candidates=(
+            CandidateModel(
+                model_name=model.name,
+                model_id=model.id,
+                description="bedrock candidate",
+                quality_tier=QualityTier.MEDIUM,
+                supports_tools=True,
+            ),
+        ),
+        default_model=model.name,
+        default_model_id=model.id,
+        strategy="judge",
+        strategy_config={},
+        enabled=True,
+        created_at=datetime.now(UTC),
+    )
+    router_service = NoSideEffectRouter()
+    service = CompletionService(
+        models=FakeModels(model),  # type: ignore[arg-type]
+        credentials=FakeCredentials(),  # type: ignore[arg-type]
+        gateway=gateway,  # type: ignore[arg-type]
+        meter=UsageMeter(
+            usage=usage,  # type: ignore[arg-type]
+            emit_trace=lambda trace: None,
+            budgets=FakeBudgets(_budget(1.0)),  # type: ignore[arg-type]
+        ),
+        router_service=router_service,  # type: ignore[arg-type]
+        callable_resolver=FakeCallableResolver(router, model),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(UnsupportedOperation, match=match):
+        await service.responses(
+            TEAM_ID,
+            KEY_ID,
+            {"model": "auto", **payload},
+        )
+
+    assert router_service.route_calls == 0
+    assert usage.spend_since_calls == []
+    assert usage.events == []
     assert gateway.calls == 0
 
 

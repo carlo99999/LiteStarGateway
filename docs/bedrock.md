@@ -2,11 +2,13 @@
 
 > **Status — implemented**: `infrastructure/llm/bedrock_adapter.py` (Converse
 > chat + streaming, emulated Responses via `ChatToResponsesAdapter`,
-> Titan/Cohere embeddings and Titan images via `invoke_model`, structured
-> outputs as a forced tool), botocore error translation in
+> Titan/Cohere embeddings and Titan images via `invoke_model`, best-effort
+> JSON-object prompting, and bounded non-streaming client tool loops for
+> validated Claude 3/Nova model IDs), botocore error translation in
 > `infrastructure/llm/errors.py`, registered in the gateway capability matrix.
-> Async surface delegates to a worker thread (`asyncio.to_thread`), streaming
-> included. Deferred from this doc: `role_arn` assume-role credentials and
+> Async surface delegates to dedicated bounded worker pools, streaming
+> included. Deferred: Bedrock JSON-schema capability modeling, `role_arn`
+> assume-role credentials and
 > non-Titan image families.
 
 ## 1. Goal
@@ -26,8 +28,18 @@ message format very close to OpenAI chat. So we do NOT hand-roll signing.
   mapper like `anthropic_event_to_delta`).
 - **Responses** → emulate via the existing `ChatToResponsesAdapter` (Bedrock has
   no Responses API), exactly like Databricks/Anthropic.
+- **Client tools** → non-streaming OpenAI definitions/replay map to Converse
+  `toolSpec`/`toolUse`/`toolResult`. `auto`, `required → any` and documented
+  named choice are supported for validated Claude 3/Nova IDs. `none`, disabled
+  parallelism, `strict=true`, streaming tools, unknown families and opaque ARNs
+  fail before provider dispatch. Nova tool schemas are constrained to its
+  documented top-level `type`/`properties`/`required` subset.
+- **Structured output** → `json_object` gets a best-effort system instruction.
+  `json_schema` fails before admission until Bedrock's per-model native
+  `outputConfig.textFormat` support is represented explicitly; it is not
+  simulated through a non-strict forced tool.
 - **Embeddings / Images** → `invoke_model` (Titan / Cohere embeddings; Titan
-  Image / SD for images), model-family specific bodies.
+  Image for images), model-family specific bodies.
 
 ## 3. Sync + async
 

@@ -16,7 +16,12 @@ from botocore.exceptions import (
     EventStreamError,
     ReadTimeoutError,
 )
-from litestar.status_codes import HTTP_200_OK, HTTP_400_BAD_REQUEST
+from litestar.status_codes import (
+    HTTP_200_OK,
+    HTTP_400_BAD_REQUEST,
+    HTTP_501_NOT_IMPLEMENTED,
+    HTTP_502_BAD_GATEWAY,
+)
 from litestar.testing import AsyncTestClient
 
 from litestar_gateway.config import DEFAULT_MAX_RETRIES, DEFAULT_REQUEST_TIMEOUT
@@ -26,6 +31,7 @@ from litestar_gateway.domain.exceptions import (
     UpstreamAuthFailed,
     UpstreamRateLimited,
     UpstreamRequestRejected,
+    UpstreamResponseInvalid,
     UpstreamTimeout,
     UpstreamUnavailable,
 )
@@ -44,6 +50,22 @@ BEDROCK_VALUES = {
     "aws_secret_access_key": "shhh",  # pragma: allowlist secret
     "region": "eu-west-1",
 }
+
+WEATHER_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the weather.",
+            "parameters": {
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"],
+            },
+            "strict": False,
+        },
+    }
+]
 
 
 def _model(provider_model_id: str = "anthropic.claude-3-5-sonnet-v2:0") -> Model:
@@ -106,21 +128,18 @@ def test_to_converse_request_omits_absent_params() -> None:
     assert "toolConfig" not in kwargs
 
 
-def test_to_converse_request_json_schema_forces_a_tool() -> None:
-    kwargs = to_converse_request(
-        {
-            "messages": [{"role": "user", "content": "hi"}],
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {"name": "answer", "schema": {"type": "object"}},
+def test_to_converse_request_rejects_json_schema_without_validated_model_support() -> None:
+    with pytest.raises(UnsupportedOperation, match="json_schema"):
+        to_converse_request(
+            {
+                "messages": [{"role": "user", "content": "hi"}],
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": "answer", "schema": {"type": "object"}},
+                },
             },
-        },
-        _model(),
-    )
-    tool = kwargs["toolConfig"]["tools"][0]["toolSpec"]
-    assert tool["name"] == "answer"
-    assert tool["inputSchema"] == {"json": {"type": "object"}}
-    assert kwargs["toolConfig"]["toolChoice"] == {"tool": {"name": "answer"}}
+            _model(),
+        )
 
 
 def test_to_converse_request_json_object_nudges_via_system() -> None:
@@ -133,6 +152,140 @@ def test_to_converse_request_json_object_nudges_via_system() -> None:
     )
     assert "toolConfig" not in kwargs
     assert any("JSON" in part["text"] for part in kwargs["system"])
+
+
+def test_to_converse_request_maps_client_tools_and_required_choice() -> None:
+    kwargs = to_converse_request(
+        {
+            "messages": [{"role": "user", "content": "Weather?"}],
+            "tools": WEATHER_TOOLS,
+            "tool_choice": "required",
+            "parallel_tool_calls": True,
+        },
+        _model(),
+    )
+
+    assert kwargs["toolConfig"] == {
+        "tools": [
+            {
+                "toolSpec": {
+                    "name": "get_weather",
+                    "description": "Get the weather.",
+                    "inputSchema": {
+                        "json": {
+                            "type": "object",
+                            "properties": {"city": {"type": "string"}},
+                            "required": ["city"],
+                        }
+                    },
+                }
+            }
+        ],
+        "toolChoice": {"any": {}},
+    }
+
+
+def test_to_converse_request_maps_named_choice_and_omits_default_choice() -> None:
+    named = to_converse_request(
+        {
+            "messages": [{"role": "user", "content": "Weather?"}],
+            "tools": WEATHER_TOOLS,
+            "tool_choice": {
+                "type": "function",
+                "function": {"name": "get_weather"},
+            },
+        },
+        _model(),
+    )
+    automatic = to_converse_request(
+        {
+            "messages": [{"role": "user", "content": "Weather?"}],
+            "tools": WEATHER_TOOLS,
+        },
+        _model(),
+    )
+
+    assert named["toolConfig"]["toolChoice"] == {"tool": {"name": "get_weather"}}
+    assert "toolChoice" not in automatic["toolConfig"]
+
+
+def test_to_converse_request_maps_parallel_tool_replay() -> None:
+    kwargs = to_converse_request(
+        {
+            "messages": [
+                {"role": "user", "content": "Weather?"},
+                {
+                    "role": "assistant",
+                    "content": "Checking.",
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": '{"city":"Rome"}',
+                            },
+                        },
+                        {
+                            "id": "call_2",
+                            "type": "function",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": '{"city":"Milan"}',
+                            },
+                        },
+                    ],
+                },
+                {"role": "tool", "tool_call_id": "call_1", "content": "sunny"},
+                {"role": "tool", "tool_call_id": "call_2", "content": "rain"},
+            ],
+            "tools": WEATHER_TOOLS,
+            "tool_choice": "auto",
+        },
+        _model(),
+    )
+
+    assert kwargs["messages"] == [
+        {"role": "user", "content": [{"text": "Weather?"}]},
+        {
+            "role": "assistant",
+            "content": [
+                {"text": "Checking."},
+                {
+                    "toolUse": {
+                        "toolUseId": "call_1",
+                        "name": "get_weather",
+                        "input": {"city": "Rome"},
+                    }
+                },
+                {
+                    "toolUse": {
+                        "toolUseId": "call_2",
+                        "name": "get_weather",
+                        "input": {"city": "Milan"},
+                    }
+                },
+            ],
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "toolResult": {
+                        "toolUseId": "call_1",
+                        "content": [{"text": "sunny"}],
+                    }
+                },
+                {
+                    "toolResult": {
+                        "toolUseId": "call_2",
+                        "content": [{"text": "rain"}],
+                    }
+                },
+            ],
+        },
+    ]
+    assert kwargs["toolConfig"]["toolChoice"] == {"auto": {}}
 
 
 def test_from_converse_response_maps_text_usage_and_stop_reason() -> None:
@@ -154,21 +307,112 @@ def test_from_converse_response_maps_text_usage_and_stop_reason() -> None:
     assert body["usage"] == {"prompt_tokens": 3, "completion_tokens": 5, "total_tokens": 8}
 
 
-def test_from_converse_response_surfaces_forced_tool_as_json_content() -> None:
+def test_from_converse_response_requires_explicit_assistant_role() -> None:
+    with pytest.raises(UpstreamResponseInvalid, match="malformed output"):
+        from_converse_response(
+            {
+                "output": {"message": {"content": [{"text": "hi"}]}},
+                "stopReason": "end_turn",
+                "usage": {"inputTokens": 1, "outputTokens": 2},
+            },
+            "m",
+        )
+
+
+def test_from_converse_response_rejects_tool_stop_without_tool_call() -> None:
+    with pytest.raises(UpstreamResponseInvalid, match="unexpected tool stop"):
+        from_converse_response(
+            {
+                "output": {
+                    "message": {
+                        "role": "assistant",
+                        "content": [{"text": "not a tool"}],
+                    }
+                },
+                "stopReason": "tool_use",
+                "usage": {"inputTokens": 1, "outputTokens": 2},
+            },
+            "m",
+        )
+
+
+def test_from_converse_response_maps_client_tool_calls() -> None:
     body = from_converse_response(
         {
             "output": {
-                "message": {"content": [{"toolUse": {"name": "answer", "input": {"answer": 42}}}]}
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "call_1",
+                                "name": "get_weather",
+                                "input": {"city": "Rome"},
+                            }
+                        },
+                        {
+                            "toolUse": {
+                                "toolUseId": "call_2",
+                                "name": "get_weather",
+                                "input": {"city": "Milan"},
+                            }
+                        },
+                    ],
+                }
             },
             "stopReason": "tool_use",
-            "usage": {"inputTokens": 1, "outputTokens": 2},
+            "usage": {"inputTokens": 3, "outputTokens": 5, "totalTokens": 8},
         },
         "m",
+        client_tool_names={"get_weather"},
     )
+
     choice = body["choices"][0]
-    assert json.loads(choice["message"]["content"]) == {"answer": 42}
-    # Structured output looks like a normal completion to the client.
-    assert choice["finish_reason"] == "stop"
+    assert choice["finish_reason"] == "tool_calls"
+    assert choice["message"] == {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {"name": "get_weather", "arguments": '{"city":"Rome"}'},
+            },
+            {
+                "id": "call_2",
+                "type": "function",
+                "function": {"name": "get_weather", "arguments": '{"city":"Milan"}'},
+            },
+        ],
+    }
+
+
+@pytest.mark.parametrize(
+    "tool_use",
+    [
+        {"name": "get_weather", "input": {"city": "Rome"}},
+        {"toolUseId": "call_1", "name": "undeclared", "input": {"city": "Rome"}},
+        {"toolUseId": "call_1", "name": "get_weather", "input": "not-an-object"},
+    ],
+)
+def test_from_converse_response_rejects_malformed_client_tool_use(
+    tool_use: dict[str, Any],
+) -> None:
+    with pytest.raises(UpstreamResponseInvalid):
+        from_converse_response(
+            {
+                "output": {
+                    "message": {
+                        "role": "assistant",
+                        "content": [{"toolUse": tool_use}],
+                    }
+                },
+                "stopReason": "tool_use",
+                "usage": {"inputTokens": 3, "outputTokens": 5, "totalTokens": 8},
+            },
+            "m",
+            client_tool_names={"get_weather"},
+        )
 
 
 def test_converse_event_to_delta_mapping() -> None:
@@ -176,17 +420,77 @@ def test_converse_event_to_delta_mapping() -> None:
         {"role": "assistant"},
         None,
     )
-    assert converse_event_to_delta({"contentBlockDelta": {"delta": {"text": "hi"}}}) == (
+    assert converse_event_to_delta(
+        {"contentBlockDelta": {"delta": {"text": "hi"}, "contentBlockIndex": 0}}
+    ) == (
         {"content": "hi"},
         None,
     )
-    # Forced structured-output tool streams partial JSON via toolUse input.
-    assert converse_event_to_delta(
-        {"contentBlockDelta": {"delta": {"toolUse": {"input": '{"a":'}}}}
-    ) == ({"content": '{"a":'}, None)
+    with pytest.raises(UpstreamResponseInvalid, match="content delta"):
+        converse_event_to_delta(
+            {
+                "contentBlockDelta": {
+                    "delta": {"toolUse": {"input": '{"a":'}},
+                    "contentBlockIndex": 0,
+                }
+            }
+        )
     assert converse_event_to_delta({"messageStop": {"stopReason": "end_turn"}}) == ({}, "stop")
-    assert converse_event_to_delta({"contentBlockStop": {}}) == (None, None)
-    assert converse_event_to_delta({"metadata": {"usage": {}}}) == (None, None)
+    assert converse_event_to_delta({"contentBlockStop": {"contentBlockIndex": 0}}) == (None, None)
+    assert converse_event_to_delta(
+        {
+            "metadata": {
+                "usage": {"inputTokens": 1, "outputTokens": 2, "totalTokens": 3},
+                "metrics": {"latencyMs": 4},
+            }
+        }
+    ) == (None, None)
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "tool_use",
+        "malformed_model_output",
+        "malformed_tool_use",
+        "future_unknown_reason",
+    ],
+)
+def test_converse_event_to_delta_rejects_invalid_stop_reasons(reason: str) -> None:
+    with pytest.raises(UpstreamResponseInvalid):
+        converse_event_to_delta({"messageStop": {"stopReason": reason}})
+
+
+@pytest.mark.parametrize("start", [{}, {"role": "user"}, "assistant"])
+def test_converse_event_to_delta_rejects_invalid_message_start(start: object) -> None:
+    with pytest.raises(UpstreamResponseInvalid):
+        converse_event_to_delta({"messageStart": start})
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        {"futureUnknownEvent": {}},
+        {"contentBlockDelta": {}},
+        {"contentBlockStart": "malformed"},
+        {
+            "messageStart": {"role": "assistant"},
+            "messageStop": {"stopReason": "end_turn"},
+        },
+        {"metadata": "malformed"},
+        {
+            "metadata": {
+                "usage": {"inputTokens": 1, "outputTokens": 2},
+                "metrics": {"latencyMs": 4},
+            }
+        },
+    ],
+)
+def test_converse_event_to_delta_rejects_unknown_or_malformed_events(
+    event: dict[str, object],
+) -> None:
+    with pytest.raises(UpstreamResponseInvalid):
+        converse_event_to_delta(event)
 
 
 # ── Error translation (botocore) ─────────────────────────────────────────────
@@ -295,9 +599,20 @@ class FakeBedrockRuntime:
 
     def converse(self, **kwargs: Any) -> dict:
         FakeBedrockRuntime.last_kwargs = kwargs
-        if (kwargs.get("toolConfig") or {}).get("toolChoice"):
-            name = kwargs["toolConfig"]["toolChoice"]["tool"]["name"]
-            content = [{"toolUse": {"toolUseId": "t1", "name": name, "input": {"answer": 42}}}]
+        has_tool_result = any(
+            isinstance(block, dict) and "toolResult" in block
+            for message in kwargs.get("messages") or []
+            if isinstance(message, dict)
+            for block in message.get("content") or []
+        )
+        tool_config = kwargs.get("toolConfig") or {}
+        if tool_config and not has_tool_result:
+            choice = tool_config.get("toolChoice") or {}
+            name = (choice.get("tool") or {}).get("name")
+            if name is None:
+                name = tool_config["tools"][0]["toolSpec"]["name"]
+            tool_input = {"answer": 42} if name == "answer" else {"city": "Rome"}
+            content = [{"toolUse": {"toolUseId": "t1", "name": name, "input": tool_input}}]
             stop = "tool_use"
         else:
             content = [{"text": "hello from bedrock"}]
@@ -316,7 +631,12 @@ class FakeBedrockRuntime:
             {"contentBlockDelta": {"delta": {"text": " there"}, "contentBlockIndex": 0}},
             {"contentBlockStop": {"contentBlockIndex": 0}},
             {"messageStop": {"stopReason": "end_turn"}},
-            {"metadata": {"usage": {"inputTokens": 5, "outputTokens": 7, "totalTokens": 12}}},
+            {
+                "metadata": {
+                    "usage": {"inputTokens": 5, "outputTokens": 7, "totalTokens": 12},
+                    "metrics": {"latencyMs": 1},
+                }
+            },
         ]
         return {"stream": iter(events)}
 
@@ -439,7 +759,7 @@ async def test_bedrock_chat_completions(
 ) -> None:
     _patch(monkeypatch)
     _patch_bedrock(monkeypatch)
-    api_key = await _setup(
+    api_key, team, admin = await _setup_team(
         client,
         provider="bedrock",
         values=BEDROCK_VALUES,
@@ -466,12 +786,17 @@ async def test_bedrock_chat_completions(
     assert boto_config.retries["max_attempts"] == DEFAULT_MAX_RETRIES
 
 
-async def test_bedrock_structured_output_forces_a_tool(
+async def test_bedrock_json_schema_fails_before_provider(
     client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch(monkeypatch)
     _patch_bedrock(monkeypatch)
-    api_key = await _setup(client, provider="bedrock", values=BEDROCK_VALUES)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="bedrock",
+        values=BEDROCK_VALUES,
+        provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+    )
     resp = await client.post(
         "/v1/chat/completions",
         json={
@@ -484,12 +809,338 @@ async def test_bedrock_structured_output_forces_a_tool(
         },
         headers=_bearer(api_key),
     )
-    assert resp.status_code == HTTP_200_OK, resp.text
-    tool_config = FakeBedrockRuntime.last_kwargs["toolConfig"]
-    assert tool_config["toolChoice"] == {"tool": {"name": "answer"}}
-    choice = resp.json()["choices"][0]
-    assert json.loads(choice["message"]["content"]) == {"answer": 42}
-    assert choice["finish_reason"] == "stop"
+    assert resp.status_code == HTTP_501_NOT_IMPLEMENTED, resp.text
+    assert FakeBedrockRuntime.last_kwargs == {}
+    assert await _team_usage(client, team, admin) == []
+
+
+async def test_bedrock_malformed_response_format_fails_before_provider(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    _patch_bedrock(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="bedrock",
+        values=BEDROCK_VALUES,
+        provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+    )
+
+    response = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "hi"}],
+            "response_format": {"type": "unknown"},
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_501_NOT_IMPLEMENTED
+    assert FakeBedrockRuntime.last_kwargs == {}
+    assert await _team_usage(client, team, admin) == []
+
+
+async def test_bedrock_chat_non_streaming_tool_loop_is_faithful_and_billed(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    _patch_bedrock(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="bedrock",
+        values=BEDROCK_VALUES,
+        provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+
+    first = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "Weather?"}],
+            "tools": WEATHER_TOOLS,
+            "tool_choice": "required",
+            "parallel_tool_calls": True,
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert first.status_code == HTTP_200_OK, first.text
+    first_body = first.json()
+    call = first_body["choices"][0]["message"]["tool_calls"][0]
+    assert call == {
+        "id": "t1",
+        "type": "function",
+        "function": {"name": "get_weather", "arguments": '{"city":"Rome"}'},
+    }
+    assert first_body["choices"][0]["finish_reason"] == "tool_calls"
+    assert FakeBedrockRuntime.last_kwargs["toolConfig"]["toolChoice"] == {"any": {}}
+
+    second = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [
+                {"role": "user", "content": "Weather?"},
+                first_body["choices"][0]["message"],
+                {"role": "tool", "tool_call_id": call["id"], "content": "sunny"},
+            ],
+            "tools": WEATHER_TOOLS,
+            "tool_choice": "auto",
+            "parallel_tool_calls": True,
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert second.status_code == HTTP_200_OK, second.text
+    assert second.json()["choices"][0]["message"]["content"] == "hello from bedrock"
+    assert FakeBedrockRuntime.last_kwargs["messages"][-1] == {
+        "role": "user",
+        "content": [
+            {
+                "toolResult": {
+                    "toolUseId": "t1",
+                    "content": [{"text": "sunny"}],
+                }
+            }
+        ],
+    }
+    usage = await _team_usage(client, team, admin)
+    assert usage[0]["calls"] == 2
+    assert usage[0]["prompt_tokens"] == 6
+    assert usage[0]["completion_tokens"] == 10
+    assert usage[0]["cost"] == pytest.approx(0.26)
+
+
+async def test_bedrock_responses_non_streaming_tool_loop_preserves_call_id(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    _patch_bedrock(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="bedrock",
+        values=BEDROCK_VALUES,
+        provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+    )
+    response_tool = {
+        "type": "function",
+        "name": "get_weather",
+        "description": "Get the weather.",
+        "parameters": WEATHER_TOOLS[0]["function"]["parameters"],
+        "strict": False,
+    }
+
+    first = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": "Weather?",
+            "tools": [response_tool],
+            "tool_choice": "required",
+            "parallel_tool_calls": True,
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert first.status_code == HTTP_200_OK, first.text
+    first_body = first.json()
+    call = next(item for item in first_body["output"] if item["type"] == "function_call")
+    assert call["call_id"] == "t1"
+    assert call["name"] == "get_weather"
+    assert call["arguments"] == '{"city":"Rome"}'
+
+    second = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": [
+                {"role": "user", "content": "Weather?"},
+                call,
+                {
+                    "type": "function_call_output",
+                    "call_id": call["call_id"],
+                    "output": "sunny",
+                },
+            ],
+            "tools": [response_tool],
+            "tool_choice": "auto",
+            "parallel_tool_calls": True,
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert second.status_code == HTTP_200_OK, second.text
+    assert second.json()["output_text"] == "hello from bedrock"
+    assert (
+        FakeBedrockRuntime.last_kwargs["messages"][-1]["content"][0]["toolResult"]["toolUseId"]
+        == "t1"
+    )
+
+
+async def test_bedrock_unsupported_tool_semantics_fail_before_provider(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    _patch_bedrock(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="bedrock",
+        values=BEDROCK_VALUES,
+        provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+    )
+    FakeBedrockRuntime.last_kwargs = {}
+
+    response = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "Weather?"}],
+            "tools": WEATHER_TOOLS,
+            "tool_choice": "none",
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_501_NOT_IMPLEMENTED
+    assert FakeBedrockRuntime.last_kwargs == {}
+    assert await _team_usage(client, team, admin) == []
+
+
+async def test_bedrock_responses_json_schema_fails_before_provider(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    _patch_bedrock(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="bedrock",
+        values=BEDROCK_VALUES,
+        provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+    )
+
+    response = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": "answer",
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "answer",
+                    "schema": {"type": "object"},
+                }
+            },
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_501_NOT_IMPLEMENTED
+    assert FakeBedrockRuntime.last_kwargs == {}
+    assert await _team_usage(client, team, admin) == []
+
+
+async def test_bedrock_responses_invalid_call_id_fails_before_provider(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    _patch_bedrock(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="bedrock",
+        values=BEDROCK_VALUES,
+        provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+    )
+
+    response = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": [
+                {
+                    "type": "function_call",
+                    "call_id": "bad id",
+                    "name": "get_weather",
+                    "arguments": "{}",
+                },
+                {
+                    "type": "function_call_output",
+                    "call_id": "bad id",
+                    "output": "sunny",
+                },
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "name": "get_weather",
+                    "parameters": {"type": "object"},
+                    "strict": False,
+                }
+            ],
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_501_NOT_IMPLEMENTED
+    assert FakeBedrockRuntime.last_kwargs == {}
+    assert await _team_usage(client, team, admin) == []
+
+
+async def test_malformed_bedrock_tool_response_fails_closed_but_is_billed(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch(monkeypatch)
+    _patch_bedrock(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="bedrock",
+        values=BEDROCK_VALUES,
+        provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+
+    def malformed(_runtime: FakeBedrockRuntime, **kwargs: Any) -> dict[str, Any]:
+        FakeBedrockRuntime.last_kwargs = kwargs
+        return {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "t1",
+                                "name": "get_weather",
+                                "input": "not-an-object",
+                            }
+                        }
+                    ],
+                }
+            },
+            "stopReason": "tool_use",
+            "usage": {"inputTokens": 3, "outputTokens": 5, "totalTokens": 8},
+        }
+
+    monkeypatch.setattr(FakeBedrockRuntime, "converse", malformed)
+    response = await client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": "Weather?"}],
+            "tools": WEATHER_TOOLS,
+            "tool_choice": "required",
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert response.status_code == HTTP_502_BAD_GATEWAY
+    usage = await _team_usage(client, team, admin)
+    assert usage[0]["calls"] == 1
+    assert usage[0]["prompt_tokens"] == 3
+    assert usage[0]["completion_tokens"] == 5
+    assert usage[0]["cost"] == pytest.approx(0.13)
 
 
 async def test_bedrock_streaming_sse_records_usage(

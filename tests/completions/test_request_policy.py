@@ -30,6 +30,7 @@ def _model(
     *,
     params: dict[str, object] | None = None,
     params_enforced: dict[str, object] | None = None,
+    provider_model_id: str = "upstream",
 ) -> Model:
     return Model(
         id=uuid4(),
@@ -38,7 +39,7 @@ def _model(
         provider=provider,
         credential_id=uuid4(),
         type=ModelType.CHAT,
-        provider_model_id="upstream",
+        provider_model_id=provider_model_id,
         params=params or {},
         params_enforced=params_enforced or {},
         api_version=None,
@@ -55,9 +56,15 @@ def _validate_responses_request(
     *,
     params: dict[str, object] | None = None,
     params_enforced: dict[str, object] | None = None,
+    provider_model_id: str = "upstream",
 ) -> dict[str, object]:
     return validate_responses_request(
-        _model(provider, params=params, params_enforced=params_enforced),
+        _model(
+            provider,
+            params=params,
+            params_enforced=params_enforced,
+            provider_model_id=provider_model_id,
+        ),
         request,
     )
 
@@ -202,14 +209,10 @@ def test_databricks_responses_accept_string_tool_choices(choice: str) -> None:
     assert _validate_responses_request(Provider.DATABRICKS, request) == request
 
 
-@pytest.mark.parametrize(
-    "provider",
-    [Provider.VERTEX_AI, Provider.BEDROCK],
-)
-def test_other_chat_only_providers_still_reject_function_tools(provider: Provider) -> None:
+def test_vertex_responses_still_reject_function_tools() -> None:
     with pytest.raises(UnsupportedOperation, match="tools"):
         _validate_responses_request(
-            provider,
+            Provider.VERTEX_AI,
             {
                 "model": "m",
                 "input": "weather?",
@@ -222,6 +225,88 @@ def test_other_chat_only_providers_still_reject_function_tools(provider: Provide
                     }
                 ],
             },
+        )
+
+
+def test_bedrock_responses_accepts_non_streaming_function_tool_subset() -> None:
+    request: dict[str, object] = {
+        "model": "m",
+        "input": [
+            {
+                "type": "function_call",
+                "call_id": "call_123",
+                "name": "get_weather",
+                "arguments": '{"city":"Rome"}',
+            },
+            {
+                "type": "function_call_output",
+                "call_id": "call_123",
+                "output": "sunny",
+            },
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "name": "get_weather",
+                "parameters": {"type": "object"},
+                "strict": False,
+            }
+        ],
+        "tool_choice": "required",
+        "parallel_tool_calls": True,
+    }
+
+    assert (
+        _validate_responses_request(
+            Provider.BEDROCK,
+            request,
+            provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+        )
+        == request
+    )
+
+
+@pytest.mark.parametrize(
+    ("provider_model_id", "extra", "match"),
+    [
+        (
+            "anthropic.claude-3-5-sonnet-v2:0",
+            {"tool_choice": "none"},
+            "tool_choice='none'",
+        ),
+        (
+            "anthropic.claude-3-5-sonnet-v2:0",
+            {"parallel_tool_calls": False},
+            "parallel_tool_calls=false",
+        ),
+        (
+            "meta.llama3-70b-instruct-v1:0",
+            {},
+            "validated",
+        ),
+    ],
+)
+def test_bedrock_responses_rejects_unsupported_tool_capabilities(
+    provider_model_id: str,
+    extra: dict[str, object],
+    match: str,
+) -> None:
+    with pytest.raises(UnsupportedOperation, match=match):
+        _validate_responses_request(
+            Provider.BEDROCK,
+            {
+                "model": "m",
+                "input": "weather?",
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "get_weather",
+                        "parameters": {"type": "object"},
+                    }
+                ],
+                **extra,
+            },
+            provider_model_id=provider_model_id,
         )
 
 
@@ -308,6 +393,24 @@ def test_anthropic_responses_rejects_configured_structured_output_with_client_to
                     },
                 }
             },
+        )
+
+
+def test_bedrock_responses_rejects_configured_json_schema_before_translation() -> None:
+    with pytest.raises(UnsupportedOperation, match="json_schema"):
+        _validate_responses_request(
+            Provider.BEDROCK,
+            {"model": "m", "input": "answer"},
+            params_enforced={
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "answer",
+                        "schema": {"type": "object"},
+                    },
+                }
+            },
+            provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
         )
 
 
@@ -537,6 +640,335 @@ def test_anthropic_chat_accepts_complete_parallel_tool_replay() -> None:
     }
 
     assert validate_chat_request(_model(Provider.ANTHROPIC), request) == request
+
+
+@pytest.mark.parametrize("choice", [None, "auto", "required"])
+def test_bedrock_chat_accepts_supported_tool_choices(choice: str | None) -> None:
+    request: dict[str, object] = {
+        "messages": [{"role": "user", "content": "weather?"}],
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "weather",
+                    "parameters": {"type": "object"},
+                    "strict": False,
+                },
+            }
+        ],
+        "parallel_tool_calls": True,
+    }
+    if choice is not None:
+        request["tool_choice"] = choice
+
+    assert (
+        validate_chat_request(
+            _model(
+                Provider.BEDROCK,
+                provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+            ),
+            request,
+        )
+        == request
+    )
+
+
+def test_bedrock_chat_accepts_named_choice_for_supported_family() -> None:
+    request: dict[str, object] = {
+        "messages": [{"role": "user", "content": "weather?"}],
+        "tools": [
+            {
+                "type": "function",
+                "function": {"name": "weather", "parameters": {"type": "object"}},
+            }
+        ],
+        "tool_choice": {"type": "function", "function": {"name": "weather"}},
+    }
+
+    assert (
+        validate_chat_request(
+            _model(
+                Provider.BEDROCK,
+                provider_model_id="us.amazon.nova-pro-v1:0",
+            ),
+            request,
+        )
+        == request
+    )
+
+
+def test_bedrock_chat_rejects_strict_tool_schema() -> None:
+    with pytest.raises(UnsupportedOperation, match="strict tool schemas"):
+        validate_chat_request(
+            _model(
+                Provider.BEDROCK,
+                provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+            ),
+            {
+                "messages": [{"role": "user", "content": "weather?"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "weather",
+                            "parameters": {"type": "object"},
+                            "strict": True,
+                        },
+                    }
+                ],
+            },
+        )
+
+
+def test_bedrock_responses_rejects_strict_tool_schema() -> None:
+    with pytest.raises(UnsupportedOperation, match="strict tool schemas"):
+        _validate_responses_request(
+            Provider.BEDROCK,
+            {
+                "model": "m",
+                "input": "weather?",
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "weather",
+                        "parameters": {"type": "object"},
+                        "strict": True,
+                    }
+                ],
+            },
+            provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+        )
+
+
+def test_bedrock_nova_rejects_unsupported_top_level_tool_schema_fields() -> None:
+    with pytest.raises(UnsupportedOperation, match="Amazon Nova tool schemas"):
+        validate_chat_request(
+            _model(
+                Provider.BEDROCK,
+                provider_model_id="us.amazon.nova-pro-v1:0",
+            ),
+            {
+                "messages": [{"role": "user", "content": "weather?"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "weather",
+                            "parameters": {
+                                "type": "object",
+                                "additionalProperties": False,
+                            },
+                        },
+                    }
+                ],
+            },
+        )
+
+
+def test_bedrock_chat_rejects_empty_tool_description() -> None:
+    with pytest.raises(UnsupportedOperation, match="description.*non-empty"):
+        validate_chat_request(
+            _model(
+                Provider.BEDROCK,
+                provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+            ),
+            {
+                "messages": [{"role": "user", "content": "weather?"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "weather",
+                            "description": "",
+                            "parameters": {},
+                        },
+                    }
+                ],
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    ("provider_model_id", "response_format", "match"),
+    [
+        (
+            "meta.llama3-70b-instruct-v1:0",
+            {
+                "type": "json_schema",
+                "json_schema": {"name": "answer", "schema": {"type": "object"}},
+            },
+            "validated",
+        ),
+        (
+            "anthropic.claude-3-5-sonnet-v2:0",
+            {
+                "type": "json_schema",
+                "json_schema": {"name": "bad name", "schema": {"type": "object"}},
+            },
+            "name",
+        ),
+        (
+            "anthropic.claude-3-5-sonnet-v2:0",
+            {
+                "type": "json_schema",
+                "json_schema": {"name": "answer", "schema": "not-an-object"},
+            },
+            "schema",
+        ),
+    ],
+)
+def test_bedrock_chat_validates_synthetic_structured_tool_before_routing(
+    provider_model_id: str,
+    response_format: dict[str, object],
+    match: str,
+) -> None:
+    with pytest.raises(UnsupportedOperation, match=match):
+        validate_chat_request(
+            _model(Provider.BEDROCK, provider_model_id=provider_model_id),
+            {
+                "messages": [{"role": "user", "content": "answer"}],
+                "response_format": response_format,
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    ("response_format", "match"),
+    [
+        ("json_object", "object"),
+        ({"type": "unknown"}, "type"),
+        ({"type": "json_object", "extra": True}, "response_format.extra"),
+        (
+            {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "answer",
+                    "schema": {"type": "object"},
+                    "extra": True,
+                },
+            },
+            "json_schema.extra",
+        ),
+    ],
+)
+def test_bedrock_chat_rejects_malformed_response_format_before_routing(
+    response_format: object,
+    match: str,
+) -> None:
+    with pytest.raises(UnsupportedOperation, match=match):
+        validate_chat_request(
+            _model(
+                Provider.BEDROCK,
+                provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+            ),
+            {
+                "messages": [{"role": "user", "content": "answer"}],
+                "response_format": response_format,
+            },
+        )
+
+
+def test_bedrock_responses_rejects_invalid_call_id_before_translation() -> None:
+    with pytest.raises(UnsupportedOperation, match="call_id"):
+        _validate_responses_request(
+            Provider.BEDROCK,
+            {
+                "model": "m",
+                "input": [
+                    {
+                        "type": "function_call",
+                        "call_id": "bad id",
+                        "name": "get_weather",
+                        "arguments": "{}",
+                    },
+                    {
+                        "type": "function_call_output",
+                        "call_id": "bad id",
+                        "output": "sunny",
+                    },
+                ],
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "get_weather",
+                        "parameters": {"type": "object"},
+                    }
+                ],
+            },
+            provider_model_id="anthropic.claude-3-5-sonnet-v2:0",
+        )
+
+
+def test_bedrock_responses_validates_synthetic_structured_tool_before_routing() -> None:
+    with pytest.raises(UnsupportedOperation, match="validated"):
+        _validate_responses_request(
+            Provider.BEDROCK,
+            {
+                "model": "m",
+                "input": "answer",
+                "text": {
+                    "format": {
+                        "type": "json_schema",
+                        "name": "answer",
+                        "schema": {"type": "object"},
+                    }
+                },
+            },
+            provider_model_id="meta.llama3-70b-instruct-v1:0",
+        )
+
+
+@pytest.mark.parametrize(
+    ("provider_model_id", "extra", "match"),
+    [
+        (
+            "anthropic.claude-3-5-sonnet-v2:0",
+            {"tool_choice": "none"},
+            "tool_choice='none'",
+        ),
+        (
+            "anthropic.claude-3-5-sonnet-v2:0",
+            {"parallel_tool_calls": False},
+            "parallel_tool_calls=false",
+        ),
+        (
+            "meta.llama3-70b-instruct-v1:0",
+            {},
+            "validated",
+        ),
+        (
+            "arn:aws:bedrock:eu-west-1:123456789012:inference-profile/claude",
+            {},
+            "validated",
+        ),
+        (
+            "proxy.anthropic.claude-3-5-sonnet-v2:0",
+            {},
+            "validated",
+        ),
+    ],
+)
+def test_bedrock_chat_rejects_unsupported_tool_capabilities(
+    provider_model_id: str,
+    extra: dict[str, object],
+    match: str,
+) -> None:
+    request: dict[str, object] = {
+        "messages": [{"role": "user", "content": "weather?"}],
+        "tools": [
+            {
+                "type": "function",
+                "function": {"name": "weather", "parameters": {}},
+            }
+        ],
+        **extra,
+    }
+
+    with pytest.raises(UnsupportedOperation, match=match):
+        validate_chat_request(
+            _model(Provider.BEDROCK, provider_model_id=provider_model_id),
+            request,
+        )
 
 
 def test_anthropic_chat_tool_count_limit_accepts_boundary_and_rejects_next() -> None:
@@ -943,10 +1375,10 @@ def test_chat_only_responses_reject_multimodal_input() -> None:
         )
 
 
-def test_chat_only_responses_reject_function_call_output_input() -> None:
+def test_vertex_responses_reject_function_call_output_input() -> None:
     with pytest.raises(UnsupportedOperation, match="function_call_output"):
         _validate_responses_request(
-            Provider.BEDROCK,
+            Provider.VERTEX_AI,
             {
                 "model": "m",
                 "input": [

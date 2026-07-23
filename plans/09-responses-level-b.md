@@ -4,7 +4,8 @@
 
 **Depends on:** Plan 02 (complete) and the existing Responses emulation adapter.
 
-**Status:** Phase 0, Phase 1a and Phase 1b-A (Anthropic) complete; Bedrock is next.
+**Status:** Phase 0, Phase 1a and Phase 1b-A/B (Anthropic + Bedrock) complete;
+Vertex tool state is next.
 
 **Theme:** eliminate silent feature drops, then add faithful tool-call items and
 events for chat-only upstreams.
@@ -53,16 +54,24 @@ events for chat-only upstreams.
   the emulated Responses loop passes an endpoint integration test. Malformed
   billable upstream tool output settles usage once and returns a sanitized 502.
 
-## Phase 1b-B — Bedrock Converse tools
+## Phase 1b-B — Bedrock Converse tools — ✅ complete
 
-- Map tools, `strict`, assistant `toolUse`, user `toolResult`, `auto`, `any` and
-  supported named choices.
+- Map non-strict tools, assistant `toolUse`, user `toolResult`, `auto`, `any`
+  and supported named choices.
 - Add a model-family capability gate: Bedrock documents named choice only for
   Claude 3 and Nova.
 - Keep `tool_choice=none` and `parallel_tool_calls=false` at 501 because Converse
   has no general equivalent.
-- **Done when:** every enabled model/choice combination has a direct Chat and
-  Responses conformance loop; all other combinations fail before routing.
+- Keep `strict=true` and `json_schema` at 501 until the per-model Bedrock
+  structured-output matrix and native `outputConfig.textFormat` mapping are
+  explicit; do not simulate schema enforcement with a non-strict forced tool.
+- Enforce Nova's documented top-level tool-schema subset.
+- Reject unknown model families and opaque ARNs before routing; enable the
+  proved Claude 3/Nova matrix only.
+- **Done:** direct Chat and emulated Responses two-turn loops preserve IDs,
+  arguments and ordered results; malformed billable upstream output settles
+  usage once and returns a sanitized 502. Unsupported model/choice/streaming
+  combinations fail before routing, budget admission or provider dispatch.
 
 ## Phase 1b-C — Vertex/Gemini tool state
 

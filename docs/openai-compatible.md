@@ -37,15 +37,22 @@ regression breaks a contract test rather than surfacing in your agent.
 ## Tool calling
 
 Tool/function calling over this surface works for models backed by **OpenAI,
-Azure OpenAI, Databricks, and Anthropic**. Anthropic supports faithful
-non-streaming definitions, `strict`, choice/parallel intent, exact call IDs and
-tool-result replay.
+Azure OpenAI, Databricks, Anthropic, and capability-gated AWS Bedrock Claude
+3/Nova models**. Anthropic and Bedrock support faithful non-streaming
+definitions, exact call IDs and tool-result replay. Anthropic maps `strict`;
+Bedrock accepts only omitted/`false` strict intent for this validated matrix.
 
-Anthropic streaming tool calls, all translated tool calls on **Vertex (Gemini)**
-and **Bedrock**, and vision content on these translated adapters remain
-`501 Not Implemented` rather than silently degrading. For unrestricted
-Anthropic and Gemini features, use the native endpoints below; Bedrock has no
-gateway-native endpoint.
+Bedrock maps `auto`, `required → any`, and supported named choices. It rejects
+`strict=true`, `tool_choice=none`, `parallel_tool_calls=false`, opaque model ARNs
+and unknown model families before routing because the selected Converse model
+matrix cannot prove those contracts. Amazon Nova schemas are additionally
+limited to a top-level object containing only `type`, `properties` and
+`required`.
+Anthropic/Bedrock streaming tool calls, all translated tool calls on **Vertex
+(Gemini)**, and vision content on these translated adapters remain `501 Not
+Implemented` rather than silently degrading. For unrestricted Anthropic and
+Gemini features, use the native endpoints below; Bedrock has no gateway-native
+endpoint.
 
 ## Errors
 
@@ -61,7 +68,7 @@ expected:
 | Use the **OpenAI-compatible** surface (`/v1/chat/completions`) | Use a **native** endpoint |
 |---|---|
 | Provider-agnostic or OpenAI-targeted clients/agents | Anthropic or Gemini tool-calling agents that need full fidelity |
-| Text and non-streaming OpenAI/Azure/Databricks/Anthropic tool calling | Provider-specific features the OpenAI shape can't express |
+| Text and non-streaming OpenAI/Azure/Databricks/Anthropic/capability-gated Bedrock tool calling | Provider-specific features the OpenAI shape can't express |
 | You want one client shape across many providers | You already use the native `anthropic` / `google-genai` SDK |
 
 Native endpoints:

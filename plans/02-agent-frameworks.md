@@ -58,7 +58,7 @@ The core deliverable, buildable now against what already ships.
 - **Done when:** `tests/conformance/` is green in CI and a change to the
   request/response/stream/error shape breaks a **contract** test (not just a
   low-level unit test), for OpenAI/Azure/Databricks-backed models and the
-  non-streaming Anthropic tool-loop subset.
+  non-streaming Anthropic/capability-gated Bedrock tool-loop subsets.
 
 ## Phase 2 — Close OpenAI-shape contract gaps
 
@@ -73,7 +73,7 @@ adapter/emulation layer — never a per-framework special case.
   `openai` SDK; note that any framework layering on it (Pydantic AI, LangChain,
   OpenAI Agents SDK) inherits this for free.
 - The surface-selection note: OpenAI surface for OpenAI-target/provider-agnostic
-  clients, including non-streaming Anthropic tool loops; **native endpoints
+  clients, including non-streaming Anthropic and bounded Bedrock tool loops; **native endpoints
   (Plan 01)** for full-fidelity Anthropic/Gemini features and streaming tools.
 
 ## After Plan 01 — extend conformance to the native contracts

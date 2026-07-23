@@ -6,9 +6,10 @@
 > OpenAI-compatible surface could not originally express tool/function calling
 > or multimodal input on Anthropic, Vertex or Bedrock, so such requests failed
 > with `UnsupportedOperation` (501) instead of being silently stripped.
-> Non-streaming Anthropic tools have since gained a bounded, conformance-tested
-> translation; Anthropic streaming tools, Vertex/Bedrock tools and translated
-> multimodal input remain fail-closed. The native wire protocols remain
+> Non-streaming Anthropic tools and capability-gated Bedrock Claude 3/Nova
+> tools have since gained bounded, conformance-tested translations. Translated
+> streaming tools, Vertex tools and multimodal input remain fail-closed. The
+> native wire protocols remain
 > first-class gateway endpoints and let clients use the provider's **native SDK**
 > pointed at the gateway `base_url`. The workload stays inside the gateway, so
 > budget, keys, usage metering, audit, routing and rate-limiting all still apply —
@@ -36,8 +37,9 @@ same governance it enforces on `/v1/chat/completions`.
 Non-goal for the native endpoints: cross-protocol translation. An
 Anthropic-shaped request is served only by an Anthropic-backed model; a
 Gemini-shaped request only by a Gemini-backed model. The separate
-OpenAI-compatible adapter now translates a bounded non-streaming Anthropic tool
-subset; that does not change these passthrough endpoints.
+OpenAI-compatible adapter now translates bounded non-streaming Anthropic and
+capability-gated Bedrock tool subsets; that does not change these passthrough
+endpoints.
 
 ## Endpoints (phase 1: Anthropic; phase 2: Gemini)
 
@@ -127,10 +129,10 @@ dispatch-time validation. It never introduces cross-protocol translation.
 
 `CandidateModel.supports_tools` means that both the model and the selected
 surface can honor the requested tool contract. The OpenAI path now honors its
-bounded non-streaming contract for OpenAI/Azure/Databricks/Anthropic; native
-Anthropic remains the route for unrestricted or streaming Claude tool use.
-Vertex and Bedrock translations stay fail-closed until their narrower contracts
-are implemented.
+bounded non-streaming contract for OpenAI/Azure/Databricks/Anthropic and
+validated Bedrock Claude 3/Nova IDs; native Anthropic remains the route for
+unrestricted or streaming Claude tool use. Vertex translation stays fail-closed
+until its thought-signature contract is implemented.
 
 ## Suggested slicing
 
@@ -148,10 +150,13 @@ are implemented.
 3. **Gemini `generateContent` + `:streamGenerateContent`** — same pattern with
    the `google-genai` SDK.
 4. **Docs**: maintain a capability matrix page. The current
-   OpenAI-compatible surface supports text + structured output on all providers
-   and non-streaming tools on OpenAI/Azure/Databricks/Anthropic. For
-   full-fidelity tools/multimodal on Anthropic/Gemini, use the native endpoints
-   with the provider SDK; Bedrock has no gateway-native endpoint.
+   OpenAI-compatible surface supports text on all providers, structured output
+   where the selected model contract can enforce it, and non-streaming tools on
+   OpenAI/Azure/Databricks/Anthropic plus validated Bedrock Claude 3/Nova IDs.
+   Bedrock `json_schema` remains fail-closed pending a native per-model
+   capability matrix. For full-fidelity tools/multimodal on
+   Anthropic/Gemini, use the native endpoints with the provider SDK; Bedrock has
+   no gateway-native endpoint.
 
 ## Acceptance
 
@@ -162,7 +167,8 @@ are implemented.
   tests for the native router).
 - The OpenAI-compatible surface fails loudly for unsupported provider/feature
   combinations. Its bounded non-streaming Anthropic tool subset is supported;
-  Anthropic streaming tools and all Vertex/Bedrock translated tools remain 501.
+  the bounded Bedrock subset is supported; translated streaming tools, Vertex
+  tools and unsupported Bedrock choice/model combinations remain 501.
 
 ## Usage
 
