@@ -10,6 +10,7 @@ from load_test_settings import (
     LoadConfigurationError,
     LoadResponseError,
     LoadTestSettings,
+    evaluate_load_gate,
     is_sse_content_line,
     iter_bounded_lines,
     validate_sse_stream,
@@ -193,37 +194,30 @@ def enforce_service_levels(environment: Environment, **_: object) -> None:
     failure_ratio = primary.fail_ratio
     p95_ms = primary.get_response_time_percentile(0.95) or 0.0
 
-    failures: list[str] = []
-    if primary.num_requests == 0:
-        failures.append("no requests completed")
-    if successful_rps < SETTINGS.target_rps * SETTINGS.min_rps_ratio:
-        failures.append(
-            f"achieved {successful_rps:.1f} successful RPS,"
-            f" below {SETTINGS.min_rps_ratio:.0%} of target"
-        )
-    if failure_ratio > SETTINGS.max_failure_ratio:
-        failures.append(
-            f"failure ratio {failure_ratio:.3%} exceeds {SETTINGS.max_failure_ratio:.3%}"
-        )
-    if p95_ms > SETTINGS.max_p95_ms:
-        failures.append(f"p95 {p95_ms:.0f}ms exceeds {SETTINGS.max_p95_ms:.0f}ms")
-
     ttft_ms = 0.0
+    ttft_samples = 0
     if SETTINGS.mode == "chat-stream":
         ttft = STREAM_TTFT_STATS.get(TTFT_NAME, "SSE")
         ttft_ms = ttft.get_response_time_percentile(0.95) or 0.0
-        if primary.num_requests and ttft.num_requests == 0:
-            failures.append("successful stream completions have no TTFT samples")
-        if ttft_ms > SETTINGS.max_ttft_ms:
-            failures.append(f"TTFT p95 {ttft_ms:.0f}ms exceeds {SETTINGS.max_ttft_ms:.0f}ms")
+        ttft_samples = ttft.num_requests
 
-    outcome = "PASS" if not failures else "FAIL"
+    gate = evaluate_load_gate(
+        SETTINGS,
+        num_requests=primary.num_requests,
+        successful_rps=successful_rps,
+        failure_ratio=failure_ratio,
+        p95_ms=p95_ms,
+        ttft_samples=ttft_samples,
+        ttft_p95_ms=ttft_ms,
+    )
+
+    outcome = "PASS" if gate.passed else "FAIL"
     print(
         f"Load gate {outcome}: achieved={successful_rps:.1f} successful RPS"
         f" failures={failure_ratio:.3%} p95={p95_ms:.0f}ms"
         f" ttft_p95={ttft_ms:.0f}ms"
     )
-    if failures:
-        for failure in failures:
+    if gate.failures:
+        for failure in gate.failures:
             print(f"  - {failure}")
-        environment.process_exit_code = 1
+    environment.process_exit_code = 0 if gate.passed else 1

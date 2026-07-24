@@ -145,6 +145,17 @@ budget.
 The current local mock proved the bottleneck but was temporary. Make the
 experiment repeatable before changing production behavior.
 
+Implementation split:
+
+- **Benchmark contract (this first PR):** a tracked isolated Compose stack,
+  permanent deterministic mock, public-API fixture bootstrap, independent modes,
+  diagnostic/fail-fast policies, threshold-aligned exits, mode-specific latency
+  gates, allowlisted run metadata, and external gateway/mock CPU/RSS samples.
+- **Profiling instrumentation (next PR):** event-loop lag, DB-pool wait, Redis
+  timing and provider timing. These require production hot-path hooks and are
+  intentionally measured and reviewed with the profiler rather than mixed into
+  the zero-production-behavior benchmark PR.
+
 Tasks:
 
 - add a deterministic OpenAI-compatible mock for ordinary and SSE chat
@@ -160,8 +171,9 @@ Tasks:
 - add mode-specific p95 and TTFT limits;
 - compute concurrency from expected latency with documented headroom and verify
   the load generator is not saturated;
-- record completed RPS, status/cause failures, p50/p95/p99, streaming TTFT,
-  event-loop lag, gateway CPU/RSS, DB pool wait, Redis timing and provider timing;
+- record completed RPS, status/cause failures, p50/p95/p99, streaming TTFT and
+  gateway/mock CPU/RSS in the benchmark contract; add event-loop lag, DB pool
+  wait, Redis timing and provider timing with Phase 1 profiling instrumentation;
 - retain exact commit, image, worker count, CPU/memory limit, command and report
   location;
 - use at least 60 seconds of steady state for acceptance runs.
@@ -173,6 +185,35 @@ Phase 0 exit criteria:
 - a synthetic injected failure proves the configured threshold and exit code
   agree;
 - no real provider credential or benchmark model is needed.
+
+### Initial permanent-contract validation (24 July 2026)
+
+The first full diagnostic run of the permanent contract used the same three
+workers, 3 CPU / 4 GiB gateway limit, 50 ms mock total latency, 10-second ramp,
+5-second settle and 30-second steady window:
+
+| Mode | Offered | Permanent contract | Temporary baseline | Difference |
+|---|---:|---:|---:|---:|
+| non-streaming | 100 RPS | 99.89 RPS | 99.93 RPS | −0.0% |
+| non-streaming | 200 RPS | 161.74 RPS | 151.42 RPS | +6.8% |
+| non-streaming | 300 RPS | 161.88 RPS | 148.36 RPS | +9.1% |
+| streaming | 100 RPS | 100.06 RPS | 100.10 RPS | −0.0% |
+| streaming | 200 RPS | 144.91 RPS | 127.32 RPS | +13.8% |
+| streaming | 300 RPS | 148.32 RPS | 120.18 RPS | +23.4% |
+
+The first four comparisons satisfy ±10%; the two saturated streaming stages do
+not. The temporary mock source and exact SSE event shape were not retained, so
+its streaming numbers cannot safely become a frozen contract by tuning the new
+mock until they match. Trials with 4 and 10 chunks still produced approximately
+141–145 and 138 RPS respectively at saturation, confirming that chunk count
+alone does not explain the old result.
+
+Treat the table above as a candidate v1 baseline, not a completed Phase 0 exit.
+Before freezing it, run the exact permanent six-stage profile three times on the
+same host, retain the median, and require subsequent runs to remain within ±10%.
+The injected-failure contract is already verified: approximately 20% synthetic
+failures passed with a 25% limit and exited zero, then failed with a 15% limit
+and exited one. No provider credential or billable call was used.
 
 ## Phase 1 — Profile and fix provider-client lifecycle
 

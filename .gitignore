@@ -1,5 +1,6 @@
 .env
 .env.docker-dev
+.env.benchmark
 docker-compose.load.yml
 .docker-compose.load.tmp.*
 *.db

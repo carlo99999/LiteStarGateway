@@ -3,20 +3,28 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import math
 import os
 import subprocess
 import sys
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 from urllib.parse import urlsplit
 
+from load_artifacts import (
+    DockerStatsSampler,
+    build_safe_run_metadata,
+    git_metadata,
+    inspect_containers,
+)
 from load_test_settings import LoadConfigurationError, parse_progressive_targets
 
 ChatMode = Literal["chat", "chat-stream"]
+ProfilePolicy = Literal["fail-fast", "diagnostic"]
 PROFILE_MODES: tuple[ChatMode, ...] = ("chat", "chat-stream")
 
 
@@ -32,6 +40,63 @@ class ProviderBudget:
     @property
     def max_total_tokens(self) -> int:
         return self.max_input_tokens + self.max_output_tokens
+
+
+@dataclass(frozen=True)
+class StageOutcome:
+    """Result retained for every attempted mode/RPS stage."""
+
+    mode: ChatMode
+    target_rps: float
+    returncode: int
+
+
+def parse_profile_modes(raw: str) -> tuple[ChatMode, ...]:
+    """Parse an explicit ordered subset of the supported chat modes."""
+
+    parts = tuple(part.strip() for part in raw.split(","))
+    if (
+        not raw.strip()
+        or any(not part for part in parts)
+        or any(part not in PROFILE_MODES for part in parts)
+        or len(set(parts)) != len(parts)
+    ):
+        raise LoadConfigurationError(
+            "LOAD_MODES must be an ordered, unique list containing chat and/or chat-stream"
+        )
+    return cast(tuple[ChatMode, ...], parts)
+
+
+def parse_profile_policy(raw: str) -> ProfilePolicy:
+    """Validate whether a failed stage stops or merely marks a diagnostic run."""
+
+    policy = raw.strip().lower()
+    if policy not in {"fail-fast", "diagnostic"}:
+        raise LoadConfigurationError("LOAD_PROFILE_POLICY must be 'fail-fast' or 'diagnostic'")
+    return cast(ProfilePolicy, policy)
+
+
+def execute_stages(
+    *,
+    modes: tuple[ChatMode, ...],
+    targets: tuple[float, ...],
+    policy: ProfilePolicy,
+    run_stage: Callable[[ChatMode, float], int],
+) -> tuple[StageOutcome, ...]:
+    """Execute the profile according to the selected failure policy."""
+
+    outcomes: list[StageOutcome] = []
+    for mode in modes:
+        for target in targets:
+            outcome = StageOutcome(
+                mode=mode,
+                target_rps=target,
+                returncode=run_stage(mode, target),
+            )
+            outcomes.append(outcome)
+            if outcome.returncode and policy == "fail-fast":
+                return tuple(outcomes)
+    return tuple(outcomes)
 
 
 def _positive_number(environment: Mapping[str, str], name: str, default: str) -> float:
@@ -67,6 +132,25 @@ def _positive_integer(environment: Mapping[str, str], name: str, default: str) -
     return value
 
 
+def parse_resource_containers(raw: str) -> dict[str, str]:
+    """Parse role-to-container names used only for Docker resource sampling."""
+
+    if not raw.strip():
+        return {}
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise LoadConfigurationError("LOAD_RESOURCE_CONTAINERS must be a JSON object") from exc
+    if not isinstance(value, dict) or any(
+        not isinstance(role, str) or not role or not isinstance(container, str) or not container
+        for role, container in value.items()
+    ):
+        raise LoadConfigurationError(
+            "LOAD_RESOURCE_CONTAINERS must map non-empty roles to container names"
+        )
+    return dict(value)
+
+
 def validate_load_host(raw: str) -> str:
     """Require HTTPS except for an explicit loopback benchmark target."""
 
@@ -95,6 +179,7 @@ def validate_load_host(raw: str) -> str:
 def estimate_provider_budget(
     *,
     targets: tuple[float, ...],
+    modes: tuple[ChatMode, ...],
     duration_seconds: float,
     ramp_seconds: float,
     settle_seconds: float,
@@ -108,11 +193,15 @@ def estimate_provider_budget(
     """Bound calls as if every stage ran at full target for its entire window."""
 
     seconds_per_stage = duration_seconds + ramp_seconds + settle_seconds
-    paced_requests = math.ceil(sum(targets) * seconds_per_stage * len(PROFILE_MODES))
+    paced_requests = math.ceil(sum(targets) * seconds_per_stage * len(modes))
+    expected_latencies = {
+        "chat": chat_expected_latency_seconds,
+        "chat-stream": stream_expected_latency_seconds,
+    }
     initial_user_burst = sum(
-        math.ceil(target * latency * user_headroom)
+        math.ceil(target * expected_latencies[mode] * user_headroom)
         for target in targets
-        for latency in (chat_expected_latency_seconds, stream_expected_latency_seconds)
+        for mode in modes
     )
     gateway_requests = paced_requests + initial_user_burst
     provider_attempts = gateway_requests * max_attempts
@@ -179,6 +268,13 @@ def build_stage_environment(
     )
     if latency_override in environment:
         stage["LOAD_EXPECTED_LATENCY_SECONDS"] = environment[latency_override]
+    p95_override = "LOAD_STREAM_MAX_P95_MS" if mode == "chat-stream" else "LOAD_CHAT_MAX_P95_MS"
+    if p95_override in environment:
+        stage["LOAD_MAX_P95_MS"] = environment[p95_override]
+    if mode == "chat-stream" and "LOAD_STREAM_MAX_TTFT_MS" in environment:
+        stage["LOAD_MAX_TTFT_MS"] = environment["LOAD_STREAM_MAX_TTFT_MS"]
+    if mode == "chat":
+        stage.pop("LOAD_MAX_TTFT_MS", None)
     return stage
 
 
@@ -201,6 +297,8 @@ def main() -> int:
         targets = parse_progressive_targets(
             environment.get("LOAD_STAGES", "25,50,100,150,200,250,300")
         )
+        modes = parse_profile_modes(environment.get("LOAD_MODES", "chat,chat-stream"))
+        policy = parse_profile_policy(environment.get("LOAD_PROFILE_POLICY", "fail-fast"))
         duration = _positive_number(environment, "LOAD_DURATION_SECONDS", "60")
         ramp = _nonnegative_number(environment, "LOAD_RAMP_SECONDS", "10")
         settle = _nonnegative_number(environment, "LOAD_SETTLE_SECONDS", "5")
@@ -233,12 +331,16 @@ def main() -> int:
             "100000000",
         )
         host = validate_load_host(environment.get("LOAD_HOST", "http://127.0.0.1:8000"))
+        resource_containers = parse_resource_containers(
+            environment.get("LOAD_RESOURCE_CONTAINERS", "")
+        )
     except LoadConfigurationError as exc:
         print(f"load-test configuration error: {exc}", file=sys.stderr)
         return 2
 
     budget = estimate_provider_budget(
         targets=targets,
+        modes=modes,
         duration_seconds=duration,
         ramp_seconds=ramp,
         settle_seconds=settle,
@@ -268,6 +370,34 @@ def main() -> int:
 
     run_directory = Path("load-results") / time.strftime("%Y%m%d-%H%M%S")
     run_directory.mkdir(parents=True, exist_ok=False)
+    commands = tuple(
+        tuple(
+            build_locust_command(
+                output_directory=run_directory,
+                mode=mode,
+                target_rps=target,
+                host=host,
+            )
+        )
+        for mode in modes
+        for target in targets
+    )
+    commit, dirty = git_metadata()
+    metadata = build_safe_run_metadata(
+        environment,
+        commit=commit,
+        dirty=dirty,
+        containers=inspect_containers(resource_containers),
+        report_directory=str(run_directory),
+        commands=commands,
+    )
+    with (run_directory / "metadata.json").open("w", encoding="utf-8") as output:
+        json.dump(metadata, output, indent=2, sort_keys=True)
+        output.write("\n")
+    sampler = DockerStatsSampler(
+        containers=resource_containers,
+        destination=run_directory / "resources.jsonl",
+    )
     print(
         f"Provider safety bounds: <= {budget.gateway_request_count} gateway requests,"
         f" <= {budget.provider_attempt_count} provider attempts,"
@@ -275,27 +405,40 @@ def main() -> int:
         flush=True,
     )
 
-    for mode in PROFILE_MODES:
-        for target in targets:
-            print(f"\n=== {mode}: {target:g} RPS ===", flush=True)
-            command = build_locust_command(
-                output_directory=run_directory,
-                mode=mode,
-                target_rps=target,
-                host=host,
-            )
-            stage_environment = build_stage_environment(
-                environment,
-                mode=mode,
-                target_rps=target,
-            )
-            completed = subprocess.run(command, env=stage_environment, check=False)
-            if completed.returncode:
-                print(
-                    f"Profile stopped at the first failed stage: {mode} {target:g} RPS",
-                    file=sys.stderr,
-                )
-                return completed.returncode
+    def run_stage(mode: ChatMode, target: float) -> int:
+        print(f"\n=== {mode}: {target:g} RPS ===", flush=True)
+        command = build_locust_command(
+            output_directory=run_directory,
+            mode=mode,
+            target_rps=target,
+            host=host,
+        )
+        stage_environment = build_stage_environment(
+            environment,
+            mode=mode,
+            target_rps=target,
+        )
+        return subprocess.run(command, env=stage_environment, check=False).returncode
+
+    sampler.start()
+    try:
+        outcomes = execute_stages(
+            modes=modes,
+            targets=targets,
+            policy=policy,
+            run_stage=run_stage,
+        )
+    finally:
+        sampler.stop()
+    failed = tuple(outcome for outcome in outcomes if outcome.returncode)
+    if failed:
+        first = failed[0]
+        print(
+            f"Profile failed in {len(failed)} stage(s); first:"
+            f" {first.mode} {first.target_rps:g} RPS",
+            file=sys.stderr,
+        )
+        return first.returncode
 
     print(f"\nAll progressive stages passed. Reports: {run_directory}")
     return 0

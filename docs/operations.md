@@ -74,8 +74,60 @@ See [observability](observability.md).
 
 ## Capacity checks
 
-Run load tests against the production image, never the reload-enabled development
-backend. The load script stops the development stack, generates the ignored
+Use the deterministic contract for gateway changes. It builds the production
+image with the UI, starts an isolated tmpfs Postgres, Redis, and a private
+OpenAI-compatible mock, bootstraps the model through the public management API,
+then destroys the stack and its data:
+
+```bash
+just load-contract
+```
+
+No provider credential, existing model, billable call, or development database
+is involved. Private bootstrap secrets live in the ignored `.env.benchmark`
+file with mode `0600`; the generated team API key stays in process memory and
+is neither printed nor written to reports.
+
+The default contract runs independent complete-response and SSE stages at 25,
+50, 100, 150, 200, 250, and 300 completed RPS. Each stage has 10 seconds of
+ramp, 5 seconds of settle, and 60 seconds of measured steady state. It sizes
+concurrency for one-second chat and three-second stream latency plus 25%
+headroom, so the load generator does not become the bottleneck when the gateway
+queues. Select one mode or collect every requested stage after failures with:
+
+```bash
+LOAD_MODES=chat just load-contract
+LOAD_MODES=chat-stream LOAD_PROFILE_POLICY=diagnostic just load-contract
+```
+
+`fail-fast` is the acceptance default; `diagnostic` continues but still exits
+non-zero if any stage misses its gate. Mode-specific limits are
+`LOAD_CHAT_MAX_P95_MS`, `LOAD_STREAM_MAX_P95_MS`, and
+`LOAD_STREAM_MAX_TTFT_MS` (defaults: 500 ms, 750 ms, and 750 ms). A failure ratio exactly at
+`LOAD_MAX_FAILURE_RATIO` passes; only a value above it fails. This explicit gate
+overrides Locust's default any-failure exit behavior.
+
+The mock accepts `LOAD_MOCK_TTFT_MS`, `LOAD_MOCK_CHUNK_INTERVAL_MS`,
+`LOAD_MOCK_TOTAL_LATENCY_MS`, and `LOAD_MOCK_CHUNK_COUNT`. It can inject every
+Nth upstream failure deterministically. For example, this run should fail a 4%
+threshold because every twentieth upstream request fails:
+
+```bash
+LOAD_MODES=chat LOAD_STAGES=25 \
+LOAD_DURATION_SECONDS=60 LOAD_MOCK_FAILURE_EVERY=20 \
+LOAD_MAX_FAILURE_RATIO=0.04 just load-contract
+```
+
+Every run writes ignored CSV/HTML results plus `metadata.json` and
+`resources.jsonl` under `load-results/<timestamp>/`. Metadata is allowlisted and
+includes the commit, dirty bit, selected contract, worker count, container image
+IDs and CPU/memory limits. Resource samples contain gateway and mock CPU/RSS.
+Internal event-loop, DB-pool, Redis and provider timing belongs to the profiling
+instrumentation phase because adding it changes the production hot path.
+
+Use the live-provider profile only to measure the real upstream/network path.
+Run it against the production image, never the reload-enabled development
+backend. The live script stops the development stack, generates the ignored
 Compose overlay, and starts the production image against the existing
 development Postgres volume:
 
@@ -95,7 +147,9 @@ just load-300
 responses and then for SSE streaming responses. Each stage ramps for 10 seconds,
 settles for 5 seconds, measures a 60-second steady window, and writes its own
 ignored CSV/HTML report under a timestamped `load-results/` directory. The
-profile stops at the first failed stage.
+profile stops at the first failed stage unless
+`LOAD_PROFILE_POLICY=diagnostic` is selected. Use `LOAD_MODES=chat` or
+`LOAD_MODES=chat-stream` to run one path.
 
 The explicit confirmation is required because the default profile can make more
 than one hundred thousand billable provider calls. Check upstream quotas and
@@ -125,9 +179,10 @@ streams. Override `LOAD_CHAT_EXPECTED_LATENCY_SECONDS` and
 `LOAD_STREAM_EXPECTED_LATENCY_SECONDS` after measuring the provider. For
 example, 300 RPS at one second uses 375 users; at five seconds it uses 1,875.
 The process exits non-zero when successful completed RPS falls below 98% of the
-stage target, failures exceed 0.1%, end-to-end p95 exceeds
-`LOAD_MAX_P95_MS`, or streaming TTFT p95 exceeds `LOAD_MAX_TTFT_MS`. A streaming
-response counts exactly once and only after a valid `[DONE]` marker.
+stage target, failures exceed 0.1%, end-to-end p95 exceeds the selected
+`LOAD_CHAT_MAX_P95_MS` or `LOAD_STREAM_MAX_P95_MS`, or streaming TTFT p95
+exceeds `LOAD_STREAM_MAX_TTFT_MS`. A streaming response counts exactly once and
+only after a valid `[DONE]` marker.
 
 This is a closed-loop capacity gate: enough Locust users are allocated to
 approximate the requested completion rate, but it is not a strict open-loop

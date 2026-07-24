@@ -29,6 +29,17 @@ class StreamSummary:
     content_chunk_count: int
 
 
+@dataclass(frozen=True)
+class LoadGateResult:
+    """Deterministic outcome of one load-test service-level gate."""
+
+    failures: tuple[str, ...]
+
+    @property
+    def passed(self) -> bool:
+        return not self.failures
+
+
 def _decode_stream_data(value: StreamData) -> str:
     if isinstance(value, str):
         return value
@@ -298,3 +309,37 @@ class LoadTestSettings:
             max_tokens=max_tokens,
             max_stream_bytes=max_stream_bytes,
         )
+
+
+def evaluate_load_gate(
+    settings: LoadTestSettings,
+    *,
+    num_requests: int,
+    successful_rps: float,
+    failure_ratio: float,
+    p95_ms: float,
+    ttft_samples: int = 0,
+    ttft_p95_ms: float = 0.0,
+) -> LoadGateResult:
+    """Evaluate measured metrics without inheriting Locust's any-failure exit policy."""
+
+    failures: list[str] = []
+    if num_requests == 0:
+        failures.append("no requests completed")
+    if successful_rps < settings.target_rps * settings.min_rps_ratio:
+        failures.append(
+            f"achieved {successful_rps:.1f} successful RPS,"
+            f" below {settings.min_rps_ratio:.0%} of target"
+        )
+    if failure_ratio > settings.max_failure_ratio:
+        failures.append(
+            f"failure ratio {failure_ratio:.3%} exceeds {settings.max_failure_ratio:.3%}"
+        )
+    if p95_ms > settings.max_p95_ms:
+        failures.append(f"p95 {p95_ms:.0f}ms exceeds {settings.max_p95_ms:.0f}ms")
+    if settings.mode == "chat-stream":
+        if num_requests and ttft_samples == 0:
+            failures.append("successful stream completions have no TTFT samples")
+        if ttft_p95_ms > settings.max_ttft_ms:
+            failures.append(f"TTFT p95 {ttft_p95_ms:.0f}ms exceeds {settings.max_ttft_ms:.0f}ms")
+    return LoadGateResult(failures=tuple(failures))
