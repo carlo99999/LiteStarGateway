@@ -13,13 +13,77 @@ run_load_profile = importlib.import_module("run_load_profile")
 LoadConfigurationError = load_test_settings.LoadConfigurationError
 LoadResponseError = load_test_settings.LoadResponseError
 LoadTestSettings = load_test_settings.LoadTestSettings
+evaluate_load_gate = load_test_settings.evaluate_load_gate
 parse_progressive_targets = load_test_settings.parse_progressive_targets
 validate_sse_stream = load_test_settings.validate_sse_stream
 build_locust_command = run_load_profile.build_locust_command
 build_stage_environment = run_load_profile.build_stage_environment
 estimate_provider_budget = run_load_profile.estimate_provider_budget
+execute_stages = run_load_profile.execute_stages
+parse_profile_modes = run_load_profile.parse_profile_modes
+parse_profile_policy = run_load_profile.parse_profile_policy
 validate_load_host = run_load_profile.validate_load_host
 FAKE_API_KEY = "not-a-real-load-test-key"  # pragma: allowlist secret
+
+
+def _gate_settings(mode: str = "chat") -> LoadTestSettings:
+    return LoadTestSettings.from_environment(
+        {
+            "LOAD_MODE": mode,
+            "LOAD_API_KEY": FAKE_API_KEY,
+            "LOAD_MODEL": "configured-model",
+            "LOAD_TARGET_RPS": "100",
+            "LOAD_MAX_FAILURE_RATIO": "0.01",
+            "LOAD_MIN_RPS_RATIO": "0.95",
+            "LOAD_MAX_P95_MS": "500",
+            "LOAD_MAX_TTFT_MS": "250",
+        }
+    )
+
+
+def test_load_gate_accepts_metrics_exactly_on_configured_thresholds() -> None:
+    result = evaluate_load_gate(
+        _gate_settings("chat-stream"),
+        num_requests=100,
+        successful_rps=95,
+        failure_ratio=0.01,
+        p95_ms=500,
+        ttft_samples=99,
+        ttft_p95_ms=250,
+    )
+
+    assert result.passed
+    assert result.failures == ()
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"successful_rps": 94.9}, "below"),
+        ({"failure_ratio": 0.0101}, "failure ratio"),
+        ({"p95_ms": 501}, "p95"),
+        ({"ttft_p95_ms": 251}, "TTFT"),
+        ({"ttft_samples": 0}, "no TTFT"),
+    ],
+)
+def test_load_gate_rejects_metrics_beyond_thresholds(
+    overrides: dict[str, float | int],
+    message: str,
+) -> None:
+    metrics: dict[str, float | int] = {
+        "num_requests": 100,
+        "successful_rps": 95,
+        "failure_ratio": 0.01,
+        "p95_ms": 500,
+        "ttft_samples": 99,
+        "ttft_p95_ms": 250,
+    }
+    metrics.update(overrides)
+
+    result = evaluate_load_gate(_gate_settings("chat-stream"), **metrics)
+
+    assert not result.passed
+    assert any(message in failure for failure in result.failures)
 
 
 def test_chat_settings_size_users_from_rps_latency_and_headroom() -> None:
@@ -205,6 +269,9 @@ def test_stage_environment_is_new_and_selects_mode_and_target() -> None:
     original = {
         "LOAD_API_KEY": FAKE_API_KEY,
         "LOAD_MODEL": "configured-model",
+        "LOAD_CHAT_MAX_P95_MS": "500",
+        "LOAD_STREAM_MAX_P95_MS": "750",
+        "LOAD_STREAM_MAX_TTFT_MS": "250",
     }
 
     stage = build_stage_environment(original, mode="chat-stream", target_rps=150)
@@ -214,6 +281,71 @@ def test_stage_environment_is_new_and_selects_mode_and_target() -> None:
     assert stage["LOAD_MODE"] == "chat-stream"
     assert stage["LOAD_TARGET_RPS"] == "150"
     assert stage["LOAD_API_KEY"] == FAKE_API_KEY
+    assert stage["LOAD_MAX_P95_MS"] == "750"
+    assert stage["LOAD_MAX_TTFT_MS"] == "250"
+
+    chat_stage = build_stage_environment(original, mode="chat", target_rps=100)
+    assert chat_stage["LOAD_MAX_P95_MS"] == "500"
+    assert "LOAD_MAX_TTFT_MS" not in chat_stage
+
+
+def test_profile_modes_are_explicit_ordered_and_unique() -> None:
+    assert parse_profile_modes("chat-stream") == ("chat-stream",)
+    assert parse_profile_modes("chat, chat-stream") == ("chat", "chat-stream")
+
+    for invalid in ("", "readiness", "chat,chat", "chat,"):
+        with pytest.raises(LoadConfigurationError):
+            parse_profile_modes(invalid)
+
+
+def test_profile_policy_is_validated() -> None:
+    assert parse_profile_policy("fail-fast") == "fail-fast"
+    assert parse_profile_policy("diagnostic") == "diagnostic"
+
+    with pytest.raises(LoadConfigurationError):
+        parse_profile_policy("continue-maybe")
+
+
+def test_diagnostic_policy_runs_every_stage_but_preserves_failure() -> None:
+    seen: list[tuple[str, float]] = []
+
+    def run_stage(mode: str, target: float) -> int:
+        seen.append((mode, target))
+        return 1 if target == 100 else 0
+
+    outcomes = execute_stages(
+        modes=("chat", "chat-stream"),
+        targets=(100.0, 200.0),
+        policy="diagnostic",
+        run_stage=run_stage,
+    )
+
+    assert seen == [
+        ("chat", 100.0),
+        ("chat", 200.0),
+        ("chat-stream", 100.0),
+        ("chat-stream", 200.0),
+    ]
+    assert [outcome.returncode for outcome in outcomes] == [1, 0, 1, 0]
+
+
+def test_fail_fast_policy_stops_after_first_failed_stage() -> None:
+    seen: list[tuple[str, float]] = []
+
+    def run_stage(mode: str, target: float) -> int:
+        seen.append((mode, target))
+        return 1
+
+    outcomes = execute_stages(
+        modes=("chat", "chat-stream"),
+        targets=(100.0, 200.0),
+        policy="fail-fast",
+        run_stage=run_stage,
+    )
+
+    assert seen == [("chat", 100.0)]
+    assert len(outcomes) == 1
+    assert outcomes[0].returncode == 1
 
 
 @pytest.mark.parametrize(
@@ -245,6 +377,7 @@ def test_load_host_rejects_secret_leak_prone_targets(raw: str) -> None:
 def test_provider_budget_is_a_conservative_upper_bound() -> None:
     budget = estimate_provider_budget(
         targets=(25.0, 50.0, 100.0),
+        modes=("chat", "chat-stream"),
         duration_seconds=60,
         ramp_seconds=10,
         settle_seconds=5,
@@ -265,3 +398,34 @@ def test_provider_budget_is_a_conservative_upper_bound() -> None:
     assert budget.max_input_tokens >= budget.provider_attempt_count * len("OK")
     assert budget.max_output_tokens == budget.provider_attempt_count * 8
     assert budget.max_total_tokens == budget.max_input_tokens + budget.max_output_tokens
+
+
+def test_provider_budget_honors_a_single_selected_mode() -> None:
+    both = estimate_provider_budget(
+        targets=(100.0,),
+        modes=("chat", "chat-stream"),
+        duration_seconds=10,
+        ramp_seconds=0,
+        settle_seconds=0,
+        max_tokens=8,
+        prompt="OK",
+        max_attempts=1,
+        chat_expected_latency_seconds=1,
+        stream_expected_latency_seconds=3,
+        user_headroom=1.25,
+    )
+    chat_only = estimate_provider_budget(
+        targets=(100.0,),
+        modes=("chat",),
+        duration_seconds=10,
+        ramp_seconds=0,
+        settle_seconds=0,
+        max_tokens=8,
+        prompt="OK",
+        max_attempts=1,
+        chat_expected_latency_seconds=1,
+        stream_expected_latency_seconds=3,
+        user_headroom=1.25,
+    )
+
+    assert chat_only.gateway_request_count < both.gateway_request_count

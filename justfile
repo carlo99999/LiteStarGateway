@@ -190,6 +190,18 @@ load-prod-up:
 load-prod-down:
     ./scripts/load-compose.sh down
 
+# Deterministic, isolated contract: ephemeral Postgres, Redis, the production
+# gateway image, and a private OpenAI-compatible mock. No provider key or dev
+# database is used.
+load-contract-up:
+    ./scripts/benchmark-compose.sh up
+
+load-contract-down:
+    ./scripts/benchmark-compose.sh down
+
+load-contract:
+    ./scripts/benchmark-compose.sh run
+
 _load-deps:
     env -u LOAD_API_KEY -u LOAD_MODEL uv sync --locked --group load
 
@@ -203,8 +215,8 @@ load-smoke: _load-deps
       --headless --host http://127.0.0.1:8000 \
       --csv load-results/readiness --html load-results/readiness.html
 
-# Progressive authenticated gates for complete responses and SSE streams. Each
-# stage gets an independent report and the profile stops at the first failure.
+# Progressive authenticated live-provider gates. LOAD_MODES selects chat and/or
+# chat-stream; LOAD_PROFILE_POLICY selects fail-fast (default) or diagnostic.
 load-300: _load-deps
     #!/usr/bin/env bash
     set -euo pipefail
@@ -222,8 +234,9 @@ load-300: _load-deps
       LOAD_RAMP_SECONDS="${LOAD_RAMP_SECONDS:-10}" \
       LOAD_SETTLE_SECONDS="${LOAD_SETTLE_SECONDS:-5}" \
       LOAD_MIN_RPS_RATIO="${LOAD_MIN_RPS_RATIO:-0.98}" \
-      LOAD_MAX_P95_MS="${LOAD_MAX_P95_MS:-30000}" \
-      LOAD_MAX_TTFT_MS="${LOAD_MAX_TTFT_MS:-10000}" \
+      LOAD_CHAT_MAX_P95_MS="${LOAD_CHAT_MAX_P95_MS:-30000}" \
+      LOAD_STREAM_MAX_P95_MS="${LOAD_STREAM_MAX_P95_MS:-30000}" \
+      LOAD_STREAM_MAX_TTFT_MS="${LOAD_STREAM_MAX_TTFT_MS:-10000}" \
       uv run --locked --no-sync --group load python scripts/run_load_profile.py
 
 # ── Documentation ─────────────────────────────────────────────────────────────
