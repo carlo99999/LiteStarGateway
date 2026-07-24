@@ -15,10 +15,11 @@ server), which is not a production setup.
 - **Dockerfile** (multi-stage): build stage installs deps with `uv` from
   `uv.lock` (reproducible); slim runtime stage copies the venv + source. Non-root
   user. `.dockerignore` to keep the image lean.
-- **ASGI server**: run under **uvicorn** with one worker per container,
+- **ASGI server**: run under **uvicorn** with a configurable worker count
+  (`UVICORN_WORKERS`, default 1),
   `--proxy-headers`, `--forwarded-allow-ips` so the real client IP reaches the
-  app — **required** for the per-IP rate limiting to be meaningful. Scale with
-  replicas rather than adding workers to the same container.
+  app — **required** for the per-IP rate limiting to be meaningful. Multi-worker
+  and multi-replica deployments use Redis for shared limits.
 - **TLS**: terminate at a reverse proxy / ingress; document that the app expects
   to sit behind one.
 - **Config**: all via env (already the case). Document required vars
@@ -31,9 +32,10 @@ server), which is not a production setup.
   (app + Postgres) for local prod-like runs.
 - **Admin UI**: build the React application in a dedicated image stage and copy
   its static output into the runtime image; the app serves it at `/ui`.
-- **Resource baseline**: reserve and limit each one-worker app container to
-  1 CPU and 4 GiB, matching
-  [LiteLLM's published production baseline](https://docs.litellm.ai/docs/proxy/prod#machine-specifications).
+- **Resource baseline**: the local production-like Compose profile reserves and
+  limits the app container to 3 CPU and 4 GiB. Its load overlay runs three
+  workers; the base production configuration keeps the conservative one-worker
+  default until explicitly overridden.
 - **Observability**: do not bundle an MLflow server. `MLFLOW_TRACKING_URI`
   remains an optional pointer to an externally operated service; empty disables
   MLflow.
@@ -59,8 +61,8 @@ state is global.
    `REDIS_URL` (needed for multi-worker rate limiting; falls back to in-memory
    when unset).
 5. **Production Compose**: app + Postgres + Redis, without reload or MLflow.
-   The same app container serves the pre-built UI and has a 1 CPU / 4 GiB
-   reservation and limit.
+   The same app container serves the pre-built UI and has a 3 CPU / 4 GiB
+   reservation and limit. `UVICORN_WORKERS` controls process-level parallelism.
 
 ## 5. Rollout
 

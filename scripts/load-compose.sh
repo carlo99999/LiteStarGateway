@@ -27,6 +27,7 @@ create_overlay() {
     echo "    environment:"
     echo '      INFERENCE_RATE_LIMIT_RPM: ${INFERENCE_RATE_LIMIT_RPM:-36000}'
     echo '      MAX_RETRIES: ${MAX_RETRIES:-0}'
+    echo '      UVICORN_WORKERS: ${UVICORN_WORKERS:-3}'
     echo "volumes:"
     echo "  dev-pg-data:"
     echo "    external: true"

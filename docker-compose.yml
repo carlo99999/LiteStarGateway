@@ -51,16 +51,18 @@ services:
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
       # Shared rate-limit store (drop this line to fall back to in-memory).
       REDIS_URL: redis://redis:6379
-    # Match LiteLLM's published production baseline for one worker. The admin UI
-    # is pre-built static content served by this same process, so it needs no
-    # separate frontend allocation.
+      # One worker remains the safe production default. The local load overlay
+      # sets this to three to exercise all three allocated CPU cores.
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-1}
+    # Three-worker benchmark footprint. The admin UI is pre-built static content
+    # served by this same service, so it needs no separate frontend allocation.
     deploy:
       resources:
         limits:
-          cpus: "1"
+          cpus: "3"
           memory: 4G
         reservations:
-          cpus: "1"
+          cpus: "3"
           memory: 4G
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
