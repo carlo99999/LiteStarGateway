@@ -26,6 +26,7 @@ def _config() -> dict[str, Any]:
             "MASTER_KEY": "benchmark-master-key",  # pragma: allowlist secret
             "JWT_SECRET": "benchmark-jwt-secret",  # pragma: allowlist secret
             "SALT_KEY": "benchmark-salt-key",  # pragma: allowlist secret
+            "ADMIN_EMAIL": "benchmark-admin@example.invalid",
         },
         capture_output=True,
         check=False,
