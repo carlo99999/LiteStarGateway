@@ -154,9 +154,11 @@ profile without tracking the machine-local file. `just load-prod-up` stops the
 development stack first; never start it again while the load stack is using the
 same volume. Stop the load stack with `just load-prod-down`. Results include the
 real provider, network, quota, and current development data; they measure the
-end-to-end setup, not the gateway in isolation. The 1 CPU / 4 GiB cap applies
-to the application container; Postgres, Redis, the provider, and the Locust
-process are outside that budget.
+end-to-end setup, not the gateway in isolation. The ignored overlay runs three
+Uvicorn workers under the application's 3 CPU / 4 GiB cap; Postgres, Redis, the
+provider, and the Locust process are outside that budget. Override
+`UVICORN_WORKERS` to compare one, two, and three processes without changing the
+image.
 
 The gateway keeps the pre-auth inference guard at 120 RPM per IP by default.
 An isolated load profile can explicitly raise `INFERENCE_RATE_LIMIT_RPM`; do not
@@ -164,6 +166,12 @@ raise it on an Internet-facing deployment unless a trusted ingress supplies the
 equivalent flood protection.
 
 ## Multi-process / replicas
+
+The production container accepts `UVICORN_WORKERS` from 1 through 32 and
+defaults to 1. Each worker is a separate process with its own event loop,
+provider clients, memory and Postgres pool; size `DB_POOL_SIZE` and
+`DB_MAX_OVERFLOW` against the total worker count. The local load profile defaults
+to 3 workers so its three CPU cores can execute Python work concurrently.
 
 Set `REDIS_URL` to back the rate-limit store with a shared Redis so limits hold
 across workers/replicas (the compose stack includes a `redis` service and sets

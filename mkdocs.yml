@@ -110,6 +110,7 @@ nav:
           - 11 · Platform quality gates: plans/11-platform-quality-gates.md
           - 12 · Routing evolution: plans/12-routing-evolution.md
           - 13 · Billing integrity: plans/13-billing-integrity.md
+          - 14 · Gateway throughput: plans/14-hot-path-throughput.md
       - Design proposals:
           - Response caching: docs/next-steps/response-caching.md
           - Cross-provider failover: docs/next-steps/cross-provider-failover.md

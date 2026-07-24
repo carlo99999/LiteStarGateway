@@ -17,6 +17,7 @@ COMPOSE_FILE = ROOT / "docker-compose.dev.yml"
 DEV_DOCKERFILE = ROOT / "Dockerfile.dev"
 PROD_COMPOSE_FILE = ROOT / "docker-compose.yml"
 PROD_DOCKERFILE = ROOT / "Dockerfile"
+PROD_ENTRYPOINT = ROOT / "docker-entrypoint.sh"
 
 
 def _compose_config(
@@ -164,9 +165,10 @@ def test_prod_compose_keeps_the_ui_without_bundling_mlflow() -> None:
     assert app["build"]["target"] == "runtime"
     assert set(app["depends_on"]) == {"db", "redis"}
     assert app["environment"]["MLFLOW_TRACKING_URI"] == ""
+    assert app["environment"]["UVICORN_WORKERS"] == "1"
     assert app["deploy"]["resources"] == {
-        "limits": {"cpus": 1, "memory": str(4 * 1024**3)},
-        "reservations": {"cpus": 1, "memory": str(4 * 1024**3)},
+        "limits": {"cpus": 3, "memory": str(4 * 1024**3)},
+        "reservations": {"cpus": 3, "memory": str(4 * 1024**3)},
     }
     external_mlflow = _compose_config(
         PROD_COMPOSE_FILE,
@@ -176,6 +178,8 @@ def test_prod_compose_keeps_the_ui_without_bundling_mlflow() -> None:
         external_mlflow["services"]["app"]["environment"]["MLFLOW_TRACKING_URI"]
         == "https://mlflow.example.com"
     )
+    three_workers = _compose_config(PROD_COMPOSE_FILE, {"UVICORN_WORKERS": "3"})
+    assert three_workers["services"]["app"]["environment"]["UVICORN_WORKERS"] == "3"
     assert "/health/ready" in " ".join(app["healthcheck"]["test"])
     assert app["ports"] == [
         {
@@ -305,9 +309,57 @@ def test_load_script_generates_the_ignored_prod_overlay() -> None:
     assert "litestar-gateway-dev_pg-dev-data" in launcher
     assert "INFERENCE_RATE_LIMIT_RPM" in launcher
     assert "MAX_RETRIES" in launcher
+    assert "UVICORN_WORKERS" in launcher
     assert '"$ROOT/scripts/dev-compose.sh" down' in launcher
     assert "load-prod-up:" in justfile
     assert "./scripts/load-compose.sh up" in justfile
+
+
+def _run_prod_entrypoint(tmp_path: Path, workers: str | None) -> subprocess.CompletedProcess[str]:
+    fake_uvicorn = tmp_path / "uvicorn"
+    fake_uvicorn.write_text(
+        "#!/bin/sh\nprintf '%s\\n' \"$@\"\n",
+        encoding="utf-8",
+    )
+    fake_uvicorn.chmod(0o700)
+    environment = {
+        **os.environ,
+        "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
+        "MIGRATE_ON_START": "false",
+    }
+    if workers is not None:
+        environment["UVICORN_WORKERS"] = workers
+    else:
+        environment.pop("UVICORN_WORKERS", None)
+    return subprocess.run(
+        ["sh", str(PROD_ENTRYPOINT)],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+
+@pytest.mark.parametrize(("workers", "expected"), [(None, "1"), ("3", "3")])
+def test_prod_entrypoint_passes_valid_worker_count(
+    tmp_path: Path, workers: str | None, expected: str
+) -> None:
+    result = _run_prod_entrypoint(tmp_path, workers)
+
+    assert result.returncode == 0, result.stderr
+    arguments = result.stdout.splitlines()
+    workers_index = arguments.index("--workers")
+    assert arguments[workers_index + 1] == expected
+
+
+@pytest.mark.parametrize("workers", ["", "0", "-1", "three", "33"])
+def test_prod_entrypoint_rejects_invalid_worker_count(tmp_path: Path, workers: str) -> None:
+    result = _run_prod_entrypoint(tmp_path, workers)
+
+    assert result.returncode != 0
+    assert "UVICORN_WORKERS must be an integer from 1 to 32" in result.stderr
+    assert result.stdout == ""
 
 
 def test_dev_script_rejects_symlinked_secret_file(tmp_path: Path) -> None:

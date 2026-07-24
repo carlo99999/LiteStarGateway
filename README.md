@@ -176,8 +176,9 @@ See `.env.sample`. Key env vars: `DATABASE_URL` (Postgres in production),
 `ADMIN_EMAIL` + `MASTER_KEY` (bootstrap admin), `JWT_SECRET` (token signing),
 `SALT_KEY` (credential encryption at rest), `ENVIRONMENT` (`production`
 enables startup config checks), `REDIS_URL` (shared rate limits + rotation
-lock for replicas), `MLFLOW_TRACKING_URI` (tracing), `MAX_BODY_SIZE` (request
-body cap, default 10 MB). Details in the [operations guide](docs/operations.md).
+lock for replicas), `UVICORN_WORKERS` (production process count, default 1),
+`MLFLOW_TRACKING_URI` (tracing), `MAX_BODY_SIZE` (request body cap, default
+10 MB). Details in the [operations guide](docs/operations.md).
 
 ```bash
 uv run litestar --app litestar_gateway.app:app run   # dev server

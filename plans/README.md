@@ -42,22 +42,27 @@ It is deliberately separate from `docs/next-steps/`:
 | 11 | [Platform quality gates](11-platform-quality-gates.md) | ⏳ planned, not started | Request correlation, drift gates, browser E2E, dependency safety |
 | 12 | [Routing evolution](12-routing-evolution.md) | ⏳ designed, not started | Capability discovery, shadow promotion, dry-run simulation, native-family routing |
 | 13 | [Billing integrity & retention](13-billing-integrity.md) | ⏳ designed, not started | Image/cache-token pricing, decimal money, distributed budgets, durable history |
+| 14 | [Gateway hot-path throughput](14-hot-path-throughput.md) | 📊 3-worker ceiling measured; code optimization next | Profile-driven client reuse and hot-path work toward 300 RPS |
 
 ## Recommended order
 
-1. **Correctness now:** Plan 09 Phase 2 (implement the streaming event
+1. **Performance evidence first:** Plan 14 Phase 0–1 — make the deterministic
+   1-worker/3-worker benchmark permanent, then profile and fix provider-client
+   lifecycle if the measurement confirms it before changing billing or
+   persistence semantics.
+2. **Correctness now:** Plan 09 Phase 2 (implement the streaming event
    contract), while keeping generic Vertex Responses tools fail-closed until a
    safe signature-state contract is selected; Plan 10 Phase 0 (attach stream
    usage to routing decisions).
-2. **Trust the delivery pipeline:** Plan 11's OpenAPI/migration drift gates and
+3. **Trust the delivery pipeline:** Plan 11's OpenAPI/migration drift gates and
    critical Playwright flows. Request correlation can ship independently.
-3. **Money correctness:** Plan 13 image/cache-token pricing and decimal ledger
+4. **Money correctness:** Plan 13 image/cache-token pricing and decimal ledger
    before adding more billing-dependent surfaces; Plan 10 time-series API/UI can
    then build on the authoritative data.
-4. **Reliability and policy:** sequential failover → observability → circuit
+5. **Reliability and policy:** sequential failover → observability → circuit
    breaker in Plan 05, with guardrails (Plan 06) parallel once its policy
    contract is settled.
-5. **Product expansion:** Plans 07, 04, 12 and 08. Response caching remains
+6. **Product expansion:** Plans 07, 04, 12 and 08. Response caching remains
    opt-in and should follow its tenant-isolation threat model; Batch/Files stays
    last because it introduces a durable asynchronous execution model.
 
