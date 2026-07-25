@@ -46,11 +46,13 @@ class LLMGatewayImpl:
         client_registry: ClientRegistry | None = None,
     ) -> None:
         resilience = resilience or ResilienceConfig()
-        # Process-owned, bounded cache of provider SDK clients (Plan 14): not yet
-        # leased by any adapter below — this only gives it a concrete owner and a
-        # deterministic shutdown path (see `aclose`) ahead of adapter adoption.
+        # Process-owned, bounded cache of provider SDK clients (Plan 14). Leased
+        # by the OpenAI-compatible and Azure adapters below (Step 3); other
+        # providers still construct-and-close per call until they adopt it too.
         self._client_registry = client_registry or ClientRegistry(close=_close_provider_client)
-        openai_adapter = OpenAIAdapter(resilience)  # OpenAI + Databricks share the client surface
+        # OpenAI + Databricks share the client surface (and therefore the
+        # registry adoption below) via this one instance.
+        openai_adapter = OpenAIAdapter(resilience, self._client_registry)
         # provider -> (adapter, supported operation shapes)
         self._registry = {
             Provider.OPENAI: (
@@ -58,7 +60,7 @@ class LLMGatewayImpl:
                 frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES}),
             ),
             Provider.AZURE_OPENAI: (
-                AzureOpenAIAdapter(resilience),
+                AzureOpenAIAdapter(resilience, self._client_registry),
                 frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES}),
             ),
             # Databricks: no native Responses API (emulated); embeddings are OpenAI-compatible.
