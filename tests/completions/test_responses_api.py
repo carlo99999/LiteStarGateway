@@ -1162,8 +1162,10 @@ async def test_vertex_chat_translation(
     assert body["choices"][0]["finish_reason"] == "stop"
     assert body["usage"]["prompt_tokens"] == 4
     assert body["usage"]["completion_tokens"] == 2
-    # The per-request genai client must be closed after the call (no pool leak).
-    assert FakeGenaiClient.closed is True
+    # The client is leased from the registry (Plan 14 Step 4) and cached for
+    # reuse, not closed after every call — it's only closed on eviction,
+    # rotation-drain, or gateway shutdown.
+    assert FakeGenaiClient.closed is False
 
 
 async def test_vertex_responses_emulated(

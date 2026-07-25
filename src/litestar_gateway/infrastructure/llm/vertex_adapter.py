@@ -20,6 +20,7 @@ import base64
 import json
 import time
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 from uuid import uuid4
 
@@ -36,6 +37,11 @@ from litestar_gateway.domain.chat_tool_policy import (
 )
 from litestar_gateway.domain.entities import Model
 from litestar_gateway.domain.exceptions import CredentialMisconfigured, UpstreamResponseInvalid
+from litestar_gateway.infrastructure.llm.client_registry import (
+    ClientKey,
+    ClientRegistry,
+    fingerprint_material,
+)
 from litestar_gateway.infrastructure.llm.feature_support import ensure_translatable_chat_request
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.llm.structured_output import parse_response_format
@@ -510,7 +516,12 @@ async def _raw_request_streamed(
     return await client.aio._api_client.async_request_streamed(http_method, path, body)
 
 
-def _build_client(credentials: dict[str, str], timeout_ms: int) -> genai.Client:
+def _build_client(
+    credentials: dict[str, str],
+    timeout_ms: int,
+    *,
+    async_http_client: Any = None,
+) -> genai.Client:
     creds = None
     if raw := credentials.get("vertex_credentials"):
         # Never let a malformed service-account JSON surface as a 500 whose message
@@ -523,21 +534,71 @@ def _build_client(credentials: dict[str, str], timeout_ms: int) -> genai.Client:
             raise CredentialMisconfigured(
                 "vertex_credentials is not a valid service-account JSON"
             ) from exc
+    http_options_kwargs: dict[str, Any] = {"timeout": timeout_ms}
+    if async_http_client is not None:
+        http_options_kwargs["httpx_async_client"] = async_http_client
     return genai.Client(
         vertexai=True,
         project=credentials.get("vertex_project"),
         location=credentials.get("vertex_location"),
         credentials=creds,
-        http_options=HttpOptions(timeout=timeout_ms),
+        http_options=HttpOptions(**http_options_kwargs),
     )
 
 
 class VertexAdapter:
-    def __init__(self, resilience: ResilienceConfig | None = None) -> None:
+    def __init__(
+        self,
+        resilience: ResilienceConfig | None = None,
+        client_registry: ClientRegistry | None = None,
+    ) -> None:
         self._resilience = resilience or ResilienceConfig()
+        self._client_registry = client_registry
 
     def _client(self, credentials: dict[str, str]) -> genai.Client:
         return _build_client(credentials, self._resilience.timeout_ms)
+
+    def _async_client(self, credentials: dict[str, str]) -> genai.Client:
+        # A registry-shared client is used by every concurrent request for one
+        # credential, so it needs the same generous bounded pool as the
+        # OpenAI/Anthropic adapters (Plan 14 Step 3's connection-pool fix),
+        # not google-genai's own low default.
+        return _build_client(
+            credentials,
+            self._resilience.timeout_ms,
+            async_http_client=self._resilience.build_async_http_client(),
+        )
+
+    def _client_key(self, credentials: dict[str, str]) -> ClientKey:
+        project = credentials.get("vertex_project") or ""
+        location = credentials.get("vertex_location") or ""
+        service_account_json = credentials.get("vertex_credentials") or ""
+        return ClientKey(
+            provider="vertex_ai",
+            fingerprint=fingerprint_material(project, location, service_account_json),
+            endpoint=f"{project}/{location}" if project or location else "",
+        )
+
+    @asynccontextmanager
+    async def _leased_async_client(
+        self, credentials: dict[str, str]
+    ) -> AsyncIterator[genai.Client]:
+        """Reuse a cached async-configured client when a registry is wired in;
+        otherwise construct-and-close exactly like before (unchanged
+        fallback). Distinct from `_client`/`_sync_client` use in the sync
+        methods below, which aren't on the profiled async hot path."""
+        if self._client_registry is None:
+            client = self._async_client(credentials)
+            try:
+                yield client
+            finally:
+                await client.aio.aclose()
+            return
+        key = self._client_key(credentials)
+        async with self._client_registry.lease(
+            key, lambda: self._async_client(credentials)
+        ) as client:
+            yield client
 
     def chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -564,8 +625,7 @@ class VertexAdapter:
     async def achat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = self._client(credentials)
-        try:
+        async with self._leased_async_client(credentials) as client:
             response = await client.aio.models.generate_content(**to_gemini_request(request, model))
             names, require_call, forbid_call, require_signature = _tool_response_contract(
                 request, model
@@ -577,22 +637,20 @@ class VertexAdapter:
                 forbid_tool_call=forbid_call,
                 require_thought_signature=require_signature,
             )
-        finally:
-            await client.aio.aclose()
 
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        client = self._client(credentials)
         base = {
             "id": "chatcmpl-gemini",
             "object": "chat.completion.chunk",
             "created": int(time.time()),
             "model": model.provider_model_id,
         }
-        # Keep the client open for the whole stream; close on completion/disconnect
-        # (finally runs on generator close).
-        try:
+        # The client is leased for the whole stream and released (not force-
+        # closed while another request still holds it) once iteration ends or
+        # the client disconnects.
+        async with self._leased_async_client(credentials) as client:
             # Open the provider stream first, so a start-of-stream failure
             # surfaces as an HTTP status (via priming) instead of after a
             # fabricated "started" chunk (R7-H24). Only then synthesize the role
@@ -631,8 +689,6 @@ class VertexAdapter:
                     or (prompt_tokens + completion_tokens),
                 },
             }
-        finally:
-            await client.aio.aclose()
 
     async def agenerate_content(
         self, native_body: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -643,13 +699,10 @@ class VertexAdapter:
         # resolved to the provider id in the URL PATH (Gemini carries the model in
         # the path, not the body), which is not translation. The credential-side
         # config (project/location/base_url) stays server-side in the client.
-        client = self._client(credentials)
-        path = f"{model.provider_model_id}:generateContent"
-        try:
+        async with self._leased_async_client(credentials) as client:
+            path = f"{model.provider_model_id}:generateContent"
             response = await _raw_request(client, "post", path, dict(native_body))
             return json.loads(response.body) if response.body else {}
-        finally:
-            await client.aio.aclose()
 
     async def astream_generate_content(
         self, native_body: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -657,17 +710,15 @@ class VertexAdapter:
         # Native passthrough streaming: relay the upstream Gemini
         # `GenerateContentResponse` chunks verbatim (parsed from the raw REST SSE)
         # — NO gemini_chunk_to_delta, NO OpenAI chunk shape. Only the model alias is
-        # resolved to the provider id in the URL PATH (not translation). Client
-        # lifecycle mirrors astream_chat_completion minus the translation.
-        client = self._client(credentials)
-        path = f"{model.provider_model_id}:streamGenerateContent"
-        try:
+        # resolved to the provider id in the URL PATH (not translation). The client
+        # is leased for the whole stream and released (not force-closed while
+        # another request still holds it) once iteration ends or disconnects.
+        async with self._leased_async_client(credentials) as client:
+            path = f"{model.provider_model_id}:streamGenerateContent"
             stream = await _raw_request_streamed(client, "post", path, dict(native_body))
             async for chunk in stream:
                 if chunk.body:
                     yield json.loads(chunk.body)
-        finally:
-            await client.aio.aclose()
 
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -682,14 +733,11 @@ class VertexAdapter:
     async def aembeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = self._client(credentials)
-        try:
+        async with self._leased_async_client(credentials) as client:
             response = await client.aio.models.embed_content(
                 **to_gemini_embed_request(request, model)
             )
             return from_gemini_embeddings(response.model_dump(), model.provider_model_id)
-        finally:
-            await client.aio.aclose()
 
     def images(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -704,9 +752,6 @@ class VertexAdapter:
     async def aimages(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = self._client(credentials)
-        try:
+        async with self._leased_async_client(credentials) as client:
             response = await client.aio.models.generate_images(**to_imagen_request(request, model))
             return from_imagen_response(response.model_dump())
-        finally:
-            await client.aio.aclose()

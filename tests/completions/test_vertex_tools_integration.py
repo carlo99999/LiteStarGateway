@@ -156,7 +156,9 @@ async def test_vertex_chat_two_turn_tool_loop_preserves_signature_and_billing(
     assert usage[0]["prompt_tokens"] == 8
     assert usage[0]["completion_tokens"] == 4
     assert usage[0]["cost"] == pytest.approx(0.16)
-    assert FakeGenaiClient.closed is True
+    # The client is leased from the registry (Plan 14 Step 4) and cached for
+    # reuse across the two-turn tool loop, not closed after every call.
+    assert FakeGenaiClient.closed is False
 
 
 async def test_vertex_streaming_tools_and_responses_tools_remain_fail_closed(

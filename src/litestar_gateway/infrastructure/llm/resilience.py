@@ -35,24 +35,25 @@ class ResilienceConfig:
         """Kwargs accepted by the OpenAI and Anthropic client constructors."""
         return {"timeout": self.timeout, "max_retries": self.max_retries}
 
+    def build_async_http_client(self) -> httpx.AsyncClient:
+        """A fresh, generously bounded `httpx.AsyncClient` for an async
+        provider client instance meant to be reused (leased from the
+        registry) rather than built fresh per call. Built fresh on every
+        call, matching the "build once per registry miss" cost model — never
+        share the returned object across two provider client instances."""
+        return httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_connections=self.max_connections,
+                max_keepalive_connections=self.max_keepalive_connections,
+            ),
+            timeout=self.timeout,
+        )
+
     @property
     def async_client_kwargs(self) -> dict[str, Any]:
-        """`client_kwargs` plus an explicit, generously bounded httpx
-        connection pool for an async client instance meant to be reused
-        (leased from the registry) rather than built fresh per call. A fresh
-        `httpx.AsyncClient` is constructed on every access, matching the
-        "build once per registry miss" cost model — never share this
-        `httpx.AsyncClient` object across two provider client instances."""
-        return {
-            **self.client_kwargs,
-            "http_client": httpx.AsyncClient(
-                limits=httpx.Limits(
-                    max_connections=self.max_connections,
-                    max_keepalive_connections=self.max_keepalive_connections,
-                ),
-                timeout=self.timeout,
-            ),
-        }
+        """`client_kwargs` plus the pooled async client, for OpenAI/Anthropic-
+        style constructors that accept `http_client` directly."""
+        return {**self.client_kwargs, "http_client": self.build_async_http_client()}
 
     @property
     def timeout_ms(self) -> int:
