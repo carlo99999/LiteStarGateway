@@ -9,12 +9,18 @@ provide the client constructor; the four operations are shared.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from typing import Any
 
 from openai import AsyncOpenAI, BadRequestError, OpenAI
 
 from litestar_gateway.domain.entities import Model
 from litestar_gateway.domain.exceptions import CredentialMisconfigured
+from litestar_gateway.infrastructure.llm.client_registry import (
+    ClientKey,
+    ClientRegistry,
+    fingerprint_material,
+)
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 
 
@@ -86,8 +92,16 @@ def _base_url(credentials: dict[str, str]) -> str | None:
 class OpenAICompatibleAdapter:
     """Shared operations for any client exposing the OpenAI SDK surface."""
 
-    def __init__(self, resilience: ResilienceConfig | None = None) -> None:
+    def __init__(
+        self,
+        resilience: ResilienceConfig | None = None,
+        client_registry: ClientRegistry | None = None,
+    ) -> None:
         self._resilience = resilience or ResilienceConfig()
+        # None keeps the old construct-and-close-per-call behavior (used by
+        # standalone adapter construction, e.g. in unit tests); LLMGatewayImpl
+        # always supplies one in the running gateway.
+        self._client_registry = client_registry
 
     def _sync_client(self, model: Model, credentials: dict[str, str]) -> Any:
         raise NotImplementedError
@@ -95,25 +109,45 @@ class OpenAICompatibleAdapter:
     def _async_client(self, model: Model, credentials: dict[str, str]) -> Any:
         raise NotImplementedError
 
+    def _client_key(self, model: Model, credentials: dict[str, str]) -> ClientKey:
+        raise NotImplementedError
+
     def _run(
         self, model: Model, credentials: dict[str, str], call: Callable[[Any], Any]
     ) -> dict[str, Any]:
         # Each SDK client owns an httpx connection pool; close it after the call so
-        # per-request clients don't leak sockets/file descriptors.
+        # per-request clients don't leak sockets/file descriptors. The sync path
+        # isn't on the async hot path profiled in Plan 14 and doesn't lease.
         client = self._sync_client(model, credentials)
         try:
             return call(client).model_dump()
         finally:
             client.close()
 
+    @asynccontextmanager
+    async def _leased_async_client(
+        self, model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[Any]:
+        """Reuse a cached async client when a registry is wired in; otherwise
+        construct-and-close exactly like before (unchanged fallback)."""
+        if self._client_registry is None:
+            client = self._async_client(model, credentials)
+            try:
+                yield client
+            finally:
+                await client.close()
+            return
+        key = self._client_key(model, credentials)
+        async with self._client_registry.lease(
+            key, lambda: self._async_client(model, credentials)
+        ) as client:
+            yield client
+
     async def _arun(
         self, model: Model, credentials: dict[str, str], call: Callable[[Any], Awaitable[Any]]
     ) -> dict[str, Any]:
-        client = self._async_client(model, credentials)
-        try:
+        async with self._leased_async_client(model, credentials) as client:
             return (await call(client)).model_dump()
-        finally:
-            await client.close()
 
     def chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -144,36 +178,32 @@ class OpenAICompatibleAdapter:
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        client = self._async_client(model, credentials)
-        kwargs = _kwargs(request, model)
-        kwargs["stream"] = True
-        # Ask for the final usage chunk so the gateway can meter streamed calls
-        # (OpenAI omits usage from streams unless this is set). Forced on: billing
-        # must not depend on the client opting in.
-        kwargs["stream_options"] = {**kwargs.get("stream_options", {}), "include_usage": True}
-        # Keep the client open for the whole stream; close it once iteration ends
-        # or the client disconnects (finally runs on generator close).
-        try:
-            # Any: with stream=True the SDK returns AsyncStream (no model_dump itself);
-            # each yielded chunk is a ChatCompletionChunk that does have model_dump.
+        # The client is leased for the whole stream and released (not force-
+        # closed while another request still holds it) once iteration ends or
+        # the client disconnects — `_leased_async_client`'s `__aexit__` still
+        # runs on generator close/cancellation.
+        async with self._leased_async_client(model, credentials) as client:
+            kwargs = _kwargs(request, model)
+            kwargs["stream"] = True
+            # Ask for the final usage chunk so the gateway can meter streamed
+            # calls (OpenAI omits usage from streams unless this is set).
+            # Forced on: billing must not depend on the client opting in.
+            kwargs["stream_options"] = {**kwargs.get("stream_options", {}), "include_usage": True}
+            # Any: with stream=True the SDK returns AsyncStream (no model_dump
+            # itself); each yielded chunk is a ChatCompletionChunk that does.
             stream: Any = await _achat_create(client, kwargs)
             async for chunk in stream:
                 yield chunk.model_dump()
-        finally:
-            await client.close()
 
     async def astream_responses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        client = self._async_client(model, credentials)
-        kwargs = _kwargs(request, model)
-        kwargs["stream"] = True
-        try:
+        async with self._leased_async_client(model, credentials) as client:
+            kwargs = _kwargs(request, model)
+            kwargs["stream"] = True
             stream: Any = await client.responses.create(**kwargs)
             async for event in stream:
                 yield event.model_dump()
-        finally:
-            await client.close()
 
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -202,19 +232,25 @@ class OpenAICompatibleAdapter:
         )
 
 
+def _openai_client_kwargs(credentials: dict[str, str]) -> dict[str, Any]:
+    return {"api_key": require_api_key(credentials), "base_url": _base_url(credentials)}
+
+
 class OpenAIAdapter(OpenAICompatibleAdapter):
     """Plain OpenAI, and OpenAI-compatible endpoints (e.g. Databricks via base_url)."""
 
     def _sync_client(self, model: Model, credentials: dict[str, str]) -> OpenAI:
-        return OpenAI(
-            api_key=require_api_key(credentials),
-            base_url=_base_url(credentials),
-            **self._resilience.client_kwargs,
-        )
+        return OpenAI(**_openai_client_kwargs(credentials), **self._resilience.client_kwargs)
 
     def _async_client(self, model: Model, credentials: dict[str, str]) -> AsyncOpenAI:
         return AsyncOpenAI(
-            api_key=require_api_key(credentials),
-            base_url=_base_url(credentials),
-            **self._resilience.client_kwargs,
+            **_openai_client_kwargs(credentials), **self._resilience.async_client_kwargs
+        )
+
+    def _client_key(self, model: Model, credentials: dict[str, str]) -> ClientKey:
+        kwargs = _openai_client_kwargs(credentials)
+        return ClientKey(
+            provider="openai",
+            fingerprint=fingerprint_material(*kwargs.values()),
+            endpoint=kwargs.get("base_url") or "",
         )

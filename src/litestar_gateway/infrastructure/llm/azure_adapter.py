@@ -11,6 +11,7 @@ from typing import Any
 from openai import AsyncAzureOpenAI, AzureOpenAI
 
 from litestar_gateway.domain.entities import Model
+from litestar_gateway.infrastructure.llm.client_registry import ClientKey, fingerprint_material
 from litestar_gateway.infrastructure.llm.openai_adapter import (
     OpenAICompatibleAdapter,
     require_api_key,
@@ -32,5 +33,13 @@ class AzureOpenAIAdapter(OpenAICompatibleAdapter):
 
     def _async_client(self, model: Model, credentials: dict[str, str]) -> AsyncAzureOpenAI:
         return AsyncAzureOpenAI(
-            **_client_kwargs(model, credentials), **self._resilience.client_kwargs
+            **_client_kwargs(model, credentials), **self._resilience.async_client_kwargs
+        )
+
+    def _client_key(self, model: Model, credentials: dict[str, str]) -> ClientKey:
+        kwargs = _client_kwargs(model, credentials)
+        return ClientKey(
+            provider="azure_openai",
+            fingerprint=fingerprint_material(*kwargs.values()),
+            endpoint=kwargs.get("azure_endpoint") or "",
         )

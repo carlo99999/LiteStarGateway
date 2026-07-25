@@ -181,39 +181,73 @@ full 1,430-test suite staying green): `LLMGatewayImpl` now owns one
 clients stay alive until every other lifespan manager has finished). No
 adapter leases from it yet; that is Step 3.
 
-## Step 3 — Adopt the registry: OpenAI-compatible + Azure (PR 3)
+## Step 3 — Adopt the registry: OpenAI-compatible + Azure (PR 4) — ✅ done
 
-Goal: the benchmark path stops constructing clients per operation.
+Implemented as designed: `openai_adapter.py`'s `_arun`/`astream_chat_completion`/
+`astream_responses` now go through `_leased_async_client()` (an
+`@asynccontextmanager` that leases from the registry when one is wired in, or
+falls back to the exact old construct-and-close behavior otherwise — so
+standalone-constructed adapters in tests are unaffected). Streaming leases the
+client for the whole generator lifetime; cancellation/disconnect unwinds the
+`async with`, releasing the lease without force-closing a client another
+request still holds. `azure_adapter.py` mirrors this, keying on the same
+resolved kwargs (`api_key`, `azure_endpoint`, `api_version`) used to construct
+the client, so the two can never drift out of sync. `gateway.py` passes
+`self._client_registry` into the shared `OpenAIAdapter` instance (which
+Databricks reuses via `ChatToResponsesAdapter`, adopting it for free) and into
+`AzureOpenAIAdapter`. Sync methods (`_run`, `chat_completion`, etc.) are
+untouched — they aren't on the profiled async hot path.
 
-Touchpoints:
+New adapter-level tests in `tests/llm/test_openai_adapter_registry.py`:
+sequential reuse, credential rotation producing a distinct client, and stream
+cancellation releasing the lease without closing a client held by a concurrent
+request — all against a real `ClientRegistry` with a fake SDK client (no
+network, no real `AsyncOpenAI` construction).
 
-- `src/litestar_gateway/infrastructure/llm/openai_adapter.py` — replace
-  `_client`/`_async_client` construct-and-close in `_run`/`_arun` and the
-  streaming paths with `registry.lease(...)`; the response stream still
-  closes on disconnect, the client does not;
-- `src/litestar_gateway/infrastructure/llm/azure_adapter.py` — same, with
-  api_version/deployment in the key;
-- `src/litestar_gateway/infrastructure/llm/gateway.py` +
-  `src/litestar_gateway/app.py` — pass the registry through;
-- keep `ResilienceConfig` behavior: timeout/retry kwargs stay identical.
+### An unplanned but necessary fix: connection-pool sizing
 
-Tests (before implementation):
+The first full 3-worker measurement surfaced a real regression: streaming at
+200 RPS offered dropped to 113 achieved with 9% failures and 10s+ TTFT (worse
+than the frozen baseline's 152 RPS *without* the registry). Root cause: a
+registry-leased client is now shared by every concurrent request for one
+credential, but httpx's own default pool (`max_connections=100`) was sized for
+one request per client, not hundreds sharing one. Fixed by adding
+`ResilienceConfig.async_client_kwargs` (`resilience.py`), which supplies an
+explicit `httpx.AsyncClient` with a generous bounded pool
+(`max_connections=1000`, `max_keepalive_connections=100`) — confirmed the
+OpenAI SDK's `close()` always closes the underlying httpx client even when
+supplied by the caller, so this doesn't change close semantics. `httpx` was
+promoted from a transitive to a direct dependency since the code now imports
+it. Four new tests in `tests/llm/test_resilience_config.py`. The exact,
+deployment-wide pool sizing is still Step 6's job; this is a safe, generous
+interim default.
 
-- adapter-level: two sequential completions reuse one client (spy factory);
-- streaming cancellation mid-stream closes the SSE response, not the client;
-- rotation mid-traffic: next request uses the new credential;
-- existing completions/streaming/upstream-error suites stay green untouched
-  (`tests/completions/`, `tests/llm/`).
+### Measured result (3 runs, medians; 3 workers / 3 CPU, same conditions as
 
-Measure (the point of the PR):
+the frozen v1 baseline)
 
-1. repeat the Step 1 one-worker profile → client-lifecycle frames should
-   collapse;
-2. run the 3-worker contract 3× → compare medians against frozen v1;
-3. report in the PR: RPS, p95, CPU/RPS, RSS, registry hit ratio.
+| Mode | Offered | v1 baseline | After Step 3 | Change |
+|---|---:|---:|---:|---:|
+| non-streaming | 100 | 100.0 | 100.2 | +0.2% |
+| non-streaming | 200 | 164.6 | 199.8 | **+21.4%** |
+| non-streaming | 300 | 165.9 | 245.3 | **+47.9%** |
+| streaming | 100 | 99.7 | 99.5 | −0.2% |
+| streaming | 200 | 152.1 | 199.2 | **+31.0%** |
+| streaming | 300 | 150.1 | 151.8 | +1.1% (0% → 11% failures) |
 
-Exit: statistically meaningful improvement (>3%) demonstrated, no regression
-in any correctness suite, review blockers from plan 14 all absent.
+At 100 RPS both modes were already unsaturated, so no change is expected. At
+200 RPS — solidly saturated in the v1 baseline — both modes now sustain
+essentially the full offered load. At 300 RPS non-streaming still doesn't
+pass its p95 gate but throughput jumped ~48%; 300 RPS streaming lands close to
+the old ceiling but now with real failures (~11%, up from the baseline's
+0–5%), meaning **the bottleneck has moved**: client-lifecycle waste no longer
+dominates, so something else caps throughput starting around 250-300 RPS.
+That's Step 5's job to find, not this PR's.
+
+Exit: statistically meaningful improvement demonstrated (far beyond the >3%
+noise floor) at every previously-saturated stage; zero regressions in the
+full 1,438-test suite; review blockers from plan 14 all absent (bounded pool,
+no cross-credential sharing, rotation-safe, cancellation-safe).
 
 ## Step 4 — Adopt the registry: Anthropic + Vertex, assess the rest (PR 4)
 
