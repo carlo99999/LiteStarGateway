@@ -74,7 +74,7 @@ class _FakeStream:
         self._gate = gate
         self._yielded = 0
 
-    def __aiter__(self) -> "_FakeStream":
+    def __aiter__(self) -> _FakeStream:
         return self
 
     async def __anext__(self) -> _StreamChunk:
@@ -158,9 +158,10 @@ async def test_sequential_chat_completions_reuse_one_client(
         "vertex_project": "p",
         "vertex_location": "us-central1",
     }
+    request = {"messages": [{"role": "user", "content": "hi"}]}
 
-    await adapter.achat_completion({"messages": [{"role": "user", "content": "hi"}]}, model, credentials)
-    await adapter.achat_completion({"messages": [{"role": "user", "content": "hi"}]}, model, credentials)
+    await adapter.achat_completion(request, model, credentials)
+    await adapter.achat_completion(request, model, credentials)
 
     assert len(created) == 1
     assert created[0].close_count == 0
@@ -174,9 +175,11 @@ async def test_rotated_project_gets_a_new_client(monkeypatch: pytest.MonkeyPatch
     adapter = VertexAdapter(ResilienceConfig(), registry)
     model = _model()
     request = {"messages": [{"role": "user", "content": "hi"}]}
+    first_credentials = {"vertex_project": "p1", "vertex_location": "us"}
+    second_credentials = {"vertex_project": "p2", "vertex_location": "us"}
 
-    await adapter.achat_completion(request, model, {"vertex_project": "p1", "vertex_location": "us"})
-    await adapter.achat_completion(request, model, {"vertex_project": "p2", "vertex_location": "us"})
+    await adapter.achat_completion(request, model, first_credentials)
+    await adapter.achat_completion(request, model, second_credentials)
 
     assert len(created) == 2
     assert created[0] is not created[1]

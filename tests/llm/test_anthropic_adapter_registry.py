@@ -63,7 +63,7 @@ class _FakeStream:
         self._gate = gate
         self._yielded = 0
 
-    def __aiter__(self) -> "_FakeStream":
+    def __aiter__(self) -> _FakeStream:
         return self
 
     async def __anext__(self) -> _StreamEvent:
@@ -130,9 +130,10 @@ async def test_sequential_chat_completions_reuse_one_client(
     adapter = AnthropicAdapter(ResilienceConfig(), registry)
     model = _model()
     credentials = {"api_key": "sk-ant-test"}  # pragma: allowlist secret
+    request = {"messages": [{"role": "user", "content": "hi"}]}
 
-    await adapter.achat_completion({"messages": [{"role": "user", "content": "hi"}]}, model, credentials)
-    await adapter.achat_completion({"messages": [{"role": "user", "content": "hi"}]}, model, credentials)
+    await adapter.achat_completion(request, model, credentials)
+    await adapter.achat_completion(request, model, credentials)
 
     assert len(created) == 1
     assert created[0].close_count == 0
