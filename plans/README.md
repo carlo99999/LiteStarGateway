@@ -42,7 +42,8 @@ It is deliberately separate from `docs/next-steps/`:
 | 11 | [Platform quality gates](11-platform-quality-gates.md) | ⏳ planned, not started | Request correlation, drift gates, browser E2E, dependency safety |
 | 12 | [Routing evolution](12-routing-evolution.md) | ⏳ designed, not started | Capability discovery, shadow promotion, dry-run simulation, native-family routing |
 | 13 | [Billing integrity & retention](13-billing-integrity.md) | ⏳ designed, not started | Image/cache-token pricing, decimal money, distributed budgets, durable history |
-| 14 | [Gateway hot-path throughput](14-hot-path-throughput.md) | 📊 3-worker ceiling measured; code optimization next | Profile-driven client reuse and hot-path work toward 300 RPS |
+| 14 | [Gateway hot-path throughput](14-hot-path-throughput.md) | 📊 Phase 0 complete (frozen v1 baseline); Phase 1 profiling next | Profile-driven client reuse and hot-path work toward 300 RPS |
+| 14a | [Hot-path implementation steps](14a-hot-path-implementation.md) | 🚧 execution companion to 14 — step-by-step PR sequence | Registry, adapter adoption, measured hotspots, deployment tuning |
 
 ## Recommended order
 

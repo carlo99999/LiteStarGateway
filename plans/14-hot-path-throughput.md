@@ -208,12 +208,43 @@ mock until they match. Trials with 4 and 10 chunks still produced approximately
 141–145 and 138 RPS respectively at saturation, confirming that chunk count
 alone does not explain the old result.
 
-Treat the table above as a candidate v1 baseline, not a completed Phase 0 exit.
-Before freezing it, run the exact permanent six-stage profile three times on the
-same host, retain the median, and require subsequent runs to remain within ±10%.
 The injected-failure contract is already verified: approximately 20% synthetic
 failures passed with a 25% limit and exited zero, then failed with a 15% limit
 and exited one. No provider credential or billable call was used.
+
+### Frozen v1 baseline (24 July 2026)
+
+The permanent six-stage profile was run three consecutive times on the same
+host (14-CPU Docker engine; gateway limited to 3 workers, 3 CPU / 4 GiB; 50 ms
+mock total latency; one upstream attempt; 10-second ramp, 5-second settle,
+30-second steady window; diagnostic policy). Every stage of every run stayed
+within ±10% of the per-stage median, satisfying the Phase 0 reproducibility
+exit criterion. The medians below are the frozen v1 baseline for all future
+before/after comparisons:
+
+| Mode | Offered | Successful RPS (median) | p95 (median) | Failures |
+|---|---:|---:|---:|---:|
+| non-streaming | 100 RPS | 100.0 RPS | 210 ms | 0% |
+| non-streaming | 200 RPS | 164.6 RPS | 1.8 s | 0% |
+| non-streaming | 300 RPS | 165.9 RPS | 2.8 s | 0% |
+| streaming | 100 RPS | 99.7 RPS | 460 ms | 0% |
+| streaming | 200 RPS | 152.1 RPS | 6.5 s | 0% |
+| streaming | 300 RPS | 150.1 RPS | 10 s | 0–5.2% |
+
+Run-to-run spread of successful RPS was at most 3.0% (chat 200 RPS) and 2.9%
+(streaming 300 RPS). Streaming TTFT p95 at the passing 100 RPS stage was
+roughly 400–430 ms. The fully overloaded streaming stage is the only unstable
+cell: two of three runs completed with zero failures and one produced 5.2%
+(overload timeouts), so treat streaming-300 failure counts as noise, not
+signal, until the offered load is sustainable.
+
+Raw local reports (gitignored): `load-results/20260724-182943`,
+`load-results/20260724-183539` and `load-results/20260724-184112`.
+
+Against this frozen baseline the honest saturated ceilings are approximately
+165 successful non-streaming RPS and 152 successful streaming RPS on three
+workers/CPUs — roughly 55 and 50 RPS per core. Phase 0 is complete; Phase 1
+profiling starts from these numbers.
 
 ## Phase 1 — Profile and fix provider-client lifecycle
 

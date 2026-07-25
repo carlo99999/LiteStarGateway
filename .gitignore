@@ -43,3 +43,5 @@ ui/node_modules/
 ui/dist/
 ui/*.tsbuildinfo
 ui/.vite/
+
+**/*/.DS_Store
