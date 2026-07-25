@@ -101,3 +101,20 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
 # FORWARDED_ALLOW_IPS (default: loopback) — set it to your reverse proxy's
 # IP/CIDR so the real client IP reaches the per-IP rate limiting.
 CMD ["sh", "/app/docker-entrypoint.sh"]
+
+# ---- Profile: runtime + py-spy, for local benchmark profiling only ----
+# Never used by production compose files. py-spy needs CAP_SYS_PTRACE to
+# attach to a sibling process; setcap on the binary lets the non-root `app`
+# user invoke it directly (no `docker exec --user root` needed), as long as
+# the container is started with `cap_add: [SYS_PTRACE]`.
+FROM runtime AS profile
+
+USER root
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y libcap2-bin \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m venv /opt/pyspy-venv \
+    && /opt/pyspy-venv/bin/pip install --no-cache-dir py-spy==0.4.* \
+    && setcap cap_sys_ptrace+eip /opt/pyspy-venv/bin/py-spy \
+    && ln -s /opt/pyspy-venv/bin/py-spy /usr/local/bin/py-spy
+USER app

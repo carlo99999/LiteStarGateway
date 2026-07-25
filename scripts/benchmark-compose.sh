@@ -5,6 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env.benchmark"
 COMPOSE_FILE="$ROOT_DIR/docker-compose.benchmark.yml"
 PROJECT_NAME="${BENCHMARK_PROJECT_NAME:-litestar-gateway-benchmark}"
+COMPOSE_ARGS=(--project-name "$PROJECT_NAME" --file "$COMPOSE_FILE")
+if [ "${PROFILE:-0}" = "1" ]; then
+  COMPOSE_ARGS+=(--file "$ROOT_DIR/docker-compose.profile.yml")
+fi
 
 ensure_environment() {
   umask 077
@@ -63,7 +67,7 @@ ensure_environment() {
 }
 
 compose() {
-  docker compose --project-name "$PROJECT_NAME" --file "$COMPOSE_FILE" "$@"
+  docker compose "${COMPOSE_ARGS[@]}" "$@"
 }
 
 up() {
