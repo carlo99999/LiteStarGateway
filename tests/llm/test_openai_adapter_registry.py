@@ -130,7 +130,7 @@ async def test_sequential_chat_completions_reuse_one_client(
     created = _patch_async_client(monkeypatch, OpenAIAdapter)
     adapter = OpenAIAdapter(ResilienceConfig(), registry)
     model = _model()
-    credentials = {"api_key": "sk-test"}
+    credentials = {"api_key": "sk-test"}  # pragma: allowlist secret
 
     await adapter.achat_completion({"messages": []}, model, credentials)
     await adapter.achat_completion({"messages": []}, model, credentials)
@@ -147,8 +147,10 @@ async def test_rotated_credentials_get_a_new_client(monkeypatch: pytest.MonkeyPa
     adapter = OpenAIAdapter(ResilienceConfig(), registry)
     model = _model()
 
-    await adapter.achat_completion({"messages": []}, model, {"api_key": "sk-old"})
-    await adapter.achat_completion({"messages": []}, model, {"api_key": "sk-new"})
+    old_credentials = {"api_key": "sk-old"}  # pragma: allowlist secret
+    new_credentials = {"api_key": "sk-new"}  # pragma: allowlist secret
+    await adapter.achat_completion({"messages": []}, model, old_credentials)
+    await adapter.achat_completion({"messages": []}, model, new_credentials)
 
     assert len(created) == 2
     assert created[0] is not created[1]
@@ -167,7 +169,7 @@ async def test_stream_cancellation_releases_lease_without_closing_shared_client(
     )
     adapter = OpenAIAdapter(ResilienceConfig(), registry)
     model = _model()
-    credentials = {"api_key": "sk-test"}
+    credentials = {"api_key": "sk-test"}  # pragma: allowlist secret
 
     # A concurrent non-streaming call keeps the same client leased throughout,
     # simulating another in-flight request sharing the connection.
@@ -206,7 +208,10 @@ async def test_azure_client_key_isolates_api_version(monkeypatch: pytest.MonkeyP
     created = _patch_async_client(monkeypatch, AzureOpenAIAdapter)
     adapter = AzureOpenAIAdapter(ResilienceConfig(), registry)
     model = _model(provider=Provider.AZURE_OPENAI, api_version="2024-01-01")
-    base_credentials = {"api_key": "sk-test", "api_base": "https://example.openai.azure.com"}
+    base_credentials = {
+        "api_key": "sk-test",  # pragma: allowlist secret
+        "api_base": "https://example.openai.azure.com",
+    }
 
     await adapter.achat_completion(
         {"messages": []}, model, {**base_credentials, "api_version": "2024-01-01"}
