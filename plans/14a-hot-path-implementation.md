@@ -249,19 +249,61 @@ noise floor) at every previously-saturated stage; zero regressions in the
 full 1,438-test suite; review blockers from plan 14 all absent (bounded pool,
 no cross-credential sharing, rotation-safe, cancellation-safe).
 
-## Step 4 — Adopt the registry: Anthropic + Vertex, assess the rest (PR 4)
+## Step 4 — Adopt the registry: Anthropic + Vertex, assess the rest (PR 5) — ✅ done
 
-1. `anthropic_adapter.py`: replace the five-plus `AsyncAnthropic(...)`
-   construct/close sites with leases (same test pattern as Step 3).
-2. `vertex_adapter.py`: reuse via `_client()` keyed by project/region;
-   verify the google-genai client is safe for concurrent reuse first.
-3. Bedrock (`bedrock_adapter.py`): boto3 clients + executor threads — adopt
-   only after verifying the documented thread-safety contract; otherwise
-   record "not adopted, reason" in plan 14.
-4. Databricks (OpenAI-compatible): should come for free via Step 3; verify.
+1. `anthropic_adapter.py`: all four async construct/close sites
+   (`achat_completion`, `astream_chat_completion`, `anative_messages`,
+   `astream_native_messages`) now go through `_leased_async_client()`, same
+   pattern as Step 3's `OpenAICompatibleAdapter`.
+2. `vertex_adapter.py`: reuse via a new `_async_client()` (distinct from the
+   existing `_client()` used by the sync methods), keyed by
+   `vertex_project`/`vertex_location`/`vertex_credentials` (the service-account
+   JSON — a credential-material dimension, same treatment as an API key).
+   **Compatibility wrinkle**: `genai.Client`'s async close lives at
+   `client.aio.aclose()`, not `client.close()` (unlike OpenAI/Anthropic) — one
+   `ClientRegistry` instance has exactly one close callback for everything it
+   holds, so Vertex gets its **own** registry (`LLMGatewayImpl` now owns two:
+   `_client_registry` for OpenAI/Azure/Anthropic, `_vertex_client_registry` for
+   Vertex), both closed on gateway shutdown. Also applied the Step 3
+   connection-pool fix here (`HttpOptions(httpx_async_client=...)`, confirmed
+   `google-genai` accepts a caller-supplied async httpx client the same way
+   OpenAI/Anthropic do).
+3. **Bedrock — assessed, deliberately not adopted.** `bedrock_adapter.py`
+   already reuses one boto3 client's *connections* correctly (a shared
+   `ThreadPoolExecutor` runs blocking calls off the event loop); AWS
+   documents boto3 clients as safe for concurrent calls from multiple
+   threads, so reuse is safe in principle. Deferred anyway: it isn't
+   exercised by the deterministic benchmark contract (no before/after
+   throughput evidence either way), and leasing a client that's used from a
+   *worker thread* rather than the event loop needs its own design
+   (the lease must stay held across the thread hop). Revisit only if a future
+   profile shows Bedrock client construction is materially expensive — no
+   evidence of that exists yet.
+4. Databricks (OpenAI-compatible): confirmed free — `gateway.py` wraps the
+   *same* `OpenAIAdapter` instance (with the registry already wired in from
+   Step 3) via `ChatToResponsesAdapter`, so it was never a separate adoption.
+
+New adapter-level tests: `tests/llm/test_anthropic_adapter_registry.py` and
+`tests/llm/test_vertex_adapter_registry.py`, mirroring Step 3's OpenAI tests
+(sequential reuse, rotation produces a distinct client, stream cancellation
+releases the lease without closing a client held by a concurrent request).
+
+Two pre-existing Vertex integration tests
+(`tests/completions/test_responses_api.py::test_vertex_chat_translation`,
+`tests/completions/test_vertex_tools_integration.py::...preserves_signature_and_billing`)
+asserted the *old* "closed after every call" behavior as a correctness
+invariant; updated both to assert the new cached-and-reused behavior instead
+— this is the intended behavior change, not a regression.
+
+No throughput measurement for this step: the deterministic benchmark contract
+only exercises OpenAI-compatible traffic (the mock speaks that protocol), so
+Anthropic/Vertex have no comparable before/after numbers. Validated instead
+by the adapter-level tests above and the full suite staying green.
 
 Exit: every adapter either leases from the registry or has a written
-justification; conformance + native endpoint suites green.
+justification (Bedrock); conformance + native endpoint suites green; full
+suite 1,444 passed, 6 skipped, zero regressions beyond the two intentionally
+updated assertions.
 
 ## Step 5 — Re-profile and rank the next hotspot (evidence, then PR 5)
 

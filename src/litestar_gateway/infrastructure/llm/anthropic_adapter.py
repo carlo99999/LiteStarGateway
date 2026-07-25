@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from anthropic import Anthropic, AsyncAnthropic
@@ -21,6 +22,11 @@ from anthropic import Anthropic, AsyncAnthropic
 from litestar_gateway.domain.chat_tool_policy import validate_chat_request
 from litestar_gateway.domain.entities import Model
 from litestar_gateway.domain.exceptions import UpstreamResponseInvalid
+from litestar_gateway.infrastructure.llm.client_registry import (
+    ClientKey,
+    ClientRegistry,
+    fingerprint_material,
+)
 from litestar_gateway.infrastructure.llm.feature_support import ensure_translatable_chat_request
 from litestar_gateway.infrastructure.llm.openai_adapter import require_api_key
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
@@ -440,13 +446,54 @@ def _response_tool_contract(
 
 
 class AnthropicAdapter:
-    def __init__(self, resilience: ResilienceConfig | None = None) -> None:
+    def __init__(
+        self,
+        resilience: ResilienceConfig | None = None,
+        client_registry: ClientRegistry | None = None,
+    ) -> None:
         self._resilience = resilience or ResilienceConfig()
+        self._client_registry = client_registry
+
+    def _client_key(self, credentials: dict[str, str]) -> ClientKey:
+        api_key = require_api_key(credentials)
+        base_url = _base_url(credentials) or ""
+        return ClientKey(
+            provider="anthropic",
+            fingerprint=fingerprint_material(api_key, base_url),
+            endpoint=base_url,
+        )
+
+    def _async_client(self, credentials: dict[str, str]) -> AsyncAnthropic:
+        return AsyncAnthropic(
+            api_key=require_api_key(credentials),
+            base_url=_base_url(credentials),
+            **self._resilience.async_client_kwargs,
+        )
+
+    @asynccontextmanager
+    async def _leased_async_client(
+        self, credentials: dict[str, str]
+    ) -> AsyncIterator[AsyncAnthropic]:
+        """Reuse a cached async client when a registry is wired in; otherwise
+        construct-and-close exactly like before (unchanged fallback)."""
+        if self._client_registry is None:
+            client = self._async_client(credentials)
+            try:
+                yield client
+            finally:
+                await client.close()
+            return
+        key = self._client_key(credentials)
+        async with self._client_registry.lease(
+            key, lambda: self._async_client(credentials)
+        ) as client:
+            yield client
 
     def chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        # Close the client after the call so its httpx pool isn't leaked.
+        # Close the client after the call so its httpx pool isn't leaked. Sync
+        # path isn't on the profiled async hot path and doesn't lease.
         client = Anthropic(
             api_key=require_api_key(credentials),
             base_url=_base_url(credentials),
@@ -470,12 +517,7 @@ class AnthropicAdapter:
     async def achat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        client = AsyncAnthropic(
-            api_key=require_api_key(credentials),
-            base_url=_base_url(credentials),
-            **self._resilience.client_kwargs,
-        )
-        try:
+        async with self._leased_async_client(credentials) as client:
             message: Any = await client.messages.create(**to_anthropic_request(request, model))
             expected_tool_names, require_tool_call, max_tool_calls, structured_tool_name = (
                 _response_tool_contract(request, model)
@@ -487,8 +529,6 @@ class AnthropicAdapter:
                 max_tool_calls=max_tool_calls,
                 structured_tool_name=structured_tool_name,
             )
-        finally:
-            await client.close()
 
     async def anative_messages(
         self, native_body: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -497,18 +537,11 @@ class AnthropicAdapter:
         # verbatim and return the response as-is — NO to_anthropic_request /
         # from_anthropic_response translation. Only the `model` field is resolved
         # from the team alias to the upstream provider id (same as every path),
-        # which is not translation. Client lifecycle mirrors achat_completion.
-        client = AsyncAnthropic(
-            api_key=require_api_key(credentials),
-            base_url=_base_url(credentials),
-            **self._resilience.client_kwargs,
-        )
-        body: dict[str, Any] = {**native_body, "model": model.provider_model_id}
-        try:
+        # which is not translation.
+        async with self._leased_async_client(credentials) as client:
+            body: dict[str, Any] = {**native_body, "model": model.provider_model_id}
             message: Any = await client.messages.create(**body)
             return message.model_dump()
-        finally:
-            await client.close()
 
     async def astream_native_messages(
         self, native_body: dict[str, Any], model: Model, credentials: dict[str, str]
@@ -516,30 +549,22 @@ class AnthropicAdapter:
         # Native passthrough streaming: relay the upstream Anthropic events verbatim
         # (event.model_dump()) — NO anthropic_event_to_delta, NO OpenAI chunk shape.
         # Only the client's `model` alias is resolved to the provider id (same as
-        # every path), which is not translation. Client lifecycle mirrors
-        # astream_chat_completion minus the translation + synthetic usage chunk.
-        client = AsyncAnthropic(
-            api_key=require_api_key(credentials),
-            base_url=_base_url(credentials),
-            **self._resilience.client_kwargs,
-        )
-        body: dict[str, Any] = {**native_body, "model": model.provider_model_id, "stream": True}
-        # Keep the client open for the whole stream; close on completion/disconnect.
-        try:
+        # every path), which is not translation. The client is leased for the
+        # whole stream and released (not force-closed while another request
+        # still holds it) once iteration ends or the client disconnects.
+        async with self._leased_async_client(credentials) as client:
+            body: dict[str, Any] = {
+                **native_body,
+                "model": model.provider_model_id,
+                "stream": True,
+            }
             stream: Any = await client.messages.create(**body)
             async for event in stream:
                 yield event.model_dump()
-        finally:
-            await client.close()
 
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        client = AsyncAnthropic(
-            api_key=require_api_key(credentials),
-            base_url=_base_url(credentials),
-            **self._resilience.client_kwargs,
-        )
         base = {
             "id": "chatcmpl-anthropic",
             "object": "chat.completion.chunk",
@@ -553,8 +578,10 @@ class AnthropicAdapter:
         input_tokens = 0
         output_tokens = 0
         refused = False
-        # Keep the client open for the whole stream; close on completion/disconnect.
-        try:
+        # The client is leased for the whole stream and released (not force-
+        # closed while another request still holds it) once iteration ends or
+        # the client disconnects.
+        async with self._leased_async_client(credentials) as client:
             stream: Any = await client.messages.create(**kwargs)
             async for event in stream:
                 raw = event.model_dump()
@@ -586,5 +613,3 @@ class AnthropicAdapter:
                     ),
                 },
             }
-        finally:
-            await client.close()

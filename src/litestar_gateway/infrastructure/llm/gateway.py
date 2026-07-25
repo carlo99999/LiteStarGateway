@@ -35,8 +35,13 @@ _NATIVE_GENERATE_CONTENT = "native.generate_content"
 
 
 async def _close_provider_client(client: Any) -> None:
-    """Every provider SDK's async client exposes an async `close()`."""
+    """OpenAI, Azure and Anthropic's async clients expose an async `close()`."""
     await client.close()
+
+
+async def _close_genai_client(client: Any) -> None:
+    """`google-genai`'s async close lives under `.aio`, not `.close()`."""
+    await client.aio.aclose()
 
 
 class LLMGatewayImpl:
@@ -44,12 +49,18 @@ class LLMGatewayImpl:
         self,
         resilience: ResilienceConfig | None = None,
         client_registry: ClientRegistry | None = None,
+        vertex_client_registry: ClientRegistry | None = None,
     ) -> None:
         resilience = resilience or ResilienceConfig()
-        # Process-owned, bounded cache of provider SDK clients (Plan 14). Leased
-        # by the OpenAI-compatible and Azure adapters below (Step 3); other
-        # providers still construct-and-close per call until they adopt it too.
+        # Process-owned, bounded caches of provider SDK clients (Plan 14).
+        # Two registries because google-genai's close contract differs from
+        # OpenAI/Anthropic's (`client.aio.aclose()` vs `client.close()`) —
+        # each registry has exactly one close callback for every client it
+        # holds, so they can't be shared across that difference.
         self._client_registry = client_registry or ClientRegistry(close=_close_provider_client)
+        self._vertex_client_registry = vertex_client_registry or ClientRegistry(
+            close=_close_genai_client
+        )
         # OpenAI + Databricks share the client surface (and therefore the
         # registry adoption below) via this one instance.
         openai_adapter = OpenAIAdapter(resilience, self._client_registry)
@@ -71,13 +82,13 @@ class LLMGatewayImpl:
             # Anthropic: chat + emulated Responses + native Messages passthrough.
             # No embeddings API.
             Provider.ANTHROPIC: (
-                ChatToResponsesAdapter(AnthropicAdapter(resilience)),
+                ChatToResponsesAdapter(AnthropicAdapter(resilience, self._client_registry)),
                 frozenset({_CHAT, _RESPONSES, _NATIVE_MESSAGES}),
             ),
             # Vertex/Gemini: chat + emulated Responses + native generateContent
             # passthrough + embeddings + images (Imagen).
             Provider.VERTEX_AI: (
-                ChatToResponsesAdapter(VertexAdapter(resilience)),
+                ChatToResponsesAdapter(VertexAdapter(resilience, self._vertex_client_registry)),
                 frozenset({_CHAT, _RESPONSES, _EMBEDDINGS, _IMAGES, _NATIVE_GENERATE_CONTENT}),
             ),
             # Bedrock: Converse chat + emulated Responses + invoke_model
@@ -210,3 +221,4 @@ class LLMGatewayImpl:
     async def aclose(self) -> None:
         """Close every retained provider client. Call once, at process shutdown."""
         await self._client_registry.aclose()
+        await self._vertex_client_registry.aclose()
