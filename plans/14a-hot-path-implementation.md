@@ -161,60 +161,25 @@ Proceed to Step 2 (the client registry). No fallback to Step 5 is needed.
 Exit: flamegraphs and raw profiles archived under
 `load-results/20260725-032657-profile/`; decision recorded above.
 
-## Step 2 — Provider client registry (PR 2, TDD)
+## Step 2 — Provider client registry (PR #349, TDD) — ✅ done
 
-Goal: one process-owned, bounded, credential-isolated cache of async SDK
-clients so connections are reused across requests.
+Implemented as designed below. `ClientRegistry` (bounded LRU+TTL, per-key
+leasing, double-checked-locking construction, secret-free `ClientKey` via a
+one-way `fingerprint_material()` hash) lives in
+`src/litestar_gateway/infrastructure/llm/client_registry.py`, with 16 tests in
+`tests/llm/test_client_registry.py` (98% coverage) covering every item in the
+mandatory list below plus two extra races (a genuine in-lock double-check hit,
+forced via controlled interleaving since `asyncio.Lock.acquire()` doesn't
+yield when uncontended; and a failing `close()` callback, which must log and
+never propagate).
 
-New files:
-
-- `src/litestar_gateway/infrastructure/llm/client_registry.py`
-- `tests/llm/test_client_registry.py`
-
-Design (from plan 14, condensed):
-
-- `ClientKey`: provider, credential id, non-reversible fingerprint of the
-  credential material (e.g. HMAC/hash, never the secret), endpoint/base URL,
-  API version, region/project, plus every behavior-changing constructor
-  option. `repr` must be secret-free.
-- `ClientRegistry(capacity: int, ttl_seconds: float)`:
-  - `lease(key, factory) -> AsyncContextManager[client]` — hit reuses,
-    concurrent misses on one key build exactly one client (per-key lock);
-  - LRU + TTL eviction, but an evicted client closes only after its last
-    lease is released; close exactly once;
-  - `aclose()` for shutdown: closes everything exactly once, waits for
-    active leases with a bounded drain timeout;
-  - factory failure does not poison the key and leaks nothing;
-  - bounded, secret-free metrics: hits, misses, creates, evictions, active
-    leases.
-- Ownership: constructed in `_build_lifespan()` in
-  `src/litestar_gateway/app.py`, injected into `LLMGatewayImpl`
-  (`src/litestar_gateway/infrastructure/llm/gateway.py`), closed in the
-  lifespan teardown. No module-level global.
-
-Test list (write first, watch them fail):
-
-1. sequential calls with one key → one client, one create;
-2. N concurrent first calls with one key → exactly one factory invocation;
-3. different provider / credential id / material version / endpoint /
-   API version / region → distinct clients, never shared;
-4. rotation (same credential id, new material) → new key, new client; old
-   client closes only after its in-flight lease releases;
-5. eviction at capacity closes the evicted client exactly once, and never
-   while leased;
-6. TTL expiry behaves like eviction;
-7. `aclose()` closes all clients exactly once, twice-idempotent;
-8. factory raising → key not poisoned, retry works, nothing to close;
-9. cancellation of a leased operation releases the lease without closing
-   the shared client;
-10. `repr`/metrics/logs contain no credential material (assert on the
-    fingerprint being non-reversible and on log capture).
-
-Verify: new tests green, full suite green, `just lint`, `just typecheck`,
-coverage ≥80% on the new module.
-
-Exit: registry module merged behind no behavior change (not yet adopted by
-any adapter), so the PR is pure addition plus tests.
+Ownership wiring (no adapter touched, no behavior change — verified by the
+full 1,430-test suite staying green): `LLMGatewayImpl` now owns one
+`ClientRegistry` instance (`gateway.py`), exposes `async def aclose()`, and
+`app.py`'s composition root calls it from a new lifespan manager
+(`_make_llm_gateway_lifespan`, entered first so it unwinds last — provider
+clients stay alive until every other lifespan manager has finished). No
+adapter leases from it yet; that is Step 3.
 
 ## Step 3 — Adopt the registry: OpenAI-compatible + Azure (PR 3)
 

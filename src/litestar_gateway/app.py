@@ -21,6 +21,7 @@ from litestar_gateway.domain.exceptions import DomainError
 from litestar_gateway.domain.ports import IdentityProvider, LLMGateway
 from litestar_gateway.infrastructure.bootstrap import make_bootstrap_admin
 from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
 from litestar_gateway.infrastructure.logging import build_logging_config
 from litestar_gateway.infrastructure.observability.aggregator import MetricsAggregator
 from litestar_gateway.infrastructure.observability.composite import CompositeTraceSink
@@ -136,7 +137,9 @@ def create_app(
         plugins=[database.plugin],
         logging_config=build_logging_config(settings),
         on_startup=[make_bootstrap_admin(database, settings)],
-        lifespan=_build_lifespan(database, settings, trace_dispatcher, metrics_aggregator),
+        lifespan=_build_lifespan(
+            database, settings, trace_dispatcher, metrics_aggregator, llm_gateway
+        ),
         dependencies=dependencies,
         stores=_build_rate_limit_stores(settings),
         response_headers=_security_headers(settings),
@@ -392,13 +395,30 @@ def _build_rate_limit_stores(settings: Settings) -> dict[str, Store]:
     return stores
 
 
+def _make_llm_gateway_lifespan(llm_gateway: LLMGatewayImpl):
+    """Close every retained provider client on shutdown. Entered first (of this
+    list) so it unwinds last, keeping provider clients alive for as long as any
+    other lifespan manager might still be doing request-adjacent work."""
+
+    @asynccontextmanager
+    async def lifespan(_: Litestar) -> AsyncGenerator[None]:
+        try:
+            yield
+        finally:
+            await llm_gateway.aclose()
+
+    return lifespan
+
+
 def _build_lifespan(
     database: Database,
     settings: Settings,
     trace_dispatcher: TraceDispatcher,
     metrics_aggregator: MetricsAggregator | None,
+    llm_gateway: LLMGatewayImpl,
 ) -> list:
     return [
+        _make_llm_gateway_lifespan(llm_gateway),
         make_rotation_scheduler(database, settings),
         make_usage_reconciler(database, settings),
         trace_dispatcher.run,
