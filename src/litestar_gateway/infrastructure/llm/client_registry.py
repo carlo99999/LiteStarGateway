@@ -119,9 +119,7 @@ class ClientRegistry:
         self._closed = False
 
     @asynccontextmanager
-    async def lease(
-        self, key: ClientKey, factory: Callable[[], Any]
-    ) -> AsyncIterator[Any]:
+    async def lease(self, key: ClientKey, factory: Callable[[], Any]) -> AsyncIterator[Any]:
         """Lease the client for `key`, constructing it on first use.
 
         Usage: `async with registry.lease(key, lambda: Client(...)) as client:`.

@@ -261,7 +261,9 @@ async def test_cancellation_releases_lease_without_closing_shared_client() -> No
 def test_key_and_metrics_never_expose_credential_material() -> None:
     material_value = "sk-super-material_value-value"
     key = ClientKey(
-        provider="openai", fingerprint=fingerprint_material(material_value, "https://api"), endpoint="https://api"
+        provider="openai",
+        fingerprint=fingerprint_material(material_value, "https://api"),
+        endpoint="https://api",
     )
 
     assert material_value not in repr(key)
