@@ -54,32 +54,112 @@ Rules:
 
 Exit: baseline v1 is in git history before any optimization lands.
 
-## Step 1 — Before-profile on one worker (PR: none, evidence only)
+## Step 1 — Before-profile on one worker (PR #348, evidence only) — ✅ done
 
 Goal: prove (or refute) that client lifecycle is the dominant per-request
 cost, and produce the "before" flamegraph every later PR compares against.
 
-Tasks:
+Implementation note: instead of a `profile` uv dependency group, py-spy was
+added via a dedicated Docker build stage (`profile`, extending `runtime`) with
+`setcap cap_sys_ptrace+eip` applied to the py-spy binary at build time. This
+lets the non-root `app` user invoke py-spy directly against a sibling process
+without `docker exec --user root`, and keeps py-spy completely out of the
+production image (the `runtime` target is untouched). The compose overlay
+`docker-compose.profile.yml` builds the `app` service from the `profile`
+target and adds `cap_add: [SYS_PTRACE]`; `scripts/benchmark-compose.sh` picks
+it up automatically when `PROFILE=1` is set.
 
-1. Add a `profile` uv dependency group containing `py-spy`.
-2. Add a compose overlay `docker-compose.profile.yml` that grants the app
-   container `cap_add: [SYS_PTRACE]` and `pid: host` is NOT required —
-   attach from inside: `docker exec <app> py-spy record -p <worker-pid>
-   -o /tmp/profile.svg -d 60 --idle`.
-3. Run the 1-worker contract at a saturating stage (offered 80 RPS) while
-   recording 60 s of samples; also record `--format speedscope` output.
-4. Repeat once for a streaming stage.
-5. Store artifacts under `load-results/<ts>-profile/` (gitignored) and write
-   a short summary table (top-10 self-time frames) into the PR description
-   of Step 2 (or into plan 14 if Step 2 is cancelled).
+Tasks completed:
 
-Decision gate:
+1. `Dockerfile`: added the `profile` stage.
+2. `docker-compose.profile.yml`: overlay, opt-in via `PROFILE=1`.
+3. Ran the 1-worker contract (`PROFILE=1 UVICORN_WORKERS=1
+   ./scripts/benchmark-compose.sh up`) at a saturating chat stage (80 RPS
+   offered) and captured 55 s of samples with `py-spy record --pid 1
+   --format raw` (both an SVG flamegraph and the raw folded-stack format were
+   produced for the chat stage).
+4. Attempted the same for a streaming stage; the capture was abandoned
+   partway through (see "Environment caveat" below) once the code-level
+   confirmation below made a second capture unnecessary for the decision
+   gate.
+5. Artifacts stored under `load-results/20260725-032657-profile/`
+   (gitignored, as with all `load-results/` content).
 
-- if client construction + pool/TLS setup + close accounts for a material
-  share of CPU/wall time → proceed to Step 2;
-- if not → skip to Step 5 with the measured top cost instead.
+### Result: the client-lifecycle hypothesis is confirmed, decisively
 
-Exit: flamegraphs archived; decision recorded in plan 14.
+Of 5,589 stack samples collected during the saturating chat-80 stage:
+
+- **53.3%** of *all* CPU self-time samples landed in a single frame:
+  `ssl.py:717 create_default_context`;
+- **59.7%** of samples had `httpx` somewhere on the stack;
+- **54.2%** had `ssl` somewhere on the stack;
+- **61.3%** had `__init__` somewhere on the stack (client construction);
+- every other named hot path — SQLAlchemy ORM hydration, asyncpg execution,
+  greenlet bridging, JSON decoding — was **under 0.5%** each.
+
+The full call stack for the dominant frame is unambiguous:
+
+```text
+completions.py:62 chat_completions
+  → completion_service.py:675 chat_completion
+  → completion_service.py:217 _dispatch
+  → gateway.py:94 achat_completion
+  → errors.py:158 arun_translated
+  → openai_adapter.py:126 achat_completion
+  → openai_adapter.py:112 _arun
+  → openai_adapter.py:216 _async_client        ← client constructed here
+  → openai/_client.py:860 __init__
+  → openai/_base_client.py:1519/1426 __init__
+  → httpx/_client.py:1402 __init__
+  → httpx/_client.py:1445 _init_transport
+  → httpx/_transports/default.py:297 __init__
+  → httpx/_config.py:40 create_ssl_context
+  → ssl.py:717 create_default_context          ← 53.3% of all CPU samples
+```
+
+`ssl.create_default_context()` reads and parses the OS CA bundle from disk
+and is documented as expensive precisely because it is meant to be called
+once and reused — the gateway calls it on essentially every request, because
+`OpenAICompatibleAdapter._async_client()` (`openai_adapter.py:216`)
+constructs a brand-new `AsyncOpenAI` → `httpx.AsyncClient` → transport → SSL
+context for every single non-streaming call, and `_run`/`_arun` close it
+immediately after (`openai_adapter.py:107,116`).
+
+The streaming path (`astream_chat_completion`, `openai_adapter.py:143`) calls
+the exact same `_async_client()` before opening the SSE stream, so this cost
+applies identically there — confirmed by code inspection rather than a
+second full profile capture (see caveat below).
+
+### Environment caveat: ptrace over Docker Desktop's VM is slow
+
+py-spy's ptrace-based sampling stops the target process on every sample. On
+this host (macOS + Docker Desktop, i.e. a virtualized Linux VM), each
+ptrace stop/read/continue cycle crosses the virtualization boundary and is
+far slower than on bare-metal Linux. Effects observed:
+
+- at the default 100 Hz rate under ~90 concurrent users, py-spy fell up to
+  86 seconds behind a 55-second recording window;
+- the achieved RPS *during profiling* (20–47 RPS) is depressed by the
+  profiler's own overhead and must not be compared against the frozen v1
+  baseline (56 RPS unprofiled) — profiling perturbs the measurement, which is
+  expected and is why Step 1 is "evidence, no PR to production code";
+- a second streaming capture at a reduced rate (40 Hz) still took several
+  minutes of wall time for a nominal 45-second recording and was killed once
+  the chat-mode result plus the shared `_async_client()` call site made
+  further data collection unnecessary for the decision gate.
+
+This is a profiling-tool/host limitation, not a gateway property — it does
+not affect the validity of the self-time percentages above (relative
+proportions among frames actually sampled), only the wall-clock time needed
+to collect them and the achieved-RPS number during collection. On bare-metal
+Linux (e.g. CI or a cloud runner) this would be expected to run close to the
+nominal duration.
+
+Decision gate: **client lifecycle is the dominant per-request cost.**
+Proceed to Step 2 (the client registry). No fallback to Step 5 is needed.
+
+Exit: flamegraphs and raw profiles archived under
+`load-results/20260725-032657-profile/`; decision recorded above.
 
 ## Step 2 — Provider client registry (PR 2, TDD)
 

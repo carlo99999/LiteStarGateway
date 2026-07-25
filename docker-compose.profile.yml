@@ -1,0 +1,13 @@
+# Overlay for docker-compose.benchmark.yml: builds the `app` service from the
+# `profile` Dockerfile stage (adds py-spy) and grants CAP_SYS_PTRACE so it can
+# attach to a sibling Uvicorn worker. Never merge this into production compose
+# files — the profile image stage and the added capability are local-only.
+#
+# Usage: PROFILE=1 ./scripts/benchmark-compose.sh up
+
+services:
+  app:
+    build:
+      target: profile
+    cap_add:
+      - SYS_PTRACE
