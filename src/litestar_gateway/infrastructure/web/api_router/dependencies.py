@@ -46,10 +46,13 @@ from litestar_gateway.infrastructure.persistence.usage_repository import (
 )
 
 
-def build_llm_gateway(settings: Settings) -> LLMGateway:
+def build_llm_gateway(settings: Settings) -> LLMGatewayImpl:
     """Build the shared gateway once, with provider-call resilience from settings.
 
-    Stateless afterwards; adapters build provider clients per call."""
+    Returns the concrete type (not the `LLMGateway` port) so the composition
+    root can call `aclose()` on it at shutdown; callers that only need the
+    port's request-serving surface can still assign it to an `LLMGateway`-typed
+    variable, since `LLMGatewayImpl` satisfies that Protocol structurally."""
     return LLMGatewayImpl(
         ResilienceConfig(timeout=settings.request_timeout, max_retries=settings.max_retries)
     )

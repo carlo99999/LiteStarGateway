@@ -15,6 +15,7 @@ from litestar_gateway.domain.exceptions import UnsupportedOperation
 from litestar_gateway.infrastructure.llm.anthropic_adapter import AnthropicAdapter
 from litestar_gateway.infrastructure.llm.azure_adapter import AzureOpenAIAdapter
 from litestar_gateway.infrastructure.llm.bedrock_adapter import BedrockAdapter
+from litestar_gateway.infrastructure.llm.client_registry import ClientRegistry
 from litestar_gateway.infrastructure.llm.errors import (
     arun_translated,
     run_translated,
@@ -33,9 +34,22 @@ _NATIVE_MESSAGES = "native.messages"
 _NATIVE_GENERATE_CONTENT = "native.generate_content"
 
 
+async def _close_provider_client(client: Any) -> None:
+    """Every provider SDK's async client exposes an async `close()`."""
+    await client.close()
+
+
 class LLMGatewayImpl:
-    def __init__(self, resilience: ResilienceConfig | None = None) -> None:
+    def __init__(
+        self,
+        resilience: ResilienceConfig | None = None,
+        client_registry: ClientRegistry | None = None,
+    ) -> None:
         resilience = resilience or ResilienceConfig()
+        # Process-owned, bounded cache of provider SDK clients (Plan 14): not yet
+        # leased by any adapter below — this only gives it a concrete owner and a
+        # deterministic shutdown path (see `aclose`) ahead of adapter adoption.
+        self._client_registry = client_registry or ClientRegistry(close=_close_provider_client)
         openai_adapter = OpenAIAdapter(resilience)  # OpenAI + Databricks share the client surface
         # provider -> (adapter, supported operation shapes)
         self._registry = {
@@ -190,3 +204,7 @@ class LLMGatewayImpl:
     ) -> dict[str, Any]:
         adapter = self._resolve(model.provider, "image_generation")
         return await arun_translated(adapter.aimages(request, model, credentials))
+
+    async def aclose(self) -> None:
+        """Close every retained provider client. Call once, at process shutdown."""
+        await self._client_registry.aclose()
