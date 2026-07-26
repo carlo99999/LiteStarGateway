@@ -173,6 +173,52 @@ def test_from_env_rejects_non_positive_inference_rate_limit(
         Settings.from_env()
 
 
+def test_from_env_configures_circuit_breaker_failure_threshold(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "10")
+
+    assert Settings.from_env().circuit_breaker_failure_threshold == 10
+
+
+def test_from_env_defaults_circuit_breaker_failure_threshold() -> None:
+    assert Settings.from_env().circuit_breaker_failure_threshold == 5
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_from_env_rejects_non_positive_circuit_breaker_failure_threshold(
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+) -> None:
+    monkeypatch.setenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", value)
+
+    with pytest.raises(InsecureConfigurationError):
+        Settings.from_env()
+
+
+def test_from_env_configures_circuit_breaker_cooldown_seconds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CIRCUIT_BREAKER_COOLDOWN_SECONDS", "60")
+
+    assert Settings.from_env().circuit_breaker_cooldown_seconds == 60
+
+
+def test_from_env_defaults_circuit_breaker_cooldown_seconds() -> None:
+    assert Settings.from_env().circuit_breaker_cooldown_seconds == 30
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_from_env_rejects_non_positive_circuit_breaker_cooldown_seconds(
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+) -> None:
+    monkeypatch.setenv("CIRCUIT_BREAKER_COOLDOWN_SECONDS", value)
+
+    with pytest.raises(InsecureConfigurationError):
+        Settings.from_env()
+
+
 def test_from_env_zero_metrics_interval_disables_the_publisher(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

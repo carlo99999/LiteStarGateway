@@ -3,8 +3,8 @@
 **Status:** Phase 0, Phase 1 (sequential failover for non-streamed calls),
 Phase 2 (streaming failover, pre-first-byte only), and Phase 3's observability
 slice (attempts/failover_used persisted on the routing decision) are complete.
-The Phase 3 circuit breaker and admin-console reliability view remain
-optional and not started.
+The optional circuit breaker (Phase 3) is now also complete. Only the
+admin-console reliability view remains open.
 
 **Design doc:** [docs/next-steps/cross-provider-failover.md](../docs/next-steps/cross-provider-failover.md).
 **Depends on:** the smart-routing candidate/router infrastructure
@@ -146,12 +146,59 @@ to native passthrough endpoints.
   for a cooldown, skipping it in the chain. Put the state machine behind a small
   port with in-memory development and Redis (`.env.sample:18`) multi-replica
   adapters.
+  **✅ Done (26 July 2026):** `domain/ports/circuit_breaker.py` defines the
+  `CircuitBreaker` Protocol (`allow(key) -> bool`, `record_failure(key)`,
+  `record_success(key)`), mirroring `RateLimiter`'s port shape exactly.
+  `infrastructure/circuit_breaker.py` implements the closed → open →
+  half-open → closed/open state machine: closed admits every call and counts
+  *consecutive* failures (any success resets the counter), reaching
+  `failure_threshold` trips the breaker to open where `allow()` is false
+  until `cooldown_seconds` elapse, then the breaker moves to half-open and
+  grants exactly one trial (the same `allow()` call that observes the
+  elapsed cooldown both transitions state and grants the trial, so no
+  concurrent caller gets a second one); the trial's outcome decides —
+  success closes and resets, failure re-opens with a fresh cooldown.
+  `InMemoryCircuitBreaker` is dict + `asyncio.Lock`-guarded, same shape as
+  `InMemoryRateLimiter`; `RedisCircuitBreaker` stores a plain INCR'd failure
+  counter (reset on success) plus an "opened at" timestamp key, and claims
+  the single half-open trial with `SET key value NX EX cooldown_seconds` —
+  only one replica's `SET` can win the race. `build_circuit_breaker(settings)`
+  picks Redis when `REDIS_URL` is set, else in-memory, mirroring
+  `build_rate_limiter` exactly. The key is `str(model.id)` — a per-model
+  breaker, matching the failover chain's own routing unit. Settings:
+  `CIRCUIT_BREAKER_FAILURE_THRESHOLD` (default 5) and
+  `CIRCUIT_BREAKER_COOLDOWN_SECONDS` (default 30), both validated with a
+  minimum of 1 like the existing `_env_int`-based settings.
+
+  Wired into `CompletionService` via an optional `circuit_breaker:
+  CircuitBreaker | None = None` constructor param (default `None`, so every
+  existing call site is unaffected). Both failover loops
+  (`_chat_completion_with_failover`, `_open_chat_stream_with_failover`)
+  filter the *retry* chain (`_breaker_filtered`) before computing
+  `max_attempts`, so a tripped candidate is skipped entirely — never
+  selected for a retry — rather than attempted and immediately failing.
+  Attempt #1 (the router's own chosen candidate) is never filtered, since
+  the breaker only guards the fallback chain per this plan's original text.
+  Every attempt's outcome (including attempt #1's) is recorded: a
+  failover-eligible failure calls `record_failure(str(attempt_model.id))`
+  — except `UpstreamResponseInvalid` (already billed, terminal in the
+  non-streaming loop) and any non-eligible (client 4xx) error, which must
+  never trip a provider's breaker since it isn't the provider's fault; a
+  success calls `record_success`. Recording every attempt (not just retries)
+  means a provider that keeps failing on attempt #1 also eventually gets
+  skipped for *other* requests' retry chains, which is more useful than
+  scoping the breaker to retries alone. No Redis Lua scripting was needed —
+  the whole adapter is expressible with INCR/SET NX EX/EXPIRE/GET/DELETE.
 - Console: reliability view with metadata-only aggregates and request-ID
-  drill-down; never display prompt/response content or credentials.
+  drill-down; never display prompt/response content or credentials. **Not**
+  part of this slice — deferred, the one remaining open item for Phase 3.
 - **Done when:** `failover_used` + attempts are persisted and queryable
-  (✅ done); the breaker (if built) skips a provider tripped past its threshold
-  and re-admits it after cooldown; two replicas share breaker state through
-  Redis; the console distinguishes errors from true zeroes.
+  (✅ done); the breaker skips a provider tripped past its threshold and
+  re-admits it after cooldown (✅ done, `tests/routing/test_circuit_breaker.py`
+  - the 3-candidate chain-filtering tests in `test_failover_orchestration.py`/
+  `test_failover_streaming.py`); two replicas share breaker state through
+  Redis (✅ done, `RedisCircuitBreaker`); the console distinguishes errors
+  from true zeroes (not started — deferred).
 
 ## TDD strategy
 

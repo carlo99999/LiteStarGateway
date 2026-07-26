@@ -12,6 +12,7 @@ from litestar_gateway.application.usage_meter import InFlightSpend, UsageMeter
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.ports import (
     BudgetRepository,
+    CircuitBreaker,
     LLMGateway,
     RateLimiter,
     RoutingDecisionLogFactory,
@@ -80,6 +81,7 @@ def provide_completion_service(
     shadow_repos_factory: NamedDependency[RoutingRepositoryFactory],
     rate_limiter: NamedDependency[RateLimiter],
     callable_resolver: NamedDependency[CallableAliasResolver],
+    circuit_breaker: NamedDependency[CircuitBreaker],
 ) -> CompletionService:
     # One request-scoped meter, shared by the completion path and the router:
     # judge/embeddings strategies make real, billable provider calls that must be
@@ -113,4 +115,5 @@ def provide_completion_service(
         router_service=router_service,
         meter=meter,
         callable_resolver=callable_resolver,
+        circuit_breaker=circuit_breaker,
     )

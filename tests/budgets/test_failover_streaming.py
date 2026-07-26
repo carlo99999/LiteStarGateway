@@ -33,6 +33,7 @@ from litestar_gateway.domain.routing import (
     RouterConfig,
     RoutingDecision,
 )
+from litestar_gateway.infrastructure.circuit_breaker import InMemoryCircuitBreaker
 
 TEAM_ID = uuid4()
 KEY_ID = uuid4()
@@ -223,6 +224,8 @@ def _service(
     router: RouterConfig,
     models: dict[UUID, Model],
     router_service: FixedDecisionRouter,
+    *,
+    circuit_breaker: InMemoryCircuitBreaker | None = None,
 ) -> CompletionService:
     return CompletionService(
         models=SimpleNamespace(get_by_name=None),  # type: ignore[arg-type]
@@ -235,6 +238,7 @@ def _service(
         ),
         router_service=router_service,  # type: ignore[arg-type]
         callable_resolver=MultiModelCallableResolver(router, models),  # type: ignore[arg-type]
+        circuit_breaker=circuit_breaker,
     )
 
 
@@ -317,6 +321,66 @@ async def test_exhausting_max_attempts_surfaces_the_last_streaming_error() -> No
     # failover_used=True even though the request ultimately failed -- a
     # retry did fire, which is exactly what this observability records.
     assert router_service.failover_outcomes == [(2, True)]
+
+
+def _three_candidate_router(
+    primary: Model, secondary: Model, tertiary: Model, *, max_attempts: int = 3
+) -> RouterConfig:
+    return RouterConfig(
+        id=uuid4(),
+        team_id=TEAM_ID,
+        name="auto",
+        candidates=(
+            CandidateModel(
+                model_name=primary.name,
+                model_id=primary.id,
+                description="primary",
+                quality_tier=QualityTier.MEDIUM,
+            ),
+            CandidateModel(
+                model_name=secondary.name,
+                model_id=secondary.id,
+                description="secondary",
+                quality_tier=QualityTier.MEDIUM,
+            ),
+            CandidateModel(
+                model_name=tertiary.name,
+                model_id=tertiary.id,
+                description="tertiary",
+                quality_tier=QualityTier.MEDIUM,
+            ),
+        ),
+        default_model=primary.name,
+        default_model_id=primary.id,
+        strategy="complexity",
+        strategy_config={},
+        enabled=True,
+        created_at=datetime.now(UTC),
+        failover_enabled=True,
+        max_attempts=max_attempts,
+    )
+
+
+async def test_a_tripped_candidate_is_skipped_in_the_streaming_retry_chain() -> None:
+    # secondary is already tripped past its failure threshold (constructed
+    # pre-tripped); the streaming retry chain must skip straight past it.
+    primary, secondary, tertiary = _model("primary"), _model("secondary"), _model("tertiary")
+    router = _three_candidate_router(primary, secondary, tertiary)
+    models = {primary.id: primary, secondary.id: secondary, tertiary.id: tertiary}
+    gateway = ScriptedStreamGateway([UpstreamUnavailable("503 at open")])
+    usage = FakeUsage()
+    breaker = InMemoryCircuitBreaker(failure_threshold=1, cooldown_seconds=999, clock=lambda: 0.0)
+    await breaker.record_failure(str(secondary.id))
+    service = _service(
+        gateway, usage, router, models, FixedDecisionRouter(primary), circuit_breaker=breaker
+    )
+
+    stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(REQUEST))
+    chunks = [chunk async for chunk in stream]
+
+    assert chunks == _ok_chunks()
+    # secondary was skipped -- the retry landed on tertiary, not secondary.
+    assert gateway.calls == [primary, tertiary]
 
 
 async def test_error_after_first_chunk_never_fails_over() -> None:

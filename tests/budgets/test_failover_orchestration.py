@@ -38,6 +38,7 @@ from litestar_gateway.domain.routing import (
     RouterConfig,
     RoutingDecision,
 )
+from litestar_gateway.infrastructure.circuit_breaker import InMemoryCircuitBreaker
 
 TEAM_ID = uuid4()
 KEY_ID = uuid4()
@@ -232,6 +233,7 @@ def _service(
     router_service: FixedDecisionRouter,
     *,
     rate_limiter: FakeRateLimiter | None = None,
+    circuit_breaker: InMemoryCircuitBreaker | None = None,
 ) -> CompletionService:
     return CompletionService(
         models=FakeModels({}),  # type: ignore[arg-type]
@@ -246,6 +248,45 @@ def _service(
         ),
         router_service=router_service,  # type: ignore[arg-type]
         callable_resolver=MultiModelCallableResolver(router, models),  # type: ignore[arg-type]
+        circuit_breaker=circuit_breaker,
+    )
+
+
+def _three_candidate_router(
+    primary: Model, secondary: Model, tertiary: Model, *, max_attempts: int = 3
+) -> RouterConfig:
+    return RouterConfig(
+        id=uuid4(),
+        team_id=TEAM_ID,
+        name="auto",
+        candidates=(
+            CandidateModel(
+                model_name=primary.name,
+                model_id=primary.id,
+                description="primary",
+                quality_tier=QualityTier.MEDIUM,
+            ),
+            CandidateModel(
+                model_name=secondary.name,
+                model_id=secondary.id,
+                description="secondary",
+                quality_tier=QualityTier.MEDIUM,
+            ),
+            CandidateModel(
+                model_name=tertiary.name,
+                model_id=tertiary.id,
+                description="tertiary",
+                quality_tier=QualityTier.MEDIUM,
+            ),
+        ),
+        default_model=primary.name,
+        default_model_id=primary.id,
+        strategy="complexity",
+        strategy_config={},
+        enabled=True,
+        created_at=datetime.now(UTC),
+        failover_enabled=True,
+        max_attempts=max_attempts,
     )
 
 
@@ -428,3 +469,98 @@ async def test_max_attempts_caps_the_chain_even_with_more_candidates() -> None:
 
     # max_attempts=2 caps the chain at 2 candidates even though 3 are declared.
     assert gateway.calls == [primary, secondary]
+
+
+async def test_a_tripped_candidate_is_skipped_in_the_retry_chain() -> None:
+    # secondary is already tripped past its failure threshold (constructed
+    # pre-tripped rather than driven there via repeated requests); the retry
+    # chain must skip straight past it to tertiary.
+    primary, secondary, tertiary = _model("primary"), _model("secondary"), _model("tertiary")
+    router = _three_candidate_router(primary, secondary, tertiary)
+    models = {primary.id: primary, secondary.id: secondary, tertiary.id: tertiary}
+    gateway = ScriptedGateway([UpstreamUnavailable("503")])
+    usage = FakeUsage()
+    breaker = InMemoryCircuitBreaker(failure_threshold=1, cooldown_seconds=999, clock=lambda: 0.0)
+    await breaker.record_failure(str(secondary.id))
+    service = _service(
+        gateway, usage, router, models, FixedDecisionRouter(primary), circuit_breaker=breaker
+    )
+
+    response = await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+
+    assert response["usage"] == {"prompt_tokens": 1, "completion_tokens": 1}
+    # secondary was skipped -- the retry landed on tertiary, not secondary.
+    assert gateway.calls == [primary, tertiary]
+
+
+async def test_a_failing_attempt_trips_the_breaker_for_a_later_request() -> None:
+    primary, secondary = _model("primary"), _model("secondary")
+    router = _router(primary, secondary, max_attempts=2)
+    models = {primary.id: primary, secondary.id: secondary}
+    breaker = InMemoryCircuitBreaker(failure_threshold=1, cooldown_seconds=999, clock=lambda: 0.0)
+    # First logical request: primary fails (failover-eligible), tripping the
+    # breaker for primary since threshold=1; secondary serves it.
+    gateway = ScriptedGateway([UpstreamUnavailable("503")])
+    usage = FakeUsage()
+    service = _service(
+        gateway, usage, router, models, FixedDecisionRouter(primary), circuit_breaker=breaker
+    )
+    await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+    assert gateway.calls == [primary, secondary]
+
+    # Second logical request: the router still picks primary as attempt #1
+    # (the breaker only filters the *retry* chain, not attempt #1), but a
+    # forced second failure on primary would find secondary skipped this time.
+    assert await breaker.allow(str(primary.id)) is False
+
+
+async def test_a_success_clears_prior_failures_before_the_threshold_trips() -> None:
+    # Partial-failure-then-recovery: consecutive-since-last-success semantics
+    # mean scattered, non-consecutive failures never trip the breaker. Three
+    # separate logical requests exercise this: secondary fails once (below
+    # the threshold=2), then succeeds outright (resetting its counter), so a
+    # later single failure on primary still finds secondary eligible for the
+    # retry chain -- it was never allowed to accumulate a second failure.
+    primary, secondary, tertiary = _model("primary"), _model("secondary"), _model("tertiary")
+    router = _three_candidate_router(primary, secondary, tertiary)
+    models = {primary.id: primary, secondary.id: secondary, tertiary.id: tertiary}
+    breaker = InMemoryCircuitBreaker(failure_threshold=2, cooldown_seconds=999, clock=lambda: 0.0)
+
+    gateway_a = ScriptedGateway([UpstreamUnavailable("503")])
+    service_a = _service(
+        gateway_a,
+        FakeUsage(),
+        router,
+        models,
+        FixedDecisionRouter(secondary),
+        circuit_breaker=breaker,
+    )
+    await service_a.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+    assert await breaker.allow(str(secondary.id)) is True  # only 1 consecutive failure so far
+
+    gateway_b = ScriptedGateway([])  # secondary succeeds outright this time
+    service_b = _service(
+        gateway_b,
+        FakeUsage(),
+        router,
+        models,
+        FixedDecisionRouter(secondary),
+        circuit_breaker=breaker,
+    )
+    await service_b.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+
+    gateway_c = ScriptedGateway([UpstreamUnavailable("503-again")])
+    service_c = _service(
+        gateway_c,
+        FakeUsage(),
+        router,
+        models,
+        FixedDecisionRouter(primary),
+        circuit_breaker=breaker,
+    )
+    response = await service_c.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+
+    assert response["usage"] == {"prompt_tokens": 1, "completion_tokens": 1}
+    # secondary was NOT skipped -- its earlier failure was reset by the
+    # outright success on request B above.
+    assert gateway_c.calls == [primary, secondary]

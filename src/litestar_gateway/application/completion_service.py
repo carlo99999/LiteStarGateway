@@ -34,6 +34,7 @@ from litestar_gateway.domain.exceptions import (
 )
 from litestar_gateway.domain.failover import is_failover_eligible
 from litestar_gateway.domain.ports import (
+    CircuitBreaker,
     CredentialRepository,
     LLMGateway,
     ModelRepository,
@@ -139,6 +140,7 @@ class CompletionService:
         meter: UsageMeter,
         router_service: RouterService | None = None,
         callable_resolver: CallableAliasResolver | None = None,
+        circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
         self._models = models
         self._credentials = credentials
@@ -146,6 +148,7 @@ class CompletionService:
         self._meter = meter
         self._router_service = router_service
         self._callable_resolver = callable_resolver
+        self._circuit_breaker = circuit_breaker
 
     async def _candidate_model(self, team_id: UUID, candidate: CandidateModel) -> Model | None:
         if self._callable_resolver is not None:
@@ -742,6 +745,18 @@ class CompletionService:
                 models.append(candidate_model)
         return models
 
+    async def _breaker_filtered(self, candidates: list[Model]) -> list[Model]:
+        """Drop candidates the circuit breaker has short-circuited (tripped
+        past its failure threshold, still cooling down) from the retry chain.
+        A no-op when no breaker is configured."""
+        if self._circuit_breaker is None:
+            return candidates
+        allowed: list[Model] = []
+        for candidate in candidates:
+            if await self._circuit_breaker.allow(str(candidate.id)):
+                allowed.append(candidate)
+        return allowed
+
     async def _chat_completion_with_failover(
         self,
         team_id: UUID,
@@ -763,6 +778,7 @@ class CompletionService:
         output ceiling and provider contract."""
         start = perf_counter()
         remaining = await self._remaining_failover_candidates(team_id, router, decision, sanitized)
+        remaining = await self._breaker_filtered(remaining)
         max_attempts = min(router.max_attempts, 1 + len(remaining))
         attempt_model, attempt_values, attempt_reservation, attempt_clean = (
             model,
@@ -797,7 +813,7 @@ class CompletionService:
                         skip_team_rate_limit=True,
                     )
                 try:
-                    return await self._dispatch(
+                    response = await self._dispatch(
                         team_id,
                         api_key_id,
                         attempt_model,
@@ -815,14 +831,21 @@ class CompletionService:
                     # it would double-bill the team for one logical request, so
                     # it is terminal here even though the general eligibility
                     # classifier marks it eligible (it subclasses
-                    # UpstreamUnavailable, whose *other* members never bill).
-                    if (
-                        not is_failover_eligible(exc)
-                        or isinstance(exc, UpstreamResponseInvalid)
-                        or attempt_index == max_attempts - 1
-                    ):
+                    # UpstreamUnavailable, whose *other* members never bill). A
+                    # client 4xx (not failover-eligible) never trips the breaker --
+                    # it is the client's fault, not the provider's.
+                    eligible = is_failover_eligible(exc) and not isinstance(
+                        exc, UpstreamResponseInvalid
+                    )
+                    if eligible and self._circuit_breaker is not None:
+                        await self._circuit_breaker.record_failure(str(attempt_model.id))
+                    if not eligible or attempt_index == max_attempts - 1:
                         raise
                     last_exc = exc
+                    continue
+                if self._circuit_breaker is not None:
+                    await self._circuit_breaker.record_success(str(attempt_model.id))
+                return response
             raise AssertionError("unreachable: the loop above always returns or raises")
         finally:
             if self._router_service is not None:
@@ -926,6 +949,7 @@ class CompletionService:
         this loop retries."""
         start = perf_counter()
         remaining = await self._remaining_failover_candidates(team_id, router, decision, sanitized)
+        remaining = await self._breaker_filtered(remaining)
         max_attempts = min(router.max_attempts, 1 + len(remaining))
         attempt_model, attempt_values, attempt_reservation, attempt_clean = (
             model,
@@ -967,7 +991,10 @@ class CompletionService:
                     # Never entered _metered, so nothing else releases this
                     # attempt's reservation -- we must release it ourselves.
                     self._meter.release(team_id, attempt_reservation)
-                    if not is_failover_eligible(exc) or attempt_index == max_attempts - 1:
+                    eligible = is_failover_eligible(exc)
+                    if eligible and self._circuit_breaker is not None:
+                        await self._circuit_breaker.record_failure(str(attempt_model.id))
+                    if not eligible or attempt_index == max_attempts - 1:
                         raise
                     last_exc = exc
                     continue
@@ -985,15 +1012,22 @@ class CompletionService:
                     attribution,
                 )
                 try:
-                    return await _prime(gen)
+                    primed = await _prime(gen)
                 except DomainError as exc:
                     # metered_stream's own shielded finally already released this
                     # reservation (via the release() closure _metered wired in)
                     # and already settled billing (nothing, per M26, since zero
                     # chunks were ever produced) -- do not release again here.
-                    if not is_failover_eligible(exc) or attempt_index == max_attempts - 1:
+                    eligible = is_failover_eligible(exc)
+                    if eligible and self._circuit_breaker is not None:
+                        await self._circuit_breaker.record_failure(str(attempt_model.id))
+                    if not eligible or attempt_index == max_attempts - 1:
                         raise
                     last_exc = exc
+                    continue
+                if self._circuit_breaker is not None:
+                    await self._circuit_breaker.record_success(str(attempt_model.id))
+                return primed
             raise AssertionError("unreachable: the loop above always returns or raises")
         finally:
             if self._router_service is not None:
