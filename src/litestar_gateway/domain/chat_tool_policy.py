@@ -153,6 +153,34 @@ def decode_vertex_thought_signature(value: Any, *, field: str) -> bytes:
     return decoded
 
 
+# Carries an opaque Gemini thought_signature inside the tool call's own id
+# (the same trick LiteLLM uses), rather than a side-channel field: both the
+# OpenAI Chat and Responses wire contracts already require the client to
+# echo a tool call's id back verbatim to correlate its result, and the
+# gateway's own generic Responses<->Chat translators copy call ids but not
+# arbitrary extra fields — so encoding into the id is the one carrier that
+# survives every surface without special-casing.
+VERTEX_CALL_ID_SIGNATURE_DELIMITER = "__thought__"
+
+
+def encode_vertex_call_id(call_id: str, signature: bytes | None) -> str:
+    if signature is None:
+        return call_id
+    return (
+        f"{call_id}{VERTEX_CALL_ID_SIGNATURE_DELIMITER}"
+        f"{base64.b64encode(signature).decode('ascii')}"
+    )
+
+
+def decode_vertex_call_id(value: str, *, field: str) -> tuple[str, bytes | None]:
+    base_id, delimiter, encoded_signature = value.partition(VERTEX_CALL_ID_SIGNATURE_DELIMITER)
+    if not delimiter:
+        return value, None
+    if not base_id:
+        raise UnsupportedOperation(f"Provider 'vertex_ai' requires {field} to have a call id")
+    return base_id, decode_vertex_thought_signature(encoded_signature, field=field)
+
+
 def _validate_text_content(content: Any, *, provider: Provider, field: str) -> None:
     if isinstance(content, str):
         return
@@ -620,40 +648,30 @@ def _validate_vertex_extra_content(
     *,
     call_id: str,
     field: str,
-) -> bool:
+) -> None:
+    """Validate the gateway-provenance marker only; the thought_signature
+    carrier lives in the call id itself (`decode_vertex_call_id`), not here."""
     if extra_content is None:
-        return False
+        return
     if (
         not isinstance(extra_content, dict)
         or not extra_content
-        or set(extra_content) - {"google", "litestar_gateway"}
+        or set(extra_content) - {"litestar_gateway"}
     ):
         raise UnsupportedOperation(
             f"Provider 'vertex_ai' requires {field} to contain only documented metadata"
         )
-    google = extra_content.get("google")
-    if "google" in extra_content:
-        if not isinstance(google, dict) or set(google) != {"thought_signature"}:
-            raise UnsupportedOperation(
-                f"Provider 'vertex_ai' requires {field}.google to contain only thought_signature"
-            )
-        decode_vertex_thought_signature(
-            google["thought_signature"],
-            field=f"{field}.google.thought_signature",
-        )
     gateway = extra_content.get("litestar_gateway")
-    if "litestar_gateway" in extra_content:
-        if (
-            not isinstance(gateway, dict)
-            or set(gateway) != {"synthetic_call_id"}
-            or gateway.get("synthetic_call_id") is not True
-            or not call_id.startswith(VERTEX_GATEWAY_CALL_ID_PREFIX)
-        ):
-            raise UnsupportedOperation(
-                f"Provider 'vertex_ai' requires {field}.litestar_gateway to mark only "
-                "gateway-generated call IDs"
-            )
-    return "google" in extra_content
+    if (
+        not isinstance(gateway, dict)
+        or set(gateway) != {"synthetic_call_id"}
+        or gateway.get("synthetic_call_id") is not True
+        or not call_id.startswith(VERTEX_GATEWAY_CALL_ID_PREFIX)
+    ):
+        raise UnsupportedOperation(
+            f"Provider 'vertex_ai' requires {field}.litestar_gateway to mark only "
+            "gateway-generated call IDs"
+        )
 
 
 def _validate_tool_replay(
@@ -713,12 +731,15 @@ def _validate_tool_replay(
                 pending_call_ids.add(call_id)
                 pending_call_order.append(call_id)
                 if provider is Provider.VERTEX_AI:
-                    has_signature = _validate_vertex_extra_content(
+                    _validate_vertex_extra_content(
                         call.get("extra_content"),
                         call_id=call_id,
                         field=f"messages[{index}].tool_calls[{call_index}].extra_content",
                     )
-                    if has_signature and call_index != 0:
+                    _, signature = decode_vertex_call_id(
+                        call_id, field=f"messages[{index}].tool_calls[{call_index}].id"
+                    )
+                    if signature is not None and call_index != 0:
                         raise UnsupportedOperation(
                             "Provider 'vertex_ai' requires thought_signature only on "
                             "the first function call in a parallel group"
@@ -727,10 +748,8 @@ def _validate_tool_replay(
                 provider is Provider.VERTEX_AI
                 and model.provider_model_id.lower().startswith("gemini-3")
                 and isinstance(tool_calls[0], dict)
-                and not (
-                    isinstance(tool_calls[0].get("extra_content"), dict)
-                    and isinstance(tool_calls[0]["extra_content"].get("google"), dict)
-                )
+                and isinstance(tool_calls[0].get("id"), str)
+                and decode_vertex_call_id(tool_calls[0]["id"], field="tool_calls[0].id")[1] is None
             ):
                 raise UnsupportedOperation(
                     "Provider 'vertex_ai' requires thought_signature on the first "

@@ -364,23 +364,18 @@ async def test_vertex_malformed_signature_fails_before_router_and_budget_side_ef
                         "role": "assistant",
                         "tool_calls": [
                             {
-                                "id": "call_a",
+                                "id": "call_a__thought__not base64!",
                                 "type": "function",
                                 "function": {
                                     "name": "weather",
                                     "arguments": "{}",
-                                },
-                                "extra_content": {
-                                    "google": {
-                                        "thought_signature": "not base64!",
-                                    }
                                 },
                             }
                         ],
                     },
                     {
                         "role": "tool",
-                        "tool_call_id": "call_a",
+                        "tool_call_id": "call_a__thought__not base64!",
                         "content": "{}",
                     },
                 ],
