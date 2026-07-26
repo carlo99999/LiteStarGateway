@@ -187,6 +187,81 @@ a thin caller of this service, sharing the store and `EmbedFn` (no parallel cach
 - **Done when:** an admin sees hit rate and cost saved, and can toggle the cache
   per team/model from the console (Plan 03).
 
+> **Done — 27 July 2026.** Shipped as-designed, mirroring the smart-routing
+> savings endpoints byte-for-byte in shape: `UsageRepository.cache_savings(team_id)`
+> and `.platform_cache_savings()` (new port methods, implemented in
+> `SQLAlchemyUsageRepository` as one point-in-time aggregate query each, the
+> same pattern as `SQLAlchemyRoutingDecisionLog._savings_aggregate`) return
+> `(avoided_cost, priced_hits, hits_without_price, total_events)` by
+> `LEFT JOIN`-ing `usage_event` to `model` on `model_id` and summing, over
+> `cache_hit=true` rows whose model still has both unit costs configured,
+> `model.input_cost_per_token × event.prompt_tokens + model.output_cost_per_token
+> × event.completion_tokens` — the event's own *stored* token counts (not the
+> model's current tokens) at the model's *current* unit price, exactly as
+> briefed. A hit whose model was deleted or never priced still counts toward
+> the hit rate (`hits_without_price`) but contributes $0 to the sum, so a
+> missing price can never inflate or crash the aggregate.
+>
+> Two endpoints, added to `infrastructure/web/teams/controller.py` (not a new
+> controller — it already owns `usage_repository` and the team/platform RBAC
+> dependencies for the sibling `/usage` and `/budget` endpoints):
+> `GET /teams/{team_id}/cache/savings` (`team_service.ensure_team_permission`,
+> `Permission.USAGE_READ`, mirroring `web/routing/controller.py`'s
+> `team_savings` exactly) and `GET /cache/savings` (platform-admin only via
+> `provide_current_admin`, mirroring the module-level `platform_routing_savings`
+> function, registered in `app.py` next to `TeamController`). Both return a
+> plain `dict[str, Any]` (untyped in the OpenAPI schema, same convention as the
+> routing savings dicts): `cache_hit_rate` (`hits / total_requests`, `0.0` when
+> `total_requests` is `0` — the mandated empty-state, no exception path),
+> `estimated_cost_saved`, `cache_hits`, `cache_hits_without_price`, and
+> `total_requests` (every usage event for the scope, hit or miss — the hit-rate
+> denominator); the team endpoint additionally echoes `team_id`.
+>
+> Console: the three toggle checkboxes (`cache_enabled`,
+> `cache_allow_nondeterministic`, `cache_semantic_enabled`) were added to both
+> `CreateModelDialog.tsx` and `EditModelDialog.tsx` (the backend DTOs already
+> carried all three fields end-to-end since Phase 0/2 — this was a pure
+> frontend gap), wired through new fields on `NewModel`/`EditModel` in
+> `features/models/api.ts`. The observability view landed as a small
+> `CacheSavingsPanel` (hit rate, cost saved, hit count — the same `Stat`-card
+> layout `RouterDetailPage.tsx` uses for routing savings) embedded in
+> `ModelsPage.tsx`'s per-team section, gated on `canReadUsage(role)`: chosen
+> over a `UsagePage.tsx` section or a standalone `features/cache/` page
+> because the cache toggle already lives on this page's model dialogs, so hit
+> rate/cost saved sit right next to the setting that controls them, and no
+> platform-wide dashboard tile was added (deliberately out of scope — the
+> team-scoped panel was the one explicitly required by "Done when"). The
+> checked-in `ui/openapi.json`/`schema.ts` were regenerated via `just
+> ui-schema` to pick up the new endpoints and the three model fields; doing so
+> also surfaced a **pre-existing, unrelated** frontend/schema drift —
+> `RouterRequest.failover_enabled`/`.max_attempts` (shipped on the backend
+> before this phase) were never threaded through
+> `setRouterEnabled`/`setGlobalRouterEnabled`/`CreateRouterDialog.tsx`, which
+> the newly-regenerated (now-required, non-optional) TS fields turned into a
+> `tsc` build failure. Fixed minimally (pass the router's existing values
+> through on toggle-enable; default `false`/`3` on create) to keep the gate
+> green — unrelated to Plan 04 itself, called out here for visibility.
+>
+> Deliberate simplifications versus the letter of the design: (1) `cache_hit`
+> is not surfaced as a new column/badge in `UsagePage.tsx` — the repo has no
+> existing per-event flag/badge convention there (verified: no
+> `Badge`/`cache_hit` references pre-existing) and the brief treated this as
+> lowest-priority/optional; skipped rather than inventing new UI infrastructure
+> for it. (2) No new Alembic migration — all three toggle columns and
+> `cache_hit` already existed from Phases 0/2, exactly as expected. (3) UI
+> verification performed: `pnpm typecheck`/`pnpm lint`/`pnpm build`/`pnpm test`
+> all green; an end-to-end script driving two identical `/v1/chat/completions`
+> requests through the real app (via Litestar's `AsyncTestClient`, the same
+> harness the test suite uses — not a separately-running `uvicorn` process
+> reached by a plain `curl`) confirmed a cache hit and a non-zero
+> `cache_hit_rate`/`estimated_cost_saved` from both new endpoints. A headless
+> browser check of the rendered console page (checkbox toggle round-trip,
+> panel rendering with live numbers) was **not** performed — deferred and
+> stated explicitly, not silently skipped.
+>
+> This completes Plan 04. All four phases (exact-match cache, Redis store,
+> semantic tier, console observability) are shipped.
+
 ## TDD test strategy
 
 - **Unit — key derivation:** table-driven equivalence/difference cases — same

@@ -53,3 +53,18 @@ class UsageRepository(Protocol):
         """Move up to `limit` dead-lettered usage events into the ledger (idempotent
         by event id), removing settled ones. Returns how many were settled."""
         ...
+
+    async def cache_savings(self, team_id: UUID) -> tuple[float, int, int, int]:
+        """Response-cache observability for one team (Plan 04 Phase 3):
+        ``(avoided_cost, priced_hits, hits_without_price, total_events)``.
+
+        ``avoided_cost`` sums, over cache-hit events whose model still has a
+        priced unit cost, the stored token counts × the model's *current* unit
+        price. ``priced_hits`` + ``hits_without_price`` is the total hit count;
+        ``total_events`` is every usage event for the team (hit rate
+        denominator)."""
+        ...
+
+    async def platform_cache_savings(self) -> tuple[float, int, int, int]:
+        """Same as `cache_savings`, across every team (platform-admin dashboard)."""
+        ...

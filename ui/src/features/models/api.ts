@@ -27,6 +27,13 @@ export interface NewModel {
   inputCostPerToken: number | null;
   outputCostPerToken: number | null;
   enabled: boolean;
+  /** Response cache opt-in (Plan 04): off by default even when the platform
+   * kill-switch is on. */
+  cacheEnabled: boolean;
+  /** Also cache requests with `temperature > 0` (refused by default). */
+  cacheAllowNondeterministic: boolean;
+  /** Semantic-tier opt-in; only takes effect when `cacheEnabled` is also true. */
+  cacheSemanticEnabled: boolean;
 }
 
 function fail(error: unknown, fallback: string): Error {
@@ -116,6 +123,9 @@ export async function createModel(teamId: string, model: NewModel): Promise<Mode
       input_cost_per_token: model.inputCostPerToken,
       output_cost_per_token: model.outputCostPerToken,
       enabled: model.enabled,
+      cache_enabled: model.cacheEnabled,
+      cache_allow_nondeterministic: model.cacheAllowNondeterministic,
+      cache_semantic_enabled: model.cacheSemanticEnabled,
     },
   });
   if (error || !data) throw fail(error, "Failed to create model");
@@ -144,6 +154,9 @@ export interface EditModel {
   apiVersion: string | null;
   inputCostPerToken: number | null;
   outputCostPerToken: number | null;
+  cacheEnabled: boolean;
+  cacheAllowNondeterministic: boolean;
+  cacheSemanticEnabled: boolean;
 }
 
 /** PATCH /teams/{id}/models/{modelId} — update mutable fields. The backend
@@ -162,6 +175,9 @@ export async function updateModel(
       api_version: changes.apiVersion,
       input_cost_per_token: changes.inputCostPerToken,
       output_cost_per_token: changes.outputCostPerToken,
+      cache_enabled: changes.cacheEnabled,
+      cache_allow_nondeterministic: changes.cacheAllowNondeterministic,
+      cache_semantic_enabled: changes.cacheSemanticEnabled,
     },
   });
   if (error || !data) throw fail(error, "Failed to update model");
@@ -180,6 +196,9 @@ function modelBody(model: NewModel) {
     input_cost_per_token: model.inputCostPerToken,
     output_cost_per_token: model.outputCostPerToken,
     enabled: model.enabled,
+    cache_enabled: model.cacheEnabled,
+    cache_allow_nondeterministic: model.cacheAllowNondeterministic,
+    cache_semantic_enabled: model.cacheSemanticEnabled,
   };
 }
 
@@ -216,6 +235,9 @@ export async function updateGlobalModel(modelId: string, changes: EditModel): Pr
       api_version: changes.apiVersion,
       input_cost_per_token: changes.inputCostPerToken,
       output_cost_per_token: changes.outputCostPerToken,
+      cache_enabled: changes.cacheEnabled,
+      cache_allow_nondeterministic: changes.cacheAllowNondeterministic,
+      cache_semantic_enabled: changes.cacheSemanticEnabled,
     },
   });
   if (error || !data) throw fail(error, "Failed to update global model");
@@ -305,4 +327,32 @@ export async function deleteModel(teamId: string, modelId: string): Promise<void
     params: { path: { team_id: teamId, model_id: modelId } },
   });
   if (error) throw fail(error, "Failed to delete model");
+}
+
+/** Shape of the response-cache savings endpoints (untyped dicts in the OpenAPI
+ * schema, same convention as `RouterSavings` in `features/routing/api.ts`). */
+export interface CacheSavings {
+  cache_hit_rate: number;
+  estimated_cost_saved: number;
+  cache_hits: number;
+  cache_hits_without_price: number;
+  total_requests: number;
+}
+
+/** GET /teams/{id}/cache/savings — response-cache hit rate and cost saved for
+ * the team (requires `usage:read`). */
+export async function teamCacheSavings(teamId: string): Promise<CacheSavings> {
+  const { data, error } = await api.GET("/teams/{team_id}/cache/savings", {
+    params: { path: { team_id: teamId } },
+  });
+  if (error || !data) throw fail(error, "Failed to load cache savings");
+  return data as unknown as CacheSavings;
+}
+
+/** GET /cache/savings — response-cache hit rate and cost saved across the
+ * whole platform (platform-admin only). */
+export async function platformCacheSavings(): Promise<CacheSavings> {
+  const { data, error } = await api.GET("/cache/savings");
+  if (error || !data) throw fail(error, "Failed to load platform cache savings");
+  return data as unknown as CacheSavings;
 }

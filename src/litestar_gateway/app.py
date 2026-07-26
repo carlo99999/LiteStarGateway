@@ -97,7 +97,7 @@ from litestar_gateway.infrastructure.web.sso_settings import SsoSettingsControll
 from litestar_gateway.infrastructure.web.sso_settings.dependencies import (
     provide_sso_settings_service,
 )
-from litestar_gateway.infrastructure.web.teams import TeamController
+from litestar_gateway.infrastructure.web.teams import TeamController, platform_cache_savings
 from litestar_gateway.infrastructure.web.ui_site import create_ui_router
 from litestar_gateway.infrastructure.web.users import create_users_router
 from litestar_gateway.infrastructure.web.users.dependencies import provide_user_service
@@ -240,6 +240,7 @@ def _build_route_handlers(database: Database, settings: Settings) -> list:
         create_session_router(),  # login (public) + /me (JWT)
         OrganizationController,  # platform-admin: orgs + team creation
         TeamController,  # team-admin: members + team-scoped API keys
+        platform_cache_savings,  # platform-admin: cross-team response-cache savings
         ModelController,  # team-admin: team-scoped model deployments
         PlatformModelController,  # platform-admin: global models + extension grants
         ModelPricesController,  # default per-token pricing lookup (console prefill)

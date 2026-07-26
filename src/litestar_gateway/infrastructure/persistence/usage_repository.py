@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import and_, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import ApiKeySpend, UsageAggregate, UsageEvent
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_gateway.infrastructure.persistence.orm import PendingUsageEventModel, UsageEventModel
+from litestar_gateway.infrastructure.persistence.orm import (
+    ModelRecord,
+    PendingUsageEventModel,
+    UsageEventModel,
+)
 
 logger = logging.getLogger("litestar_gateway.usage")
 
@@ -264,6 +269,49 @@ class SQLAlchemyUsageRepository:
                 await self._session.rollback()
                 await self._mark_failed_attempt(row_id, event_id, attempts + 1, exc)
         return settled
+
+    async def cache_savings(self, team_id: UUID) -> tuple[float, int, int, int]:
+        return await self._cache_savings_aggregate(UsageEventModel.team_id == team_id)
+
+    async def platform_cache_savings(self) -> tuple[float, int, int, int]:
+        return await self._cache_savings_aggregate()
+
+    async def _cache_savings_aggregate(self, *base: Any) -> tuple[float, int, int, int]:
+        # One point-in-time query, mirroring the routing savings aggregate
+        # (`router_repository.py`'s `_savings_aggregate`): a cache-hit event's
+        # own stored token counts × the model's *current* unit price (joined by
+        # model_id) is what the request would have cost — "priced" excludes
+        # hits whose model has no cost configured (or was deleted).
+        priced = and_(
+            UsageEventModel.cache_hit.is_(True),
+            ModelRecord.input_cost_per_token.is_not(None),
+            ModelRecord.output_cost_per_token.is_not(None),
+        )
+        cost_expr = (
+            ModelRecord.input_cost_per_token * UsageEventModel.prompt_tokens
+            + ModelRecord.output_cost_per_token * UsageEventModel.completion_tokens
+        )
+        avoided, priced_hits, all_hits, total = (
+            await self._session.execute(
+                select(
+                    func.coalesce(func.sum(case((priced, cost_expr), else_=0.0)), 0.0),
+                    func.coalesce(func.sum(case((priced, 1), else_=0)), 0),
+                    func.coalesce(
+                        func.sum(case((UsageEventModel.cache_hit.is_(True), 1), else_=0)), 0
+                    ),
+                    func.count(),
+                )
+                .select_from(UsageEventModel)
+                .outerjoin(ModelRecord, ModelRecord.id == UsageEventModel.model_id)
+                .where(*base)
+            )
+        ).one()
+        return (
+            float(avoided or 0.0),
+            int(priced_hits or 0),
+            int((all_hits or 0) - (priced_hits or 0)),
+            int(total or 0),
+        )
 
     async def _mark_failed_attempt(
         self, row_id: UUID, event_id: UUID, attempts: int, exc: Exception

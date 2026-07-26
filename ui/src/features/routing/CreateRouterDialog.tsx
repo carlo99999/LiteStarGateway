@@ -216,6 +216,8 @@ export function CreateRouterDialog({
         strategy_config: buildStrategyConfig(),
         enabled: true,
         shadow_strategy: shadow || null,
+        failover_enabled: false,
+        max_attempts: 3,
       };
       return global ? createGlobalRouter(body) : createRouter(teamId as string, body);
     },

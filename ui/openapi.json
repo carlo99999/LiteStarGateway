@@ -300,7 +300,7 @@
                     "api-endpoint"
                 ],
                 "summary": "OpenAI-compatible Responses API",
-                "description": "OpenAI and Azure use the provider's native Responses API (full feature set). Providers without one (e.g. Databricks) are **emulated** over chat.completions: text-in/text-out works, but tools, structured outputs, multimodal input and stateful conversations are not supported.",
+                "description": "OpenAI and Azure use the provider's native Responses API for the governed synchronous, stateless SDK surface. Providers without one are **emulated** over chat.completions: text and structured outputs work; Databricks and Anthropic also support non-streaming function-tool loops. Streaming tools, other providers' emulated tools, multimodal input, stateful conversations, background execution and client-selected service tiers fail explicitly with 501.",
                 "operationId": "V1ResponsesResponses",
                 "requestBody": {
                     "content": {
@@ -4728,6 +4728,105 @@
                 "deprecated": false
             }
         },
+        "/teams/{team_id}/cache/savings": {
+            "get": {
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Response-cache hit rate and cost saved for the team",
+                "operationId": "TeamsTeamIdCacheSavingsTeamCacheSavings",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {},
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/teams/{team_id}/usage": {
             "get": {
                 "tags": [
@@ -4931,6 +5030,55 @@
                                             "extra": {}
                                         }
                                     ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/cache/savings": {
+            "get": {
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Response-cache hit rate and cost saved across the whole platform",
+                "operationId": "CacheSavingsPlatformCacheSavings",
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {},
+                                    "type": "object"
                                 }
                             }
                         }
@@ -11732,6 +11880,18 @@
                     "enabled": {
                         "type": "boolean",
                         "default": true
+                    },
+                    "cache_enabled": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "cache_allow_nondeterministic": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "cache_semantic_enabled": {
+                        "type": "boolean",
+                        "default": false
                     }
                 },
                 "type": "object",
@@ -12539,6 +12699,18 @@
                                 "type": "null"
                             }
                         ]
+                    },
+                    "cache_enabled": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "cache_allow_nondeterministic": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "cache_semantic_enabled": {
+                        "type": "boolean",
+                        "default": false
                     }
                 },
                 "type": "object",
@@ -12919,6 +13091,24 @@
                                 "type": "null"
                             }
                         ]
+                    },
+                    "failover_enabled": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "max_attempts": {
+                        "type": "integer",
+                        "default": 3
+                    },
+                    "overall_deadline_ms": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",
@@ -13020,6 +13210,24 @@
                             {
                                 "type": "string",
                                 "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "failover_enabled": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "max_attempts": {
+                        "type": "integer",
+                        "default": 3
+                    },
+                    "overall_deadline_ms": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
                             },
                             {
                                 "type": "null"
@@ -13549,6 +13757,36 @@
                         ]
                     },
                     "enabled": {
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "cache_enabled": {
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "cache_allow_nondeterministic": {
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "cache_semantic_enabled": {
                         "oneOf": [
                             {
                                 "type": "boolean"

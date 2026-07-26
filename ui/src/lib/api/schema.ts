@@ -103,7 +103,7 @@ export interface paths {
         put?: never;
         /**
          * OpenAI-compatible Responses API
-         * @description OpenAI and Azure use the provider's native Responses API (full feature set). Providers without one (e.g. Databricks) are **emulated** over chat.completions: text-in/text-out works, but tools, structured outputs, multimodal input and stateful conversations are not supported.
+         * @description OpenAI and Azure use the provider's native Responses API for the governed synchronous, stateless SDK surface. Providers without one are **emulated** over chat.completions: text and structured outputs work; Databricks and Anthropic also support non-streaming function-tool loops. Streaming tools, other providers' emulated tools, multimodal input, stateful conversations, background execution and client-selected service tiers fail explicitly with 501.
          */
         post: operations["V1ResponsesResponses"];
         delete?: never;
@@ -699,6 +699,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/cache/savings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Response-cache hit rate and cost saved for the team */
+        get: operations["TeamsTeamIdCacheSavingsTeamCacheSavings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams/{team_id}/usage": {
         parameters: {
             query?: never;
@@ -708,6 +725,23 @@ export interface paths {
         };
         /** Usage */
         get: operations["TeamsTeamIdUsageUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cache/savings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Response-cache hit rate and cost saved across the whole platform */
+        get: operations["CacheSavingsPlatformCacheSavings"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1661,6 +1695,12 @@ export interface components {
             output_cost_per_token?: number | null;
             /** @default true */
             enabled: boolean;
+            /** @default false */
+            cache_enabled: boolean;
+            /** @default false */
+            cache_allow_nondeterministic: boolean;
+            /** @default false */
+            cache_semantic_enabled: boolean;
         };
         /** CreateOrganizationRequest */
         CreateOrganizationRequest: {
@@ -1854,6 +1894,12 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             origin_team_id?: string | null;
+            /** @default false */
+            cache_enabled: boolean;
+            /** @default false */
+            cache_allow_nondeterministic: boolean;
+            /** @default false */
+            cache_semantic_enabled: boolean;
         };
         /**
          * ModelType
@@ -1949,6 +1995,11 @@ export interface components {
             enabled: boolean;
             shadow_strategy?: string | null;
             base_revision_id?: string | null;
+            /** @default false */
+            failover_enabled: boolean;
+            /** @default 3 */
+            max_attempts: number;
+            overall_deadline_ms?: number | null;
         };
         /** RouterResponse */
         RouterResponse: {
@@ -1972,6 +2023,11 @@ export interface components {
             revision_id?: string | null;
             revision_number?: number | null;
             default_model_id?: string | null;
+            /** @default false */
+            failover_enabled: boolean;
+            /** @default 3 */
+            max_attempts: number;
+            overall_deadline_ms?: number | null;
         };
         /** ScimTokenCreateRequest */
         ScimTokenCreateRequest: {
@@ -2117,6 +2173,9 @@ export interface components {
             input_cost_per_token?: number | null;
             output_cost_per_token?: number | null;
             enabled?: boolean | null;
+            cache_enabled?: boolean | null;
+            cache_allow_nondeterministic?: boolean | null;
+            cache_semantic_enabled?: boolean | null;
         };
         /** UpdateOrganizationRequest */
         UpdateOrganizationRequest: {
@@ -4295,6 +4354,51 @@ export interface operations {
             };
         };
     };
+    TeamsTeamIdCacheSavingsTeamCacheSavings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
     TeamsTeamIdUsageUsage: {
         parameters: {
             query?: {
@@ -4340,6 +4444,34 @@ export interface operations {
                         extra?: null | {
                             [key: string]: unknown;
                         } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    CacheSavingsPlatformCacheSavings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
                     };
                 };
             };

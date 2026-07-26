@@ -7,6 +7,7 @@ admin or team admin). Domain errors are mapped to HTTP by the central handler.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from litestar import Controller, Request, delete, get, patch, post, put
@@ -42,6 +43,21 @@ from litestar_gateway.infrastructure.web.teams.schemas import (
     UsageResponse,
     resolve_key_expiry,
 )
+
+
+def _cache_savings_response(
+    avoided_cost: float, priced_hits: int, hits_without_price: int, total_events: int
+) -> dict[str, Any]:
+    """Shared shape for the team-scoped and platform-wide cache-savings
+    endpoints (Plan 04 Phase 3), mirroring the routing savings dict shape."""
+    hits = priced_hits + hits_without_price
+    return {
+        "cache_hit_rate": (hits / total_events) if total_events else 0.0,
+        "estimated_cost_saved": avoided_cost,
+        "cache_hits": hits,
+        "cache_hits_without_price": hits_without_price,
+        "total_requests": total_events,
+    }
 
 
 def _parse_budget(data: SetBudgetRequest, team_id: UUID) -> Budget:
@@ -477,3 +493,48 @@ class TeamController(Controller):
             offset=page_offset,
         )
         return [UsageResponse.from_aggregate(a) for a in aggregates]
+
+    @get(
+        "/{team_id:uuid}/cache/savings",
+        summary="Response-cache hit rate and cost saved for the team",
+    )
+    async def team_cache_savings(
+        self,
+        team_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        usage_repository: NamedDependency[UsageRepository],
+    ) -> dict[str, Any]:
+        """Response-cache observability (Plan 04 Phase 3), mirroring the
+        smart-routing savings endpoint: hit rate + Σ(avoided cost) across the
+        team's own usage history."""
+        await team_service.ensure_team_permission(current_user, team_id, Permission.USAGE_READ)
+        avoided_cost, priced_hits, hits_without_price, total = await usage_repository.cache_savings(
+            team_id
+        )
+        return {
+            "team_id": str(team_id),
+            **_cache_savings_response(avoided_cost, priced_hits, hits_without_price, total),
+        }
+
+
+# Platform-wide cache savings aggregate — outside the /teams controller because
+# it spans every team (platform-admin only), mirroring `platform_routing_savings`
+# in `web/routing/controller.py`.
+@get(
+    "/cache/savings",
+    summary="Response-cache hit rate and cost saved across the whole platform",
+    dependencies={"admin_user": Provide(provide_current_admin)},
+    tags=["teams"],
+)
+async def platform_cache_savings(
+    admin_user: NamedDependency[User],
+    usage_repository: NamedDependency[UsageRepository],
+) -> dict[str, Any]:
+    (
+        avoided_cost,
+        priced_hits,
+        hits_without_price,
+        total,
+    ) = await usage_repository.platform_cache_savings()
+    return _cache_savings_response(avoided_cost, priced_hits, hits_without_price, total)

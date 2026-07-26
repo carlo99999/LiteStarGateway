@@ -78,6 +78,9 @@ export function CreateModelDialog({
   const [apiVersion, setApiVersion] = useState("");
   const [inputCost, setInputCost] = useState("");
   const [outputCost, setOutputCost] = useState("");
+  const [cacheEnabled, setCacheEnabled] = useState(false);
+  const [cacheAllowNondeterministic, setCacheAllowNondeterministic] = useState(false);
+  const [cacheSemanticEnabled, setCacheSemanticEnabled] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -91,6 +94,9 @@ export function CreateModelDialog({
       setApiVersion("");
       setInputCost("");
       setOutputCost("");
+      setCacheEnabled(false);
+      setCacheAllowNondeterministic(false);
+      setCacheSemanticEnabled(false);
     }
   }, [open]);
 
@@ -141,6 +147,9 @@ export function CreateModelDialog({
         inputCostPerToken: parseNonNegative(inputCost),
         outputCostPerToken: parseNonNegative(outputCost),
         enabled: true,
+        cacheEnabled,
+        cacheAllowNondeterministic,
+        cacheSemanticEnabled,
       };
       return global ? createGlobalModel(model) : createModel(effectiveTeamId, model);
     },
@@ -336,6 +345,35 @@ export function CreateModelDialog({
               placeholder="no ceiling"
               autoComplete="off"
             />
+          </div>
+          <div className="grid gap-2">
+            <Label>response cache</Label>
+            <label className="flex cursor-pointer items-center gap-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={cacheEnabled}
+                onChange={(e) => setCacheEnabled(e.target.checked)}
+              />
+              cache identical requests (exact-match)
+            </label>
+            <label className="flex cursor-pointer items-center gap-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={cacheAllowNondeterministic}
+                disabled={!cacheEnabled}
+                onChange={(e) => setCacheAllowNondeterministic(e.target.checked)}
+              />
+              also cache non-deterministic requests (temperature &gt; 0)
+            </label>
+            <label className="flex cursor-pointer items-center gap-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={cacheSemanticEnabled}
+                disabled={!cacheEnabled}
+                onChange={(e) => setCacheSemanticEnabled(e.target.checked)}
+              />
+              semantic tier (near-duplicate prompts)
+            </label>
           </div>
           {mutation.isError ? (
             <p className="font-mono text-xs text-destructive">{mutation.error.message}</p>
