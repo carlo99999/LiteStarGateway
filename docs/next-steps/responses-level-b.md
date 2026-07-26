@@ -148,11 +148,10 @@ contract is the specification.
   than a side-channel field, since both the Chat and Responses wire contracts
   already require the client to echo a call's id back verbatim — the one
   carrier that survives generic id-copying translation for free. Shipped for
-  validated Gemini 2.5/3 text models on the direct Chat surface, with
-  byte-exact replay, ordered parallel results and mandatory Gemini 3 step
-  signatures. Because the carrier lives in the id, unlocking the emulated
-  Responses surface needs no new translator changes — only removing its
-  Vertex tool guard (Plan 09, Phase 1b-C).
+  validated Gemini 2.5/3 text models on both the direct Chat surface and the
+  emulated Responses surface, with byte-exact replay, ordered parallel
+  results and mandatory Gemini 3 step signatures. Streaming Vertex tool
+  calls remain fail-closed on both surfaces.
 
 ## 8. Non-goals
 

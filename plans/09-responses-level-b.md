@@ -110,6 +110,27 @@ validation that already exists for the Chat surface — no changes needed to
 the Responses<->Chat translators themselves, since copying the id is already
 their job.
 
+**Done (26 July 2026): non-streaming Vertex tool calls now work on
+`/v1/responses`.** `Provider.VERTEX_AI` added to
+`_EMULATED_RESPONSES_TOOL_PROVIDERS`/`_BOUNDED_TRANSLATED_TOOL_PROVIDERS`;
+model-family (`vertex_supports_tools`) and disabled-parallel rejection
+mirror the Bedrock block exactly. `strict` is rejected outright (any value,
+matching the Chat surface — not just non-bool values), closing an
+early-rejection gap that only Bedrock had before. A full two-turn tool loop
+through `/v1/responses` (declare tool → call → result → final answer)
+verifies byte-exact signature replay, correct real-vs-synthetic id
+handling, and billing, exactly matching the direct Chat surface's existing
+test. Streaming Vertex tool calls remain fail-closed — a separate gap
+(Converse/Gemini stream event translation), not this decision.
+
+**Known, accepted gap:** `request_policy.py`'s pre-dispatch tool validation
+does not exhaustively mirror every Chat-surface constraint early (e.g. deep
+schema/JSON-depth checks) for every case; anything it misses is still
+caught by `to_gemini_request`'s call into `validate_chat_request` before
+any provider network call — just after budget admission rather than
+before. Not a correctness gap, only a "how early" one; extend
+`request_policy.py`'s block only if a real cost-avoidance need arises.
+
 ## Phase 2 — Streaming tool events
 
 - Preserve call index/ID across fragmented chat deltas.

@@ -28,6 +28,7 @@ from litestar_gateway.domain.chat_tool_policy import (
     validate_bedrock_tool_strict,
     validate_bedrock_tool_use_id,
     validate_tool_name,
+    vertex_supports_tools,
 )
 from litestar_gateway.domain.entities import Model, Provider
 from litestar_gateway.domain.exceptions import UnsupportedNativeField, UnsupportedOperation
@@ -142,14 +143,18 @@ _EMULATED_RESPONSES_FIELDS = frozenset(
 )
 _EMULATED_RESPONSES_TOOL_FIELDS = frozenset({"tools", "tool_choice", "parallel_tool_calls"})
 _EMULATED_RESPONSES_TOOL_PROVIDERS = frozenset(
-    {Provider.DATABRICKS, Provider.ANTHROPIC, Provider.BEDROCK}
+    {Provider.DATABRICKS, Provider.ANTHROPIC, Provider.BEDROCK, Provider.VERTEX_AI}
 )
 # Plan 09 Phase 2: streaming tool-call events are implemented for the
 # OpenAI-compatible chat surface (Databricks) and Anthropic's
 # input_json_delta accumulation. Bedrock's Converse stream events need
-# their own translation and stay fail-closed until they get one.
+# their own translation and stay fail-closed until they get one. Vertex
+# streaming tool calls stay fail-closed too, independent of the id-encoded
+# thought_signature carrier that unlocked non-streaming Responses tools.
 _STREAMING_RESPONSES_TOOL_PROVIDERS = frozenset({Provider.DATABRICKS, Provider.ANTHROPIC})
-_BOUNDED_TRANSLATED_TOOL_PROVIDERS = frozenset({Provider.ANTHROPIC, Provider.BEDROCK})
+_BOUNDED_TRANSLATED_TOOL_PROVIDERS = frozenset(
+    {Provider.ANTHROPIC, Provider.BEDROCK, Provider.VERTEX_AI}
+)
 _EMULATED_TEXT_FORMATS = frozenset({"text", "json_object", "json_schema"})
 _EMULATED_TEXT_PARTS = frozenset({"text", "input_text", "output_text"})
 _EMULATED_MESSAGE_FIELDS = frozenset({"type", "role", "content"})
@@ -526,6 +531,10 @@ def _validate_emulated_tools(model: Model, request: dict[str, Any]) -> set[str]:
                     strict,
                     field=f"Responses tools[{index}].strict",
                 )
+            elif provider is Provider.VERTEX_AI and strict is not None:
+                raise UnsupportedOperation(
+                    f"Provider '{provider.value}' cannot emulate Responses tools[{index}].strict"
+                )
             elif strict is not None and not isinstance(strict, bool):
                 raise UnsupportedOperation(
                     f"Provider '{provider.value}' cannot emulate Responses tools[{index}].strict"
@@ -769,6 +778,17 @@ def validate_responses_request(model: Model, request: dict[str, Any]) -> dict[st
             raise UnsupportedOperation(
                 "Provider 'bedrock' cannot translate parallel_tool_calls=false; "
                 "Converse has no general disabled-parallel setting"
+            )
+    if model.provider is Provider.VERTEX_AI and has_tool_request:
+        if not vertex_supports_tools(model.provider_model_id):
+            raise UnsupportedOperation(
+                "Provider 'vertex_ai' Responses tool emulation is enabled only for "
+                "validated Gemini 2.5 and Gemini 3 text model IDs"
+            )
+        if request.get("parallel_tool_calls") is False:
+            raise UnsupportedOperation(
+                "Provider 'vertex_ai' cannot translate parallel_tool_calls=false; "
+                "Gemini has no general disabled-parallel setting"
             )
     tool_names = _validate_emulated_tools(model, request) if supports_tools else set()
     if model.provider in _BOUNDED_TRANSLATED_TOOL_PROVIDERS and has_tool_request and not tool_names:
