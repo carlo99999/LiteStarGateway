@@ -131,6 +131,54 @@ a thin caller of this service, sharing the store and `EmbedFn` (no parallel cach
 - **Done when:** with semantic opted in, a near-duplicate prompt (≥ threshold)
   hits; a below-threshold prompt misses; entries never match across tenants.
 
+> **Done — 26 July 2026.** Shipped as-designed, sitting entirely behind the
+> exact-match tier: `domain/response_cache_semantic.py`'s pure
+> `is_semantic_cacheable` (exact-match eligibility PLUS the model's own,
+> separate `cache_semantic_enabled`), `extract_semantic_text` (a best-effort
+> plain-text view of `messages`/`input`), and `cosine_similarity` (mirroring
+> `application/routing/embeddings.py`'s `_cosine` verbatim, duplicated rather
+> than imported to keep `domain/` dependency-free); the new
+> `SemanticResponseCache` Protocol (`domain/ports/response_cache.py`) with
+> `find`/`add` scoped by the exact `(team_id, api_key_id)` tenant pair — the
+> same hard invariant as `CacheKey`, verified by a test proving even a
+> similarity-1.0 vector under a different tenant misses;
+> `infrastructure/cache/semantic.py`'s `InMemorySemanticResponseCache`, a
+> bounded (50 entries), TTL-aware per-tenant list with a linear cosine scan
+> (no external vector DB, per the design's explicit non-goal) — no
+> Redis-backed variant exists for this tier. `CompletionService` tries it only
+> on an exact-match miss, for `chat.completions`/`responses` requests whose
+> model opted into semantic caching (`_semantic_text_for`), and never in
+> place of the exact-match write. `RESPONSE_CACHE_SEMANTIC_THRESHOLD`
+> (default 0.97) landed in `Settings`; `Model.cache_semantic_enabled` is the
+> third, separate toggle alongside `cache_enabled`/
+> `cache_allow_nondeterministic` (own migration,
+> `2026-07-26_add_response_cache_semantic_column_f358c2474285`, with the
+> `server_default` fix-up), surfaced through the existing model create/update
+> endpoints exactly as Phase 0's toggles were. A semantic hit settles through
+> the *same* `settle_cache_hit` path at the stored token counts and
+> `cost=0.0` — no new settlement code was needed. Investigated the
+> `smart-routing.md` §8 sketch first, as instructed: it was design-only (no
+> code), and its own text already flags itself as *superseded* by this
+> gateway-wide design, so there was no parallel implementation to reconcile —
+> nothing else needed changing there.
+>
+> Deliberate simplifications versus the letter of the design doc: (1) the
+> embedding model to use is a single platform-wide config value
+> (`RESPONSE_CACHE_SEMANTIC_EMBEDDING_MODEL`, an embeddings-model *name*
+> resolved per-team, the same pattern the S3 routing strategy's
+> `embedding_model` config field already uses) rather than a new per-model
+> FK column — simpler, and consistent with the design doc never specifying
+> per-model embedder selection; a team without a model of that name simply
+> never gets a semantic lookup/write (treated as ineligible, not an error).
+> (2) The embed call this tier makes is not separately metered/billed (unlike
+> the S3 routing strategy's judge/embeddings calls, which are user-configured
+> and billed); billing it would need reservation/admission plumbing this
+> phase's scope didn't call for, and a hit's provider-call avoidance already
+> nets out favorably. (3) Scoped to the same two non-streamed operations as
+> Phase 0/1 (`chat.completions`/`responses`); the Phase 1 streaming
+> synthetic-replay path stays exact-match only — a semantic hit does not (yet)
+> feed `open_chat_stream`'s replay. Phase 3 (console observability) remains.
+
 ### Phase 3 — Console observability (1 slice)
 
 - Endpoint mirroring `web/routing/controller.py:413`: hit rate + Σ(avoided cost)

@@ -58,3 +58,34 @@ class ResponseCache(Protocol):
     async def get(self, key: CacheKey) -> CachedResponse | None: ...
 
     async def put(self, key: CacheKey, value: CachedResponse, ttl_s: int) -> None: ...
+
+
+@runtime_checkable
+class SemanticResponseCache(Protocol):
+    """The semantic tier (Plan 04 Phase 2): tried only when the exact-match
+    tier (above) has already missed and the model separately opted in. `find`
+    receives an already-computed query embedding and returns the closest
+    stored entry at/above `threshold` *within the caller's own tenant scope*
+    — `team_id`/`api_key_id` are the same hard-invariant namespace as
+    `CacheKey` (design §3); implementations must never search or match across
+    them. `add` stores a fresh entry's embedding alongside its
+    `CachedResponse` for future lookups. Same failure policy as
+    `ResponseCache` (design §8): callers must treat any exception from
+    `find`/`add` as a miss/no-op."""
+
+    async def find(
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        vector: list[float],
+        threshold: float,
+    ) -> CachedResponse | None: ...
+
+    async def add(
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        vector: list[float],
+        value: CachedResponse,
+        ttl_s: int,
+    ) -> None: ...

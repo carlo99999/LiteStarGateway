@@ -63,6 +63,11 @@ class Model:
     # caching requests with `temperature > 0` (refused by default — design §7).
     cache_enabled: bool = False
     cache_allow_nondeterministic: bool = False
+    # Semantic-tier opt-in (Plan 04 Phase 2), separate from `cache_enabled`:
+    # the semantic tier is never built without exact-match in front of it, so
+    # this only ever takes effect when `cache_enabled` is also true, but
+    # exact-match may be on while this stays off (design §1/§7).
+    cache_semantic_enabled: bool = False
 
     def merge_params(self, request: dict[str, Any]) -> dict[str, Any]:
         """Effective request for a provider call: admin `params` (defaults the

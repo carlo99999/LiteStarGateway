@@ -42,6 +42,9 @@ class CreateModelRequest:
     # global RESPONSE_CACHE_ENABLED kill-switch is on.
     cache_enabled: bool = False
     cache_allow_nondeterministic: bool = False
+    # Semantic-tier opt-in (Plan 04 Phase 2), separate from `cache_enabled` —
+    # only takes effect when `cache_enabled` is also true.
+    cache_semantic_enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -59,6 +62,7 @@ class UpdateModelRequest:
     enabled: bool | None = None
     cache_enabled: bool | None = None
     cache_allow_nondeterministic: bool | None = None
+    cache_semantic_enabled: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -81,6 +85,7 @@ class ModelResponse:
     origin_team_id: UUID | None = None  # team a global model was promoted from
     cache_enabled: bool = False
     cache_allow_nondeterministic: bool = False
+    cache_semantic_enabled: bool = False
 
     @classmethod
     def from_entity(cls, model: Model) -> ModelResponse:
@@ -103,6 +108,7 @@ class ModelResponse:
             origin_team_id=model.origin_team_id,
             cache_enabled=model.cache_enabled,
             cache_allow_nondeterministic=model.cache_allow_nondeterministic,
+            cache_semantic_enabled=model.cache_semantic_enabled,
         )
 
 
