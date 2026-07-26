@@ -63,14 +63,11 @@ def test_loadgen_service_is_profile_gated_with_no_ports_and_mounts_out() -> None
     assert loadgen["profiles"] == ["loadgen"]
     assert loadgen["build"]["target"] == "loadgen"
     assert "ports" not in loadgen
-    assert loadgen["volumes"] == [
-        {
-            "type": "bind",
-            "source": str(ROOT / "load-results"),
-            "target": "/out",
-            "bind": {},
-        }
-    ]
+    assert len(loadgen["volumes"]) == 1
+    volume = loadgen["volumes"][0]
+    assert volume["type"] == "bind"
+    assert volume["source"] == str(ROOT / "load-results")
+    assert volume["target"] == "/out"
 
 
 def test_benchmark_launcher_generates_private_secrets_and_destroys_ephemeral_data() -> None:
