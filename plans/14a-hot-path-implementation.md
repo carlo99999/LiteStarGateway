@@ -378,38 +378,68 @@ Ran the plan 14 acceptance ladder at the mandated 60 s minimum steady window
 (not the 30 s used in the Step 3/Step 5 protocol for faster iteration) — 3
 runs, 3 workers / 3 CPU / 4 GiB, medians retained:
 
-| Mode | Offered | v1 baseline (30 s) | After registry (60 s) | Change |
+| Mode | Offered | v1 baseline (30 s) | After registry (60 s, via host proxy) | Change |
 |---|---:|---:|---:|---:|
 | non-streaming | 100 | 100.0 | 100.0 | +0.0% |
 | non-streaming | 200 | 164.6 | 199.9 | **+21.5%** |
 | non-streaming | 300 | 165.9 | 247.2 | **+49.0%** |
 | streaming | 100 | 99.7 | 99.5 | −0.2% |
-| streaming | 200 | 152.1 (0% fail) | 162.7 (5.5–6.5% fail) | +7.0% RPS, **gate PASS→FAIL** |
-| streaming | 300 | 150.1 (0–5.2% fail) | 149.3 (14–15% fail) | −0.5% RPS, worse failure rate |
+| streaming | 200 | 152.1 (0% fail) | 162.7 (5.5–6.5% fail)¹ | see resolution below |
+| streaming | 300 | 150.1 (0–5.2% fail) | 149.3 (14–15% fail)¹ | see resolution below |
 
-### An honest finding the 30 s protocol missed
+¹ The 60 s streaming failures were later proven to be a **measurement-
+infrastructure artifact** (Docker Desktop's host→container port proxy), not
+gateway behavior — full investigation below. Measured in-network (no proxy in
+the path), streaming-200 sustains **199.5 RPS, 0.000% failures, p95 270 ms,
+TTFT p95 230 ms** for the full 105 s window: a clean gate PASS.
 
-Non-streaming's gains hold fully at 60 s. Streaming does not: Step 3's 30 s
-measurement showed streaming-200 at ~199 RPS with 0% failures (a clean
-PASS); the same conditions held for the full mandated 60 s window show it
-settling to ~163 RPS with 5.5–6.5% failures — a real, reproducible
-degradation across all 3 runs, not noise. **This is a genuine regression in
-the streaming-200 gate outcome** (PASS at v1 baseline → FAIL now), even
-though raw throughput is nominally higher. Streaming-300's throughput is
-flat but its failure rate roughly tripled (0–5.2% → 14–15%).
+### An honest finding the 30 s protocol missed — resolved: proxy artifact
 
-This was only visible because the acceptance ladder's 60 s window is longer
-than the 30 s used for fast iteration during Steps 3–5 — exactly why plan 14
-mandates 60 s for acceptance and not just for measuring directional
-improvement. The likely mechanism (not yet profiled): streaming leases hold
-their client for the entire stream lifetime, and the registry's removal of
-the old SSL/client-construction throttle now lets far more concurrent
-long-lived streams start and stay open simultaneously than before — shifting
-contention from "client construction" to something that only accumulates
-under sustained (not short-burst) concurrent streaming. This is the clear
-top candidate for the next profiling pass (3-worker, sustained streaming
-load — not the 1-worker chat profile Step 5 used), and is called out here
-rather than papered over.
+What we initially observed: streaming at 200 RPS offered passed cleanly at
+30 s windows (Step 3) but showed a hard failure onset at **exactly t≈60 s**
+of sustained load — reproducible across every run, always the same second,
+with `status 0` (no HTTP response at all) client-side errors, temporary
+recovery, then re-collapse in a rough 30–45 s cycle. Initially recorded here
+as a suspected registry-induced regression. That attribution was wrong, and
+the investigation that established the real cause is worth recording:
+
+1. **Seven server-side hypotheses eliminated by direct experiment**: gateway
+   `REQUEST_TIMEOUT` (lowered to 20 s — onset stayed at 60 s), DB pool
+   exhaustion (production-size pool — no change), the usage reconciler's
+   60-second loop (disabled entirely — no change), container file-descriptor
+   limits (1M, nowhere near), Locust's own 60 s `network_timeout`/
+   `connection_timeout` (raised to 120 s — onset **stayed at 60 s**), CPU
+   hotspots (three per-worker py-spy profiles during the collapse: nothing),
+   and the upstream mock (its own metrics showed ≤30 concurrent requests and
+   *zero* new arrivals during the collapse — requests died before reaching
+   it).
+2. **The pre-registry control**: the identical 90 s diagnostic against the
+   pre-registry commit (`568f522`) showed **zero failures** — it never went
+   fast enough to trip the real limit (~150 RPS of multi-second queued
+   streams vs. ~200 RPS of ~200 ms streams after the registry).
+3. **The smoking gun**: sampling host-side TCP socket states during a run.
+   Healthy phase: ~150 ESTABLISHED keep-alive connections, TIME_WAIT ≈ 0.
+   At t≈60 s: ESTABLISHED jumps to ~1,500 and TIME_WAIT explodes from 0 to
+   **12,282** — mass connection churn on the macOS-host side of Docker
+   Desktop's port forward, exactly at failure onset.
+4. **The decisive isolation**: the same load, same duration, same gateway,
+   but with Locust running **inside the Docker network** (container→container,
+   no host proxy): **199.5 RPS, 0.000% failures, p95 270 ms for the full
+   window.** The collapse exists only when Docker Desktop's host→VM port
+   proxy is in the path.
+
+Verdict: the registry did not regress streaming — it made the gateway fast
+enough to exceed what Docker Desktop's macOS port-forwarding proxy can
+sustain for long-duration high-churn streaming. The "regression" lived in
+the measurement path, not the system under test. The pre-registry gateway
+never hit it because it was too slow to.
+
+Consequence for the benchmark contract: on macOS/Docker Desktop hosts,
+sustained streaming acceptance runs **must run the load generator inside the
+Docker network** (or on a Linux host with native networking). A follow-up to
+containerize the load generator in `docker-compose.benchmark.yml` is the
+natural next benchmark-contract improvement; until then, host-proxy streaming
+numbers at ≥60 s are not valid evidence.
 
 ### Pool sizing reviewed, not changed
 
@@ -420,9 +450,9 @@ explicitly for operators running multiple replicas or a smaller Postgres
 tier. The benchmark contract itself runs with `DB_MAX_OVERFLOW=0` (15 total)
 as a deliberately bounded test configuration. Provider connection pools were
 already sized in Step 3 (`ResilienceConfig.async_client_kwargs`,
-1000 max / 100 keepalive) — no further change made here; the streaming
-degradation above shows the bottleneck has moved past pool *size* into
-something duration-dependent, so a bigger pool is not the fix.
+1000 max / 100 keepalive) — no further change made here, and the streaming
+investigation above confirmed pool size was not implicated (the failures
+never reached the gateway at all).
 
 uvloop/httptools were not evaluated: nothing in the Step 5 profile pointed at
 event-loop or HTTP-parser overhead as a leading cost.
@@ -436,12 +466,16 @@ gap, noted rather than closed, given time budget.
 
 Plan 14's "Definition of done" is met via **outcome 2**: all profile-proven
 safe optimizations from Steps 2–4 are delivered (client-lifecycle waste
-eliminated), the honest ceilings are recorded above, and this document
-identifies the validated next step (profile sustained 3-worker streaming)
-rather than claiming outcome 1 (clean 300/300 pass), which the evidence does
-not support. Non-streaming improved substantially and durably; streaming
-improved at short duration but regressed at the mandated acceptance duration
-and needs further, separately-scoped work before another throughput claim.
+eliminated) and the honest ceilings are recorded above. Non-streaming
+improved substantially and durably (+21.5% at 200, +49.0% at 300 offered).
+Streaming, once the measurement-path artifact was isolated and removed,
+**passes its 200 RPS gate cleanly at the full acceptance duration**
+(199.5 RPS, 0% failures, p95 270 ms, TTFT p95 230 ms, in-network). The
+300 RPS target in both modes remains unmet on 3 CPU (non-streaming honest
+ceiling ~247, streaming ≥200 with the in-network ceiling not yet probed
+beyond 200), so outcome 1 is still not claimed; the remaining follow-ups are
+containerizing the load generator in the benchmark contract and re-probing
+the true in-network streaming ceiling.
 
 ## PR sequence summary
 
