@@ -56,5 +56,6 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          target: runtime
           push: true
           tags: ${{ steps.tags.outputs.tags }}
