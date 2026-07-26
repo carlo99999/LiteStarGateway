@@ -209,8 +209,8 @@ def test_databricks_responses_accept_string_tool_choices(choice: str) -> None:
     assert _validate_responses_request(Provider.DATABRICKS, request) == request
 
 
-def test_vertex_responses_still_reject_function_tools() -> None:
-    with pytest.raises(UnsupportedOperation, match="tools"):
+def test_vertex_responses_rejects_strict_tool_schema() -> None:
+    with pytest.raises(UnsupportedOperation, match="tools.*strict"):
         _validate_responses_request(
             Provider.VERTEX_AI,
             {
@@ -225,6 +225,67 @@ def test_vertex_responses_still_reject_function_tools() -> None:
                     }
                 ],
             },
+            provider_model_id="gemini-3-pro",
+        )
+
+
+def test_vertex_responses_accepts_tools_on_a_validated_model() -> None:
+    tools = [
+        {
+            "type": "function",
+            "name": "get_weather",
+            "parameters": {"type": "object"},
+        }
+    ]
+
+    result = _validate_responses_request(
+        Provider.VERTEX_AI,
+        {
+            "model": "m",
+            "input": "weather?",
+            "tools": tools,
+        },
+        provider_model_id="gemini-2.5-flash",
+    )
+
+    assert result["tools"] == tools
+
+
+def test_vertex_responses_rejects_tools_on_an_unvalidated_model() -> None:
+    with pytest.raises(UnsupportedOperation, match="validated Gemini"):
+        _validate_responses_request(
+            Provider.VERTEX_AI,
+            {
+                "model": "m",
+                "input": "weather?",
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "get_weather",
+                        "parameters": {"type": "object"},
+                    }
+                ],
+            },
+        )
+
+
+def test_vertex_responses_rejects_disabled_parallel_tool_calls() -> None:
+    with pytest.raises(UnsupportedOperation, match="parallel_tool_calls=false"):
+        _validate_responses_request(
+            Provider.VERTEX_AI,
+            {
+                "model": "m",
+                "input": "weather?",
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "get_weather",
+                        "parameters": {"type": "object"},
+                    }
+                ],
+                "parallel_tool_calls": False,
+            },
+            provider_model_id="gemini-3-pro",
         )
 
 
@@ -1430,7 +1491,15 @@ def test_vertex_responses_reject_function_call_output_input() -> None:
                         "output": "sunny",
                     }
                 ],
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "get_weather",
+                        "parameters": {"type": "object"},
+                    }
+                ],
             },
+            provider_model_id="gemini-3-pro",
         )
 
 

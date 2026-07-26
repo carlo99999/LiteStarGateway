@@ -163,7 +163,7 @@ async def test_vertex_chat_two_turn_tool_loop_preserves_signature_and_billing(
     assert FakeGenaiClient.closed is False
 
 
-async def test_vertex_streaming_tools_and_responses_tools_remain_fail_closed(
+async def test_vertex_streaming_tools_remain_fail_closed(
     client: AsyncTestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -185,6 +185,25 @@ async def test_vertex_streaming_tools_and_responses_tools_remain_fail_closed(
         },
         headers=_bearer(api_key),
     )
+
+    assert chat.status_code == HTTP_501_NOT_IMPLEMENTED
+    assert FakeGenaiClient.last_kwargs == {}
+
+
+async def test_vertex_responses_non_streaming_tool_calls_now_succeed(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Plan 09, Phase 1b-C: the id-encoded thought_signature carrier unlocked
+    # non-streaming tool calls on the emulated Responses surface.
+    _patch(monkeypatch)
+    api_key = await _setup(
+        client,
+        provider="vertex_ai",
+        values=VERTEX_VALUES,
+        provider_model_id="gemini-3-pro",
+    )
+
     responses = await client.post(
         "/v1/responses",
         json={
@@ -201,9 +220,123 @@ async def test_vertex_streaming_tools_and_responses_tools_remain_fail_closed(
         headers=_bearer(api_key),
     )
 
-    assert chat.status_code == HTTP_501_NOT_IMPLEMENTED
-    assert responses.status_code == HTTP_501_NOT_IMPLEMENTED
-    assert FakeGenaiClient.last_kwargs == {}
+    assert responses.status_code == HTTP_200_OK, responses.text
+    assert FakeGenaiClient.last_kwargs != {}
+
+
+async def test_vertex_responses_two_turn_tool_loop_preserves_signature_and_billing(
+    client: AsyncTestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    async def generate_content(self: _FakeGeminiModels, **kwargs: object) -> _Result:
+        calls.append(kwargs)
+        contents = kwargs["contents"]
+        assert isinstance(contents, list)
+        has_result = any(
+            isinstance(content, dict)
+            and any(
+                isinstance(part, dict) and part.get("function_response") is not None
+                for part in content.get("parts", [])
+            )
+            for content in contents
+        )
+        parts = (
+            [{"text": "It is sunny."}]
+            if has_result
+            else [
+                {
+                    "function_call": {
+                        "id": "call_a",
+                        "name": "weather",
+                        "args": {"city": "Rome"},
+                    },
+                    "thought_signature": SIGNATURE,
+                }
+            ]
+        )
+        return _Result(
+            {
+                "candidates": [
+                    {
+                        "content": {"role": "model", "parts": parts},
+                        "finish_reason": "STOP",
+                    }
+                ],
+                "usage_metadata": {
+                    "prompt_token_count": 4,
+                    "candidates_token_count": 2,
+                    "total_token_count": 6,
+                },
+                "model_version": "gemini-3-pro",
+                "response_id": f"response-{len(calls)}",
+            }
+        )
+
+    _patch(monkeypatch)
+    monkeypatch.setattr(_FakeGeminiModels, "generate_content", generate_content)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="vertex_ai",
+        values=VERTEX_VALUES,
+        provider_model_id="gemini-3-pro",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+    weather_tool = {
+        "type": "function",
+        "name": "weather",
+        "parameters": {
+            "type": "object",
+            "properties": {"city": {"type": "string"}},
+            "required": ["city"],
+        },
+    }
+    first = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": "Weather in Rome?",
+            "tools": [weather_tool],
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert first.status_code == HTTP_200_OK, first.text
+    first_body = first.json()
+    function_call = first_body["output"][0]
+    assert function_call["type"] == "function_call"
+    call_id = function_call["call_id"]
+    assert call_id == encode_vertex_call_id("call_a", SIGNATURE)
+
+    second = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": [
+                {"role": "user", "content": "Weather in Rome?"},
+                function_call,
+                {
+                    "type": "function_call_output",
+                    "call_id": call_id,
+                    "output": '{"temperature":23,"condition":"sunny"}',
+                },
+            ],
+            "tools": [weather_tool],
+        },
+        headers=_bearer(api_key),
+    )
+
+    assert second.status_code == HTTP_200_OK, second.text
+    assert second.json()["output_text"] == "It is sunny."
+    replay_part = calls[1]["contents"][1]["parts"][0]  # type: ignore[index]
+    assert replay_part["thought_signature"] == SIGNATURE
+    assert replay_part["function_call"]["id"] == "call_a"
+
+    usage = await _team_usage(client, team, admin)
+    assert usage[0]["calls"] == 2
+    assert usage[0]["cost"] == pytest.approx(0.16)
 
 
 async def test_vertex_malformed_billable_tool_response_settles_once(
