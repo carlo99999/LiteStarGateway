@@ -424,6 +424,132 @@ def test_stream_stop_reason_maps_refusal_and_rejects_pause_turn() -> None:
         )
 
 
+def test_streaming_single_tool_call_produces_openai_shaped_tool_call_deltas() -> None:
+    state: dict[int, dict[str, Any]] = {}
+
+    added, added_finish = anthropic_event_to_delta(
+        {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {"type": "tool_use", "id": "toolu_abc", "name": "get_weather"},
+        },
+        tool_call_state=state,
+    )
+    assert added_finish is None
+    assert added == {
+        "tool_calls": [
+            {
+                "index": 0,
+                "id": "toolu_abc",
+                "type": "function",
+                "function": {"name": "get_weather", "arguments": ""},
+            }
+        ]
+    }
+
+    delta1, _ = anthropic_event_to_delta(
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "input_json_delta", "partial_json": '{"city":'},
+        },
+        tool_call_state=state,
+    )
+    delta2, _ = anthropic_event_to_delta(
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "input_json_delta", "partial_json": ' "Paris"}'},
+        },
+        tool_call_state=state,
+    )
+    assert delta1 == {"tool_calls": [{"index": 0, "function": {"arguments": '{"city":'}}]}
+    assert delta2 == {"tool_calls": [{"index": 0, "function": {"arguments": ' "Paris"}'}}]}
+
+    stop_delta, finish = anthropic_event_to_delta(
+        {"type": "message_delta", "delta": {"stop_reason": "tool_use"}},
+        tool_call_state=state,
+    )
+    assert stop_delta == {}
+    assert finish == "tool_calls"
+
+
+def test_streaming_parallel_tool_calls_keep_distinct_indexes() -> None:
+    state: dict[int, dict[str, Any]] = {}
+    for index, (call_id, name) in enumerate([("toolu_a", "get_weather"), ("toolu_b", "get_time")]):
+        anthropic_event_to_delta(
+            {
+                "type": "content_block_start",
+                "index": index,
+                "content_block": {"type": "tool_use", "id": call_id, "name": name},
+            },
+            tool_call_state=state,
+        )
+    delta_a, _ = anthropic_event_to_delta(
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "input_json_delta", "partial_json": '{"city": "Paris"}'},
+        },
+        tool_call_state=state,
+    )
+    delta_b, _ = anthropic_event_to_delta(
+        {
+            "type": "content_block_delta",
+            "index": 1,
+            "delta": {"type": "input_json_delta", "partial_json": "{}"},
+        },
+        tool_call_state=state,
+    )
+    assert delta_a == {"tool_calls": [{"index": 0, "function": {"arguments": '{"city": "Paris"}'}}]}
+    assert delta_b == {"tool_calls": [{"index": 1, "function": {"arguments": "{}"}}]}
+
+
+@pytest.mark.parametrize(
+    "content_block",
+    [
+        {"type": "tool_use", "name": "get_weather"},
+        {"type": "tool_use", "id": "toolu_x"},
+        {"type": "tool_use", "id": "toolu_x", "name": ""},
+    ],
+)
+def test_streaming_malformed_tool_use_block_start_fails_closed(
+    content_block: dict[str, Any],
+) -> None:
+    with pytest.raises(UpstreamResponseInvalid, match="malformed"):
+        anthropic_event_to_delta(
+            {"type": "content_block_start", "index": 0, "content_block": content_block},
+            tool_call_state={},
+        )
+
+
+def test_streaming_forced_structured_output_tool_still_relays_as_content() -> None:
+    state: dict[int, dict[str, Any]] = {}
+
+    added, _ = anthropic_event_to_delta(
+        {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {"type": "tool_use", "id": "toolu_synthetic", "name": "answer"},
+        },
+        structured_tool_name="answer",
+        tool_call_state=state,
+    )
+    assert added is None
+    assert state == {}
+
+    delta, _ = anthropic_event_to_delta(
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "input_json_delta", "partial_json": '{"a":1}'},
+        },
+        structured_tool_name="answer",
+        tool_call_state=state,
+    )
+    assert delta == {"content": '{"a":1}'}
+
+
 def test_response_rejects_undeclared_tool_name_and_preserves_billable_usage() -> None:
     with pytest.raises(UpstreamResponseInvalid) as exc:
         from_anthropic_response(

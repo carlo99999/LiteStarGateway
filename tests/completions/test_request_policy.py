@@ -489,19 +489,6 @@ def test_anthropic_responses_rejects_configured_stream_before_tool_routing() -> 
                         "function": {"name": "weather", "parameters": {}},
                     }
                 ],
-                "stream": True,
-            },
-            "streaming",
-        ),
-        (
-            {
-                "messages": [{"role": "user", "content": "weather?"}],
-                "tools": [
-                    {
-                        "type": "function",
-                        "function": {"name": "weather", "parameters": {}},
-                    }
-                ],
                 "response_format": {
                     "type": "json_schema",
                     "json_schema": {"name": "answer", "schema": {"type": "object"}},
@@ -516,6 +503,40 @@ def test_anthropic_chat_rejects_non_faithful_tool_shapes(
 ) -> None:
     with pytest.raises(UnsupportedOperation, match=match):
         validate_chat_request(_model(Provider.ANTHROPIC), payload)
+
+
+def test_anthropic_chat_now_accepts_streaming_tools() -> None:
+    request: dict[str, object] = {
+        "messages": [{"role": "user", "content": "weather?"}],
+        "tools": [
+            {
+                "type": "function",
+                "function": {"name": "weather", "parameters": {}},
+            }
+        ],
+        "stream": True,
+    }
+
+    assert validate_chat_request(_model(Provider.ANTHROPIC), request) == request
+
+
+def test_bedrock_chat_still_rejects_streaming_tools() -> None:
+    request: dict[str, object] = {
+        "messages": [{"role": "user", "content": "weather?"}],
+        "tools": [
+            {
+                "type": "function",
+                "function": {"name": "weather", "parameters": {}},
+            }
+        ],
+        "stream": True,
+    }
+
+    with pytest.raises(UnsupportedOperation, match="streaming"):
+        validate_chat_request(
+            _model(Provider.BEDROCK, provider_model_id="anthropic.claude-3-5-sonnet-v2:0"),
+            request,
+        )
 
 
 @pytest.mark.parametrize("stream", [1, "true"])
@@ -1136,9 +1157,10 @@ def test_databricks_responses_reject_lossy_or_malformed_tool_shapes(
         )
 
 
-def test_databricks_responses_allows_streaming_tools() -> None:
+@pytest.mark.parametrize("provider", [Provider.DATABRICKS, Provider.ANTHROPIC])
+def test_databricks_and_anthropic_responses_allow_streaming_tools(provider: Provider) -> None:
     result = _validate_responses_request(
-        Provider.DATABRICKS,
+        provider,
         {
             "model": "m",
             "input": "weather?",
@@ -1156,13 +1178,10 @@ def test_databricks_responses_allows_streaming_tools() -> None:
     assert result["stream"] is True
 
 
-@pytest.mark.parametrize("provider", [Provider.ANTHROPIC, Provider.BEDROCK])
-def test_other_providers_still_reject_streaming_tools_until_their_own_phase_2(
-    provider: Provider,
-) -> None:
+def test_bedrock_responses_still_rejects_streaming_tools_until_its_own_phase_2() -> None:
     with pytest.raises(UnsupportedOperation, match="streaming tool"):
         _validate_responses_request(
-            provider,
+            Provider.BEDROCK,
             {
                 "model": "m",
                 "input": "weather?",

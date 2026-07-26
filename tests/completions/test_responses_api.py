@@ -483,11 +483,6 @@ async def test_anthropic_responses_non_streaming_tool_loop_is_faithful_and_bille
     "payload",
     [
         {
-            "input": "Weather in Paris?",
-            "tools": [WEATHER_TOOL],
-            "stream": True,
-        },
-        {
             "input": [
                 {
                     "type": "function_call",

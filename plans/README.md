@@ -37,7 +37,7 @@ It is deliberately separate from `docs/next-steps/`:
 | 06 | [Guardrails](06-guardrails.md) | ⏳ designed, not started | Enterprise policy — pluggable PII/moderation pre- and post-call |
 | 07 | [Budget alerts](07-budget-alerts.md) | ⏳ designed, not started | Proactive spend notifications at % thresholds, off the hot path |
 | 08 | [Extended endpoints](08-extended-endpoints.md) | ⏳ designed, not started | Surface breadth — audio, moderations, rerank, Batch/Files |
-| 09 | [Responses API Level B](09-responses-level-b.md) | 🚧 Phase 0 + 1a + provider Chat tool replay + streaming tool events (Databricks) complete; Anthropic/Bedrock streaming next | Contract correctness — faithful tool events on chat-only providers, fail loudly otherwise |
+| 09 | [Responses API Level B](09-responses-level-b.md) | 🚧 Phase 0 + 1a + provider Chat tool replay + streaming tool events (Databricks, Anthropic) complete; Bedrock streaming is an accepted known limit, generic Vertex Responses state remains | Contract correctness — faithful tool events on chat-only providers, fail loudly otherwise |
 | 10 | [Usage analytics](10-usage-analytics.md) | ⏳ designed, not started | Accurate streaming savings + temporal cost/token/call charts |
 | 11 | [Platform quality gates](11-platform-quality-gates.md) | ⏳ planned, not started | Request correlation, drift gates, browser E2E, dependency safety |
 | 12 | [Routing evolution](12-routing-evolution.md) | ⏳ designed, not started | Capability discovery, shadow promotion, dry-run simulation, native-family routing |
