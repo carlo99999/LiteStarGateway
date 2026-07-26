@@ -144,11 +144,11 @@ _EMULATED_RESPONSES_TOOL_FIELDS = frozenset({"tools", "tool_choice", "parallel_t
 _EMULATED_RESPONSES_TOOL_PROVIDERS = frozenset(
     {Provider.DATABRICKS, Provider.ANTHROPIC, Provider.BEDROCK}
 )
-# Plan 09 Phase 2: streaming tool-call events are implemented only for the
-# OpenAI-compatible chat surface (Databricks). Anthropic's input_json_delta
-# and Bedrock's Converse stream events need their own translation and stay
-# fail-closed until they get one.
-_STREAMING_RESPONSES_TOOL_PROVIDERS = frozenset({Provider.DATABRICKS})
+# Plan 09 Phase 2: streaming tool-call events are implemented for the
+# OpenAI-compatible chat surface (Databricks) and Anthropic's
+# input_json_delta accumulation. Bedrock's Converse stream events need
+# their own translation and stay fail-closed until they get one.
+_STREAMING_RESPONSES_TOOL_PROVIDERS = frozenset({Provider.DATABRICKS, Provider.ANTHROPIC})
 _BOUNDED_TRANSLATED_TOOL_PROVIDERS = frozenset({Provider.ANTHROPIC, Provider.BEDROCK})
 _EMULATED_TEXT_FORMATS = frozenset({"text", "json_object", "json_schema"})
 _EMULATED_TEXT_PARTS = frozenset({"text", "input_text", "output_text"})

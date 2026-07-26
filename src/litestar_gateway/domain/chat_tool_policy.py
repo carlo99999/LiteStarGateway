@@ -38,6 +38,10 @@ _VERTEX_TOOL_MODEL_ID = re.compile(
 )
 _CHAT_TOOL_CHOICES = frozenset({"auto", "none", "required"})
 _TRANSLATED_CHAT_PROVIDERS = frozenset({Provider.ANTHROPIC, Provider.VERTEX_AI, Provider.BEDROCK})
+# Plan 09 Phase 2: streaming tool-call events are translated for Anthropic's
+# input_json_delta accumulation. Bedrock (Converse stream events) and Vertex
+# stay fail-closed until they get their own translation.
+_STREAMING_TOOL_TRANSLATED_PROVIDERS = frozenset({Provider.ANTHROPIC})
 _TEXT_MESSAGE_ROLES = frozenset({"system", "user", "assistant"})
 
 
@@ -792,7 +796,12 @@ def validate_chat_request(model: Model, request: dict[str, Any]) -> dict[str, An
             "Provider 'bedrock' tool calling is enabled only for validated "
             "Anthropic Claude 3 and Amazon Nova model IDs"
         )
-    if raw_stream is True or effective_stream is True:
+    if raw_stream is True and effective_stream is not True:
+        raise UnsupportedOperation(
+            f"Provider '{model.provider.value}' cannot bypass an enforced non-streaming "
+            "tool configuration"
+        )
+    if effective_stream is True and model.provider not in _STREAMING_TOOL_TRANSLATED_PROVIDERS:
         raise UnsupportedOperation(
             f"Provider '{model.provider.value}' does not support streaming tool calls until the "
             "Phase 2 event contract is available"

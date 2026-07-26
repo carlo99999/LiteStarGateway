@@ -6,8 +6,8 @@
 
 **Status:** Phase 0, Phase 1a and Phase 1b-A/B (Anthropic + Bedrock) complete;
 Direct Vertex Chat tool state is complete; Phase 2 streaming tool events are
-done for the OpenAI-compatible chat surface (Databricks) — Anthropic and
-Bedrock streaming translation, and generic Vertex Responses state, remain.
+done for Databricks and Anthropic — Bedrock streaming translation (accepted
+known limitation, not planned) and generic Vertex Responses state remain.
 
 **Theme:** eliminate silent feature drops, then add faithful tool-call items and
 events for chat-only upstreams.
@@ -106,12 +106,30 @@ events for chat-only upstreams.
 → `response.function_call_arguments.done` → `response.output_item.done` per
 call, in first-seen order; a stream that ends without `finish_reason ==
 "tool_calls"` while any call is still open raises instead of completing.
-`validate_responses_request`'s streaming-tool guard now excludes only this
-provider (`_STREAMING_RESPONSES_TOOL_PROVIDERS`); Anthropic and Bedrock
-still fail closed until they get their own event translation
-(`input_json_delta` accumulation for Anthropic, Converse stream events for
-Bedrock — different upstream delta shapes, not a mechanical copy of this
-slice).
+
+**Anthropic slice — ✅ complete** (`anthropic_event_to_delta`,
+`anthropic_adapter.py`): `content_block_start` with `content_block.type ==
+"tool_use"` now emits an initial `tool_calls` delta (index/id/name);
+`input_json_delta` maps to `tool_calls[].function.arguments` for tracked
+indexes instead of the old blanket `content` mapping. The forced
+structured-output tool (Anthropic has no native JSON mode) is excluded by
+name from this tracking, so its `input_json_delta` events keep relaying as
+`content` exactly as before — unaffected by this change. `stop_reason ==
+"tool_use"` now maps to OpenAI `finish_reason: "tool_calls"` (previously
+`"stop"`, which the non-streaming path already special-cased but the
+streaming path didn't) whenever any real tool call was tracked. Both
+`validate_responses_request`'s and `validate_chat_request`'s streaming-tool
+guards now exclude Anthropic — the latter required separating the existing
+"enforced non-streaming bypassed by a raw `stream: true` request" check
+(must always fail, independent of provider support) from the
+provider-support check itself (`_STREAMING_TOOL_TRANSLATED_PROVIDERS`).
+
+**Bedrock — accepted known limitation, not planned.** `converse_event_to_delta`
+currently raises `UpstreamResponseInvalid` for *any* non-text content block
+or delta (`contentBlockStart`/`contentBlockDelta` with `toolUse`), so
+Bedrock streaming tool calls fail loud today rather than producing wrong
+output — an acceptable state to leave as-is. `_STREAMING_RESPONSES_TOOL_PROVIDERS`
+and `_STREAMING_TOOL_TRANSLATED_PROVIDERS` both still exclude Bedrock.
 
 ## Phase 3 — SDK canaries and documentation
 

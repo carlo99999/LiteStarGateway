@@ -351,6 +351,45 @@ class FakeAnthropic:
                     "usage": {"input_tokens": 3, "output_tokens": 5},
                 }
             )
+        if kwargs.get("stream") and tools and choice.get("type") != "none" and not has_tool_result:
+            selected = choice.get("name") or tools[0]["name"]
+            return _FakeStream(
+                [
+                    {
+                        "type": "message_start",
+                        "message": {
+                            "id": "msg-tool-s",
+                            "usage": {"input_tokens": 9, "output_tokens": 1},
+                        },
+                    },
+                    {
+                        "type": "content_block_start",
+                        "index": 0,
+                        "content_block": {
+                            "type": "tool_use",
+                            "id": "toolu-weather",
+                            "name": selected,
+                        },
+                    },
+                    {
+                        "type": "content_block_delta",
+                        "index": 0,
+                        "delta": {"type": "input_json_delta", "partial_json": '{"city":'},
+                    },
+                    {
+                        "type": "content_block_delta",
+                        "index": 0,
+                        "delta": {"type": "input_json_delta", "partial_json": ' "Paris"}'},
+                    },
+                    {"type": "content_block_stop", "index": 0},
+                    {
+                        "type": "message_delta",
+                        "delta": {"stop_reason": "tool_use"},
+                        "usage": {"output_tokens": 12},
+                    },
+                    {"type": "message_stop"},
+                ]
+            )
         if tools and choice.get("type") != "none" and not has_tool_result:
             selected = choice.get("name") or tools[0]["name"]
             return _Result(

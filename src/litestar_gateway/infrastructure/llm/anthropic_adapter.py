@@ -5,8 +5,8 @@ schema work; the adapter is a thin client wrapper. Responses are provided by
 wrapping this adapter in `ChatToResponsesAdapter`.
 
 Scope: text-in/text-out, structured outputs (`response_format`) translated to a
-forced tool (streaming included), and faithful non-streaming client tool calls.
-Streaming client tools and multimodal content remain fail-closed.
+forced tool (streaming included), and faithful client tool calls (streaming and
+non-streaming, Plan 09 Phase 2). Multimodal content remains fail-closed.
 """
 
 from __future__ import annotations
@@ -370,20 +370,66 @@ def from_anthropic_response(
     }
 
 
-def anthropic_event_to_delta(event: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+def anthropic_event_to_delta(
+    event: dict[str, Any],
+    *,
+    structured_tool_name: str | None = None,
+    tool_call_state: dict[int, dict[str, Any]] | None = None,
+) -> tuple[dict[str, Any] | None, str | None]:
     """Map one Anthropic stream event to an OpenAI chunk (delta, finish_reason).
 
     Returns (None, None) for events that produce no chunk (e.g. pings, block stops).
+
+    `tool_call_state` (index -> {call_id, name}) is mutated in place to track
+    real client tool_use blocks across events, so `astream_chat_completion`
+    can pass the same dict through the whole stream. `structured_tool_name`
+    identifies the synthetic forced tool used for structured-output emulation
+    (Anthropic has no native JSON mode): its `input_json_delta` events keep
+    relaying as `content` (unchanged, pre-Phase-2 behavior) rather than
+    `tool_calls`, since that tool is never exposed to the client.
     """
+    state = tool_call_state if tool_call_state is not None else {}
     etype = event.get("type")
     if etype == "message_start":
         return {"role": "assistant"}, None
+    if etype == "content_block_start":
+        index = event.get("index")
+        block = event.get("content_block") or {}
+        if not isinstance(index, int) or isinstance(index, bool) or block.get("type") != "tool_use":
+            return None, None
+        name = block.get("name")
+        if structured_tool_name is not None and name == structured_tool_name:
+            return None, None
+        call_id = block.get("id")
+        if not isinstance(call_id, str) or not call_id or not isinstance(name, str) or not name:
+            raise UpstreamResponseInvalid(
+                "Anthropic returned a malformed streamed tool call",
+                {"usage": {}},
+            )
+        state[index] = {"call_id": call_id, "name": name}
+        return {
+            "tool_calls": [
+                {
+                    "index": index,
+                    "id": call_id,
+                    "type": "function",
+                    "function": {"name": name, "arguments": ""},
+                }
+            ]
+        }, None
     if etype == "content_block_delta":
         delta = event.get("delta") or {}
         dtype = delta.get("type")
         if dtype == "text_delta":
             return {"content": delta.get("text", "")}, None
         if dtype == "input_json_delta":
+            index = event.get("index")
+            if isinstance(index, int) and not isinstance(index, bool) and index in state:
+                return {
+                    "tool_calls": [
+                        {"index": index, "function": {"arguments": delta.get("partial_json", "")}}
+                    ]
+                }, None
             # Structured output streams as a forced tool: relay its partial JSON
             # as content deltas so the client reconstructs the same JSON it gets
             # non-streamed (matching how OpenAI/Gemini stream JSON content).
@@ -397,7 +443,7 @@ def anthropic_event_to_delta(event: dict[str, Any]) -> tuple[dict[str, Any] | No
                 {"usage": {}},
             )
         if reason:
-            finish = _FINISH_REASON.get(reason)
+            finish = "tool_calls" if state else _FINISH_REASON.get(reason)
             if finish is None:
                 raise UpstreamResponseInvalid(
                     "Anthropic returned an invalid streaming stop reason",
@@ -572,12 +618,18 @@ class AnthropicAdapter:
             "model": model.provider_model_id,
         }
         kwargs: dict[str, Any] = {**to_anthropic_request(request, model), "stream": True}
+        effective = model.merge_params(request)
+        structured = parse_response_format(effective)
+        structured_tool_name = (
+            structured.name if structured is not None and structured.schema is not None else None
+        )
         # Anthropic reports input tokens on message_start and cumulative output
         # tokens on message_delta; accumulate them and emit a trailing
         # OpenAI-style usage chunk so streamed calls can be metered.
         input_tokens = 0
         output_tokens = 0
         refused = False
+        tool_call_state: dict[int, dict[str, Any]] = {}
         # The client is leased for the whole stream and released (not force-
         # closed while another request still holds it) once iteration ends or
         # the client disconnects.
@@ -593,7 +645,11 @@ class AnthropicAdapter:
                     delta_usage = raw.get("usage") or {}
                     output_tokens = delta_usage.get("output_tokens") or output_tokens
                     refused = (raw.get("delta") or {}).get("stop_reason") == "refusal"
-                delta, finish = anthropic_event_to_delta(raw)
+                delta, finish = anthropic_event_to_delta(
+                    raw,
+                    structured_tool_name=structured_tool_name,
+                    tool_call_state=tool_call_state,
+                )
                 if delta is None and finish is None:
                     continue
                 yield {
