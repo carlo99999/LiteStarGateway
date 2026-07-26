@@ -94,3 +94,21 @@ services:
       timeout: 3s
       start_period: 15s
       retries: 20
+
+  # In-network load generator (Plan 15 Step A1). Never started by `up`
+  # (gated behind the "loadgen" profile) — `scripts/run_load_profile.py`
+  # invokes it per stage via `docker compose run`, talking to `app` over the
+  # compose network instead of the host-published port. Required for valid
+  # sustained-streaming measurements: Docker Desktop's macOS host-port proxy
+  # cannot sustain long-duration, high-connection-churn streaming traffic
+  # (Plan 14a, Step 6 resolution) — the load generator itself must run
+  # inside the same network as the gateway it is measuring.
+  loadgen:
+    build:
+      context: .
+      target: loadgen
+    image: litestar-gateway-benchmark-loadgen
+    profiles:
+      - loadgen
+    volumes:
+      - ./load-results:/out

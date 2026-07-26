@@ -118,3 +118,16 @@ RUN apt-get update \
     && setcap cap_sys_ptrace+eip /opt/pyspy-venv/bin/py-spy \
     && ln -s /opt/pyspy-venv/bin/py-spy /usr/local/bin/py-spy
 USER app
+
+# ---- Load generator: builder + the load dependency group, for in-network
+# benchmark runs only (Plan 15 Step A1). Never used by production compose
+# files. Built from `builder` (not `runtime`): it needs the load group's
+# dependencies (locust, gevent, geventhttpclient), never the app's own
+# runtime image, and runs as the image's default root user since it never
+# serves traffic or holds credentials beyond one ephemeral benchmark API key.
+FROM builder AS loadgen
+
+RUN uv sync --frozen --no-dev --group load
+
+ENV PATH="/app/.venv/bin:$PATH"
+WORKDIR /app

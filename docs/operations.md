@@ -100,6 +100,21 @@ LOAD_MODES=chat just load-contract
 LOAD_MODES=chat-stream LOAD_PROFILE_POLICY=diagnostic just load-contract
 ```
 
+By default the load generator itself runs inside the Compose network (a
+profile-gated `loadgen` service, invoked per stage via `docker compose run`),
+talking to `app` directly instead of through the host-published port. This
+is required for valid sustained-streaming measurements: Docker Desktop's
+macOS host-port proxy cannot sustain long-duration, high-connection-churn
+streaming traffic. Admin bootstrap still runs on the host against the
+published port — it is low-rate management traffic, unaffected by the
+proxy artifact, and this keeps bootstrap secrets off the loadgen container.
+Set `LOAD_IN_NETWORK=0` to fall back to host-path load generation for a
+quick smoke run:
+
+```bash
+LOAD_IN_NETWORK=0 just load-contract
+```
+
 `fail-fast` is the acceptance default; `diagnostic` continues but still exits
 non-zero if any stage misses its gate. Mode-specific limits are
 `LOAD_CHAT_MAX_P95_MS`, `LOAD_STREAM_MAX_P95_MS`, and

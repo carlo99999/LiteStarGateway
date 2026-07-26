@@ -101,7 +101,7 @@ docker-ci:
     }
     trap cleanup EXIT
     docker rm -f "$name" >/dev/null 2>&1 || true
-    docker build -t "$image" .
+    docker build --target runtime -t "$image" .
     docker run -d --name "$name" \
         -p "$port:8000" \
         -e ENVIRONMENT=development \

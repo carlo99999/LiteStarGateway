@@ -100,7 +100,25 @@ run_contract() {
     echo "Benchmark containers are not running" >&2
     exit 2
   fi
+  # In-network by default: the load generator runs inside the compose
+  # network via the `loadgen` service, talking to `app` directly instead of
+  # through the host-published port. Required for valid sustained-streaming
+  # measurements — Docker Desktop's macOS host-port proxy cannot sustain
+  # long-duration, high-connection-churn streaming traffic (Plan 14a, Step 6
+  # resolution). Set LOAD_IN_NETWORK=0 to fall back to the old host-path
+  # execution for a quick host-side smoke run.
+  export LOAD_IN_NETWORK="${LOAD_IN_NETWORK:-1}"
+  export LOAD_COMPOSE_PROJECT="$PROJECT_NAME"
+  export LOAD_COMPOSE_FILE="$COMPOSE_FILE"
+  # LOAD_HOST always stays the host-published address: the admin bootstrap
+  # above runs on the host and must keep reaching app via the published
+  # port regardless of LOAD_IN_NETWORK. LOAD_STAGE_HOST, read only by the
+  # locust stage itself, is the one that switches to the in-network address.
   export LOAD_HOST="http://127.0.0.1:${BENCHMARK_PORT:-18000}"
+  if [[ "$LOAD_IN_NETWORK" == "1" ]]; then
+    export LOAD_STAGE_HOST="http://app:8000"
+    compose --profile loadgen build loadgen
+  fi
   export LOAD_MODES="${LOAD_MODES:-chat,chat-stream}"
   export LOAD_PROFILE_POLICY="${LOAD_PROFILE_POLICY:-fail-fast}"
   export LOAD_STAGES="${LOAD_STAGES:-25,50,100,150,200,250,300}"

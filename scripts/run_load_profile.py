@@ -151,8 +151,14 @@ def parse_resource_containers(raw: str) -> dict[str, str]:
     return dict(value)
 
 
-def validate_load_host(raw: str) -> str:
-    """Require HTTPS except for an explicit loopback benchmark target."""
+def validate_load_host(raw: str, *, allow_in_network: bool = False) -> str:
+    """Require HTTPS except for an explicit loopback benchmark target, or —
+    when `allow_in_network` is set (Plan 15 Step A1's in-network loadgen
+    container, e.g. `LOAD_HOST=http://app:8000`) — any plain-HTTP host. The
+    in-network loadgen talks to the gateway over the trusted compose
+    network, where TLS provides no real protection and the loopback check
+    doesn't apply (it runs in its own network namespace). Default is
+    unchanged: `allow_in_network` is opt-in, never on by default."""
 
     parsed = urlsplit(raw)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
@@ -166,13 +172,14 @@ def validate_load_host(raw: str) -> str:
     except ValueError as exc:
         raise LoadConfigurationError("LOAD_HOST has an invalid port") from exc
 
-    hostname = parsed.hostname
-    try:
-        loopback = hostname == "localhost" or ipaddress.ip_address(hostname).is_loopback
-    except ValueError:
-        loopback = hostname == "localhost"
-    if parsed.scheme == "http" and not loopback:
-        raise LoadConfigurationError("LOAD_HOST must use HTTPS unless it targets loopback")
+    if parsed.scheme == "http" and not allow_in_network:
+        hostname = parsed.hostname
+        try:
+            loopback = hostname == "localhost" or ipaddress.ip_address(hostname).is_loopback
+        except ValueError:
+            loopback = hostname == "localhost"
+        if not loopback:
+            raise LoadConfigurationError("LOAD_HOST must use HTTPS unless it targets loopback")
     return raw.rstrip("/")
 
 
@@ -224,10 +231,57 @@ def build_locust_command(
     mode: ChatMode,
     target_rps: float,
     host: str = "http://127.0.0.1:8000",
+    compose_project: str | None = None,
+    compose_file: str | None = None,
+    stage_environment: Mapping[str, str] | None = None,
 ) -> list[str]:
-    """Build a lockfile-only command whose arguments never contain credentials."""
+    """Build a command whose arguments never contain credentials.
 
-    prefix = output_directory / f"{mode}-{_target_label(target_rps)}"
+    Default form runs `locust` directly via `uv run` on the host. When both
+    `compose_project` and `compose_file` are given (Plan 15 Step A1), the
+    same stage instead runs inside the Docker network via the `loadgen`
+    service — required for valid sustained-streaming measurements on
+    macOS/Docker Desktop hosts, whose host-port proxy cannot sustain
+    long-duration, high-connection-churn streaming traffic (Plan 14a, Step 6
+    resolution). Stage configuration crosses into the container via bare
+    `-e KEY` flags: Docker forwards the value from the *local* subprocess
+    environment (set by the caller via `subprocess.run(..., env=...)`), so a
+    credential is never a literal command-line argument, matching the
+    host-path invariant above."""
+
+    label = _target_label(target_rps)
+    if compose_project is not None and compose_file is not None:
+        container_prefix = Path("/out") / output_directory.name / f"{mode}-{label}"
+        env_flags = [
+            flag
+            for key in sorted(stage_environment or {})
+            if key.startswith("LOAD_")
+            for flag in ("-e", key)
+        ]
+        return [
+            "docker",
+            "compose",
+            "--project-name",
+            compose_project,
+            "--file",
+            compose_file,
+            "run",
+            "--rm",
+            "--quiet-pull",
+            *env_flags,
+            "loadgen",
+            "locust",
+            "-f",
+            "scripts/locustfile.py",
+            "--headless",
+            "--host",
+            host,
+            "--csv",
+            str(container_prefix),
+            "--html",
+            f"{container_prefix}.html",
+        ]
+    prefix = output_directory / f"{mode}-{label}"
     return [
         "uv",
         "run",
@@ -330,7 +384,19 @@ def main() -> int:
             "LOAD_MAX_PROVIDER_TOKENS",
             "100000000",
         )
-        host = validate_load_host(environment.get("LOAD_HOST", "http://127.0.0.1:8000"))
+        in_network = environment.get("LOAD_IN_NETWORK") == "1"
+        # LOAD_STAGE_HOST (set only by scripts/benchmark-compose.sh's
+        # in-network path) is the address the locust stage itself targets;
+        # LOAD_HOST stays reserved for the host-side bootstrap in
+        # scripts/run_benchmark_contract.py and is the fallback here so a
+        # standalone invocation of this script is unaffected.
+        host = validate_load_host(
+            environment.get("LOAD_STAGE_HOST")
+            or environment.get("LOAD_HOST", "http://127.0.0.1:8000"),
+            allow_in_network=in_network,
+        )
+        compose_project = environment.get("LOAD_COMPOSE_PROJECT", "litestar-gateway-benchmark")
+        compose_file = environment.get("LOAD_COMPOSE_FILE", "docker-compose.benchmark.yml")
         resource_containers = parse_resource_containers(
             environment.get("LOAD_RESOURCE_CONTAINERS", "")
         )
@@ -377,6 +443,13 @@ def main() -> int:
                 mode=mode,
                 target_rps=target,
                 host=host,
+                compose_project=compose_project if in_network else None,
+                compose_file=compose_file if in_network else None,
+                stage_environment=(
+                    build_stage_environment(environment, mode=mode, target_rps=target)
+                    if in_network
+                    else None
+                ),
             )
         )
         for mode in modes
@@ -407,16 +480,19 @@ def main() -> int:
 
     def run_stage(mode: ChatMode, target: float) -> int:
         print(f"\n=== {mode}: {target:g} RPS ===", flush=True)
+        stage_environment = build_stage_environment(
+            environment,
+            mode=mode,
+            target_rps=target,
+        )
         command = build_locust_command(
             output_directory=run_directory,
             mode=mode,
             target_rps=target,
             host=host,
-        )
-        stage_environment = build_stage_environment(
-            environment,
-            mode=mode,
-            target_rps=target,
+            compose_project=compose_project if in_network else None,
+            compose_file=compose_file if in_network else None,
+            stage_environment=stage_environment if in_network else None,
         )
         return subprocess.run(command, env=stage_environment, check=False).returncode
 

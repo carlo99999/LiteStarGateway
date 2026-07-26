@@ -441,6 +441,12 @@ containerize the load generator in `docker-compose.benchmark.yml` is the
 natural next benchmark-contract improvement; until then, host-proxy streaming
 numbers at ≥60 s are not valid evidence.
 
+**Resolved** (Plan 15 Step A1): `just load-contract` now runs the load
+generator inside the Compose network by default, via a profile-gated
+`loadgen` service invoked per stage through `docker compose run`. Admin
+bootstrap still runs on the host against the published port. Set
+`LOAD_IN_NETWORK=0` to fall back to the old host-path execution.
+
 ### Pool sizing reviewed, not changed
 
 Production defaults (`DB_POOL_SIZE=5`, `DB_MAX_OVERFLOW=10`) give 15

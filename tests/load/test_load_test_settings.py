@@ -265,6 +265,66 @@ def test_progressive_runner_builds_locked_secret_free_commands(tmp_path: Path) -
     assert str(tmp_path / "chat-stream-300") in command
 
 
+def test_in_network_command_runs_locust_via_compose_run_secret_free(tmp_path: Path) -> None:
+    stage_environment = {
+        "LOAD_API_KEY": FAKE_API_KEY,
+        "LOAD_MODEL": "configured-model",
+        "LOAD_MODE": "chat-stream",
+        "LOAD_TARGET_RPS": "300",
+    }
+
+    command = build_locust_command(
+        output_directory=tmp_path,
+        mode="chat-stream",
+        target_rps=300,
+        host="http://app:8000",
+        compose_project="litestar-gateway-benchmark",
+        compose_file="docker-compose.benchmark.yml",
+        stage_environment=stage_environment,
+    )
+
+    assert command[:6] == [
+        "docker",
+        "compose",
+        "--project-name",
+        "litestar-gateway-benchmark",
+        "--file",
+        "docker-compose.benchmark.yml",
+    ]
+    assert "run" in command
+    assert "loadgen" in command
+    assert "locust" in command
+    assert FAKE_API_KEY not in command
+    assert FAKE_API_KEY not in " ".join(command)
+    # Stage config crosses via bare `-e KEY` flags (Docker forwards the value
+    # from the invoking subprocess's own environment), never `-e KEY=VALUE`.
+    assert "-e" in command
+    assert "LOAD_API_KEY" in command
+    assert not any("LOAD_API_KEY=" in part for part in command)
+    assert str(tmp_path.name) in " ".join(command)
+
+
+def test_in_network_command_omits_docker_compose_without_both_project_and_file(
+    tmp_path: Path,
+) -> None:
+    command = build_locust_command(
+        output_directory=tmp_path,
+        mode="chat",
+        target_rps=100,
+        compose_project="litestar-gateway-benchmark",
+        compose_file=None,
+    )
+
+    assert command[0] == "uv"
+
+
+def test_load_host_allows_plain_http_in_network_targets_only_when_opted_in() -> None:
+    with pytest.raises(LoadConfigurationError):
+        validate_load_host("http://app:8000")
+
+    assert validate_load_host("http://app:8000", allow_in_network=True) == "http://app:8000"
+
+
 def test_stage_environment_is_new_and_selects_mode_and_target() -> None:
     original = {
         "LOAD_API_KEY": FAKE_API_KEY,
