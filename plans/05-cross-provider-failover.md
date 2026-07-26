@@ -1,9 +1,9 @@
 # Plan 05 — Cross-provider failover
 
-**Status:** Phase 0 (error taxonomy + eligibility classifier) and Phase 1
-(sequential failover for non-streamed calls) complete. Phase 2 (streaming
-failover, pre-first-byte only) is next; Phase 3 (circuit breaker +
-observability) can follow independently.
+**Status:** Phase 0, Phase 1 (sequential failover for non-streamed calls),
+and Phase 2 (streaming failover, pre-first-byte only) complete. Phase 3
+(circuit breaker + observability) is next, and can be split into cheap
+observability first, breaker deferred.
 
 **Design doc:** [docs/next-steps/cross-provider-failover.md](../docs/next-steps/cross-provider-failover.md).
 **Depends on:** the smart-routing candidate/router infrastructure
@@ -93,17 +93,30 @@ to native passthrough endpoints.
   capping a longer declared chain and `overall_deadline_ms` stopping further
   retries.
 
-### Phase 2 — Streaming failover (pre-first-byte only)
+### Phase 2 — Streaming failover (pre-first-byte only) — ✅ complete
 
 - Wrap the open + `_prime` first-chunk pull (`completion_service.py:103`, `:614`).
   A failover-eligible error at stream open **or** first `anext` (before the SSE
   `200 OK` commits, H24) → release (`:627`), retry next candidate.
 - Once `_rechain` (`:86`) has yielded the first chunk, any later error
   (`translate_stream`, `errors.py:164`) is **terminal** — abort, never fail over.
+- **Done (26 July 2026):** `CompletionService._open_chat_stream_with_failover`
+  wraps both boundaries in one retry loop. No `UpstreamResponseInvalid`
+  special case is needed here (unlike Phase 1): `metered_stream`'s existing
+  M26 invariant already skips billing entirely for any error where zero
+  chunks were ever produced and no usage was reported — exactly the
+  condition true for every failure this loop retries, for any exception
+  type. Reservation ownership differs by boundary: a stream-open failure
+  never entered `_metered`, so this method releases it directly; a
+  `_prime` failure has already gone through `metered_stream`'s shielded
+  finally, which already released it via the `release()` closure `_metered`
+  wired in — releasing it again would double-remove from `InFlightSpend`.
 - **Done when:** a fake stream that raises `UpstreamTimeout` at open succeeds on
   the second candidate with no bytes leaked to the client; a fake that raises
   **after** the first chunk aborts the connection and does **not** fail over
   (hard-boundary regression); reservations release exactly once in both paths.
+  All verified in `tests/budgets/test_failover_streaming.py`, including the
+  hard-boundary regression and the first-chunk-vs-stream-open distinction.
 
 ### Phase 3 — Circuit breaker + observability (optional / can split)
 

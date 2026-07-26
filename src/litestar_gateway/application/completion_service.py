@@ -851,15 +851,33 @@ class CompletionService:
         """Resolve the model + credentials (may raise → HTTP error) and return an
         async iterator of OpenAI chunk dicts, metered for usage. Awaited before
         streaming starts so resolution errors surface as HTTP status codes."""
-        clean = sanitize_request("chat.completions", request)
+        sanitized = sanitize_request("chat.completions", request)
+        router_context: dict[str, Any] = {}
         model, values, reservation, clean, attribution = await self._prepare(
             team_id,
             "chat.completions",
-            clean,
+            sanitized,
             ModelType.CHAT,
             api_key_id,
             validate_chat_request,
+            router_context=router_context,
         )
+        router = router_context.get("router")
+        decision = router_context.get("decision")
+        if isinstance(router, RouterConfig) and router.failover_enabled and decision is not None:
+            assert isinstance(decision, RoutingDecision)
+            return await self._open_chat_stream_with_failover(
+                team_id,
+                api_key_id,
+                sanitized,
+                model,
+                values,
+                reservation,
+                clean,
+                attribution,
+                router,
+                decision,
+            )
         try:
             stream = await self._gateway.astream_chat_completion(clean, model, values)
         except BaseException:
@@ -876,6 +894,98 @@ class CompletionService:
             attribution,
         )
         return await _prime(gen)
+
+    async def _open_chat_stream_with_failover(
+        self,
+        team_id: UUID,
+        api_key_id: UUID,
+        sanitized: dict[str, Any],
+        model: Model,
+        values: dict[str, str],
+        reservation: float,
+        clean: dict[str, Any],
+        attribution: UsageAttribution,
+        router: RouterConfig,
+        decision: RoutingDecision,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Streaming failover, pre-first-byte only: a failover-eligible error at
+        stream *open* or the first `anext` (before any chunk ever reaches this
+        method's caller) retries the next candidate; once a chunk has been
+        yielded, `_prime`'s job is already done and this method has already
+        returned, so no later error can reach this retry loop at all. Unlike
+        the non-streaming loop, no `UpstreamResponseInvalid` special case is
+        needed here: `metered_stream`'s existing zero-consumption invariant
+        (M26) already skips billing entirely whenever an error is raised with
+        no chunk ever seen, which is unconditionally true for every failure
+        this loop retries."""
+        start = perf_counter()
+        remaining = await self._remaining_failover_candidates(team_id, router, decision, sanitized)
+        max_attempts = min(router.max_attempts, 1 + len(remaining))
+        attempt_model, attempt_values, attempt_reservation, attempt_clean = (
+            model,
+            values,
+            reservation,
+            clean,
+        )
+        last_exc: DomainError | None = None
+        for attempt_index in range(max_attempts):
+            if attempt_index > 0:
+                assert last_exc is not None  # set by the previous iteration's failure
+                if (
+                    router.overall_deadline_ms is not None
+                    and (perf_counter() - start) * 1000 >= router.overall_deadline_ms
+                ):
+                    raise last_exc
+                attempt_model = remaining[attempt_index - 1]
+                attempt_clean = clamp_output_tokens(
+                    "chat.completions", sanitized, attempt_model.max_output_tokens
+                )
+                attempt_clean = validate_chat_request(attempt_model, attempt_clean)
+                attempt_values = await self._credentials.get_values(attempt_model.credential_id)
+                if attempt_values is None:
+                    raise CredentialNotFound(str(attempt_model.credential_id))
+                attempt_reservation = await self._meter.admit(
+                    team_id,
+                    attempt_model,
+                    attempt_model.merge_params(attempt_clean),
+                    skip_team_rate_limit=True,
+                )
+            try:
+                stream = await self._gateway.astream_chat_completion(
+                    attempt_clean, attempt_model, attempt_values
+                )
+            except DomainError as exc:
+                # Never entered _metered, so nothing else releases this
+                # attempt's reservation -- we must release it ourselves.
+                self._meter.release(team_id, attempt_reservation)
+                if not is_failover_eligible(exc) or attempt_index == max_attempts - 1:
+                    raise
+                last_exc = exc
+                continue
+            except BaseException:
+                self._meter.release(team_id, attempt_reservation)
+                raise
+            gen = self._metered(
+                team_id,
+                api_key_id,
+                attempt_model,
+                "chat.completions",
+                stream,
+                attempt_clean,
+                attempt_reservation,
+                attribution,
+            )
+            try:
+                return await _prime(gen)
+            except DomainError as exc:
+                # metered_stream's own shielded finally already released this
+                # reservation (via the release() closure _metered wired in)
+                # and already settled billing (nothing, per M26, since zero
+                # chunks were ever produced) -- do not release again here.
+                if not is_failover_eligible(exc) or attempt_index == max_attempts - 1:
+                    raise
+                last_exc = exc
+        raise AssertionError("unreachable: the loop above always returns or raises")
 
     async def open_responses_stream(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
