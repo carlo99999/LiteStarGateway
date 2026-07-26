@@ -24,7 +24,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from litestar_gateway.app import create_app
 from litestar_gateway.config import Settings
 from litestar_gateway.infrastructure.llm import openai_adapter
-from litestar_gateway.infrastructure.persistence.orm import ModelRecord, UsageEventModel
+from litestar_gateway.infrastructure.persistence.orm import (
+    CredentialModel,
+    ModelRecord,
+    OrganizationModel,
+    SecretKeyModel,
+    TeamModel,
+    UsageEventModel,
+)
 from litestar_gateway.infrastructure.persistence.usage_repository import SQLAlchemyUsageRepository
 
 MASTER_KEY = "master-secret"  # pragma: allowlist secret
@@ -229,13 +236,43 @@ async def session(database_url: str) -> AsyncIterator[AsyncSession]:
     await engine.dispose()
 
 
-def _model_record(model_id: UUID, **overrides: object) -> ModelRecord:
+async def _seed_team(session: AsyncSession) -> UUID:
+    """A real `team` row: `usage_event.team_id` is a Postgres foreign key (SQLite
+    doesn't enforce it, but the CI Postgres job does), so a bare `uuid4()` fails
+    there even though it passes locally."""
+    org = OrganizationModel(id=uuid4(), name=f"org-{uuid4()}")
+    session.add(org)
+    await session.flush()
+    team = TeamModel(id=uuid4(), organization_id=org.id, name=f"team-{uuid4()}")
+    session.add(team)
+    await session.flush()
+    return team.id
+
+
+async def _seed_credential(session: AsyncSession) -> UUID:
+    """A real `credential` row: `model.credential_id` is a Postgres foreign key."""
+    secret_key = SecretKeyModel(id=uuid4(), purpose="credential", material="k")
+    session.add(secret_key)
+    await session.flush()
+    credential = CredentialModel(
+        id=uuid4(),
+        name=f"cred-{uuid4()}",
+        provider="openai",
+        encrypted_values="",
+        key_id=secret_key.id,
+    )
+    session.add(credential)
+    await session.flush()
+    return credential.id
+
+
+def _model_record(model_id: UUID, credential_id: UUID, **overrides: object) -> ModelRecord:
     fields: dict[str, object] = {
         "id": model_id,
         "team_id": None,
         "name": "m",
         "provider": "openai",
-        "credential_id": uuid4(),
+        "credential_id": credential_id,
         "type": "chat",
         "provider_model_id": "gpt-4o-mini",
         "input_cost_per_token": 1e-6,
@@ -269,9 +306,10 @@ async def test_cache_savings_empty_state_is_zero(session: AsyncSession) -> None:
 
 
 async def test_cache_savings_sums_avoided_cost_for_priced_hits(session: AsyncSession) -> None:
-    team_id = uuid4()
+    team_id = await _seed_team(session)
+    credential_id = await _seed_credential(session)
     model_id = uuid4()
-    session.add(_model_record(model_id))
+    session.add(_model_record(model_id, credential_id))
     session.add(_usage_event(team_id, model_id))  # a hit
     session.add(_usage_event(team_id, model_id, cache_hit=False, cost=1.0))  # a miss
     await session.commit()
@@ -289,7 +327,7 @@ async def test_cache_savings_sums_avoided_cost_for_priced_hits(session: AsyncSes
 async def test_cache_savings_counts_hit_without_price_when_model_missing(
     session: AsyncSession,
 ) -> None:
-    team_id = uuid4()
+    team_id = await _seed_team(session)
     # No ModelRecord row for this model_id: the hit is real but unpriced.
     session.add(_usage_event(team_id, uuid4()))
     await session.commit()
@@ -304,9 +342,10 @@ async def test_cache_savings_counts_hit_without_price_when_model_missing(
 
 
 async def test_cache_savings_is_tenant_isolated(session: AsyncSession) -> None:
-    team_a, team_b = uuid4(), uuid4()
+    team_a, team_b = await _seed_team(session), await _seed_team(session)
+    credential_id = await _seed_credential(session)
     model_id = uuid4()
-    session.add(_model_record(model_id))
+    session.add(_model_record(model_id, credential_id))
     session.add(_usage_event(team_a, model_id))
     session.add(_usage_event(team_b, model_id))
     await session.commit()
@@ -320,9 +359,10 @@ async def test_cache_savings_is_tenant_isolated(session: AsyncSession) -> None:
 
 
 async def test_platform_cache_savings_aggregates_across_teams(session: AsyncSession) -> None:
-    team_a, team_b = uuid4(), uuid4()
+    team_a, team_b = await _seed_team(session), await _seed_team(session)
+    credential_id = await _seed_credential(session)
     model_id = uuid4()
-    session.add(_model_record(model_id))
+    session.add(_model_record(model_id, credential_id))
     session.add(_usage_event(team_a, model_id))
     session.add(_usage_event(team_b, model_id))
     session.add(_usage_event(team_b, model_id, cache_hit=False, cost=1.0))
