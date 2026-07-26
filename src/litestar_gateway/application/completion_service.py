@@ -24,6 +24,7 @@ from litestar_gateway.domain.chat_tool_policy import validate_chat_request
 from litestar_gateway.domain.entities import Model, ModelType, Provider, UsageAttribution
 from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
+    DomainError,
     ModelDisabled,
     ModelNotFound,
     ModelTypeMismatch,
@@ -31,6 +32,7 @@ from litestar_gateway.domain.exceptions import (
     UnsupportedOperation,
     UpstreamResponseInvalid,
 )
+from litestar_gateway.domain.failover import is_failover_eligible
 from litestar_gateway.domain.ports import (
     CredentialRepository,
     LLMGateway,
@@ -44,7 +46,13 @@ from litestar_gateway.domain.request_policy import (
     sanitize_request,
     validate_responses_request,
 )
-from litestar_gateway.domain.routing import CandidateModel, RouterConfig
+from litestar_gateway.domain.routing import (
+    CandidateModel,
+    RouterConfig,
+    RoutingDecision,
+    build_routing_context,
+    filter_candidates,
+)
 
 RequestValidator = Callable[[Model, dict[str, Any]], dict[str, Any]]
 
@@ -576,6 +584,8 @@ class CompletionService:
         expected_type: ModelType,
         api_key_id: UUID | None,
         request_validator: RequestValidator | None = None,
+        *,
+        router_context: dict[str, Any] | None = None,
     ) -> tuple[Model, dict[str, str], float, dict[str, Any], UsageAttribution]:
         # Gate the caller before router strategies: judge/embedding strategies
         # may make billable provider calls while resolving a virtual model.
@@ -607,6 +617,9 @@ class CompletionService:
                 decision = await self._router_service.route(
                     router, request, acting_team_id=team_id, api_key_id=api_key_id
                 )
+                if router_context is not None:
+                    router_context["router"] = router
+                    router_context["decision"] = decision
                 assert self._callable_resolver is not None
                 if decision.model_id is not None:
                     model = await self._callable_resolver.resolve_model_id(
@@ -637,6 +650,9 @@ class CompletionService:
                 decision = await self._router_service.route(
                     router, request, acting_team_id=team_id, api_key_id=api_key_id
                 )
+                if router_context is not None:
+                    router_context["router"] = router
+                    router_context["decision"] = decision
                 model = await self._models.get_by_name(team_id, decision.model_name)
         model = self._ensure_usable(model, alias, expected_type)
         _reject_unsupported_n(operation, model, request)
@@ -663,15 +679,33 @@ class CompletionService:
     async def chat_completion(
         self, team_id: UUID, api_key_id: UUID | None, request: dict[str, Any]
     ) -> dict[str, Any]:
-        clean = sanitize_request("chat.completions", request)
+        sanitized = sanitize_request("chat.completions", request)
+        router_context: dict[str, Any] = {}
         model, values, reservation, clean, attribution = await self._prepare(
             team_id,
             "chat.completions",
-            clean,
+            sanitized,
             ModelType.CHAT,
             api_key_id,
             validate_chat_request,
+            router_context=router_context,
         )
+        router = router_context.get("router")
+        decision = router_context.get("decision")
+        if isinstance(router, RouterConfig) and router.failover_enabled and decision is not None:
+            assert isinstance(decision, RoutingDecision)
+            return await self._chat_completion_with_failover(
+                team_id,
+                api_key_id,
+                sanitized,
+                model,
+                values,
+                reservation,
+                clean,
+                attribution,
+                router,
+                decision,
+            )
         return await self._dispatch(
             team_id,
             api_key_id,
@@ -682,6 +716,111 @@ class CompletionService:
             reservation,
             attribution=attribution,
         )
+
+    async def _remaining_failover_candidates(
+        self,
+        team_id: UUID,
+        router: RouterConfig,
+        decision: RoutingDecision,
+        request: dict[str, Any],
+    ) -> list[Model]:
+        """The ordered fallback chain: `filter_candidates`' survivors in
+        declared order, excluding whichever candidate the strategy already
+        chose as attempt #1."""
+        ctx = build_routing_context(request, team_id=team_id)
+        survivors = filter_candidates(ctx, router.candidates)
+        models: list[Model] = []
+        for candidate in survivors:
+            if candidate.model_name == decision.model_name:
+                continue
+            candidate_model = await self._candidate_model(team_id, candidate)
+            if (
+                candidate_model is not None
+                and candidate_model.enabled
+                and candidate_model.type is ModelType.CHAT
+            ):
+                models.append(candidate_model)
+        return models
+
+    async def _chat_completion_with_failover(
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        sanitized: dict[str, Any],
+        model: Model,
+        values: dict[str, str],
+        reservation: float,
+        clean: dict[str, Any],
+        attribution: UsageAttribution,
+        router: RouterConfig,
+        decision: RoutingDecision,
+    ) -> dict[str, Any]:
+        """Retry the remaining candidate chain on a failover-eligible error.
+        Attempt #1 reuses the model/values/reservation `_prepare` already
+        admitted; later attempts admit fresh (skipping the team-RPM gate --
+        one logical request is one team-RPM hit, taken on attempt #1) and
+        re-clamp/re-validate the *original* request for that candidate's own
+        output ceiling and provider contract."""
+        start = perf_counter()
+        remaining = await self._remaining_failover_candidates(team_id, router, decision, sanitized)
+        max_attempts = min(router.max_attempts, 1 + len(remaining))
+        attempt_model, attempt_values, attempt_reservation, attempt_clean = (
+            model,
+            values,
+            reservation,
+            clean,
+        )
+        last_exc: DomainError | None = None
+        for attempt_index in range(max_attempts):
+            if attempt_index > 0:
+                assert last_exc is not None  # set by the previous iteration's failure
+                if (
+                    router.overall_deadline_ms is not None
+                    and (perf_counter() - start) * 1000 >= router.overall_deadline_ms
+                ):
+                    raise last_exc
+                attempt_model = remaining[attempt_index - 1]
+                attempt_clean = clamp_output_tokens(
+                    "chat.completions", sanitized, attempt_model.max_output_tokens
+                )
+                attempt_clean = validate_chat_request(attempt_model, attempt_clean)
+                attempt_values = await self._credentials.get_values(attempt_model.credential_id)
+                if attempt_values is None:
+                    raise CredentialNotFound(str(attempt_model.credential_id))
+                attempt_reservation = await self._meter.admit(
+                    team_id,
+                    attempt_model,
+                    attempt_model.merge_params(attempt_clean),
+                    skip_team_rate_limit=True,
+                )
+            try:
+                return await self._dispatch(
+                    team_id,
+                    api_key_id,
+                    attempt_model,
+                    "chat.completions",
+                    attempt_clean,
+                    lambda m=attempt_model, v=attempt_values, c=attempt_clean: (
+                        self._gateway.achat_completion(c, m, v)
+                    ),
+                    attempt_reservation,
+                    attribution=attribution,
+                )
+            except DomainError as exc:
+                # UpstreamResponseInvalid already billed a partial charge
+                # inside _dispatch (settle_error) before re-raising; retrying
+                # it would double-bill the team for one logical request, so
+                # it is terminal here even though the general eligibility
+                # classifier marks it eligible (it subclasses
+                # UpstreamUnavailable, whose *other* members never bill).
+                if (
+                    not is_failover_eligible(exc)
+                    or isinstance(exc, UpstreamResponseInvalid)
+                    or attempt_index == max_attempts - 1
+                ):
+                    raise
+                last_exc = exc
+        raise AssertionError("unreachable: the loop above always returns or raises")
 
     async def responses(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]

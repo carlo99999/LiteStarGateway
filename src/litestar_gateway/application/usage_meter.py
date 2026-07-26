@@ -306,6 +306,7 @@ class UsageMeter:
         request: dict[str, Any],
         *,
         api_key_id: UUID | None = None,
+        skip_team_rate_limit: bool = False,
     ) -> float:
         """Pre-call spend gate: reject once committed spend plus the estimated
         cost already reserved by in-flight requests reaches the budget limit.
@@ -314,8 +315,17 @@ class UsageMeter:
         release it at settlement. This bounds burst overshoot per replica:
         without the reservation, any number of concurrent requests could pass
         the gate before the first one settles (streams widen that blind spot
-        to minutes)."""
-        await self._enforce_team_rate_limit(team_id)
+        to minutes).
+
+        `skip_team_rate_limit` is for cross-provider failover retries only
+        (Plan 05): one logical client request must consume exactly one
+        team-RPM hit, taken on the first attempt. A retry against the next
+        candidate still needs its own fresh budget reservation (a real
+        provider call is about to happen), but re-checking the team's
+        requests-per-minute gate on every retry would silently multiply one
+        request into N rate-limit consumptions."""
+        if not skip_team_rate_limit:
+            await self._enforce_team_rate_limit(team_id)
         await self.enforce_key_rate_limit(api_key_id)
         if self._budgets is None:
             return 0.0

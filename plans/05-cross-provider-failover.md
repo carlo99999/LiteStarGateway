@@ -1,8 +1,9 @@
 # Plan 05 — Cross-provider failover
 
-**Status:** Phase 0 (error taxonomy + eligibility classifier) complete.
-Phase 1 (sequential failover for non-streamed calls) is the shippable core,
-next.
+**Status:** Phase 0 (error taxonomy + eligibility classifier) and Phase 1
+(sequential failover for non-streamed calls) complete. Phase 2 (streaming
+failover, pre-first-byte only) is next; Phase 3 (circuit breaker +
+observability) can follow independently.
 
 **Design doc:** [docs/next-steps/cross-provider-failover.md](../docs/next-steps/cross-provider-failover.md).
 **Depends on:** the smart-routing candidate/router infrastructure
@@ -60,14 +61,37 @@ to native passthrough endpoints.
   between 1 and the candidate count, `overall_deadline_ms` must be positive
   when set — both checked only when `failover_enabled=True`, so ordinary
   routers with fewer than 3 candidates (the default `max_attempts`) are
-  never constrained by a setting they never opted into. The orchestration
-  loop itself (the actual failover behavior) is separate, next work.
+  never constrained by a setting they never opted into.
+- **✅ Done (26 July 2026): the orchestration loop.**
+  `CompletionService._chat_completion_with_failover` builds the chain from
+  `_prepare`'s already-admitted attempt #1 plus `filter_candidates`'
+  survivors (declared order, excluding the chosen candidate), capped at
+  `max_attempts`. Each retry re-clamps/re-validates the *original* request
+  for that candidate's own output ceiling and provider contract, admits
+  fresh with `skip_team_rate_limit=True` (the new `UsageMeter.admit()`
+  param fixing the re-admit RPM hazard), and re-fetches credentials.
+  `_prepare` captures the resolved `RouterConfig`/`RoutingDecision` via a
+  new optional `router_context` out-param — the existing 5-tuple return
+  shape is unchanged for the other 5 callers, so every other operation
+  (embeddings, images, responses, native) is provably unaffected.
+
+  One deliberate refinement beyond the plan text: `UpstreamResponseInvalid`
+  is a subclass of `UpstreamUnavailable` (so Phase 0's classifier marks it
+  eligible), but `_dispatch` already bills a partial charge for it via
+  `settle_error` before re-raising — retrying would double-bill the team
+  for one logical request. The failover loop therefore treats it as
+  terminal despite the general classifier, an explicit exception documented
+  in code (only `UpstreamResponseInvalid` among `DomainError`s bills before
+  re-raising, confirmed by reading `_dispatch`).
 - **Done when:** a fake primary raising `UpstreamUnavailable` (503) yields a
   successful response from the second candidate; a fake raising
   `UpstreamRequestRejected` (400) surfaces immediately with **no** second
   attempt; both cases prove budget is settled at most once and never
   double-charged; and one logical request consumes exactly one key-RPM hit
-  across N attempts.
+  across N attempts. All verified in `tests/budgets/test_failover_orchestration.py`
+  and `tests/budgets/test_admit_skip_team_rate_limit.py`, plus `max_attempts`
+  capping a longer declared chain and `overall_deadline_ms` stopping further
+  retries.
 
 ### Phase 2 — Streaming failover (pre-first-byte only)
 
