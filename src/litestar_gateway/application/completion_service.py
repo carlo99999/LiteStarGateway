@@ -9,6 +9,7 @@ budget admission, usage metering, billing, traces — is delegated to `UsageMete
 
 from __future__ import annotations
 
+import logging
 import weakref
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import replace
@@ -34,10 +35,13 @@ from litestar_gateway.domain.exceptions import (
 )
 from litestar_gateway.domain.failover import is_failover_eligible
 from litestar_gateway.domain.ports import (
+    CachedResponse,
+    CacheKey,
     CircuitBreaker,
     CredentialRepository,
     LLMGateway,
     ModelRepository,
+    ResponseCache,
 )
 from litestar_gateway.domain.request_policy import (
     clamp_native_output_tokens,
@@ -47,6 +51,7 @@ from litestar_gateway.domain.request_policy import (
     sanitize_request,
     validate_responses_request,
 )
+from litestar_gateway.domain.response_cache_key import derive_cache_key, is_cacheable
 from litestar_gateway.domain.routing import (
     CandidateModel,
     RouterConfig,
@@ -55,7 +60,31 @@ from litestar_gateway.domain.routing import (
     filter_candidates,
 )
 
+logger = logging.getLogger("litestar_gateway.response_cache")
+
 RequestValidator = Callable[[Model, dict[str, Any]], dict[str, Any]]
+
+
+def _cache_usage_tokens(usage: dict[str, Any]) -> tuple[int, int] | None:
+    """Token counts from a provider's authoritative usage block, for a
+    response-cache write. `None` when the provider reported no usable counts —
+    the response still settles and returns normally, it just isn't cached (the
+    `UsageMeter` estimate-when-missing fallback, H14, is not replicated on this
+    best-effort accelerator path)."""
+    if "prompt_tokens" in usage or "completion_tokens" in usage:
+        prompt = usage.get("prompt_tokens")
+        completion = usage.get("completion_tokens")
+    else:
+        prompt = usage.get("input_tokens")
+        completion = usage.get("output_tokens")
+    if (
+        isinstance(prompt, int)
+        and not isinstance(prompt, bool)
+        and isinstance(completion, int)
+        and not isinstance(completion, bool)
+    ):
+        return prompt, completion
+    return None
 
 
 def _reject_unsupported_n(operation: str, model: Model, request: dict[str, Any]) -> None:
@@ -141,6 +170,8 @@ class CompletionService:
         router_service: RouterService | None = None,
         callable_resolver: CallableAliasResolver | None = None,
         circuit_breaker: CircuitBreaker | None = None,
+        response_cache: ResponseCache | None = None,
+        response_cache_ttl_s: int = 3600,
     ) -> None:
         self._models = models
         self._credentials = credentials
@@ -149,6 +180,12 @@ class CompletionService:
         self._router_service = router_service
         self._callable_resolver = callable_resolver
         self._circuit_breaker = circuit_breaker
+        # None (the global RESPONSE_CACHE_ENABLED kill-switch off) makes every
+        # cache access below inert: `_dispatch` never receives a `cache_key`
+        # unless `self._response_cache` is set, so a disabled cache adds no
+        # lookup, no write, byte-identical behavior (Plan 04 Phase 0).
+        self._response_cache = response_cache
+        self._response_cache_ttl_s = response_cache_ttl_s
 
     async def _candidate_model(self, team_id: UUID, candidate: CandidateModel) -> Model | None:
         if self._callable_resolver is not None:
@@ -213,6 +250,7 @@ class CompletionService:
         reservation: float = 0.0,
         settle_view: Callable[[dict[str, Any]], dict[str, Any]] = lambda response: response,
         attribution: UsageAttribution | None = None,
+        cache_key: CacheKey | None = None,
     ) -> dict[str, Any]:
         """Run one gateway call, observing success (usage + trace) and failure
         (error trace) before the exception propagates to the HTTP layer. The
@@ -221,8 +259,33 @@ class CompletionService:
         reported none (H14). `settle_view` maps the raw response to the usage-only
         shape settlement reads (identity for OpenAI-shaped responses; the native
         Gemini path passes `_gemini_usage`), so the raw body is still returned to
-        the caller verbatim while billing sees the native token counts."""
+        the caller verbatim while billing sees the native token counts.
+
+        `cache_key` is the single response-cache integration point (Plan 04
+        Phase 0, design §9): non-`None` only for non-streamed chat.completions/
+        responses that opted in (`chat_completion`/`responses` compute it).
+        A hit skips `call()` entirely, settles at $0 via `settle_cache_hit`, and
+        returns the stored body; a miss falls through to the normal dispatch and
+        writes the fresh response afterward. Any cache exception is caught by
+        the helpers below and treated as a miss/no-op (design §8) — the cache
+        is never a dependency of the money path."""
         start = perf_counter()
+        if cache_key is not None:
+            cached = await self._cache_get(cache_key)
+            if cached is not None:
+                latency_ms = (perf_counter() - start) * 1000
+                await self._meter.settle_cache_hit(
+                    team_id,
+                    api_key_id,
+                    model,
+                    operation,
+                    cached.prompt_tokens,
+                    cached.completion_tokens,
+                    latency_ms,
+                    attribution,
+                )
+                self._meter.release(team_id, reservation)
+                return cached.body
         try:
             try:
                 response = await call()
@@ -247,20 +310,54 @@ class CompletionService:
                 )
                 raise
             latency_ms = (perf_counter() - start) * 1000
+            view = settle_view(response)
             await self._meter.settle_ok(
                 team_id,
                 api_key_id,
                 model,
                 operation,
-                settle_view(response),
+                view,
                 latency_ms,
                 request,
                 attribution,
             )
+            if cache_key is not None:
+                await self._cache_put(cache_key, response, view)
             await self._attach_routing_usage(response)
             return response
         finally:
             self._meter.release(team_id, reservation)
+
+    async def _cache_get(self, key: CacheKey) -> CachedResponse | None:
+        """A cache failure must never fail the request (design §8): any
+        exception from `get` is logged and treated as a miss."""
+        assert self._response_cache is not None
+        try:
+            return await self._response_cache.get(key)
+        except Exception:
+            logger.warning("response cache get failed; treating as a miss", exc_info=True)
+            return None
+
+    async def _cache_put(
+        self, key: CacheKey, response: dict[str, Any], usage_view: dict[str, Any]
+    ) -> None:
+        """Store a fresh, successful response for `key`. Only successful,
+        fully-formed responses ever reach here (the write sits after
+        `settle_ok`, design §7); a response whose usage can't be read cleanly
+        is simply not cached. Any store exception is logged and swallowed."""
+        assert self._response_cache is not None
+        tokens = _cache_usage_tokens(usage_view.get("usage") or {})
+        if tokens is None:
+            return
+        prompt, completion = tokens
+        try:
+            await self._response_cache.put(
+                key,
+                CachedResponse(body=response, prompt_tokens=prompt, completion_tokens=completion),
+                self._response_cache_ttl_s,
+            )
+        except Exception:
+            logger.warning("response cache put failed; continuing uncached", exc_info=True)
 
     async def _attach_routing_usage(self, response: dict[str, Any]) -> None:
         """Savings observability (§7): give the routing decision, if one was
@@ -718,7 +815,28 @@ class CompletionService:
             lambda: self._gateway.achat_completion(clean, model, values),
             reservation,
             attribution=attribution,
+            cache_key=self._cache_key_for(team_id, api_key_id, "chat.completions", clean, model),
         )
+
+    def _cache_key_for(
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        operation: str,
+        request: dict[str, Any],
+        model: Model,
+    ) -> CacheKey | None:
+        """The `_dispatch` cache-participation decision (Plan 04 Phase 0):
+        `None` when the global kill-switch is off, the team+model hasn't
+        opted in, or the request is otherwise ineligible (design §7) — in
+        every one of those cases `_dispatch` performs no lookup and no write.
+        Not wired into the cross-provider failover retry path (Plan 05): each
+        retry targets a different candidate model, and caching a failover
+        response is deferred to a later slice rather than reasoning about
+        per-attempt keys under this Phase 0's time budget."""
+        if self._response_cache is None or not is_cacheable(operation, request, model):
+            return None
+        return derive_cache_key(team_id, api_key_id, model.name, request)
 
     async def _remaining_failover_candidates(
         self,
@@ -872,6 +990,7 @@ class CompletionService:
             lambda: self._gateway.aresponses(clean, model, values),
             reservation,
             attribution=attribution,
+            cache_key=self._cache_key_for(team_id, api_key_id, "responses", clean, model),
         )
 
     async def open_chat_stream(

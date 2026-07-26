@@ -45,6 +45,9 @@ class UsageEvent:
     canonical_model_name: str | None = None
     callable_origin: str | None = None
     source_team_id: UUID | None = None
+    # True when this event settled from the response cache (Plan 04 Phase 0)
+    # rather than a real provider call — cost is always 0.0 on such an event.
+    cache_hit: bool = False
 
 
 @dataclass(frozen=True)
@@ -101,3 +104,5 @@ class TraceRecord:
     created_at: datetime
     # Exception class name when status == "error" (no message: keep traces secret-free).
     error_type: str | None = None
+    # True when this trace observed a response-cache hit (Plan 04 Phase 0).
+    cache_hit: bool = False

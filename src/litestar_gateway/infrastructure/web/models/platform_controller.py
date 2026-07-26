@@ -59,6 +59,8 @@ class PlatformModelController(Controller):
             input_cost_per_token=data.input_cost_per_token,
             output_cost_per_token=data.output_cost_per_token,
             enabled=data.enabled,
+            cache_enabled=data.cache_enabled,
+            cache_allow_nondeterministic=data.cache_allow_nondeterministic,
         )
         await record_audit(
             audit_log,
@@ -104,6 +106,8 @@ class PlatformModelController(Controller):
             input_cost_per_token=data.input_cost_per_token,
             output_cost_per_token=data.output_cost_per_token,
             enabled=data.enabled,
+            cache_enabled=data.cache_enabled,
+            cache_allow_nondeterministic=data.cache_allow_nondeterministic,
         )
         await record_audit(
             audit_log,

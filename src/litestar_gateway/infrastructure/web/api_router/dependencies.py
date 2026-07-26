@@ -15,6 +15,7 @@ from litestar_gateway.domain.ports import (
     CircuitBreaker,
     LLMGateway,
     RateLimiter,
+    ResponseCache,
     RoutingDecisionLogFactory,
     RoutingRepositoryFactory,
     UsageRepository,
@@ -82,6 +83,8 @@ def provide_completion_service(
     rate_limiter: NamedDependency[RateLimiter],
     callable_resolver: NamedDependency[CallableAliasResolver],
     circuit_breaker: NamedDependency[CircuitBreaker],
+    response_cache: NamedDependency[ResponseCache | None],
+    response_cache_ttl_s: NamedDependency[int],
 ) -> CompletionService:
     # One request-scoped meter, shared by the completion path and the router:
     # judge/embeddings strategies make real, billable provider calls that must be
@@ -116,4 +119,6 @@ def provide_completion_service(
         meter=meter,
         callable_resolver=callable_resolver,
         circuit_breaker=circuit_breaker,
+        response_cache=response_cache,
+        response_cache_ttl_s=response_cache_ttl_s,
     )

@@ -496,6 +496,7 @@ class UsageEventModel(base.UUIDAuditBase):
     prompt_tokens: Mapped[int] = mapped_column(default=0)
     completion_tokens: Mapped[int] = mapped_column(default=0)
     cost: Mapped[float] = mapped_column(default=0.0)
+    cache_hit: Mapped[bool] = mapped_column(default=False)
 
     def to_entity(self) -> UsageEvent:
         return UsageEvent(
@@ -514,6 +515,7 @@ class UsageEventModel(base.UUIDAuditBase):
             canonical_model_name=self.canonical_model_name,
             callable_origin=self.callable_origin,
             source_team_id=self.source_team_id,
+            cache_hit=self.cache_hit,
         )
 
 
@@ -542,6 +544,7 @@ class PendingUsageEventModel(base.UUIDAuditBase):
     prompt_tokens: Mapped[int] = mapped_column(default=0)
     completion_tokens: Mapped[int] = mapped_column(default=0)
     cost: Mapped[float] = mapped_column(default=0.0)
+    cache_hit: Mapped[bool] = mapped_column(default=False)
     event_created_at: Mapped[datetime] = mapped_column()
     # Poison-message bookkeeping: rows that keep failing the ledger insert are
     # quarantined after MAX_RECONCILE_ATTEMPTS instead of starving the batch.
@@ -674,6 +677,9 @@ class ModelRecord(base.UUIDAuditBase):
     enabled: Mapped[bool] = mapped_column(default=True)
     # The originally-owning team, kept when a model is promoted to global.
     origin_team_id: Mapped[UUID | None] = mapped_column(default=None)
+    # Response cache opt-in (Plan 04 Phase 0) — see domain/entities/model.py.
+    cache_enabled: Mapped[bool] = mapped_column(default=False)
+    cache_allow_nondeterministic: Mapped[bool] = mapped_column(default=False)
 
     def to_entity(self) -> Model:
         return Model(
@@ -693,6 +699,8 @@ class ModelRecord(base.UUIDAuditBase):
             enabled=self.enabled,
             created_at=self.created_at,
             origin_team_id=self.origin_team_id,
+            cache_enabled=self.cache_enabled,
+            cache_allow_nondeterministic=self.cache_allow_nondeterministic,
         )
 
 

@@ -425,6 +425,55 @@ class UsageMeter:
             )
         )
 
+    async def settle_cache_hit(
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        operation: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        latency_ms: float,
+        attribution: UsageAttribution | None = None,
+    ) -> None:
+        """Settle a response-cache hit (Plan 04 Phase 0, design §6): bill the
+        *stored* token counts at a hard `cost=0.0` rather than routing through
+        `_parse_usage` (which would compute a real, non-zero cost from those
+        same counts) — never double-bill or under-bill a hit. Still flows
+        through the ledger + trace so usage stays attributable; both records
+        carry `cache_hit=True`. The budget reservation taken at admission is
+        released by the caller (`CompletionService._dispatch`), same as every
+        other settlement path."""
+        now = datetime.now(UTC)
+        await self._bill(
+            team_id,
+            api_key_id,
+            model,
+            operation,
+            prompt_tokens,
+            completion_tokens,
+            0.0,
+            now,
+            attribution,
+            cache_hit=True,
+        )
+        self._emit_trace(
+            TraceRecord(
+                team_id=team_id,
+                api_key_id=api_key_id,
+                model_name=model.name,
+                provider=model.provider.value,
+                operation=operation,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cost=0.0,
+                latency_ms=latency_ms,
+                status="ok",
+                created_at=now,
+                cache_hit=True,
+            )
+        )
+
     async def settle_error(
         self,
         team_id: UUID,
@@ -578,6 +627,8 @@ class UsageMeter:
         cost: float,
         now: datetime,
         attribution: UsageAttribution | None = None,
+        *,
+        cache_hit: bool = False,
     ) -> None:
         """Persist the authoritative billing record (no trace — callers emit
         their own 'ok' or 'error' trace alongside)."""
@@ -598,6 +649,7 @@ class UsageMeter:
                 canonical_model_name=model.name,
                 callable_origin=attribution.callable_origin if attribution else None,
                 source_team_id=attribution.source_team_id if attribution else None,
+                cache_hit=cache_hit,
             )
         )
 
