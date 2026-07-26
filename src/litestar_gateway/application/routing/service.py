@@ -302,6 +302,16 @@ class RouterService:
             raise InvalidRouterConfig("Duplicate candidate model names")
         if router.default_model not in names:
             raise InvalidRouterConfig("default_model must be one of the candidates")
+        if router.failover_enabled:
+            if router.max_attempts < 1:
+                raise InvalidRouterConfig("max_attempts must be at least 1")
+            if router.max_attempts > len(router.candidates):
+                raise InvalidRouterConfig(
+                    f"max_attempts ({router.max_attempts}) cannot exceed the number of "
+                    f"candidates ({len(router.candidates)})"
+                )
+            if router.overall_deadline_ms is not None and router.overall_deadline_ms <= 0:
+                raise InvalidRouterConfig("overall_deadline_ms must be positive")
         # A router is a virtual model: its name must not shadow a real one.
         if (
             self._callable_resolver is None

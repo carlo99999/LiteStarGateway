@@ -53,6 +53,15 @@ to native passthrough endpoints.
   re-hit it (admit variant that skips RPM, or reserve RPM once for the chain).
 - Config: per-router `failover_enabled` (default **off**), `max_attempts`,
   `overall_deadline_ms`, validated in `RouterService._validate` (`service.py:274`).
+  **✅ Done (26 July 2026):** fields added to the `RouterConfig` domain entity,
+  persisted on both `router` and `router_revision` (append-only snapshot)
+  tables via migration `aa866e36f33b`, exposed through the admin API
+  (`RouterRequest`/`RouterResponse`). Validation: `max_attempts` must be
+  between 1 and the candidate count, `overall_deadline_ms` must be positive
+  when set — both checked only when `failover_enabled=True`, so ordinary
+  routers with fewer than 3 candidates (the default `max_attempts`) are
+  never constrained by a setting they never opted into. The orchestration
+  loop itself (the actual failover behavior) is separate, next work.
 - **Done when:** a fake primary raising `UpstreamUnavailable` (503) yields a
   successful response from the second candidate; a fake raising
   `UpstreamRequestRejected` (400) surfaces immediately with **no** second
