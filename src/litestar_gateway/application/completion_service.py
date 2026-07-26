@@ -43,6 +43,7 @@ from litestar_gateway.domain.ports import (
     LLMGateway,
     ModelRepository,
     ResponseCache,
+    SemanticResponseCache,
 )
 from litestar_gateway.domain.request_policy import (
     clamp_native_output_tokens,
@@ -53,6 +54,10 @@ from litestar_gateway.domain.request_policy import (
     validate_responses_request,
 )
 from litestar_gateway.domain.response_cache_key import derive_cache_key, is_cacheable
+from litestar_gateway.domain.response_cache_semantic import (
+    extract_semantic_text,
+    is_semantic_cacheable,
+)
 from litestar_gateway.domain.routing import (
     CandidateModel,
     RouterConfig,
@@ -213,6 +218,9 @@ class CompletionService:
         circuit_breaker: CircuitBreaker | None = None,
         response_cache: ResponseCache | None = None,
         response_cache_ttl_s: int = 3600,
+        semantic_cache: SemanticResponseCache | None = None,
+        semantic_threshold: float = 0.97,
+        semantic_embedding_model: str | None = None,
     ) -> None:
         self._models = models
         self._credentials = credentials
@@ -227,6 +235,15 @@ class CompletionService:
         # lookup, no write, byte-identical behavior (Plan 04 Phase 0).
         self._response_cache = response_cache
         self._response_cache_ttl_s = response_cache_ttl_s
+        # Semantic tier (Plan 04 Phase 2). `semantic_cache=None` (the global
+        # kill-switch off, same as `response_cache`) makes it inert exactly
+        # like the exact-match tier; `semantic_embedding_model=None` (no
+        # embedding model name configured platform-wide) makes it inert too,
+        # even for a model that opted in — a missing embedder is treated as
+        # semantic-ineligible, never an error (design §8).
+        self._semantic_cache = semantic_cache
+        self._semantic_threshold = semantic_threshold
+        self._semantic_embedding_model = semantic_embedding_model
 
     async def _candidate_model(self, team_id: UUID, candidate: CandidateModel) -> Model | None:
         if self._callable_resolver is not None:
@@ -292,6 +309,7 @@ class CompletionService:
         settle_view: Callable[[dict[str, Any]], dict[str, Any]] = lambda response: response,
         attribution: UsageAttribution | None = None,
         cache_key: CacheKey | None = None,
+        semantic_text: str | None = None,
     ) -> dict[str, Any]:
         """Run one gateway call, observing success (usage + trace) and failure
         (error trace) before the exception propagates to the HTTP layer. The
@@ -309,10 +327,18 @@ class CompletionService:
         returns the stored body; a miss falls through to the normal dispatch and
         writes the fresh response afterward. Any cache exception is caught by
         the helpers below and treated as a miss/no-op (design §8) — the cache
-        is never a dependency of the money path."""
+        is never a dependency of the money path.
+
+        `semantic_text` is the Phase 2 semantic-tier participation decision
+        (`_semantic_text_for`): non-`None` only when `cache_key` is also
+        non-`None` — the semantic tier is never tried without the exact-match
+        tier in front of it — and is only ever consulted on an exact-match
+        miss, never in place of it."""
         start = perf_counter()
         if cache_key is not None:
             cached = await self._cache_get(cache_key)
+            if cached is None and semantic_text is not None:
+                cached = await self._semantic_get(team_id, api_key_id, model, semantic_text)
             if cached is not None:
                 latency_ms = (perf_counter() - start) * 1000
                 await self._meter.settle_cache_hit(
@@ -364,6 +390,10 @@ class CompletionService:
             )
             if cache_key is not None:
                 await self._cache_put(cache_key, response, view)
+                if semantic_text is not None:
+                    await self._semantic_put(
+                        team_id, api_key_id, model, semantic_text, response, view
+                    )
             await self._attach_routing_usage(response)
             return response
         finally:
@@ -399,6 +429,91 @@ class CompletionService:
             )
         except Exception:
             logger.warning("response cache put failed; continuing uncached", exc_info=True)
+
+    async def _embed_for_semantic_cache(self, team_id: UUID, text: str) -> list[float] | None:
+        """Best-effort embed of `text` via the platform's configured semantic-
+        cache embedding model (`RESPONSE_CACHE_SEMANTIC_EMBEDDING_MODEL`,
+        resolved per-team by name), reusing the gateway's own embeddings port
+        exactly as the S3 embeddings routing strategy does
+        (`application/routing/embeddings.py`). Returns `None` — never raises —
+        when the model name isn't configured, the resolved model is missing/
+        disabled/not an embeddings model, or its credential is missing; the
+        caller's own try/except also treats a provider-call exception here as
+        a miss (design §8)."""
+        if self._semantic_embedding_model is None:
+            return None
+        embed_model = await self._models.get_by_name(team_id, self._semantic_embedding_model)
+        if (
+            embed_model is None
+            or not embed_model.enabled
+            or embed_model.type is not ModelType.EMBEDDINGS
+        ):
+            return None
+        values = await self._credentials.get_values(embed_model.credential_id)
+        if values is None:
+            return None
+        response = await self._gateway.aembeddings(
+            {"model": embed_model.name, "input": [text]}, embed_model, values
+        )
+        data = response.get("data")
+        if not isinstance(data, list) or not data:
+            return None
+        embedding = data[0].get("embedding") if isinstance(data[0], dict) else None
+        return embedding if isinstance(embedding, list) else None
+
+    async def _semantic_get(
+        self, team_id: UUID, api_key_id: UUID | None, model: Model, text: str
+    ) -> CachedResponse | None:
+        """Semantic-tier lookup (Plan 04 Phase 2, design §1/§8): embed `text`
+        and search *only* the caller's own tenant scope
+        (`SemanticResponseCache.find`'s hard invariant). Any exception —
+        embedding failure or backend error — is logged and treated as a miss,
+        exactly like `_cache_get`; the semantic tier is exactly as optional as
+        the exact-match tier it sits behind."""
+        assert self._semantic_cache is not None
+        try:
+            vector = await self._embed_for_semantic_cache(team_id, text)
+            if vector is None:
+                return None
+            return await self._semantic_cache.find(
+                team_id, api_key_id, vector, self._semantic_threshold
+            )
+        except Exception:
+            logger.warning("semantic cache lookup failed; treating as a miss", exc_info=True)
+            return None
+
+    async def _semantic_put(
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        text: str,
+        response: dict[str, Any],
+        usage_view: dict[str, Any],
+    ) -> None:
+        """Store a fresh, successful response in the semantic tier alongside
+        its embedding, mirroring `_cache_put`'s cacheability/failure rules.
+        Any exception is logged and swallowed — a semantic-write failure must
+        never fail the request or fall back to failing the exact-match write
+        (which already happened before this is called)."""
+        assert self._semantic_cache is not None
+        tokens = _cache_usage_tokens(usage_view.get("usage") or {})
+        if tokens is None:
+            return
+        prompt, completion = tokens
+        try:
+            vector = await self._embed_for_semantic_cache(team_id, text)
+            if vector is None:
+                return
+            await self._semantic_cache.add(
+                team_id,
+                api_key_id,
+                vector,
+                CachedResponse(body=response, prompt_tokens=prompt, completion_tokens=completion),
+                self._response_cache_ttl_s,
+            )
+        except Exception:
+            logger.warning("semantic cache write failed; continuing without it", exc_info=True)
 
     async def _attach_routing_usage(self, response: dict[str, Any]) -> None:
         """Savings observability (§7): give the routing decision, if one was
@@ -857,6 +972,7 @@ class CompletionService:
             reservation,
             attribution=attribution,
             cache_key=self._cache_key_for(team_id, api_key_id, "chat.completions", clean, model),
+            semantic_text=self._semantic_text_for("chat.completions", clean, model),
         )
 
     def _cache_key_for(
@@ -878,6 +994,23 @@ class CompletionService:
         if self._response_cache is None or not is_cacheable(operation, request, model):
             return None
         return derive_cache_key(team_id, api_key_id, model.name, request)
+
+    def _semantic_text_for(
+        self, operation: str, request: dict[str, Any], model: Model
+    ) -> str | None:
+        """The `_dispatch` semantic-tier participation decision (Plan 04
+        Phase 2): `None` when the semantic tier's own kill-switch/embedding
+        model aren't configured, the model hasn't separately opted in
+        (`is_semantic_cacheable` — which itself requires exact-match
+        eligibility, so semantic is never tried without exact-match in front
+        of it), or there is no extractable text to embed. In every one of
+        those cases `_dispatch` never calls `embed` and never attempts the
+        semantic tier."""
+        if self._semantic_cache is None or self._semantic_embedding_model is None:
+            return None
+        if not is_semantic_cacheable(operation, request, model):
+            return None
+        return extract_semantic_text(request)
 
     async def _remaining_failover_candidates(
         self,
@@ -1032,6 +1165,7 @@ class CompletionService:
             reservation,
             attribution=attribution,
             cache_key=self._cache_key_for(team_id, api_key_id, "responses", clean, model),
+            semantic_text=self._semantic_text_for("responses", clean, model),
         )
 
     async def open_chat_stream(

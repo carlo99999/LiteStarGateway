@@ -18,6 +18,7 @@ from litestar_gateway.domain.ports import (
     ResponseCache,
     RoutingDecisionLogFactory,
     RoutingRepositoryFactory,
+    SemanticResponseCache,
     UsageRepository,
 )
 from litestar_gateway.infrastructure.keyring import Keyring
@@ -85,6 +86,9 @@ def provide_completion_service(
     circuit_breaker: NamedDependency[CircuitBreaker],
     response_cache: NamedDependency[ResponseCache | None],
     response_cache_ttl_s: NamedDependency[int],
+    semantic_cache: NamedDependency[SemanticResponseCache | None],
+    semantic_threshold: NamedDependency[float],
+    semantic_embedding_model: NamedDependency[str | None],
 ) -> CompletionService:
     # One request-scoped meter, shared by the completion path and the router:
     # judge/embeddings strategies make real, billable provider calls that must be
@@ -121,4 +125,7 @@ def provide_completion_service(
         circuit_breaker=circuit_breaker,
         response_cache=response_cache,
         response_cache_ttl_s=response_cache_ttl_s,
+        semantic_cache=semantic_cache,
+        semantic_threshold=semantic_threshold,
+        semantic_embedding_model=semantic_embedding_model,
     )

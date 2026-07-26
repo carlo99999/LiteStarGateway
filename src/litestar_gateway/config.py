@@ -35,6 +35,11 @@ DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS = 30
 # max-entries bounds the in-memory fallback's size.
 DEFAULT_RESPONSE_CACHE_TTL_S = 3600
 DEFAULT_RESPONSE_CACHE_MAX_ENTRIES = 10_000
+# Semantic tier (Plan 04 Phase 2): a near-duplicate prompt at/above this cosine
+# similarity, within the caller's own tenant scope, is served like an exact hit.
+# Per-team/model opt-in (Model.cache_semantic_enabled), tried only on an
+# exact-match miss — never a replacement for it.
+DEFAULT_RESPONSE_CACHE_SEMANTIC_THRESHOLD = 0.97
 # Daily key rotation (UTC time, "HH:MM"). Opt-in via KEY_ROTATION_ENABLED.
 DEFAULT_ROTATION_TIME = "03:00"
 # Observability. No tracking URI ⇒ tracing disabled (NullSink).
@@ -171,6 +176,14 @@ class Settings:
     response_cache_enabled: bool = False
     response_cache_ttl_s: int = DEFAULT_RESPONSE_CACHE_TTL_S
     response_cache_max_entries: int = DEFAULT_RESPONSE_CACHE_MAX_ENTRIES
+    # Semantic tier (Plan 04 Phase 2). `response_cache_semantic_embedding_model`
+    # is the *name* of the embeddings model each team must configure to use the
+    # semantic tier (resolved per-team, same as the S3 routing embeddings
+    # strategy's `embedding_model` config field); None ⇒ the semantic tier is
+    # inert everywhere even for models that opted in (design §8 — a missing
+    # embedder is treated as semantic-ineligible, never an error).
+    response_cache_semantic_threshold: float = DEFAULT_RESPONSE_CACHE_SEMANTIC_THRESHOLD
+    response_cache_semantic_embedding_model: str | None = None
     # Daily automatic key rotation (opt-in), at rotation_time (UTC, "HH:MM").
     rotation_enabled: bool = False
     rotation_time: str = DEFAULT_ROTATION_TIME
@@ -343,6 +356,14 @@ class Settings:
             ),
             response_cache_max_entries=_env_int(
                 "RESPONSE_CACHE_MAX_ENTRIES", DEFAULT_RESPONSE_CACHE_MAX_ENTRIES, minimum=1
+            ),
+            response_cache_semantic_threshold=_env_float(
+                "RESPONSE_CACHE_SEMANTIC_THRESHOLD",
+                DEFAULT_RESPONSE_CACHE_SEMANTIC_THRESHOLD,
+                minimum=0.0,
+            ),
+            response_cache_semantic_embedding_model=os.environ.get(
+                "RESPONSE_CACHE_SEMANTIC_EMBEDDING_MODEL"
             ),
             rotation_enabled=_env_bool("KEY_ROTATION_ENABLED", False),
             rotation_time=os.environ.get("KEY_ROTATION_TIME", DEFAULT_ROTATION_TIME),

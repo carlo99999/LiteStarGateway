@@ -88,6 +88,7 @@ class ModelService:
         enabled: bool = True,
         cache_enabled: bool = False,
         cache_allow_nondeterministic: bool = False,
+        cache_semantic_enabled: bool = False,
     ) -> Model:
         """Create a team-owned model (`team_id` set) or a global one (`team_id`
         None). A team may reuse a name that only exists as a global (it shadows
@@ -130,6 +131,7 @@ class ModelService:
                 origin_team_id=team_id,
                 cache_enabled=cache_enabled,
                 cache_allow_nondeterministic=cache_allow_nondeterministic,
+                cache_semantic_enabled=cache_semantic_enabled,
             )
         )
 

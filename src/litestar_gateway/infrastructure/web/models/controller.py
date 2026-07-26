@@ -100,6 +100,7 @@ class ModelController(Controller):
             enabled=data.enabled,
             cache_enabled=data.cache_enabled,
             cache_allow_nondeterministic=data.cache_allow_nondeterministic,
+            cache_semantic_enabled=data.cache_semantic_enabled,
         )
         await record_audit(
             audit_log,
@@ -178,6 +179,7 @@ class ModelController(Controller):
             enabled=data.enabled,
             cache_enabled=data.cache_enabled,
             cache_allow_nondeterministic=data.cache_allow_nondeterministic,
+            cache_semantic_enabled=data.cache_semantic_enabled,
         )
         await record_audit(
             audit_log,

@@ -680,6 +680,8 @@ class ModelRecord(base.UUIDAuditBase):
     # Response cache opt-in (Plan 04 Phase 0) — see domain/entities/model.py.
     cache_enabled: Mapped[bool] = mapped_column(default=False)
     cache_allow_nondeterministic: Mapped[bool] = mapped_column(default=False)
+    # Semantic-tier opt-in (Plan 04 Phase 2) — see domain/entities/model.py.
+    cache_semantic_enabled: Mapped[bool] = mapped_column(default=False)
 
     def to_entity(self) -> Model:
         return Model(
@@ -701,6 +703,7 @@ class ModelRecord(base.UUIDAuditBase):
             origin_team_id=self.origin_team_id,
             cache_enabled=self.cache_enabled,
             cache_allow_nondeterministic=self.cache_allow_nondeterministic,
+            cache_semantic_enabled=self.cache_semantic_enabled,
         )
 
 
