@@ -87,6 +87,11 @@ class RouterRequest:
     # Optimistic concurrency token. Omit on create; update handlers default it
     # to the head they just read for backwards-compatible clients.
     base_revision_id: UUID | None = None
+    # Cross-provider failover (Plan 05). Off by default: existing routers are
+    # unaffected until an admin opts in explicitly.
+    failover_enabled: bool = False
+    max_attempts: int = 3
+    overall_deadline_ms: int | None = None
 
     def to_entity(
         self,
@@ -108,6 +113,9 @@ class RouterRequest:
             shadow_strategy=self.shadow_strategy,
             origin_team_id=origin_team_id,
             revision_id=self.base_revision_id,
+            failover_enabled=self.failover_enabled,
+            max_attempts=self.max_attempts,
+            overall_deadline_ms=self.overall_deadline_ms,
         )
 
 
@@ -140,6 +148,9 @@ class RouterResponse:
     revision_id: UUID | None = None
     revision_number: int | None = None
     default_model_id: UUID | None = None
+    failover_enabled: bool = False
+    max_attempts: int = 3
+    overall_deadline_ms: int | None = None
 
     @classmethod
     def from_entity(cls, router: RouterConfig) -> RouterResponse:
@@ -160,6 +171,9 @@ class RouterResponse:
             revision_id=router.revision_id,
             revision_number=router.revision_number,
             default_model_id=router.default_model_id,
+            failover_enabled=router.failover_enabled,
+            max_attempts=router.max_attempts,
+            overall_deadline_ms=router.overall_deadline_ms,
         )
 
 

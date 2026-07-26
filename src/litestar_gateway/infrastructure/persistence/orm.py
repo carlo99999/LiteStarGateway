@@ -199,6 +199,11 @@ class RouterModel(base.UUIDAuditBase):
     # nullable so router identity and its first revision can be inserted in one
     # transaction without a circular FK dependency.
     current_revision_id: Mapped[UUID | None] = mapped_column(default=None, index=True)
+    # Cross-provider failover (Plan 05). Off by default: existing routers are
+    # unaffected until an admin opts in explicitly.
+    failover_enabled: Mapped[bool] = mapped_column(default=False)
+    max_attempts: Mapped[int] = mapped_column(default=3)
+    overall_deadline_ms: Mapped[int | None] = mapped_column(default=None)
 
     def to_entity(self) -> RouterConfig:
         return RouterConfig(
@@ -227,6 +232,9 @@ class RouterModel(base.UUIDAuditBase):
             created_at=self.created_at,
             shadow_strategy=self.shadow_strategy,
             origin_team_id=self.origin_team_id,
+            failover_enabled=self.failover_enabled,
+            max_attempts=self.max_attempts,
+            overall_deadline_ms=self.overall_deadline_ms,
         )
 
 
@@ -245,6 +253,11 @@ class RouterRevisionModel(base.UUIDAuditBase):
     strategy_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     shadow_strategy: Mapped[str | None] = mapped_column(default=None)
     enabled: Mapped[bool] = mapped_column(default=True)
+    # Cross-provider failover (Plan 05). Off by default: existing revisions are
+    # unaffected until an admin opts in explicitly.
+    failover_enabled: Mapped[bool] = mapped_column(default=False)
+    max_attempts: Mapped[int] = mapped_column(default=3)
+    overall_deadline_ms: Mapped[int | None] = mapped_column(default=None)
 
     def to_entity(
         self,
@@ -291,6 +304,9 @@ class RouterRevisionModel(base.UUIDAuditBase):
             grant_id=grant_id,
             ack_active_prompt_egress=ack_active_prompt_egress,
             ack_shadow_prompt_egress=ack_shadow_prompt_egress,
+            failover_enabled=self.failover_enabled,
+            max_attempts=self.max_attempts,
+            overall_deadline_ms=self.overall_deadline_ms,
         )
 
 

@@ -221,6 +221,72 @@ async def test_router_decisions_are_persisted(client: AsyncTestClient, tmp_path:
     assert rows == [("auto", "complexity", "cheap-model", 0, 0)]
 
 
+async def test_router_defaults_leave_failover_disabled(client: AsyncTestClient) -> None:
+    # Regression: max_attempts defaults to 3 but must never constrain an
+    # ordinary router (failover disabled) with fewer than 3 candidates.
+    key, team, admin = await _setup_router(client)
+    resp = await client.get(f"/teams/{team}/routers", headers=_bearer(admin))
+    router = next(r for r in resp.json() if r["name"] == "auto")
+    assert router["failover_enabled"] is False
+    assert router["max_attempts"] == 3
+    assert router["overall_deadline_ms"] is None
+
+
+async def test_router_accepts_explicit_failover_config(client: AsyncTestClient) -> None:
+    key, team, admin = await _setup_router(client)
+    resp = await client.post(
+        f"/teams/{team}/routers",
+        json={
+            "name": "auto-with-failover",
+            "default_model": "big-model",
+            "candidates": [
+                {"model_name": "cheap-model", "description": "d", "quality_tier": "SIMPLE"},
+                {"model_name": "big-model", "description": "d", "quality_tier": "COMPLEX"},
+            ],
+            "failover_enabled": True,
+            "max_attempts": 2,
+            "overall_deadline_ms": 5000,
+        },
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_201_CREATED, resp.text
+    body = resp.json()
+    assert body["failover_enabled"] is True
+    assert body["max_attempts"] == 2
+    assert body["overall_deadline_ms"] == 5000
+
+
+@pytest.mark.parametrize(
+    ("overrides", "match"),
+    [
+        ({"max_attempts": 0}, "at least 1"),
+        ({"max_attempts": 3}, "cannot exceed"),
+        ({"max_attempts": 2, "overall_deadline_ms": 0}, "must be positive"),
+        ({"max_attempts": 2, "overall_deadline_ms": -1}, "must be positive"),
+    ],
+)
+async def test_router_rejects_invalid_failover_config(
+    client: AsyncTestClient, overrides: dict[str, object], match: str
+) -> None:
+    _, team, admin = await _setup_router(client)
+    resp = await client.post(
+        f"/teams/{team}/routers",
+        json={
+            "name": "auto-bad-failover",
+            "default_model": "big-model",
+            "candidates": [
+                {"model_name": "cheap-model", "description": "d", "quality_tier": "SIMPLE"},
+                {"model_name": "big-model", "description": "d", "quality_tier": "COMPLEX"},
+            ],
+            "failover_enabled": True,
+            **overrides,
+        },
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_400_BAD_REQUEST
+    assert match in resp.text
+
+
 async def test_router_name_cannot_shadow_a_model(client: AsyncTestClient) -> None:
     key, team, admin = await _setup_router(client)
     resp = await client.post(

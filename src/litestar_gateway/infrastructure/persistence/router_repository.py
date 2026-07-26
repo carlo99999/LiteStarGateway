@@ -186,6 +186,9 @@ class SQLAlchemyRouterRepository:
             strategy_config=await self._map_config(config, self._encrypt_section),
             shadow_strategy=router.shadow_strategy,
             enabled=router.enabled,
+            failover_enabled=router.failover_enabled,
+            max_attempts=router.max_attempts,
+            overall_deadline_ms=router.overall_deadline_ms,
         )
         self._session.add(revision)
         await self._session.flush()
@@ -201,6 +204,9 @@ class SQLAlchemyRouterRepository:
         model.shadow_strategy = revision.shadow_strategy
         model.enabled = revision.enabled
         model.current_revision_id = revision.id
+        model.failover_enabled = revision.failover_enabled
+        model.max_attempts = revision.max_attempts
+        model.overall_deadline_ms = revision.overall_deadline_ms
 
     # --- CRUD ---
 
@@ -216,6 +222,9 @@ class SQLAlchemyRouterRepository:
             shadow_strategy=router.shadow_strategy,
             enabled=router.enabled,
             origin_team_id=router.origin_team_id,
+            failover_enabled=router.failover_enabled,
+            max_attempts=router.max_attempts,
+            overall_deadline_ms=router.overall_deadline_ms,
         )
         try:
             self._session.add(model)

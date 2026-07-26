@@ -97,6 +97,11 @@ class RouterConfig:
     grant_id: UUID | None = None
     ack_active_prompt_egress: bool = False
     ack_shadow_prompt_egress: bool = False
+    # Cross-provider failover (Plan 05). Off by default: existing routers are
+    # unaffected until an admin opts in explicitly.
+    failover_enabled: bool = False
+    max_attempts: int = 3
+    overall_deadline_ms: int | None = None
 
 
 @dataclass(frozen=True)
