@@ -20,6 +20,7 @@ from litestar_gateway.config import Settings
 from litestar_gateway.domain.exceptions import DomainError
 from litestar_gateway.domain.ports import IdentityProvider, LLMGateway
 from litestar_gateway.infrastructure.bootstrap import make_bootstrap_admin
+from litestar_gateway.infrastructure.cache import build_response_cache
 from litestar_gateway.infrastructure.circuit_breaker import build_circuit_breaker
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
@@ -266,6 +267,10 @@ def _build_dependencies(
     # One shared circuit breaker (Redis-backed with REDIS_URL, else in-memory) so
     # a tripped provider/model is skipped fleet-wide, not just per process.
     circuit_breaker = build_circuit_breaker(settings)
+    # Response cache (Plan 04 Phase 0): the global kill-switch. `None` when off
+    # so `CompletionService` never even looks up/writes it — off is byte-
+    # identical to today. In-memory only in this phase (Phase 1 adds Redis).
+    response_cache = build_response_cache(settings) if settings.response_cache_enabled else None
     return {
         "api_key_service": Provide(provide_api_key_service, sync_to_thread=False),
         "user_service": Provide(provide_user_service, sync_to_thread=False),
@@ -296,6 +301,10 @@ def _build_dependencies(
         "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
         "rate_limiter": Provide(lambda: rate_limiter, sync_to_thread=False),
         "circuit_breaker": Provide(lambda: circuit_breaker, sync_to_thread=False),
+        "response_cache": Provide(lambda: response_cache, sync_to_thread=False),
+        "response_cache_ttl_s": Provide(
+            lambda: settings.response_cache_ttl_s, sync_to_thread=False
+        ),
         "keyring": Provide(keyring_provider, sync_to_thread=False),
         "browser_session_cookie_secure": Provide(
             lambda: settings.session_cookie_secure, sync_to_thread=False

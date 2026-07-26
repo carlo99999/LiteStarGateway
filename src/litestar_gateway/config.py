@@ -30,6 +30,11 @@ DEFAULT_INFERENCE_RATE_LIMIT_RPM = 120
 # a half-open retry trial.
 DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD = 5
 DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS = 30
+# Response cache (Plan 04 Phase 0): off by default (global kill-switch), plus a
+# per-team/per-model opt-in (Model.cache_enabled). TTL bounds staleness;
+# max-entries bounds the in-memory fallback's size.
+DEFAULT_RESPONSE_CACHE_TTL_S = 3600
+DEFAULT_RESPONSE_CACHE_MAX_ENTRIES = 10_000
 # Daily key rotation (UTC time, "HH:MM"). Opt-in via KEY_ROTATION_ENABLED.
 DEFAULT_ROTATION_TIME = "03:00"
 # Observability. No tracking URI ⇒ tracing disabled (NullSink).
@@ -160,6 +165,12 @@ class Settings:
     # Cross-provider failover circuit breaker (optional; see build_circuit_breaker).
     circuit_breaker_failure_threshold: int = DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD
     circuit_breaker_cooldown_seconds: int = DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS
+    # Response cache (Plan 04 Phase 0). Global kill-switch, off by default; a
+    # request only ever participates when this AND the model's own
+    # `cache_enabled` are both true.
+    response_cache_enabled: bool = False
+    response_cache_ttl_s: int = DEFAULT_RESPONSE_CACHE_TTL_S
+    response_cache_max_entries: int = DEFAULT_RESPONSE_CACHE_MAX_ENTRIES
     # Daily automatic key rotation (opt-in), at rotation_time (UTC, "HH:MM").
     rotation_enabled: bool = False
     rotation_time: str = DEFAULT_ROTATION_TIME
@@ -325,6 +336,13 @@ class Settings:
                 "CIRCUIT_BREAKER_COOLDOWN_SECONDS",
                 DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS,
                 minimum=1,
+            ),
+            response_cache_enabled=_env_bool("RESPONSE_CACHE_ENABLED", False),
+            response_cache_ttl_s=_env_int(
+                "RESPONSE_CACHE_TTL_S", DEFAULT_RESPONSE_CACHE_TTL_S, minimum=1
+            ),
+            response_cache_max_entries=_env_int(
+                "RESPONSE_CACHE_MAX_ENTRIES", DEFAULT_RESPONSE_CACHE_MAX_ENTRIES, minimum=1
             ),
             rotation_enabled=_env_bool("KEY_ROTATION_ENABLED", False),
             rotation_time=os.environ.get("KEY_ROTATION_TIME", DEFAULT_ROTATION_TIME),

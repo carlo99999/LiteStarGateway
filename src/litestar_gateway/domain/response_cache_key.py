@@ -1,0 +1,82 @@
+"""Response-cache key derivation and cacheability (Plan 04 Phase 0, design §2/§7).
+
+Pure functions, no I/O — the single most important (and easiest to regress)
+piece of the response cache, so it gets its own module and its own
+table-driven unit tests.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from typing import Any
+from uuid import UUID
+
+from litestar_gateway.domain.entities import Model
+from litestar_gateway.domain.ports.response_cache import CacheKey
+
+# Only these two operations participate in Phase 0 (non-streamed only — the
+# streaming endpoints never call into this). Embeddings/images/native bypass.
+CACHEABLE_OPERATIONS = frozenset({"chat.completions", "responses"})
+
+# Determinism-affecting fields: part of the key, so a different value is a
+# different request. `stream` and `user` are deliberately excluded (design §2).
+_KEY_FIELDS = (
+    "messages",
+    "input",
+    "instructions",
+    "system",
+    "temperature",
+    "top_p",
+    "seed",
+    "max_tokens",
+    "max_completion_tokens",
+    "max_output_tokens",
+    "stop",
+    "tools",
+    "tool_choice",
+    "response_format",
+)
+
+
+def derive_cache_key(
+    team_id: UUID, api_key_id: UUID | None, canonical_model_name: str, request: dict[str, Any]
+) -> CacheKey:
+    """A pure, canonical view of the request, hashed. `canonical_model_name`
+    must be the *resolved* `Model.name` (post-alias/router resolution), so an
+    alias and the model it points at share a hit. `json.dumps(sort_keys=True)`
+    canonicalizes object-key order at every nesting level without touching
+    string content, so semantically-significant whitespace inside message text
+    is preserved verbatim."""
+    canonical: dict[str, Any] = {"model": canonical_model_name}
+    for field in _KEY_FIELDS:
+        if field in request:
+            canonical[field] = request[field]
+    digest = hashlib.sha256(
+        json.dumps(canonical, sort_keys=True, default=str, ensure_ascii=False).encode()
+    ).hexdigest()
+    return CacheKey(team_id=team_id, api_key_id=api_key_id, digest=digest)
+
+
+def is_cacheable(operation: str, request: dict[str, Any], model: Model) -> bool:
+    """Whether this request may look up / write the response cache at all —
+    the global kill-switch and streaming are gated by the caller; this checks
+    everything else (design §7): only chat.completions/responses participate,
+    the team+model must have opted in, and a sampled (`temperature > 0`)
+    request is refused unless the model explicitly allows non-determinism.
+    Stateful Responses threads (`store`) are excluded upstream already —
+    `sanitize_request`/`validate_responses_request` reject anything but
+    `store=False`/absent before the request ever reaches here."""
+    if operation not in CACHEABLE_OPERATIONS:
+        return False
+    if not model.cache_enabled:
+        return False
+    temperature = request.get("temperature")
+    if (
+        isinstance(temperature, int | float)
+        and not isinstance(temperature, bool)
+        and temperature > 0
+        and not model.cache_allow_nondeterministic
+    ):
+        return False
+    return True

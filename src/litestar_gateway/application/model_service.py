@@ -86,6 +86,8 @@ class ModelService:
         input_cost_per_token: float | None = None,
         output_cost_per_token: float | None = None,
         enabled: bool = True,
+        cache_enabled: bool = False,
+        cache_allow_nondeterministic: bool = False,
     ) -> Model:
         """Create a team-owned model (`team_id` set) or a global one (`team_id`
         None). A team may reuse a name that only exists as a global (it shadows
@@ -126,6 +128,8 @@ class ModelService:
                 created_at=_now(),
                 # Remember the owning team so provenance survives a later promote.
                 origin_team_id=team_id,
+                cache_enabled=cache_enabled,
+                cache_allow_nondeterministic=cache_allow_nondeterministic,
             )
         )
 

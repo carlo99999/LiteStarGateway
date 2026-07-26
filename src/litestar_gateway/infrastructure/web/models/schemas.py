@@ -38,6 +38,10 @@ class CreateModelRequest:
     input_cost_per_token: float | None = None
     output_cost_per_token: float | None = None
     enabled: bool = True
+    # Response cache opt-in (Plan 04 Phase 0) — off by default even when the
+    # global RESPONSE_CACHE_ENABLED kill-switch is on.
+    cache_enabled: bool = False
+    cache_allow_nondeterministic: bool = False
 
 
 @dataclass(frozen=True)
@@ -53,6 +57,8 @@ class UpdateModelRequest:
     input_cost_per_token: float | None = None
     output_cost_per_token: float | None = None
     enabled: bool | None = None
+    cache_enabled: bool | None = None
+    cache_allow_nondeterministic: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +79,8 @@ class ModelResponse:
     enabled: bool
     created_at: datetime
     origin_team_id: UUID | None = None  # team a global model was promoted from
+    cache_enabled: bool = False
+    cache_allow_nondeterministic: bool = False
 
     @classmethod
     def from_entity(cls, model: Model) -> ModelResponse:
@@ -93,6 +101,8 @@ class ModelResponse:
             enabled=model.enabled,
             created_at=model.created_at,
             origin_team_id=model.origin_team_id,
+            cache_enabled=model.cache_enabled,
+            cache_allow_nondeterministic=model.cache_allow_nondeterministic,
         )
 
 
