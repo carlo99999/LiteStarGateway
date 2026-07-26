@@ -1,5 +1,9 @@
 # Plan 05 — Cross-provider failover
 
+**Status:** Phase 0 (error taxonomy + eligibility classifier) complete.
+Phase 1 (sequential failover for non-streamed calls) is the shippable core,
+next.
+
 **Design doc:** [docs/next-steps/cross-provider-failover.md](../docs/next-steps/cross-provider-failover.md).
 **Depends on:** the smart-routing candidate/router infrastructure
 ([docs/next-steps/smart-routing.md](../docs/next-steps/smart-routing.md)) — the
@@ -22,7 +26,7 @@ to native passthrough endpoints.
 
 ## Phases
 
-### Phase 0 — Error taxonomy + eligibility classifier
+### Phase 0 — Error taxonomy + eligibility classifier — ✅ complete
 
 - Add `is_failover_eligible(exc: DomainError) -> bool` (in `domain/failover.py` —
   reads only domain error types, honours the hexagonal boundary). Eligible:
