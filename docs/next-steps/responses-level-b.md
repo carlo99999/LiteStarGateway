@@ -143,12 +143,16 @@ contract is the specification.
   family name alone.
 - **Vertex:** [Gemini thinking models](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/thought-signatures)
   attach opaque `thought_signature` metadata
-  to function-call parts and require exact replay. The normalized Responses
-  function-call item has no carrier for it, so generic Vertex tool emulation
-  remains 501 rather than using the provider's degraded validator bypass.
-  Direct Chat is shipped for validated Gemini 2.5/3 text models through
-  `tool_calls[].extra_content.google.thought_signature`, with byte-exact
-  replay, ordered parallel results and mandatory Gemini 3 step signatures.
+  to function-call parts and require exact replay. Carried inside the tool
+  call's own id (`call_id__thought__<signature>`, LiteLLM's approach) rather
+  than a side-channel field, since both the Chat and Responses wire contracts
+  already require the client to echo a call's id back verbatim — the one
+  carrier that survives generic id-copying translation for free. Shipped for
+  validated Gemini 2.5/3 text models on the direct Chat surface, with
+  byte-exact replay, ordered parallel results and mandatory Gemini 3 step
+  signatures. Because the carrier lives in the id, unlocking the emulated
+  Responses surface needs no new translator changes — only removing its
+  Vertex tool guard (Plan 09, Phase 1b-C).
 
 ## 8. Non-goals
 

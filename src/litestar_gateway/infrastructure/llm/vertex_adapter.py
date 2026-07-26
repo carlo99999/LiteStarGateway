@@ -10,8 +10,13 @@ Credentials are used.
 
 Scope: text-in/text-out, structured outputs (`response_format`) translated to
 `response_mime_type` + `response_schema`, and faithful non-streaming function
-tools with thought-signature replay. Streaming tools and multimodal input remain
-fail-closed.
+tools with thought-signature replay. The opaque Gemini thought_signature
+carries inside the tool call's own id (`encode_vertex_call_id` /
+`decode_vertex_call_id` in `chat_tool_policy.py`), not a side-channel field —
+the same approach LiteLLM uses — so it survives verbatim through both this
+adapter's direct Chat surface and the generic Responses<->Chat translators
+in `responses_emulation.py`, which copy call ids but not arbitrary extra
+fields. Streaming tools and multimodal input remain fail-closed.
 """
 
 from __future__ import annotations
@@ -30,9 +35,11 @@ from google.oauth2 import service_account
 
 from litestar_gateway.domain.chat_tool_policy import (
     MAX_VERTEX_THOUGHT_SIGNATURE_BYTES,
+    VERTEX_CALL_ID_SIGNATURE_DELIMITER,
     VERTEX_GATEWAY_CALL_ID_PREFIX,
     VERTEX_THOUGHT_SIGNATURE_BYPASS,
-    decode_vertex_thought_signature,
+    decode_vertex_call_id,
+    encode_vertex_call_id,
     validate_chat_request,
 )
 from litestar_gateway.domain.entities import Model
@@ -140,8 +147,9 @@ def _gemini_contents(messages: list[Any]) -> list[dict[str, Any]]:
                 call_id = call["id"]
                 name = call["function"]["name"]
                 call_names[call_id] = name
+                base_call_id, signature = decode_vertex_call_id(call_id, field="tool_calls.id")
                 extra_content = call.get("extra_content")
-                provider_call_ids[call_id] = _provider_call_id(call_id, extra_content)
+                provider_call_ids[call_id] = _provider_call_id(base_call_id, extra_content)
                 function_call: dict[str, Any] = {
                     "name": name,
                     "args": _tool_input(call["function"]["arguments"]),
@@ -149,13 +157,8 @@ def _gemini_contents(messages: list[Any]) -> list[dict[str, Any]]:
                 if provider_call_id := provider_call_ids[call_id]:
                     function_call["id"] = provider_call_id
                 part: dict[str, Any] = {"function_call": function_call}
-                if isinstance(extra_content, dict):
-                    google = extra_content.get("google")
-                    if isinstance(google, dict):
-                        part["thought_signature"] = decode_vertex_thought_signature(
-                            google["thought_signature"],
-                            field="tool_calls.extra_content.google.thought_signature",
-                        )
+                if signature is not None:
+                    part["thought_signature"] = signature
                 parts.append(part)
             translated.append({"role": "model", "parts": parts})
         else:
@@ -330,19 +333,12 @@ def _gemini_tool_calls(
             raise _invalid_response(response, "Vertex returned non-JSON tool arguments") from exc
         seen_ids.add(call_id)
         call: dict[str, Any] = {
-            "id": call_id,
+            "id": encode_vertex_call_id(call_id, signature),
             "type": "function",
             "function": {"name": name, "arguments": serialized_arguments},
         }
-        extra_content: dict[str, Any] = {}
-        if signature is not None:
-            extra_content["google"] = {
-                "thought_signature": base64.b64encode(signature).decode("ascii")
-            }
         if synthetic_call_id:
-            extra_content["litestar_gateway"] = {"synthetic_call_id": True}
-        if extra_content:
-            call["extra_content"] = extra_content
+            call["extra_content"] = {"litestar_gateway": {"synthetic_call_id": True}}
         calls.append(call)
     return calls
 
@@ -380,8 +376,7 @@ def from_gemini_response(
     if forbid_tool_call and tool_calls:
         raise _invalid_response(response, "Vertex returned a tool call for tool_choice='none'")
     if require_thought_signature and tool_calls:
-        first_extra = tool_calls[0].get("extra_content")
-        if not isinstance(first_extra, dict) or "google" not in first_extra:
+        if VERTEX_CALL_ID_SIGNATURE_DELIMITER not in tool_calls[0]["id"]:
             raise _invalid_response(
                 response,
                 "Vertex omitted the required Gemini 3 function-call thought signature",

@@ -77,19 +77,38 @@ events for chat-only upstreams.
 
 ## Phase 1b-C — Vertex/Gemini tool state
 
-- **Done:** direct Chat replay for validated Gemini 2.5/3 text models uses Google's documented
-  `tool_calls[].extra_content.google.thought_signature` carrier, preserving the
-  opaque value byte-exactly in both directions. Parallel and sequential replay
-  preserve call/result ordering; Gemini 3 requires the first call signature.
-- Keep generic Responses tool loops fail-closed: normalized Responses
-  function-call items still have no thought-signature carrier. Choose an
-  explicit Responses solution: a wire-compatible stateless extension,
-  tenant-bound gateway state, or a conservative model allowlist proven not to
-  require signatures.
+- **Done:** direct Chat replay for validated Gemini 2.5/3 text models preserves
+  the opaque thought_signature byte-exactly in both directions. Parallel and
+  sequential replay preserve call/result ordering; Gemini 3 requires the first
+  call signature.
 - **Done:** unsupported per-tool `strict`, disabled-parallel semantics,
   unvalidated model families and streaming tools fail before routing/admission.
-- **Remaining decision:** Responses either gains an explicit safe carrier or
-  remains 501, without using the degraded signature-validator bypass.
+
+**Decision (26 July 2026): adopt LiteLLM's carrier scheme.** The original
+`tool_calls[].extra_content.google.thought_signature` side-channel field
+(shipped above) could never reach the Responses surface: the generic
+Responses<->Chat translators in `responses_emulation.py` copy a tool call's
+`id`/`name`/`arguments` only, dropping any other key, so `extra_content`
+never survived that translation. Researched how LiteLLM solves the same
+problem (GitHub PRs #18374, #16895) — they encode the signature directly
+into the tool call's own id (`call_123__thought__<signature>`) rather than a
+side field, since both OpenAI Chat and Responses already require the client
+to echo a call's id back verbatim to correlate its result. That id-level
+carrier survives generic translation for free, because copying the id is
+the one thing both surfaces' translators already do.
+
+Adopted as `encode_vertex_call_id`/`decode_vertex_call_id` in
+`chat_tool_policy.py` (delimiter `__thought__`), replacing the extra_content
+field entirely — a **behavior-preserving migration** on the direct Chat
+surface (same byte-exact replay, same first-call-only and Gemini-3-required
+constraints, same synthetic-call-id marking for Gemini-omitted ids, all
+re-verified by the existing test suite updated to the new encoding). This is
+the prerequisite, not the unlock itself: with the carrier now living in the
+id, a follow-up PR only needs to remove Vertex's Responses tool guard (in
+`request_policy.py`) and add the same model-family/parallel/signature
+validation that already exists for the Chat surface — no changes needed to
+the Responses<->Chat translators themselves, since copying the id is already
+their job.
 
 ## Phase 2 — Streaming tool events
 

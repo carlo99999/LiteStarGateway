@@ -9,6 +9,8 @@ from openai.types.chat import ChatCompletion
 
 from litestar_gateway.domain.chat_tool_policy import (
     MAX_TOOL_JSON_DEPTH,
+    decode_vertex_call_id,
+    encode_vertex_call_id,
     validate_chat_request,
 )
 from litestar_gateway.domain.entities import Model, ModelType, Provider
@@ -21,6 +23,28 @@ from litestar_gateway.infrastructure.llm.vertex_adapter import (
 
 SIGNATURE = b"\x00vertex\xffsignature"
 SIGNATURE_B64 = base64.b64encode(SIGNATURE).decode("ascii")
+
+
+def _signed_call_id(call_id: str, signature: bytes = SIGNATURE) -> str:
+    return encode_vertex_call_id(call_id, signature)
+
+
+def test_call_id_signature_round_trips() -> None:
+    encoded = encode_vertex_call_id("call_a", SIGNATURE)
+
+    assert encoded == f"call_a__thought__{SIGNATURE_B64}"
+    assert decode_vertex_call_id(encoded, field="id") == ("call_a", SIGNATURE)
+
+
+def test_call_id_without_a_signature_is_unchanged() -> None:
+    assert encode_vertex_call_id("call_a", None) == "call_a"
+    assert decode_vertex_call_id("call_a", field="id") == ("call_a", None)
+
+
+def test_decode_call_id_rejects_an_empty_base_id() -> None:
+    with pytest.raises(UnsupportedOperation, match="call id"):
+        decode_vertex_call_id(f"__thought__{SIGNATURE_B64}", field="id")
+
 
 TOOLS = [
     {
@@ -157,13 +181,12 @@ def test_request_replays_parallel_calls_and_results_with_exact_signature() -> No
                 "content": None,
                 "tool_calls": [
                     {
-                        "id": "call_a",
+                        "id": _signed_call_id("call_a"),
                         "type": "function",
                         "function": {
                             "name": "weather",
                             "arguments": '{"city":"Paris"}',
                         },
-                        "extra_content": {"google": {"thought_signature": SIGNATURE_B64}},
                     },
                     {
                         "id": "call_b",
@@ -177,7 +200,7 @@ def test_request_replays_parallel_calls_and_results_with_exact_signature() -> No
             },
             {
                 "role": "tool",
-                "tool_call_id": "call_a",
+                "tool_call_id": _signed_call_id("call_a"),
                 "content": '{"temperature":18}',
             },
             {
@@ -244,38 +267,34 @@ def test_request_preserves_each_signature_across_sequential_steps() -> None:
                 "role": "assistant",
                 "tool_calls": [
                     {
-                        "id": "call_a",
+                        "id": _signed_call_id("call_a"),
                         "type": "function",
                         "function": {
                             "name": "weather",
                             "arguments": '{"city":"Paris"}',
                         },
-                        "extra_content": {"google": {"thought_signature": SIGNATURE_B64}},
                     }
                 ],
             },
-            {"role": "tool", "tool_call_id": "call_a", "content": "{}"},
+            {"role": "tool", "tool_call_id": _signed_call_id("call_a"), "content": "{}"},
             {
                 "role": "assistant",
                 "tool_calls": [
                     {
-                        "id": "call_b",
+                        "id": _signed_call_id("call_b", second_signature),
                         "type": "function",
                         "function": {
                             "name": "weather",
                             "arguments": '{"city":"Rome"}',
                         },
-                        "extra_content": {
-                            "google": {
-                                "thought_signature": base64.b64encode(second_signature).decode(
-                                    "ascii"
-                                )
-                            }
-                        },
                     }
                 ],
             },
-            {"role": "tool", "tool_call_id": "call_b", "content": "{}"},
+            {
+                "role": "tool",
+                "tool_call_id": _signed_call_id("call_b", second_signature),
+                "content": "{}",
+            },
         ],
         "tools": TOOLS,
     }
@@ -331,13 +350,12 @@ def test_response_maps_parallel_calls_and_signature_carrier() -> None:
         "content": "",
         "tool_calls": [
             {
-                "id": "call_a",
+                "id": _signed_call_id("call_a"),
                 "type": "function",
                 "function": {
                     "name": "weather",
                     "arguments": '{"city":"Paris"}',
                 },
-                "extra_content": {"google": {"thought_signature": SIGNATURE_B64}},
             },
             {
                 "id": "call_b",
@@ -596,44 +614,33 @@ def test_request_rejects_deep_vertex_schema_without_recursion_error() -> None:
 
 
 @pytest.mark.parametrize(
-    "extra_content",
+    "call_id",
     [
-        {},
-        {"google": {}},
-        {"google": {"thought_signature": ""}},
-        {"google": {"thought_signature": "not base64!"}},
-        {"google": {"thought_signature": "skip_thought_signature_validator"}},
-        {
-            "google": {
-                "thought_signature": base64.b64encode(b"skip_thought_signature_validator").decode(
-                    "ascii"
-                )
-            }
-        },
-        {"google": {"thought_signature": SIGNATURE_B64, "unknown": True}},
-        {"google": {"thought_signature": SIGNATURE_B64}, "unknown": True},
+        "call_a__thought__",
+        "call_a__thought__not base64!",
+        "call_a__thought__" + base64.b64encode(b"skip_thought_signature_validator").decode("ascii"),
+        "__thought__" + SIGNATURE_B64,
     ],
 )
-def test_request_rejects_malformed_signature_carrier(extra_content: object) -> None:
+def test_request_rejects_malformed_signature_carrier(call_id: str) -> None:
     request = {
         "messages": [
             {
                 "role": "assistant",
                 "tool_calls": [
                     {
-                        "id": "call_a",
+                        "id": call_id,
                         "type": "function",
                         "function": {"name": "weather", "arguments": "{}"},
-                        "extra_content": extra_content,
                     }
                 ],
             },
-            {"role": "tool", "tool_call_id": "call_a", "content": "{}"},
+            {"role": "tool", "tool_call_id": call_id, "content": "{}"},
         ],
         "tools": TOOLS,
     }
 
-    with pytest.raises(UnsupportedOperation, match="extra_content|thought_signature"):
+    with pytest.raises(UnsupportedOperation, match="base64|call id"):
         validate_chat_request(_model(), request)
 
 
@@ -683,15 +690,14 @@ def test_request_rejects_signature_moved_to_second_parallel_call() -> None:
                         "function": {"name": "weather", "arguments": "{}"},
                     },
                     {
-                        "id": "call_b",
+                        "id": _signed_call_id("call_b"),
                         "type": "function",
                         "function": {"name": "weather", "arguments": "{}"},
-                        "extra_content": {"google": {"thought_signature": SIGNATURE_B64}},
                     },
                 ],
             },
             {"role": "tool", "tool_call_id": "call_a", "content": "{}"},
-            {"role": "tool", "tool_call_id": "call_b", "content": "{}"},
+            {"role": "tool", "tool_call_id": _signed_call_id("call_b"), "content": "{}"},
         ],
         "tools": TOOLS,
     }
@@ -707,10 +713,9 @@ def test_request_rejects_parallel_results_in_a_different_order() -> None:
                 "role": "assistant",
                 "tool_calls": [
                     {
-                        "id": "call_a",
+                        "id": _signed_call_id("call_a"),
                         "type": "function",
                         "function": {"name": "weather", "arguments": "{}"},
-                        "extra_content": {"google": {"thought_signature": SIGNATURE_B64}},
                     },
                     {
                         "id": "call_b",
@@ -720,7 +725,7 @@ def test_request_rejects_parallel_results_in_a_different_order() -> None:
                 ],
             },
             {"role": "tool", "tool_call_id": "call_b", "content": "{}"},
-            {"role": "tool", "tool_call_id": "call_a", "content": "{}"},
+            {"role": "tool", "tool_call_id": _signed_call_id("call_a"), "content": "{}"},
         ],
         "tools": TOOLS,
     }

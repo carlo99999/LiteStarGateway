@@ -198,13 +198,13 @@ def test_response_preserves_a_provider_id_that_uses_the_gateway_prefix() -> None
         expected_tool_names={"weather"},
     )
     call = translated["choices"][0]["message"]["tool_calls"][0]
-    assert "litestar_gateway" not in call["extra_content"]
+    assert "extra_content" not in call
 
     replay = to_gemini_request(
         {
             "messages": [
                 {"role": "assistant", "tool_calls": [call]},
-                {"role": "tool", "tool_call_id": provider_call_id, "content": "{}"},
+                {"role": "tool", "tool_call_id": call["id"], "content": "{}"},
             ],
             "tools": TOOLS,
         },

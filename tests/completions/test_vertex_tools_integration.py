@@ -10,6 +10,8 @@ from litestar.status_codes import (
 )
 from litestar.testing import AsyncTestClient
 
+from litestar_gateway.domain.chat_tool_policy import encode_vertex_call_id
+
 from .conftest import (
     VERTEX_VALUES,
     FakeGenaiClient,
@@ -115,8 +117,8 @@ async def test_vertex_chat_two_turn_tool_loop_preserves_signature_and_billing(
     assert first.status_code == HTTP_200_OK, first.text
     first_body = first.json()
     tool_call = first_body["choices"][0]["message"]["tool_calls"][0]
-    assert tool_call["id"] == "call_a"
-    assert tool_call["extra_content"]["google"]["thought_signature"] == SIGNATURE_B64
+    assert tool_call["id"] == encode_vertex_call_id("call_a", SIGNATURE)
+    assert "extra_content" not in tool_call
 
     second = await client.post(
         "/v1/chat/completions",
