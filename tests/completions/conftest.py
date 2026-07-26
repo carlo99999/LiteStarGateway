@@ -72,6 +72,56 @@ def _stream_chunks(model: str | None) -> list[dict]:
     ]
 
 
+def _tool_call_stream_chunks(model: str | None) -> list[dict]:
+    """A single streamed tool call, split across chunks like a real OpenAI-
+    compatible upstream: id/name arrive once, then argument fragments."""
+    base = {"id": "chatcmpl-tool-s", "object": "chat.completion.chunk", "model": model}
+    return [
+        {
+            **base,
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": {
+                        "tool_calls": [
+                            {
+                                "index": 0,
+                                "id": "call_abc123",
+                                "type": "function",
+                                "function": {"name": "get_weather", "arguments": ""},
+                            }
+                        ]
+                    },
+                }
+            ],
+        },
+        {
+            **base,
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": {"tool_calls": [{"index": 0, "function": {"arguments": '{"city":'}}]},
+                }
+            ],
+        },
+        {
+            **base,
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": {"tool_calls": [{"index": 0, "function": {"arguments": ' "Paris"}'}}]},
+                    "finish_reason": "tool_calls",
+                }
+            ],
+        },
+        {
+            **base,
+            "choices": [],
+            "usage": {"prompt_tokens": 9, "completion_tokens": 12, "total_tokens": 21},
+        },
+    ]
+
+
 class FakeClient:
     """Captures construction + call kwargs; echoes an OpenAI-shaped response."""
 
@@ -131,12 +181,14 @@ class FakeClient:
     async def create(self, **kwargs):
         FakeClient.last_kwargs = kwargs
         FakeClient.calls += 1
-        if kwargs.get("stream"):
-            return _FakeStream(_stream_chunks(kwargs.get("model")))
         messages = kwargs.get("messages") or []
         has_tool_result = any(
             isinstance(message, dict) and message.get("role") == "tool" for message in messages
         )
+        if kwargs.get("stream"):
+            if kwargs.get("tools") is not None and not has_tool_result:
+                return _FakeStream(_tool_call_stream_chunks(kwargs.get("model")))
+            return _FakeStream(_stream_chunks(kwargs.get("model")))
         if kwargs.get("tools") is not None and not has_tool_result:
             return _Result(
                 {

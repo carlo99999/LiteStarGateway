@@ -1136,10 +1136,33 @@ def test_databricks_responses_reject_lossy_or_malformed_tool_shapes(
         )
 
 
-def test_databricks_responses_reject_streaming_tools_until_phase_2() -> None:
+def test_databricks_responses_allows_streaming_tools() -> None:
+    result = _validate_responses_request(
+        Provider.DATABRICKS,
+        {
+            "model": "m",
+            "input": "weather?",
+            "stream": True,
+            "tools": [
+                {
+                    "type": "function",
+                    "name": "get_weather",
+                    "parameters": {"type": "object"},
+                }
+            ],
+        },
+    )
+
+    assert result["stream"] is True
+
+
+@pytest.mark.parametrize("provider", [Provider.ANTHROPIC, Provider.BEDROCK])
+def test_other_providers_still_reject_streaming_tools_until_their_own_phase_2(
+    provider: Provider,
+) -> None:
     with pytest.raises(UnsupportedOperation, match="streaming tool"):
         _validate_responses_request(
-            Provider.DATABRICKS,
+            provider,
             {
                 "model": "m",
                 "input": "weather?",

@@ -8,6 +8,9 @@
 > additionally support faithful non-streaming function-tool loops over their
 > translated Chat surfaces. Validated Vertex Gemini 2.5/3 text models now
 > support the direct Chat loop with byte-exact thought-signature replay.
+> Databricks additionally supports the Phase 2 streaming tool-call event
+> contract below; Anthropic and Bedrock streaming tool calls still fail
+> closed until they get their own event translation.
 > Unsupported fields fail with 501 before router side effects, budget admission
 > or provider dispatch. Generic Vertex Responses tool state and streaming tool
 > events remain.

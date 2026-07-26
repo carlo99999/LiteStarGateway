@@ -388,3 +388,10 @@ def test_chunk_output_text_sums_all_choices() -> None:
         ]
     }
     assert _chunk_output_text(chunk) == "aabbb"
+
+
+def test_chunk_output_text_counts_streamed_tool_call_arguments() -> None:
+    # A mid-tool-call disconnect must still be estimated, or streaming tool
+    # calls under-bill relative to their non-streaming equivalent.
+    chunk = {"type": "response.function_call_arguments.delta", "delta": '{"city":'}
+    assert _chunk_output_text(chunk) == '{"city":'

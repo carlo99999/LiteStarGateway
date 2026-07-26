@@ -213,6 +213,62 @@ async def test_streaming_responses_emulated_anthropic(
     assert "Hi" in body and "there" in body
 
 
+_WEATHER_TOOL = {
+    "type": "function",
+    "name": "get_weather",
+    "description": "Get weather for a city.",
+    "parameters": {
+        "type": "object",
+        "properties": {"city": {"type": "string"}},
+        "required": ["city"],
+        "additionalProperties": False,
+    },
+    "strict": True,
+}
+
+
+async def test_streaming_responses_databricks_tool_call_emits_phase_2_events_and_bills_once(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Plan 09 Phase 2: streaming tool calls, emulated over Databricks' chat stream.
+    _patch(monkeypatch)
+    api_key, team, admin = await _setup_team(
+        client,
+        provider="databricks",
+        values=DATABRICKS_VALUES,
+        provider_model_id="my-endpoint",
+        input_cost_per_token=0.01,
+        output_cost_per_token=0.02,
+    )
+    resp = await client.post(
+        "/v1/responses",
+        json={
+            "model": "m",
+            "input": "Weather in Paris?",
+            "tools": [_WEATHER_TOOL],
+            "stream": True,
+        },
+        headers=_bearer(api_key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    body = resp.text
+    assert "event: response.output_item.added" in body
+    assert "event: response.function_call_arguments.delta" in body
+    assert "event: response.function_call_arguments.done" in body
+    assert "event: response.output_item.done" in body
+    assert "event: response.completed" in body
+    assert '"call_id": "call_abc123"' in body
+    assert '"name": "get_weather"' in body
+    assert '{\\"city\\": \\"Paris\\"}' in body
+
+    usage = await _team_usage(client, team, admin)
+    assert len(usage) == 1
+    assert usage[0]["calls"] == 1
+    assert usage[0]["prompt_tokens"] == 9
+    assert usage[0]["completion_tokens"] == 12
+    assert usage[0]["cost"] == pytest.approx(0.33)
+
+
 @pytest.mark.parametrize(
     "payload,match",
     [

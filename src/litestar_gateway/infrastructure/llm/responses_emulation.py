@@ -339,7 +339,14 @@ class ChatToResponsesAdapter:
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
         """Emulate Responses streaming over the chat stream: created → text
-        deltas → completed. A subset of the native event protocol."""
+        deltas, and/or function-call argument deltas → completed. A subset of
+        the native event protocol.
+
+        Streaming tool calls (Plan 09 Phase 2) are implemented only for the
+        OpenAI-compatible chat delta shape (`choices[0].delta.tool_calls`,
+        keyed by a per-call `index` that stays stable across chunks). A
+        provider's own request policy gates which providers may reach here
+        with `stream=True` and tools present."""
         chat_request = to_chat_completions(request)
         response_id = "resp-emulated"
         meta = {"id": response_id, "object": "response", "model": model.provider_model_id}
@@ -351,6 +358,10 @@ class ChatToResponsesAdapter:
         parts: list[str] = []
         usage: dict[str, Any] = {}
         finish_reason: str | None = None
+        # Provider tool-call stream index -> accumulated call state, plus the
+        # order calls first appeared in (their Responses output_index).
+        tool_calls: dict[int, dict[str, Any]] = {}
+        tool_call_order: list[int] = []
         async for chunk in self._inner.astream_chat_completion(chat_request, model, credentials):
             # Inner chat streams end with a usage-bearing chunk (adapters force
             # it); carry it into response.completed so the call can be metered.
@@ -360,26 +371,63 @@ class ChatToResponsesAdapter:
             chunk_finish = choice.get("finish_reason")
             if isinstance(chunk_finish, str):
                 finish_reason = chunk_finish
-            content = choice.get("delta", {}).get("content")
+            delta = choice.get("delta") or {}
+            content = delta.get("content")
             if content:
                 parts.append(content)
                 yield {"type": "response.output_text.delta", "delta": content}
+            for call_delta in delta.get("tool_calls") or []:
+                async for event in self._handle_tool_call_delta(
+                    call_delta, tool_calls, tool_call_order
+                ):
+                    yield event
+
+        if tool_calls and finish_reason != "tool_calls":
+            raise UpstreamResponseInvalid(
+                "upstream provider ended the stream mid tool call arguments",
+                {"usage": usage},
+            )
 
         refused = finish_reason == "content_filter"
         text = "" if refused else "".join(parts)
+        output: list[dict[str, Any]] = []
+        if text or not tool_calls:
+            output.append(
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "status": "incomplete" if refused else "completed",
+                    "content": [{"type": "output_text", "text": text, "annotations": []}],
+                }
+            )
+        for position, index in enumerate(tool_call_order):
+            call = tool_calls[index]
+            item = {
+                "type": "function_call",
+                "id": f"fc_{call['call_id']}",
+                "status": "completed",
+                "call_id": call["call_id"],
+                "name": call["name"],
+                "arguments": call["arguments"],
+            }
+            yield {
+                "type": "response.function_call_arguments.done",
+                "output_index": position,
+                "arguments": call["arguments"],
+            }
+            yield {
+                "type": "response.output_item.done",
+                "output_index": position,
+                "item": item,
+            }
+            output.append(item)
+
         terminal_type = "response.incomplete" if refused else "response.completed"
         response_status = "incomplete" if refused else "completed"
         response = {
             **meta,
             "status": response_status,
-            "output": [
-                {
-                    "type": "message",
-                    "role": "assistant",
-                    "status": response_status,
-                    "content": [{"type": "output_text", "text": text, "annotations": []}],
-                }
-            ],
+            "output": output,
             "output_text": text,
             "usage": {
                 "input_tokens": usage.get("prompt_tokens"),
@@ -393,6 +441,55 @@ class ChatToResponsesAdapter:
             "type": terminal_type,
             "response": response,
         }
+
+    async def _handle_tool_call_delta(
+        self,
+        call_delta: Any,
+        tool_calls: dict[int, dict[str, Any]],
+        tool_call_order: list[int],
+    ) -> AsyncIterator[dict[str, Any]]:
+        index = call_delta.get("index") if isinstance(call_delta, dict) else None
+        if not isinstance(index, int) or isinstance(index, bool):
+            raise UpstreamResponseInvalid(
+                "upstream provider returned a malformed streamed tool call",
+                {"usage": {}},
+            )
+        if index not in tool_calls:
+            call_id = call_delta.get("id")
+            function = call_delta.get("function") or {}
+            name = function.get("name")
+            if not isinstance(call_id, str) or not call_id or not isinstance(name, str) or not name:
+                raise UpstreamResponseInvalid(
+                    "upstream provider returned a malformed streamed tool call",
+                    {"usage": {}},
+                )
+            tool_calls[index] = {"call_id": call_id, "name": name, "arguments": ""}
+            tool_call_order.append(index)
+            yield {
+                "type": "response.output_item.added",
+                "output_index": len(tool_call_order) - 1,
+                "item": {
+                    "type": "function_call",
+                    "id": f"fc_{call_id}",
+                    "call_id": call_id,
+                    "name": name,
+                    "arguments": "",
+                },
+            }
+        function = call_delta.get("function") or {}
+        argument_delta = function.get("arguments")
+        if argument_delta:
+            if not isinstance(argument_delta, str):
+                raise UpstreamResponseInvalid(
+                    "upstream provider returned a malformed streamed tool call",
+                    {"usage": {}},
+                )
+            tool_calls[index]["arguments"] += argument_delta
+            yield {
+                "type": "response.function_call_arguments.delta",
+                "output_index": tool_call_order.index(index),
+                "delta": argument_delta,
+            }
 
     async def anative_messages(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]

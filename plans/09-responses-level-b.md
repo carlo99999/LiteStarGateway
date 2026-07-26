@@ -5,8 +5,9 @@
 **Depends on:** Plan 02 (complete) and the existing Responses emulation adapter.
 
 **Status:** Phase 0, Phase 1a and Phase 1b-A/B (Anthropic + Bedrock) complete;
-Direct Vertex Chat tool state is complete; generic Vertex Responses state and
-streaming tool events remain.
+Direct Vertex Chat tool state is complete; Phase 2 streaming tool events are
+done for the OpenAI-compatible chat surface (Databricks) — Anthropic and
+Bedrock streaming translation, and generic Vertex Responses state, remain.
 
 **Theme:** eliminate silent feature drops, then add faithful tool-call items and
 events for chat-only upstreams.
@@ -97,6 +98,20 @@ events for chat-only upstreams.
 - Support multiple parallel calls without cross-contaminating arguments.
 - **Done when:** the stock OpenAI SDK accumulates arguments correctly and an
   incomplete/malformed upstream sequence never produces `response.completed`.
+
+**Databricks/OpenAI-compatible slice — ✅ complete** (`ChatToResponsesAdapter
+.astream_responses`, `responses_emulation.py`): accumulates
+`choices[0].delta.tool_calls[].function.arguments` by stream index, emitting
+`response.output_item.added` → N × `response.function_call_arguments.delta`
+→ `response.function_call_arguments.done` → `response.output_item.done` per
+call, in first-seen order; a stream that ends without `finish_reason ==
+"tool_calls"` while any call is still open raises instead of completing.
+`validate_responses_request`'s streaming-tool guard now excludes only this
+provider (`_STREAMING_RESPONSES_TOOL_PROVIDERS`); Anthropic and Bedrock
+still fail closed until they get their own event translation
+(`input_json_delta` accumulation for Anthropic, Converse stream events for
+Bedrock — different upstream delta shapes, not a mechanical copy of this
+slice).
 
 ## Phase 3 — SDK canaries and documentation
 
