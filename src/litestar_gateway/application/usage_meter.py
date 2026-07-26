@@ -104,7 +104,10 @@ def _chunk_output_text(chunk: dict[str, Any]) -> str:
     Sums the delta across *all* choices, not just `choices[0]`: an `n>1` chat
     stream that disconnects or errors before the authoritative usage chunk would
     otherwise have its estimate under-count the other n-1 choices (L19)."""
-    if chunk.get("type") == "response.output_text.delta":
+    if chunk.get("type") in (
+        "response.output_text.delta",
+        "response.function_call_arguments.delta",
+    ):
         delta = chunk.get("delta")
         return delta if isinstance(delta, str) else ""
     text = ""

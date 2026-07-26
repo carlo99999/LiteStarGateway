@@ -409,6 +409,249 @@ async def test_streaming_content_filter_finishes_incomplete_and_discards_final_s
     assert terminal["response"]["output"][0]["content"][0]["text"] == ""
 
 
+class _ScriptedStream:
+    def __init__(self, chunks: list[dict[str, object]]) -> None:
+        self._chunks = chunks
+
+    async def astream_chat_completion(self, request, model, credentials):
+        for chunk in self._chunks:
+            yield chunk
+
+
+def _tool_call_delta(
+    index: int,
+    *,
+    call_id: str | None = None,
+    name: str | None = None,
+    arguments: str | None = None,
+) -> dict[str, object]:
+    function: dict[str, object] = {}
+    if name is not None:
+        function["name"] = name
+    if arguments is not None:
+        function["arguments"] = arguments
+    delta: dict[str, object] = {"index": index}
+    if call_id is not None:
+        delta["id"] = call_id
+    if function:
+        delta["function"] = function
+    return delta
+
+
+async def test_streaming_single_tool_call_emits_the_phase_2_event_sequence() -> None:
+    stream = _ScriptedStream(
+        [
+            {
+                "choices": [
+                    {
+                        "delta": {
+                            "tool_calls": [
+                                _tool_call_delta(
+                                    0, call_id="call_abc123", name="get_weather", arguments=""
+                                )
+                            ]
+                        },
+                        "finish_reason": None,
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "delta": {"tool_calls": [_tool_call_delta(0, arguments='{"city":')]},
+                        "finish_reason": None,
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "delta": {"tool_calls": [_tool_call_delta(0, arguments=' "Paris"}')]},
+                        "finish_reason": "tool_calls",
+                    }
+                ]
+            },
+            {
+                "choices": [],
+                "usage": {"prompt_tokens": 9, "completion_tokens": 12, "total_tokens": 21},
+            },
+        ]
+    )
+
+    adapter = ChatToResponsesAdapter(stream)
+    events = [
+        event
+        async for event in adapter.astream_responses(
+            {"input": "weather?", "tools": [WEATHER_TOOL]},
+            cast(Model, SimpleNamespace(provider_model_id="my-endpoint")),
+            {},
+        )
+    ]
+
+    assert [event["type"] for event in events] == [
+        "response.created",
+        "response.output_item.added",
+        "response.function_call_arguments.delta",
+        "response.function_call_arguments.delta",
+        "response.function_call_arguments.done",
+        "response.output_item.done",
+        "response.completed",
+    ]
+    added = events[1]
+    assert added["output_index"] == 0
+    assert added["item"] == {
+        "type": "function_call",
+        "id": "fc_call_abc123",
+        "call_id": "call_abc123",
+        "name": "get_weather",
+        "arguments": "",
+    }
+    deltas = [event["delta"] for event in events[2:4]]
+    assert deltas == ['{"city":', ' "Paris"}']
+    done = events[4]
+    assert done["output_index"] == 0
+    assert done["arguments"] == '{"city": "Paris"}'
+    item_done = events[5]
+    assert item_done["item"]["status"] == "completed"
+    assert item_done["item"]["arguments"] == '{"city": "Paris"}'
+    terminal = events[-1]
+    assert terminal["type"] == "response.completed"
+    assert terminal["response"]["output_text"] == ""
+    assert terminal["response"]["output"] == [
+        {
+            "type": "function_call",
+            "id": "fc_call_abc123",
+            "status": "completed",
+            "call_id": "call_abc123",
+            "name": "get_weather",
+            "arguments": '{"city": "Paris"}',
+        }
+    ]
+    assert terminal["response"]["usage"] == {
+        "input_tokens": 9,
+        "output_tokens": 12,
+        "total_tokens": 21,
+    }
+
+
+async def test_streaming_parallel_tool_calls_preserve_order_and_indexes() -> None:
+    stream = _ScriptedStream(
+        [
+            {
+                "choices": [
+                    {
+                        "delta": {
+                            "tool_calls": [
+                                _tool_call_delta(
+                                    0, call_id="call_a", name="get_weather", arguments=""
+                                ),
+                                _tool_call_delta(
+                                    1, call_id="call_b", name="get_weather", arguments=""
+                                ),
+                            ]
+                        },
+                        "finish_reason": None,
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "delta": {
+                            "tool_calls": [
+                                _tool_call_delta(0, arguments='{"city": "Paris"}'),
+                                _tool_call_delta(1, arguments='{"city": "Rome"}'),
+                            ]
+                        },
+                        "finish_reason": "tool_calls",
+                    }
+                ]
+            },
+            {"choices": []},
+        ]
+    )
+
+    adapter = ChatToResponsesAdapter(stream)
+    events = [
+        event
+        async for event in adapter.astream_responses(
+            {"input": "weather?", "tools": [WEATHER_TOOL]},
+            cast(Model, SimpleNamespace(provider_model_id="my-endpoint")),
+            {},
+        )
+    ]
+
+    added_events = [event for event in events if event["type"] == "response.output_item.added"]
+    assert [event["output_index"] for event in added_events] == [0, 1]
+    assert [event["item"]["call_id"] for event in added_events] == ["call_a", "call_b"]
+    delta_events = [
+        event for event in events if event["type"] == "response.function_call_arguments.delta"
+    ]
+    assert [event["output_index"] for event in delta_events] == [0, 1]
+    assert [event["delta"] for event in delta_events] == ['{"city": "Paris"}', '{"city": "Rome"}']
+    terminal = events[-1]
+    assert [item["call_id"] for item in terminal["response"]["output"]] == ["call_a", "call_b"]
+
+
+async def test_streaming_tool_call_missing_id_or_name_fails_closed() -> None:
+    stream = _ScriptedStream(
+        [
+            {
+                "choices": [
+                    {
+                        "delta": {"tool_calls": [_tool_call_delta(0, arguments="")]},
+                        "finish_reason": None,
+                    }
+                ]
+            },
+        ]
+    )
+
+    adapter = ChatToResponsesAdapter(stream)
+    with pytest.raises(UpstreamResponseInvalid, match="malformed"):
+        _ = [
+            event
+            async for event in adapter.astream_responses(
+                {"input": "weather?", "tools": [WEATHER_TOOL]},
+                cast(Model, SimpleNamespace(provider_model_id="my-endpoint")),
+                {},
+            )
+        ]
+
+
+async def test_streaming_tool_call_ending_mid_arguments_fails_closed_not_completed() -> None:
+    stream = _ScriptedStream(
+        [
+            {
+                "choices": [
+                    {
+                        "delta": {
+                            "tool_calls": [
+                                _tool_call_delta(
+                                    0, call_id="call_abc", name="get_weather", arguments="{"
+                                )
+                            ]
+                        },
+                        "finish_reason": None,
+                    }
+                ]
+            },
+            {"choices": [{"delta": {}, "finish_reason": "length"}]},
+        ]
+    )
+
+    adapter = ChatToResponsesAdapter(stream)
+    with pytest.raises(UpstreamResponseInvalid, match="mid"):
+        _ = [
+            event
+            async for event in adapter.astream_responses(
+                {"input": "weather?", "tools": [WEATHER_TOOL]},
+                cast(Model, SimpleNamespace(provider_model_id="my-endpoint")),
+                {},
+            )
+        ]
+
+
 @pytest.mark.parametrize(
     "usage",
     ["bad", {"prompt_tokens": "many", "completion_tokens": 12}],
