@@ -25,6 +25,11 @@ DEFAULT_MAX_BODY_SIZE = 10_000_000
 # Pre-auth inference flood guard. Production may raise this explicitly when a
 # trusted ingress provides its own limit; the conservative default stays intact.
 DEFAULT_INFERENCE_RATE_LIMIT_RPM = 120
+# Cross-provider failover circuit breaker (Plan 05 Phase 3, optional): consecutive
+# failures before a candidate is short-circuited, and the cooldown before it gets
+# a half-open retry trial.
+DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD = 5
+DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS = 30
 # Daily key rotation (UTC time, "HH:MM"). Opt-in via KEY_ROTATION_ENABLED.
 DEFAULT_ROTATION_TIME = "03:00"
 # Observability. No tracking URI ⇒ tracing disabled (NullSink).
@@ -152,6 +157,9 @@ class Settings:
     # Reject request bodies larger than this many bytes (413) before they're read.
     max_body_size: int = DEFAULT_MAX_BODY_SIZE
     inference_rate_limit_rpm: int = DEFAULT_INFERENCE_RATE_LIMIT_RPM
+    # Cross-provider failover circuit breaker (optional; see build_circuit_breaker).
+    circuit_breaker_failure_threshold: int = DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD
+    circuit_breaker_cooldown_seconds: int = DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS
     # Daily automatic key rotation (opt-in), at rotation_time (UTC, "HH:MM").
     rotation_enabled: bool = False
     rotation_time: str = DEFAULT_ROTATION_TIME
@@ -306,6 +314,16 @@ class Settings:
             inference_rate_limit_rpm=_env_int(
                 "INFERENCE_RATE_LIMIT_RPM",
                 DEFAULT_INFERENCE_RATE_LIMIT_RPM,
+                minimum=1,
+            ),
+            circuit_breaker_failure_threshold=_env_int(
+                "CIRCUIT_BREAKER_FAILURE_THRESHOLD",
+                DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+                minimum=1,
+            ),
+            circuit_breaker_cooldown_seconds=_env_int(
+                "CIRCUIT_BREAKER_COOLDOWN_SECONDS",
+                DEFAULT_CIRCUIT_BREAKER_COOLDOWN_SECONDS,
                 minimum=1,
             ),
             rotation_enabled=_env_bool("KEY_ROTATION_ENABLED", False),

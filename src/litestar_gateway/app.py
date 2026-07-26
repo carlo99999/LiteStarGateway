@@ -20,6 +20,7 @@ from litestar_gateway.config import Settings
 from litestar_gateway.domain.exceptions import DomainError
 from litestar_gateway.domain.ports import IdentityProvider, LLMGateway
 from litestar_gateway.infrastructure.bootstrap import make_bootstrap_admin
+from litestar_gateway.infrastructure.circuit_breaker import build_circuit_breaker
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
 from litestar_gateway.infrastructure.logging import build_logging_config
@@ -262,6 +263,9 @@ def _build_dependencies(
     # One shared rate limiter (Redis-backed with REDIS_URL, else in-memory) so the
     # per-team RPM counter is consistent across request-scoped meters.
     rate_limiter = build_rate_limiter(settings)
+    # One shared circuit breaker (Redis-backed with REDIS_URL, else in-memory) so
+    # a tripped provider/model is skipped fleet-wide, not just per process.
+    circuit_breaker = build_circuit_breaker(settings)
     return {
         "api_key_service": Provide(provide_api_key_service, sync_to_thread=False),
         "user_service": Provide(provide_user_service, sync_to_thread=False),
@@ -291,6 +295,7 @@ def _build_dependencies(
         "trace_dispatcher": Provide(lambda: trace_dispatcher, sync_to_thread=False),
         "llm_gateway": Provide(lambda: llm_gateway, sync_to_thread=False),
         "rate_limiter": Provide(lambda: rate_limiter, sync_to_thread=False),
+        "circuit_breaker": Provide(lambda: circuit_breaker, sync_to_thread=False),
         "keyring": Provide(keyring_provider, sync_to_thread=False),
         "browser_session_cookie_secure": Provide(
             lambda: settings.session_cookie_secure, sync_to_thread=False
