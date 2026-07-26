@@ -188,6 +188,11 @@ class RoutingDecisionRecord:
     system_prompt: str | None = None
     router_revision_id: UUID | None = None
     chosen_model_id: UUID | None = None
+    # Cross-provider failover observability (Plan 05 Phase 3), filled in
+    # after the request finishes (success or exhausted retries) — the
+    # decision itself is persisted before dispatch even starts.
+    attempts: int = 1
+    failover_used: bool = False
 
 
 class RoutingStrategy(Protocol):

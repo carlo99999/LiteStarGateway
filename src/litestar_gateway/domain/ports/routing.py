@@ -84,6 +84,14 @@ class RoutingDecisionLog(Protocol):
         """Attach the request's actual token usage after settlement."""
         ...
 
+    async def update_failover_outcome(
+        self, decision_id: UUID, attempts: int, failover_used: bool
+    ) -> None:
+        """Attach the request's failover outcome once it finishes (Plan 05
+        Phase 3): how many candidates were tried and whether a retry ever
+        fired."""
+        ...
+
     async def list_decisions(
         self,
         team_id: UUID,

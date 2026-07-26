@@ -1,9 +1,10 @@
 # Plan 05 — Cross-provider failover
 
 **Status:** Phase 0, Phase 1 (sequential failover for non-streamed calls),
-and Phase 2 (streaming failover, pre-first-byte only) complete. Phase 3
-(circuit breaker + observability) is next, and can be split into cheap
-observability first, breaker deferred.
+Phase 2 (streaming failover, pre-first-byte only), and Phase 3's observability
+slice (attempts/failover_used persisted on the routing decision) are complete.
+The Phase 3 circuit breaker and admin-console reliability view remain
+optional and not started.
 
 **Design doc:** [docs/next-steps/cross-provider-failover.md](../docs/next-steps/cross-provider-failover.md).
 **Depends on:** the smart-routing candidate/router infrastructure
@@ -125,16 +126,32 @@ to native passthrough endpoints.
   provider, per-attempt error class, and a `failover_used` flag (mirror
   `fallback_used`). Aggregate error rate, retry/failover rate, p50/p95 latency and
   breaker state per provider/model beside the existing routing-stats endpoints.
+  **✅ Done (26 July 2026):** `RoutingDecisionRecord` gained `attempts: int = 1`
+  and `failover_used: bool = False`, persisted via a new `routing_decision`
+  columns migration (`e98410a45d55`, with manual `server_default` for the
+  already-populated table). The `RoutingDecisionLog` port gained
+  `update_failover_outcome(decision_id, attempts, failover_used)`, mirroring
+  the existing post-hoc `update_usage` pattern — the routing decision row is
+  written *before* dispatch/failover even starts (so it has a stable ID to
+  patch), and both `CompletionService._chat_completion_with_failover` and
+  `_open_chat_stream_with_failover` now wrap their whole attempt loop in a
+  `try/finally` that calls the new `RouterService.record_failover(attempts,
+  failover_used)` unconditionally — on success, on a terminal error, and on
+  exhausted retries alike — so the outcome is recorded even when the request
+  ultimately fails. Per-attempt error class and provider/model aggregates
+  (beyond the raw `attempts`/`failover_used` columns) and the admin-console
+  reliability view are **not** part of this slice — deferred alongside the
+  circuit breaker below, which is still optional and not started.
 - Circuit breaker (optional): short-circuit a provider seen failing repeatedly
   for a cooldown, skipping it in the chain. Put the state machine behind a small
   port with in-memory development and Redis (`.env.sample:18`) multi-replica
   adapters.
 - Console: reliability view with metadata-only aggregates and request-ID
   drill-down; never display prompt/response content or credentials.
-- **Done when:** `failover_used` + attempts are persisted and queryable; the
-  breaker (if built) skips a provider tripped past its threshold and re-admits it
-  after cooldown; two replicas share breaker state through Redis; the console
-  distinguishes errors from true zeroes.
+- **Done when:** `failover_used` + attempts are persisted and queryable
+  (✅ done); the breaker (if built) skips a provider tripped past its threshold
+  and re-admits it after cooldown; two replicas share breaker state through
+  Redis; the console distinguishes errors from true zeroes.
 
 ## TDD strategy
 

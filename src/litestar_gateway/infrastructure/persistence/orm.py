@@ -385,6 +385,9 @@ class RoutingDecisionModel(base.UUIDAuditBase):
     system_prompt: Mapped[str | None] = mapped_column(default=None)
     router_revision_id: Mapped[UUID | None] = mapped_column(default=None, index=True)
     chosen_model_id: Mapped[UUID | None] = mapped_column(default=None, index=True)
+    # Cross-provider failover observability (Plan 05 Phase 3).
+    attempts: Mapped[int] = mapped_column(default=1)
+    failover_used: Mapped[bool] = mapped_column(default=False)
 
     def to_entity(self) -> RoutingDecisionRecord:
         return RoutingDecisionRecord(
@@ -412,6 +415,8 @@ class RoutingDecisionModel(base.UUIDAuditBase):
             system_prompt=self.system_prompt,
             router_revision_id=self.router_revision_id,
             chosen_model_id=self.chosen_model_id,
+            attempts=self.attempts,
+            failover_used=self.failover_used,
         )
 
 

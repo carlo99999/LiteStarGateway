@@ -631,6 +631,8 @@ class SQLAlchemyRoutingDecisionLog:
                 system_prompt=decision.system_prompt,
                 router_revision_id=decision.router_revision_id,
                 chosen_model_id=decision.chosen_model_id,
+                attempts=decision.attempts,
+                failover_used=decision.failover_used,
             )
         )
         await self._session.commit()
@@ -642,6 +644,16 @@ class SQLAlchemyRoutingDecisionLog:
             update(RoutingDecisionModel)
             .where(RoutingDecisionModel.id == decision_id)
             .values(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+        )
+        await self._session.commit()
+
+    async def update_failover_outcome(
+        self, decision_id: UUID, attempts: int, failover_used: bool
+    ) -> None:
+        await self._session.execute(
+            update(RoutingDecisionModel)
+            .where(RoutingDecisionModel.id == decision_id)
+            .values(attempts=attempts, failover_used=failover_used)
         )
         await self._session.commit()
 

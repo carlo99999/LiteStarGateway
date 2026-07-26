@@ -153,6 +153,7 @@ class MultiModelCallableResolver:
 class FixedDecisionRouter:
     def __init__(self, chosen: Model) -> None:
         self._chosen = chosen
+        self.failover_outcomes: list[tuple[int, bool]] = []
 
     async def route(self, router, request, *, acting_team_id, api_key_id) -> RoutingDecision:
         return RoutingDecision(
@@ -164,6 +165,9 @@ class FixedDecisionRouter:
             decision_ms=0.0,
             model_id=self._chosen.id,
         )
+
+    async def record_failover(self, attempts: int, failover_used: bool) -> None:
+        self.failover_outcomes.append((attempts, failover_used))
 
     async def record_usage(self, prompt_tokens: int, completion_tokens: int) -> None:
         return None
@@ -243,7 +247,8 @@ async def test_error_at_stream_open_fails_over() -> None:
     models = {primary.id: primary, secondary.id: secondary}
     gateway = ScriptedStreamGateway([UpstreamUnavailable("503 at open")])
     usage = FakeUsage()
-    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+    router_service = FixedDecisionRouter(primary)
+    service = _service(gateway, usage, router, models, router_service)
 
     stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(REQUEST))
     chunks = [chunk async for chunk in stream]
@@ -254,6 +259,7 @@ async def test_error_at_stream_open_fails_over() -> None:
     # Nothing was billed for the failed-open attempt on the primary.
     assert len(usage.events) == 1
     assert usage.events[0].canonical_model_name == "secondary"
+    assert router_service.failover_outcomes == [(2, True)]
 
 
 async def test_error_at_first_chunk_fails_over() -> None:
@@ -262,7 +268,8 @@ async def test_error_at_first_chunk_fails_over() -> None:
     models = {primary.id: primary, secondary.id: secondary}
     gateway = ScriptedStreamGateway(["first_chunk_error"])
     usage = FakeUsage()
-    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+    router_service = FixedDecisionRouter(primary)
+    service = _service(gateway, usage, router, models, router_service)
 
     stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(REQUEST))
     chunks = [chunk async for chunk in stream]
@@ -273,6 +280,7 @@ async def test_error_at_first_chunk_fails_over() -> None:
     # The failed first-chunk attempt billed nothing (M26: zero chunks produced).
     assert len(usage.events) == 1
     assert usage.events[0].canonical_model_name == "secondary"
+    assert router_service.failover_outcomes == [(2, True)]
 
 
 async def test_terminal_error_never_retries_streaming() -> None:
@@ -281,13 +289,15 @@ async def test_terminal_error_never_retries_streaming() -> None:
     models = {primary.id: primary, secondary.id: secondary}
     gateway = ScriptedStreamGateway([UpstreamRequestRejected("bad request")])
     usage = FakeUsage()
-    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+    router_service = FixedDecisionRouter(primary)
+    service = _service(gateway, usage, router, models, router_service)
 
     with pytest.raises(UpstreamRequestRejected):
         await service.open_chat_stream(TEAM_ID, KEY_ID, dict(REQUEST))
 
     assert gateway.calls == [primary]
     assert usage.events == []
+    assert router_service.failover_outcomes == [(1, False)]
 
 
 async def test_exhausting_max_attempts_surfaces_the_last_streaming_error() -> None:
@@ -296,13 +306,17 @@ async def test_exhausting_max_attempts_surfaces_the_last_streaming_error() -> No
     models = {primary.id: primary, secondary.id: secondary}
     gateway = ScriptedStreamGateway([UpstreamUnavailable("503-a"), UpstreamUnavailable("503-b")])
     usage = FakeUsage()
-    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+    router_service = FixedDecisionRouter(primary)
+    service = _service(gateway, usage, router, models, router_service)
 
     with pytest.raises(UpstreamUnavailable, match="503-b"):
         await service.open_chat_stream(TEAM_ID, KEY_ID, dict(REQUEST))
 
     assert gateway.calls == [primary, secondary]
     assert usage.events == []
+    # failover_used=True even though the request ultimately failed -- a
+    # retry did fire, which is exactly what this observability records.
+    assert router_service.failover_outcomes == [(2, True)]
 
 
 async def test_error_after_first_chunk_never_fails_over() -> None:
@@ -314,7 +328,8 @@ async def test_error_after_first_chunk_never_fails_over() -> None:
     models = {primary.id: primary, secondary.id: secondary}
     gateway = ScriptedStreamGateway(["after_first_chunk_error"])
     usage = FakeUsage()
-    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+    router_service = FixedDecisionRouter(primary)
+    service = _service(gateway, usage, router, models, router_service)
 
     stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(REQUEST))
     with pytest.raises(UpstreamUnavailable, match="mid-stream"):
@@ -323,3 +338,6 @@ async def test_error_after_first_chunk_never_fails_over() -> None:
 
     assert gateway.calls == [primary]  # never reached the second candidate
     assert len(usage.events) == 1  # billed what streamed before the failure
+    # No retry ever fired -- the error surfaced after the loop had already
+    # returned the stream to the caller (past the failover boundary).
+    assert router_service.failover_outcomes == [(1, False)]

@@ -771,56 +771,62 @@ class CompletionService:
             clean,
         )
         last_exc: DomainError | None = None
-        for attempt_index in range(max_attempts):
-            if attempt_index > 0:
-                assert last_exc is not None  # set by the previous iteration's failure
-                if (
-                    router.overall_deadline_ms is not None
-                    and (perf_counter() - start) * 1000 >= router.overall_deadline_ms
-                ):
-                    raise last_exc
-                attempt_model = remaining[attempt_index - 1]
-                attempt_clean = clamp_output_tokens(
-                    "chat.completions", sanitized, attempt_model.max_output_tokens
-                )
-                attempt_clean = validate_chat_request(attempt_model, attempt_clean)
-                attempt_values = await self._credentials.get_values(attempt_model.credential_id)
-                if attempt_values is None:
-                    raise CredentialNotFound(str(attempt_model.credential_id))
-                attempt_reservation = await self._meter.admit(
-                    team_id,
-                    attempt_model,
-                    attempt_model.merge_params(attempt_clean),
-                    skip_team_rate_limit=True,
-                )
-            try:
-                return await self._dispatch(
-                    team_id,
-                    api_key_id,
-                    attempt_model,
-                    "chat.completions",
-                    attempt_clean,
-                    lambda m=attempt_model, v=attempt_values, c=attempt_clean: (
-                        self._gateway.achat_completion(c, m, v)
-                    ),
-                    attempt_reservation,
-                    attribution=attribution,
-                )
-            except DomainError as exc:
-                # UpstreamResponseInvalid already billed a partial charge
-                # inside _dispatch (settle_error) before re-raising; retrying
-                # it would double-bill the team for one logical request, so
-                # it is terminal here even though the general eligibility
-                # classifier marks it eligible (it subclasses
-                # UpstreamUnavailable, whose *other* members never bill).
-                if (
-                    not is_failover_eligible(exc)
-                    or isinstance(exc, UpstreamResponseInvalid)
-                    or attempt_index == max_attempts - 1
-                ):
-                    raise
-                last_exc = exc
-        raise AssertionError("unreachable: the loop above always returns or raises")
+        attempts_made = 0
+        try:
+            for attempt_index in range(max_attempts):
+                attempts_made = attempt_index + 1
+                if attempt_index > 0:
+                    assert last_exc is not None  # set by the previous iteration's failure
+                    if (
+                        router.overall_deadline_ms is not None
+                        and (perf_counter() - start) * 1000 >= router.overall_deadline_ms
+                    ):
+                        raise last_exc
+                    attempt_model = remaining[attempt_index - 1]
+                    attempt_clean = clamp_output_tokens(
+                        "chat.completions", sanitized, attempt_model.max_output_tokens
+                    )
+                    attempt_clean = validate_chat_request(attempt_model, attempt_clean)
+                    attempt_values = await self._credentials.get_values(attempt_model.credential_id)
+                    if attempt_values is None:
+                        raise CredentialNotFound(str(attempt_model.credential_id))
+                    attempt_reservation = await self._meter.admit(
+                        team_id,
+                        attempt_model,
+                        attempt_model.merge_params(attempt_clean),
+                        skip_team_rate_limit=True,
+                    )
+                try:
+                    return await self._dispatch(
+                        team_id,
+                        api_key_id,
+                        attempt_model,
+                        "chat.completions",
+                        attempt_clean,
+                        lambda m=attempt_model, v=attempt_values, c=attempt_clean: (
+                            self._gateway.achat_completion(c, m, v)
+                        ),
+                        attempt_reservation,
+                        attribution=attribution,
+                    )
+                except DomainError as exc:
+                    # UpstreamResponseInvalid already billed a partial charge
+                    # inside _dispatch (settle_error) before re-raising; retrying
+                    # it would double-bill the team for one logical request, so
+                    # it is terminal here even though the general eligibility
+                    # classifier marks it eligible (it subclasses
+                    # UpstreamUnavailable, whose *other* members never bill).
+                    if (
+                        not is_failover_eligible(exc)
+                        or isinstance(exc, UpstreamResponseInvalid)
+                        or attempt_index == max_attempts - 1
+                    ):
+                        raise
+                    last_exc = exc
+            raise AssertionError("unreachable: the loop above always returns or raises")
+        finally:
+            if self._router_service is not None:
+                await self._router_service.record_failover(attempts_made, attempts_made > 1)
 
     async def responses(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
@@ -928,64 +934,70 @@ class CompletionService:
             clean,
         )
         last_exc: DomainError | None = None
-        for attempt_index in range(max_attempts):
-            if attempt_index > 0:
-                assert last_exc is not None  # set by the previous iteration's failure
-                if (
-                    router.overall_deadline_ms is not None
-                    and (perf_counter() - start) * 1000 >= router.overall_deadline_ms
-                ):
-                    raise last_exc
-                attempt_model = remaining[attempt_index - 1]
-                attempt_clean = clamp_output_tokens(
-                    "chat.completions", sanitized, attempt_model.max_output_tokens
-                )
-                attempt_clean = validate_chat_request(attempt_model, attempt_clean)
-                attempt_values = await self._credentials.get_values(attempt_model.credential_id)
-                if attempt_values is None:
-                    raise CredentialNotFound(str(attempt_model.credential_id))
-                attempt_reservation = await self._meter.admit(
+        attempts_made = 0
+        try:
+            for attempt_index in range(max_attempts):
+                attempts_made = attempt_index + 1
+                if attempt_index > 0:
+                    assert last_exc is not None  # set by the previous iteration's failure
+                    if (
+                        router.overall_deadline_ms is not None
+                        and (perf_counter() - start) * 1000 >= router.overall_deadline_ms
+                    ):
+                        raise last_exc
+                    attempt_model = remaining[attempt_index - 1]
+                    attempt_clean = clamp_output_tokens(
+                        "chat.completions", sanitized, attempt_model.max_output_tokens
+                    )
+                    attempt_clean = validate_chat_request(attempt_model, attempt_clean)
+                    attempt_values = await self._credentials.get_values(attempt_model.credential_id)
+                    if attempt_values is None:
+                        raise CredentialNotFound(str(attempt_model.credential_id))
+                    attempt_reservation = await self._meter.admit(
+                        team_id,
+                        attempt_model,
+                        attempt_model.merge_params(attempt_clean),
+                        skip_team_rate_limit=True,
+                    )
+                try:
+                    stream = await self._gateway.astream_chat_completion(
+                        attempt_clean, attempt_model, attempt_values
+                    )
+                except DomainError as exc:
+                    # Never entered _metered, so nothing else releases this
+                    # attempt's reservation -- we must release it ourselves.
+                    self._meter.release(team_id, attempt_reservation)
+                    if not is_failover_eligible(exc) or attempt_index == max_attempts - 1:
+                        raise
+                    last_exc = exc
+                    continue
+                except BaseException:
+                    self._meter.release(team_id, attempt_reservation)
+                    raise
+                gen = self._metered(
                     team_id,
+                    api_key_id,
                     attempt_model,
-                    attempt_model.merge_params(attempt_clean),
-                    skip_team_rate_limit=True,
+                    "chat.completions",
+                    stream,
+                    attempt_clean,
+                    attempt_reservation,
+                    attribution,
                 )
-            try:
-                stream = await self._gateway.astream_chat_completion(
-                    attempt_clean, attempt_model, attempt_values
-                )
-            except DomainError as exc:
-                # Never entered _metered, so nothing else releases this
-                # attempt's reservation -- we must release it ourselves.
-                self._meter.release(team_id, attempt_reservation)
-                if not is_failover_eligible(exc) or attempt_index == max_attempts - 1:
-                    raise
-                last_exc = exc
-                continue
-            except BaseException:
-                self._meter.release(team_id, attempt_reservation)
-                raise
-            gen = self._metered(
-                team_id,
-                api_key_id,
-                attempt_model,
-                "chat.completions",
-                stream,
-                attempt_clean,
-                attempt_reservation,
-                attribution,
-            )
-            try:
-                return await _prime(gen)
-            except DomainError as exc:
-                # metered_stream's own shielded finally already released this
-                # reservation (via the release() closure _metered wired in)
-                # and already settled billing (nothing, per M26, since zero
-                # chunks were ever produced) -- do not release again here.
-                if not is_failover_eligible(exc) or attempt_index == max_attempts - 1:
-                    raise
-                last_exc = exc
-        raise AssertionError("unreachable: the loop above always returns or raises")
+                try:
+                    return await _prime(gen)
+                except DomainError as exc:
+                    # metered_stream's own shielded finally already released this
+                    # reservation (via the release() closure _metered wired in)
+                    # and already settled billing (nothing, per M26, since zero
+                    # chunks were ever produced) -- do not release again here.
+                    if not is_failover_eligible(exc) or attempt_index == max_attempts - 1:
+                        raise
+                    last_exc = exc
+            raise AssertionError("unreachable: the loop above always returns or raises")
+        finally:
+            if self._router_service is not None:
+                await self._router_service.record_failover(attempts_made, attempts_made > 1)
 
     async def open_responses_stream(
         self, team_id: UUID, api_key_id: UUID, request: dict[str, Any]
