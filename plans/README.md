@@ -32,7 +32,7 @@ It is deliberately separate from `docs/next-steps/`:
 | 01 | [Native provider endpoints](01-native-provider-endpoints.md) | ✅ **complete** (Anthropic + Gemini) | Product differentiator — native SDKs point at the gateway |
 | 02 | [Framework-agnostic wire-contract conformance](02-agent-frameworks.md) | ✅ **complete** (Level A + native contracts + docs) | Any client speaking the wire spec works — validated by contract, not per-framework |
 | 03 | [Admin UI](03-admin-ui.md) | ✅ shipped (full console at `/ui`) | Non-dev operability (teams, budgets, keys, usage) |
-| 04 | [Response caching](04-response-caching.md) | ⏳ designed, not started | Cost & latency — exact-match + optional semantic cache, per-tenant isolated |
+| 04 | [Response caching](04-response-caching.md) | 🚧 Phase 0 complete (exact-match, in-memory, off by default + per-team/model opt-in, `cache_hit` metered at $0); Phases 1–3 (Redis, semantic tier, console) remain | Cost & latency — exact-match + optional semantic cache, per-tenant isolated |
 | 05 | [Cross-provider failover](05-cross-provider-failover.md) | 🚧 Phase 0 + 1 + 2 + Phase 3 (observability + circuit breaker) complete (non-streamed and streaming failover, pre-first-byte only, config, RPM/budget single-charge guarantees, persisted attempts/failover_used, in-memory/Redis breaker skipping tripped candidates); only the admin-console reliability view remains open | Reliability — fall over to another capable candidate on 429/5xx/timeout |
 | 06 | [Guardrails](06-guardrails.md) | ⏳ designed, not started | Enterprise policy — pluggable PII/moderation pre- and post-call |
 | 07 | [Budget alerts](07-budget-alerts.md) | ⏳ designed, not started | Proactive spend notifications at % thresholds, off the hot path |

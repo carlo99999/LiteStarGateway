@@ -1,6 +1,10 @@
 # Implementation prompt: Response Caching
 
-> **Status — not yet implemented (design only).** This is the fuller, standalone
+> **Status — Phase 0 implemented (26 July 2026): exact-match, in-memory, off by
+> default, per-team/model opt-in.** See `plans/04-response-caching.md`'s dated
+> completion note for the exact shipped shape and its deliberate
+> simplifications. Phases 1 (Redis-backed shared store), 2 (semantic tier), and
+> 3 (console observability) remain design-only. This is the fuller, standalone
 > version of the optional per-router semantic cache sketched in
 > [`smart-routing.md`](smart-routing.md) §8 (in-memory, per-router, threshold
 > 0.97, reusing the S3 embedding path). That sketch stays valid as the *routing*

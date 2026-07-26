@@ -42,6 +42,31 @@ a thin caller of this service, sharing the store and `EmbedFn` (no parallel cach
   stored body without a provider call and records a `cache_hit` usage event at
   $0; with the flag off, behavior is byte-identical to today.
 
+> **Done — 26 July 2026.** Shipped as-designed: `domain/ports/response_cache.py`
+> (`ResponseCache` Protocol, frozen `CacheKey`/`CachedResponse`) and the pure
+> `domain/response_cache_key.py` (`derive_cache_key`/`is_cacheable`);
+> `infrastructure/cache/in_memory.py`'s `OrderedDict`-LRU, TTL-aware adapter,
+> selected by `RESPONSE_CACHE_ENABLED` (default off) via `build_response_cache`;
+> wired into `CompletionService._dispatch` at the two designed insertion points
+> (lookup before `call()`, write after `settle_ok`), gated to non-streamed
+> `chat.completions`/`responses` only. `UsageMeter.settle_cache_hit` bills the
+> *stored* token counts at a hard `cost=0.0` (never `_parse_usage`) and stamps
+> `cache_hit=True` on both `UsageEvent` and `TraceRecord`. The per-team/model
+> toggle landed as two columns on the existing `Model` entity/table
+> (`cache_enabled`, `cache_allow_nondeterministic`) rather than a new table —
+> Model is already the natural team+model-scoped unit — surfaced through the
+> existing model create/update endpoints (the console checkbox itself is
+> Phase 3). The `cache_hit` column shipped on both `usage_event` and
+> `pending_usage_event` (the outbox) in one migration
+> (`2026-07-26_add_response_cache_columns_bdc8a2e4eb0e`), keeping one Alembic
+> head. Two deliberate simplifications versus the letter of the design: (1) the
+> cross-provider failover retry path (Plan 05) does not participate in the
+> cache — each retry targets a different candidate model, and per-attempt keys
+> are deferred; (2) a response whose usage can't be read cleanly is simply not
+> cached rather than replicating `UsageMeter`'s estimate-when-missing fallback
+> on this best-effort accelerator path. Phases 1 (Redis), 2 (semantic tier),
+> and 3 (console observability) remain.
+
 ### Phase 1 — Redis-backed shared store (1 slice)
 
 - Redis adapter mirroring `build_rate_limiter` (`rate_limiter.py:108`), selected
