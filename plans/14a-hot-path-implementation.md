@@ -523,6 +523,32 @@ outcome 1's bar at 300 RPS; non-streaming's independent ~247 RPS ceiling is
 what keeps this outcome 2, not outcome 1. Phase B's decision below addresses
 whether closing that non-streaming gap is worth pursuing.
 
+### Plan 15 Phase B — the 300-RPS decision (26 July 2026)
+
+Decision: **B-i, stop optimizing.** The 3-CPU ceilings above (non-streaming
+~247 RPS, streaming 300 RPS) are declared final for this round; Plan 14 is
+closed as outcome 2, not outcome 1. The remaining gap to a flat 300/300 on
+exactly 3 CPU is met by deployment (an additional CPU or a second replica —
+Plan 14's own arithmetic), not by further code optimization.
+
+Rationale: Step 5 already established that the remaining CPU profile is
+diffuse (no frame >1% of total time) — there is no single hotspot left to
+attack, only a broad spread across many small costs. Closing the
+non-streaming gap would mean the Phase-2 metadata/credential cache slice
+(B-ii): a bounded, tenant-safe cache invalidated on rotation/revoke/
+disable/policy change, estimated at 2–3 days of work for an estimated
++10–20%. That estimate was made when it looked like *both* modes were
+short of 300 RPS; Step A2 now shows streaming already clears 300 RPS
+in-network, so B-ii's remaining justification is narrower than it was when
+Plan 15 was written — it would only be closing the non-streaming gap, not a
+gap in both modes. Phase C's features (streaming tool events, failover,
+caching, budget alerts, analytics) are worth more product value than the
+last ~20% of per-core headroom on a target that deployment can already
+meet by adding capacity. The cache slice's design constraints stay written
+down here (tenant isolation, invalidation triggers) for whoever picks it up
+if the product later genuinely requires 300 RPS on exactly 3 CPU without
+adding a core or a replica.
+
 ## PR sequence summary
 
 | PR | Content | Gate it must pass |
