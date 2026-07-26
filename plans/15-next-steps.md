@@ -101,6 +101,14 @@ Exit criteria:
   ~247 RPS ceiling was not proxy-affected too — if it moves >3%, all Plan 14
   after-numbers get a footnote and the in-network figures become canonical.
 
+**Resolved** (26 July 2026): 3 runs/stage, in-network, 60 s steady window.
+Streaming sustains 300 offered = 300 successful RPS, 0% failures, median
+p95 660 ms (inside the 750 ms gate, one run touched 800 ms) — a floor, not
+a proven maximum, since no stage above 300 was probed. Non-streaming's
+in-network median (246.9) differs from the host-proxy figure (247.2) by
+0.1%: noise, not a correction — non-streaming was never proxy-affected.
+Full data and analysis in Plan 14a's "Plan 15 Step A2" section.
+
 ### Deferred nice-to-have: a granian server swap (after Phase C)
 
 Deliberately parked, not planned — pick it up only once the Phase C
