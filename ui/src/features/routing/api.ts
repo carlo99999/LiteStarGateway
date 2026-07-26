@@ -84,6 +84,9 @@ export async function setRouterEnabled(
     strategy_config: router.strategy_config,
     enabled,
     shadow_strategy: router.shadow_strategy,
+    failover_enabled: router.failover_enabled,
+    max_attempts: router.max_attempts,
+    overall_deadline_ms: router.overall_deadline_ms,
   });
 }
 
@@ -138,6 +141,9 @@ export async function setGlobalRouterEnabled(router: Router, enabled: boolean): 
     strategy_config: router.strategy_config,
     enabled,
     shadow_strategy: router.shadow_strategy,
+    failover_enabled: router.failover_enabled,
+    max_attempts: router.max_attempts,
+    overall_deadline_ms: router.overall_deadline_ms,
   });
 }
 

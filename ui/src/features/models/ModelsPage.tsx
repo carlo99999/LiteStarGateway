@@ -12,8 +12,13 @@ import { DeleteModelDialog } from "@/features/models/DeleteModelDialog";
 import { EditModelDialog } from "@/features/models/EditModelDialog";
 import { ExtendModelDialog } from "@/features/models/ExtendModelDialog";
 import { ModelsTable } from "@/features/models/ModelsTable";
-import { listAllGlobalModels, listCallableModels, type Model } from "@/features/models/api";
-import { canManageModels } from "@/features/teams/access";
+import {
+  listAllGlobalModels,
+  listCallableModels,
+  teamCacheSavings,
+  type Model,
+} from "@/features/models/api";
+import { canManageModels, canReadUsage } from "@/features/teams/access";
 import { useAccessibleTeams } from "@/features/teams/useAccessibleTeams";
 import { toError } from "@/lib/toError";
 
@@ -24,6 +29,45 @@ const SELECT_CLASS =
 
 const SECTION_LABEL =
   "font-mono text-[10px] uppercase tracking-widest text-muted-foreground";
+
+function formatUsd(cost: number): string {
+  return `$${cost.toFixed(4)}`;
+}
+
+function CacheStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        // {label}
+      </p>
+      <p className="tabular mt-2 text-2xl text-foreground">{value}</p>
+    </div>
+  );
+}
+
+/** Response-cache hit rate + cost saved for the selected team (Plan 04 Phase 3),
+ * scoped the same way as smart-routing savings (`usage:read`). */
+function CacheSavingsPanel({ teamId }: { teamId: string }) {
+  const savings = useQuery({
+    queryKey: ["teams", teamId, "cache-savings"],
+    queryFn: () => teamCacheSavings(teamId),
+    enabled: teamId.length > 0,
+  });
+
+  if (savings.isError) return null; // e.g. no usage:read — stay silent, not an error banner
+  if (!savings.data || savings.data.total_requests === 0) return null;
+
+  return (
+    <div className="mb-6 grid gap-3 sm:grid-cols-3">
+      <CacheStat
+        label="cache hit rate"
+        value={`${(savings.data.cache_hit_rate * 100).toFixed(1)}%`}
+      />
+      <CacheStat label="cost saved" value={formatUsd(savings.data.estimated_cost_saved)} />
+      <CacheStat label="cache hits" value={savings.data.cache_hits} />
+    </div>
+  );
+}
 
 /** Models view: platform-wide global models, plus a per-team section for
  * team-owned models (which can be extended to other teams). */
@@ -136,6 +180,9 @@ export function ModelsPage() {
           </Button>
         ) : null}
       </div>
+      {teamId && selectedTeam && canReadUsage(selectedTeam.role) ? (
+        <CacheSavingsPanel teamId={teamId} />
+      ) : null}
       <CallableModelsTable
         rows={models.data}
         isLoading={teams.isLoading || (teamId.length > 0 && models.isLoading)}
