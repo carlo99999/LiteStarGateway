@@ -78,6 +78,50 @@ a thin caller of this service, sharing the store and `EmbedFn` (no parallel cach
   from cache produces a well-formed SSE stream billed at $0; a Redis outage falls
   through to the provider (failure-policy regression, design §8).
 
+> **Done — 26 July 2026.** Shipped as-designed:
+> `infrastructure/cache/redis.py`'s `RedisResponseCache`, mirroring
+> `RedisRateLimiter`/`RedisCircuitBreaker` byte-for-byte in shape — the client
+> is typed as `object` with `redis.asyncio.Redis` imported only inside
+> `build_response_cache`, so `redis` need not be installed unless
+> `Settings.redis_url` selects this adapter. Selection is a straight branch on
+> `settings.redis_url` in `build_response_cache`, identical to
+> `build_rate_limiter`/`build_circuit_breaker`. TTL is enforced via Redis
+> `SET ... EX` (one round-trip, equivalent to `SETEX`/`EXPIRE` folded into the
+> write) rather than a second `EXPIRE` call; size bounding is left entirely to
+> `maxmemory-policy allkeys-lru` (documented here, not enforced in code) since
+> Redis is already the shared, bounded store and an app-level cap on top of it
+> would just fight that policy — the in-memory adapter keeps its own
+> `OrderedDict` LRU bound as the single-replica fallback's substitute for that
+> guarantee. The tenant namespace is the literal Redis key
+> (`CacheKey.redis_key()` → `cache:{team_id}:{api_key_id}:{digest}`), not just
+> an in-process dataclass field, so isolation holds at the storage layer too.
+>
+> Synthetic-stream replay lives in `CompletionService.open_chat_stream`: it
+> runs the *same* `_cache_key_for` participation decision `chat_completion`
+> uses (global switch + team/model opt-in + request shape, `stream` excluded
+> from the key as designed), and on a hit calls a new
+> `_synthetic_chat_chunks` formatter that re-chunks the cached body's message
+> content into the `chat.completion.chunk` wire shape (role-delta, fixed-size
+> content-delta pieces, a closing delta carrying the original
+> `finish_reason`, and a trailing usage-only chunk) — the same shape every
+> `astream_chat_completion` adapter emits today. The tail settles through the
+> *existing* `settle_cache_hit` UsageMeter path at the stored token counts and
+> `cost=0.0`, reusing `_metered`'s release-once + `weakref.finalize` pattern
+> so a client that drops before the first byte still releases the budget
+> reservation without a spurious billing event. Any cache exception (Redis
+> outage, malformed stored JSON) is caught by the pre-existing `_cache_get`
+> try/except and treated as a miss, falling through to a normal provider
+> stream — no new failure-policy code was needed on the streaming path,
+> since it reuses the guard `_dispatch` already has for the non-streamed
+> path. One deliberate simplification versus the letter of the design:
+> synthetic-stream replay covers `chat.completions` (`open_chat_stream`)
+> only, matching the design doc's specific wording ("the wire shape
+> `open_chat_stream` emits") — `open_responses_stream` stays uncached in this
+> phase, and the failover-retry streaming path is excluded from cache
+> participation for the same reason Phase 0 excluded the non-streamed
+> failover retry chain. Phases 2 (semantic tier) and 3 (console
+> observability) remain.
+
 ### Phase 2 — Semantic tier (1 slice)
 
 - Second tier behind the port: embed the request text via the S3 `EmbedFn`
