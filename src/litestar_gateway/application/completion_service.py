@@ -10,6 +10,7 @@ budget admission, usage metering, billing, traces — is delegated to `UsageMete
 from __future__ import annotations
 
 import logging
+import time
 import weakref
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import replace
@@ -143,6 +144,46 @@ async def _rechain(
         aclose = getattr(rest, "aclose", None)
         if aclose is not None:
             await aclose()
+
+
+def _synthetic_chat_chunks(cached_body: dict[str, Any], model: Model) -> list[dict[str, Any]]:
+    """Re-chunk a cached, non-streamed `chat.completions` body into the same
+    `chat.completion.chunk` wire shape `open_chat_stream` emits (Plan 04 Phase
+    1, design §5): a role-only opening delta, the message content split into
+    fixed-size pieces (so a client sees genuine incremental deltas rather than
+    the whole body in one chunk), any tool calls as one delta (synthetic
+    replay does not need real per-argument-token granularity), a closing delta
+    carrying the original `finish_reason`, and a trailing usage-only chunk
+    mirroring the shape `astream_chat_completion` adapters emit today. Purely
+    a wire-shape formatter — billing is settled separately via
+    `settle_cache_hit` with the *stored* authoritative counts, never re-derived
+    from this synthetic usage chunk."""
+    choice = (cached_body.get("choices") or [{}])[0]
+    message = choice.get("message") or {}
+    finish_reason = choice.get("finish_reason") or "stop"
+    base = {
+        "id": cached_body.get("id", "chatcmpl-cache"),
+        "object": "chat.completion.chunk",
+        "created": cached_body.get("created", int(time.time())),
+        "model": model.provider_model_id,
+    }
+
+    def _delta_chunk(delta: dict[str, Any], finish: str | None) -> dict[str, Any]:
+        return {**base, "choices": [{"index": 0, "delta": delta, "finish_reason": finish}]}
+
+    chunks: list[dict[str, Any]] = [_delta_chunk({"role": message.get("role", "assistant")}, None)]
+    content = message.get("content")
+    if isinstance(content, str) and content:
+        chunk_size = 20
+        for start in range(0, len(content), chunk_size):
+            chunks.append(_delta_chunk({"content": content[start : start + chunk_size]}, None))
+    tool_calls = message.get("tool_calls")
+    if tool_calls:
+        chunks.append(_delta_chunk({"tool_calls": tool_calls}, None))
+    chunks.append(_delta_chunk({}, finish_reason))
+    usage = cached_body.get("usage") or {}
+    chunks.append({**base, "choices": [], "usage": usage})
+    return chunks
 
 
 async def _prime(gen: AsyncIterator[dict[str, Any]]) -> AsyncIterator[dict[str, Any]]:
@@ -998,7 +1039,17 @@ class CompletionService:
     ) -> AsyncIterator[dict[str, Any]]:
         """Resolve the model + credentials (may raise → HTTP error) and return an
         async iterator of OpenAI chunk dicts, metered for usage. Awaited before
-        streaming starts so resolution errors surface as HTTP status codes."""
+        streaming starts so resolution errors surface as HTTP status codes.
+
+        Response-cache participation (Plan 04 Phase 1, design §5, §9): the
+        same `_cache_key_for` decision `chat_completion` uses (non-`None` only
+        when the global switch, team+model opt-in, and request shape all
+        agree — `stream` is never part of the key). A hit skips the provider
+        entirely and replays the stored body as a synthetic SSE stream,
+        settling at $0 via `settle_cache_hit`; a miss falls through to the
+        normal streaming dispatch below unchanged. Not checked on the
+        failover branch, mirroring Phase 0's failover-retry exclusion (a
+        cached response was written for one specific candidate model)."""
         sanitized = sanitize_request("chat.completions", request)
         router_context: dict[str, Any] = {}
         model, values, reservation, clean, attribution = await self._prepare(
@@ -1026,6 +1077,14 @@ class CompletionService:
                 router,
                 decision,
             )
+        cache_key = self._cache_key_for(team_id, api_key_id, "chat.completions", clean, model)
+        if cache_key is not None:
+            cached = await self._cache_get(cache_key)
+            if cached is not None:
+                gen = self._metered_cache_hit_stream(
+                    team_id, api_key_id, model, "chat.completions", cached, reservation, attribution
+                )
+                return await _prime(gen)
         try:
             stream = await self._gateway.astream_chat_completion(clean, model, values)
         except BaseException:
@@ -1042,6 +1101,54 @@ class CompletionService:
             attribution,
         )
         return await _prime(gen)
+
+    def _metered_cache_hit_stream(
+        self,
+        team_id: UUID,
+        api_key_id: UUID,
+        model: Model,
+        operation: str,
+        cached: CachedResponse,
+        reservation: float,
+        attribution: UsageAttribution,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Synthetic-stream replay of a cache hit (Plan 04 Phase 1). Mirrors
+        `_metered`'s release-once + settlement machinery: the reservation is
+        released exactly once (the generator's finally when iterated, a
+        `weakref.finalize` for the never-iterated drop-before-first-byte
+        case), and the tail settles through the *same* `settle_cache_hit`
+        path `_dispatch`'s non-streamed hit uses — one billing path for both,
+        never a second one for the streaming replay (design §6)."""
+        released = False
+
+        def release() -> None:
+            nonlocal released
+            if not released:
+                released = True
+                self._meter.release(team_id, reservation)
+
+        async def gen() -> AsyncIterator[dict[str, Any]]:
+            start = perf_counter()
+            try:
+                for chunk in _synthetic_chat_chunks(cached.body, model):
+                    yield chunk
+            finally:
+                release()
+                latency_ms = (perf_counter() - start) * 1000
+                await self._meter.settle_cache_hit(
+                    team_id,
+                    api_key_id,
+                    model,
+                    operation,
+                    cached.prompt_tokens,
+                    cached.completion_tokens,
+                    latency_ms,
+                    attribution,
+                )
+
+        generator = gen()
+        weakref.finalize(generator, release)
+        return generator
 
     async def _open_chat_stream_with_failover(
         self,
