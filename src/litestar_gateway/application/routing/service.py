@@ -1151,6 +1151,19 @@ class RouterService:
         except Exception:
             logger.warning("failed to attach usage to routing decision", exc_info=True)
 
+    async def record_failover(self, attempts: int, failover_used: bool) -> None:
+        """Attach this request's failover outcome (Plan 05 Phase 3) to its
+        decision, once the request finishes (success or exhausted retries).
+        Never fails the request."""
+        if self.last_decision_record_id is None:
+            return
+        try:
+            await self._decisions.update_failover_outcome(
+                self.last_decision_record_id, attempts, failover_used
+            )
+        except Exception:
+            logger.warning("failed to attach failover outcome to routing decision", exc_info=True)
+
     async def list_decisions(self, team_id: UUID, router_id: UUID, **filters):
         router = await self.get(team_id, router_id)
         return await self._decisions.list_decisions(team_id, router.id, **filters)

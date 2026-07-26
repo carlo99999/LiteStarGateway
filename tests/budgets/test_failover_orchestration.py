@@ -188,6 +188,7 @@ class FixedDecisionRouter:
     def __init__(self, chosen: Model) -> None:
         self._chosen = chosen
         self.route_calls = 0
+        self.failover_outcomes: list[tuple[int, bool]] = []
 
     async def route(self, router, request, *, acting_team_id, api_key_id) -> RoutingDecision:
         self.route_calls += 1
@@ -200,6 +201,9 @@ class FixedDecisionRouter:
             decision_ms=0.0,
             model_id=self._chosen.id,
         )
+
+    async def record_failover(self, attempts: int, failover_used: bool) -> None:
+        self.failover_outcomes.append((attempts, failover_used))
 
     async def record_usage(self, prompt_tokens: int, completion_tokens: int) -> None:
         return None
@@ -254,13 +258,15 @@ async def test_transient_error_fails_over_to_the_second_candidate() -> None:
     models = {primary.id: primary, secondary.id: secondary}
     gateway = ScriptedGateway([UpstreamUnavailable("503")])
     usage = FakeUsage()
-    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+    router_service = FixedDecisionRouter(primary)
+    service = _service(gateway, usage, router, models, router_service)
 
     response = await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
 
     assert response["usage"] == {"prompt_tokens": 1, "completion_tokens": 1}
     assert gateway.calls == [primary, secondary]
     assert len(usage.events) == 1  # billed exactly once -- the serving provider
+    assert router_service.failover_outcomes == [(2, True)]
 
 
 async def test_terminal_error_never_retries() -> None:
@@ -269,13 +275,15 @@ async def test_terminal_error_never_retries() -> None:
     models = {primary.id: primary, secondary.id: secondary}
     gateway = ScriptedGateway([UpstreamRequestRejected("bad request")])
     usage = FakeUsage()
-    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+    router_service = FixedDecisionRouter(primary)
+    service = _service(gateway, usage, router, models, router_service)
 
     with pytest.raises(UpstreamRequestRejected):
         await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
 
     assert gateway.calls == [primary]  # never reached the second candidate
     assert usage.events == []  # nothing billed
+    assert router_service.failover_outcomes == [(1, False)]
 
 
 async def test_already_billed_response_invalid_never_retries() -> None:
@@ -321,13 +329,17 @@ async def test_exhausting_max_attempts_surfaces_the_last_error() -> None:
     models = {primary.id: primary, secondary.id: secondary}
     gateway = ScriptedGateway([UpstreamUnavailable("503-a"), UpstreamUnavailable("503-b")])
     usage = FakeUsage()
-    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+    router_service = FixedDecisionRouter(primary)
+    service = _service(gateway, usage, router, models, router_service)
 
     with pytest.raises(UpstreamUnavailable, match="503-b"):
         await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
 
     assert gateway.calls == [primary, secondary]
     assert usage.events == []
+    # failover_used=True even though the request ultimately failed -- a
+    # retry did fire, which is exactly what this observability records.
+    assert router_service.failover_outcomes == [(2, True)]
 
 
 async def test_budget_exceeded_on_retry_admission_surfaces_immediately() -> None:

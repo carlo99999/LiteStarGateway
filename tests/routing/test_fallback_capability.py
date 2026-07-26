@@ -35,6 +35,11 @@ class RecordingDecisionLog:
     ) -> None:
         return None
 
+    async def update_failover_outcome(
+        self, decision_id: UUID, attempts: int, failover_used: bool
+    ) -> None:
+        return None
+
     async def list_decisions(
         self,
         team_id: UUID,
