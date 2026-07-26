@@ -42,8 +42,9 @@ It is deliberately separate from `docs/next-steps/`:
 | 11 | [Platform quality gates](11-platform-quality-gates.md) | ⏳ planned, not started | Request correlation, drift gates, browser E2E, dependency safety |
 | 12 | [Routing evolution](12-routing-evolution.md) | ⏳ designed, not started | Capability discovery, shadow promotion, dry-run simulation, native-family routing |
 | 13 | [Billing integrity & retention](13-billing-integrity.md) | ⏳ designed, not started | Image/cache-token pricing, decimal money, distributed budgets, durable history |
-| 14 | [Gateway hot-path throughput](14-hot-path-throughput.md) | 📊 Phase 0 complete (frozen v1 baseline); Phase 1 profiling next | Profile-driven client reuse and hot-path work toward 300 RPS |
-| 14a | [Hot-path implementation steps](14a-hot-path-implementation.md) | 🚧 execution companion to 14 — step-by-step PR sequence | Registry, adapter adoption, measured hotspots, deployment tuning |
+| 14 | [Gateway hot-path throughput](14-hot-path-throughput.md) | ✅ **complete** (outcome 2: +21–49% non-streaming, streaming gate PASS in-network; PRs #348–#353) | Profile-driven client reuse and hot-path work toward 300 RPS |
+| 14a | [Hot-path implementation steps](14a-hot-path-implementation.md) | ✅ execution log of 14 — all six steps recorded, incl. the proxy-artifact investigation | Registry, adapter adoption, measured hotspots, deployment tuning |
+| 15 | [Post-throughput next steps](15-next-steps.md) | 🚧 active — benchmark hardening (in-network loadgen), the 300-RPS decision, feature sequencing | Bridge from Plan 14 to the feature roadmap (09 → 05 → 04 → 07 → 10) |
 
 ## Recommended order
 
