@@ -84,24 +84,22 @@ def test_three_images_at_flat_per_image_rate() -> None:
     assert compute_cost(usage, rates) == pytest.approx(0.12)
 
 
+def test_image_price_key_format() -> None:
+    assert image_price_key("1024x1024", "hd") == "1024x1024/hd"
+
+
 def test_size_quality_specific_price_overrides_flat_fallback() -> None:
     usage = BillableUsage(image_count=2, image_size="1024x1024", image_quality="hd")
     rates = RateCard(
         image_cost_per_image=0.04,
-        image_prices={
-            image_price_key("1024x1024", "hd"): 0.08,  # type: ignore[dict-item]
-            image_price_key("1024x1024", "standard"): 0.04,  # type: ignore[dict-item]
-        },
+        image_prices={"1024x1024/hd": 0.08, "1024x1024/standard": 0.04},
     )
     assert compute_cost(usage, rates) == pytest.approx(0.16)  # 2 * 0.08
 
 
 def test_unmatched_size_quality_falls_back_to_flat_rate() -> None:
     usage = BillableUsage(image_count=1, image_size="512x512", image_quality="standard")
-    rates = RateCard(
-        image_cost_per_image=0.02,
-        image_prices={image_price_key("1024x1024", "hd"): 0.08},  # type: ignore[dict-item]
-    )
+    rates = RateCard(image_cost_per_image=0.02, image_prices={"1024x1024/hd": 0.08})
     assert compute_cost(usage, rates) == pytest.approx(0.02)
 
 
@@ -117,7 +115,7 @@ def test_missing_dimension_uses_flat_fallback() -> None:
     usage = BillableUsage(image_count=2, image_size=None, image_quality=None)
     rates = RateCard(
         image_cost_per_image=0.03,
-        image_prices={image_price_key("1024x1024", "standard"): 0.05},  # type: ignore[dict-item]
+        image_prices={"1024x1024/standard": 0.05},
     )
     assert compute_cost(usage, rates) == pytest.approx(0.06)
 
@@ -125,7 +123,7 @@ def test_missing_dimension_uses_flat_fallback() -> None:
 def test_image_unit_price_helper() -> None:
     rates = RateCard(
         image_cost_per_image=0.01,
-        image_prices={image_price_key("1024x1024", "hd"): 0.09},  # type: ignore[dict-item]
+        image_prices={"1024x1024/hd": 0.09},
     )
     assert image_unit_price(rates, "1024x1024", "hd") == 0.09
     assert image_unit_price(rates, "512x512", "standard") == 0.01

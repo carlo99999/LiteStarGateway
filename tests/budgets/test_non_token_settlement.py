@@ -24,6 +24,8 @@ from litestar_gateway.domain.entities import (
 )
 from litestar_gateway.domain.entities.enums import ModelType
 
+TEAM_ID = uuid4()
+
 
 class _FakeUsageRepository:
     def __init__(self) -> None:
@@ -70,7 +72,7 @@ def _model(
 ) -> Model:
     return Model(
         id=uuid4(),
-        team_id=uuid4(),
+        team_id=TEAM_ID,
         name="m",
         provider=provider,
         credential_id=uuid4(),
@@ -99,10 +101,9 @@ def _meter(repo: _FakeUsageRepository) -> UsageMeter:
 async def test_image_generation_bills_per_image_and_records_the_count() -> None:
     repo = _FakeUsageRepository()
     model = _model(model_type=ModelType.IMAGE, provider=Provider.OPENAI, image_cost_per_image=0.04)
-    team_id = model.team_id
 
     _, _, cost = await (_meter(repo)).settle_ok(
-        team_id=team_id,
+        team_id=TEAM_ID,
         api_key_id=None,
         model=model,
         operation="images",
@@ -126,7 +127,7 @@ async def test_image_size_quality_specific_price_beats_flat_fallback() -> None:
         image_prices={"1024x1024/hd": 0.08},
     )
     _, _, cost = await (_meter(repo)).settle_ok(
-        team_id=model.team_id,
+        team_id=TEAM_ID,
         api_key_id=None,
         model=model,
         operation="images",
@@ -147,7 +148,7 @@ async def test_image_reservation_is_an_upper_bound_on_settlement() -> None:
 
     repo = _FakeUsageRepository()
     _, _, settled = await (_meter(repo)).settle_ok(
-        team_id=model.team_id,
+        team_id=TEAM_ID,
         api_key_id=None,
         model=model,
         operation="images",
@@ -172,7 +173,7 @@ async def test_cache_tokens_settle_at_their_own_rates_and_are_recorded() -> None
         cache_read_cost_per_token=0.0001,
     )
     _, _, cost = await (_meter(repo)).settle_ok(
-        team_id=model.team_id,
+        team_id=TEAM_ID,
         api_key_id=None,
         model=model,
         operation="chat.completions",
@@ -217,7 +218,7 @@ async def test_plain_chat_call_bills_and_reserves_exactly_as_before() -> None:
     model = _model(input_cost_per_token=0.001, output_cost_per_token=0.002)
 
     _, _, cost = await (_meter(repo)).settle_ok(
-        team_id=model.team_id,
+        team_id=TEAM_ID,
         api_key_id=None,
         model=model,
         operation="chat.completions",
