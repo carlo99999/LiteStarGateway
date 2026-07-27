@@ -154,13 +154,22 @@ class UsageBucket:
     ``created_at`` falls in ``[bucket_start, bucket_start + granularity)``.
     A bucket is only ever emitted when it has at least one matching event —
     callers wanting a dense, gap-filled series do that themselves from
-    ``UsageTimeseries.start``/``end``/``granularity``."""
+    ``UsageTimeseries.start``/``end``/``granularity``.
+
+    ``group_key`` (Plan 10 Phase 2) is ``None`` for an ungrouped series. When
+    the caller passes ``group_by="model"`` to ``UsageRepository.timeseries``,
+    one row is emitted per ``(bucket_start, group_key)`` pair instead of one
+    per ``bucket_start`` — ``group_key`` is then the same requested-alias-or-
+    canonical-model-name label `UsageResponse.from_aggregate` already uses for
+    the per-model table, so a multi-series chart can be built from a single
+    call instead of one request per model."""
 
     bucket_start: datetime
     request_count: int
     prompt_tokens: int
     completion_tokens: int
     cost: float
+    group_key: str | None = None
 
 
 @dataclass(frozen=True)

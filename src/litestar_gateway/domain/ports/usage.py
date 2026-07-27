@@ -79,6 +79,7 @@ class UsageRepository(Protocol):
         model_name: str | None = None,
         requested_alias: str | None = None,
         api_key_id: UUID | None = None,
+        group_by: Literal["model"] | None = None,
     ) -> list[UsageBucket]:
         """Bucketed usage totals for the team over ``[start, end)`` (Plan 10
         Phase 1), aggregated in SQL — never a Python-side full-table scan.
@@ -87,5 +88,11 @@ class UsageRepository(Protocol):
         range spanning a DST transition still produces evenly-spaced buckets.
         Filters mirror `aggregate`'s semantics: ``model_name`` is the broad
         alias-or-canonical match, ``requested_alias``/``api_key_id`` are exact.
-        A bucket with no matching events is omitted, not zero-filled."""
+        A bucket with no matching events is omitted, not zero-filled.
+
+        ``group_by="model"`` (Plan 10 Phase 2) additionally groups each bucket
+        by requested-alias-or-canonical-model-name, emitting one `UsageBucket`
+        per ``(bucket_start, group_key)`` pair instead of one per
+        ``bucket_start`` — the console's per-model stacked chart needs exactly
+        this shape from a single call rather than one request per model."""
         ...

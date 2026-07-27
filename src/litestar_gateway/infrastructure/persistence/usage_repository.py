@@ -355,24 +355,36 @@ class SQLAlchemyUsageRepository:
         model_name: str | None = None,
         requested_alias: str | None = None,
         api_key_id: UUID | None = None,
+        group_by: Literal["model"] | None = None,
     ) -> list[UsageBucket]:
         dialect_name = self._session.get_bind().dialect.name
         bucket_key = _bucket_key_expr(dialect_name, granularity)
+        # Same label `UsageResponse.from_aggregate` uses for the per-model
+        # table: requested alias, falling back to canonical model name.
+        group_key_expr = func.coalesce(
+            UsageEventModel.requested_alias, UsageEventModel.canonical_model_name
+        )
+        select_columns = [
+            bucket_key.label("bucket_key"),
+            func.count(),
+            func.coalesce(func.sum(UsageEventModel.prompt_tokens), 0),
+            func.coalesce(func.sum(UsageEventModel.completion_tokens), 0),
+            func.coalesce(func.sum(UsageEventModel.cost), 0.0),
+        ]
+        group_by_columns = [bucket_key]
+        if group_by == "model":
+            select_columns.append(group_key_expr.label("group_key"))
+            group_by_columns.append(group_key_expr)
+
         query = (
-            select(
-                bucket_key.label("bucket_key"),
-                func.count(),
-                func.coalesce(func.sum(UsageEventModel.prompt_tokens), 0),
-                func.coalesce(func.sum(UsageEventModel.completion_tokens), 0),
-                func.coalesce(func.sum(UsageEventModel.cost), 0.0),
-            )
+            select(*select_columns)
             .where(
                 UsageEventModel.team_id == team_id,
                 UsageEventModel.created_at >= start,
                 UsageEventModel.created_at < end,
             )
-            .group_by(bucket_key)
-            .order_by(bucket_key)
+            .group_by(*group_by_columns)
+            .order_by(*group_by_columns)
         )
         if model_name is not None:
             query = query.where(
@@ -395,6 +407,7 @@ class SQLAlchemyUsageRepository:
                 prompt_tokens=int(row[2]),
                 completion_tokens=int(row[3]),
                 cost=float(row[4]),
+                group_key=(row[5] or "unknown") if group_by == "model" else None,
             )
             for row in rows
         ]
