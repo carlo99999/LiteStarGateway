@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -13,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import BudgetAlertState, BudgetWindow, PendingBudgetAlert
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_gateway.domain.ports.notification_channel import NotificationChannel
+from litestar_gateway.domain.ports.notification_channel import ChannelResolver
 from litestar_gateway.infrastructure.persistence.orm import (
     BudgetAlertStateModel,
     PendingBudgetAlertModel,
@@ -94,22 +93,45 @@ class SQLAlchemyBudgetAlertStateRepository:
         )
         return [row.to_entity() for row in rows.all()]
 
+    async def recent_fired(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE
+    ) -> list[BudgetAlertState]:
+        """Most-recently fired alerts for a team, newest-first — the
+        read-model behind the console's 'recent alerts' list (Plan 07 Phase 3,
+        design doc §8). Reads the dedup ledger (`budget_alert_state`), which is
+        the durable record of what fired and when, independent of whether the
+        outbox row has since been delivered and deleted."""
+        rows = await self._session.scalars(
+            select(BudgetAlertStateModel)
+            .where(BudgetAlertStateModel.team_id == team_id)
+            .order_by(BudgetAlertStateModel.fired_at.desc())
+            .limit(limit)
+        )
+        return [row.to_entity() for row in rows.all()]
+
     async def dispatch_pending(
-        self, channels: Sequence[NotificationChannel], *, limit: int = DEFAULT_PAGE_SIZE
+        self, resolve_channels: ChannelResolver, *, limit: int = DEFAULT_PAGE_SIZE
     ) -> int:
-        """Drain up to `limit` pending alerts oldest-first (Plan 07 Phase 2):
-        dispatch each through every configured channel, delete the row on
-        success, or bump attempts/last_error and leave it queued for retry on
-        failure. Mirrors `SQLAlchemyUsageRepository.reconcile_pending`'s
-        shape and poison-quarantine policy exactly, reusing the
-        `attempts`/`last_error` columns Phase 1 reserved. A row is retried in
-        full (all channels) on any single channel's failure — Phase 2 ships
-        only one channel (webhook), so no partial-delivery/fan-out dedup
-        logic is built; revisit if Phase 3's email channel makes that a real
-        concern. No channels configured ⇒ a no-op (nothing is dispatched or
-        marked failed), so an alert simply waits for a channel to be wired up."""
-        if not channels:
-            return 0
+        """Drain up to `limit` pending alerts oldest-first (Plan 07 Phase 2,
+        per-team resolution added in Phase 3): for each row, resolve the
+        channel(s) for its OWNING TEAM via `resolve_channels`, dispatch through
+        every resolved channel, delete the row on success, or bump
+        attempts/last_error and leave it queued for retry on failure. Mirrors
+        `SQLAlchemyUsageRepository.reconcile_pending`'s shape and
+        poison-quarantine policy, reusing the `attempts`/`last_error` columns
+        Phase 1 reserved.
+
+        A row whose team resolves to NO channels is skipped untouched (not
+        marked failed) — it simply waits for a channel to be configured, the
+        same no-op semantics Phase 2 gave an empty platform channel list.
+
+        A row is retried in FULL (all its resolved channels re-run) on any
+        single channel's failure — this is a deliberate, consistent extension
+        of Phase 2's same simplification to the multi-channel (webhook + email)
+        case rather than tracking per-channel delivery state. A partial
+        delivery (e.g. webhook succeeds, email fails) therefore re-delivers to
+        the already-succeeded channel on the next attempt; accepted for v1 as
+        the outbox's existing at-least-once posture, not a new gap."""
         pending = (
             await self._session.scalars(
                 select(PendingBudgetAlertModel)
@@ -128,6 +150,12 @@ class SQLAlchemyBudgetAlertStateRepository:
         delivered = 0
         for row_id, attempts, alert in batch:
             try:
+                # Resolve inside the per-row try so a bad resolve (e.g. a
+                # stored URL that fails channel construction) marks just that
+                # row failed rather than killing the whole batch.
+                channels = await resolve_channels(alert)
+                if not channels:
+                    continue  # nowhere to deliver yet — leave queued, untouched
                 for channel in channels:
                     await channel.send(alert)
                 await self._session.execute(

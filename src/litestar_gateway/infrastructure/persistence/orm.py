@@ -567,6 +567,12 @@ class TeamBudgetModel(base.UUIDAuditBase):
     # NOT NULL add (migration f358c2474285's successor); unused by any request
     # path until Plan 07 Phase 1.
     thresholds: Mapped[list[int]] = mapped_column(JSON, default=list)
+    # Optional per-team alert delivery targets (Plan 07 Phase 3, design §8).
+    # Nullable: a team may configure a webhook, an email, both, or neither.
+    # `alert_webhook_url` overrides the platform-wide webhook; `alert_email`
+    # is delivered via the platform-wide SMTP server.
+    alert_webhook_url: Mapped[str | None] = mapped_column(default=None)
+    alert_email: Mapped[str | None] = mapped_column(default=None)
 
     def to_entity(self) -> Budget:
         return Budget(
@@ -576,6 +582,8 @@ class TeamBudgetModel(base.UUIDAuditBase):
             window=BudgetWindow(self.window),
             created_at=self.created_at,
             thresholds=list(self.thresholds or []),
+            alert_webhook_url=self.alert_webhook_url,
+            alert_email=self.alert_email,
         )
 
 

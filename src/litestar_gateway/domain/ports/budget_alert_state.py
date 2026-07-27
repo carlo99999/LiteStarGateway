@@ -9,14 +9,13 @@ its `pending_usage_event` outbox on one port (`domain/ports/usage.py:47-55`).
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from litestar_gateway.domain.entities import BudgetAlertState, BudgetWindow, PendingBudgetAlert
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
-from litestar_gateway.domain.ports.notification_channel import NotificationChannel
+from litestar_gateway.domain.ports.notification_channel import ChannelResolver
 
 
 @runtime_checkable
@@ -60,13 +59,22 @@ class BudgetAlertStateRepository(Protocol):
         build on."""
         ...
 
+    async def recent_fired(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE
+    ) -> list[BudgetAlertState]:
+        """A team's most-recently fired alerts, newest-first — the read-model
+        behind the console's recent-alerts list (Plan 07 Phase 3, design §8)."""
+        ...
+
     async def dispatch_pending(
-        self, channels: Sequence[NotificationChannel], *, limit: int = DEFAULT_PAGE_SIZE
+        self, resolve_channels: ChannelResolver, *, limit: int = DEFAULT_PAGE_SIZE
     ) -> int:
-        """Drain up to `limit` pending alerts oldest-first (Plan 07 Phase 2):
-        dispatch each through every `channel`, delete the row on success, or
-        bump `attempts`/`last_error` and leave it queued for retry on
-        failure — the same poison-quarantine convention as
-        `UsageRepository.reconcile_pending`. Returns how many were
-        delivered. An empty `channels` sequence is a no-op."""
+        """Drain up to `limit` pending alerts oldest-first: for each row,
+        resolve the channel(s) for its owning team via `resolve_channels`
+        (Plan 07 Phase 3 — delivery targets are per-team data, not a fixed
+        list), dispatch through every resolved channel, delete on success, or
+        bump `attempts`/`last_error` and leave it queued for retry on failure —
+        the same poison-quarantine convention as
+        `UsageRepository.reconcile_pending`. A row that resolves to no channels
+        is skipped untouched. Returns how many were delivered."""
         ...

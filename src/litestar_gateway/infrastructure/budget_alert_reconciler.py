@@ -19,15 +19,18 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from litestar import Litestar
 
 from litestar_gateway.config import Settings
-from litestar_gateway.domain.ports.notification_channel import NotificationChannel
+from litestar_gateway.infrastructure.notifications.channel_resolver import make_channel_resolver
 from litestar_gateway.infrastructure.persistence.budget_alert_state_repository import (
     SQLAlchemyBudgetAlertStateRepository,
+)
+from litestar_gateway.infrastructure.persistence.budget_repository import (
+    SQLAlchemyBudgetRepository,
 )
 from litestar_gateway.infrastructure.persistence.database import Database
 
@@ -37,21 +40,20 @@ _DISPATCH_INTERVAL_SECONDS = 60
 _DISPATCH_BATCH = 200
 
 
-def make_budget_alert_dispatcher(
-    database: Database, settings: Settings, channels: Sequence[NotificationChannel]
-):
+def make_budget_alert_dispatcher(database: Database, settings: Settings):
     """Return a Litestar lifespan that periodically drains the budget-alert
-    outbox through `channels`. Callers should only register this lifespan
-    when `channels` is non-empty (see `app.py`'s `_build_lifespan`) — with no
-    channel configured there is nowhere to dispatch to, so the outbox is left
-    alone rather than draining rows without ever delivering them."""
+    outbox, resolving each alert's delivery channel(s) from its owning team's
+    budget (Plan 07 Phase 3). Callers should only register this lifespan when
+    some delivery capability is configured (see `app.py`'s `_build_lifespan`,
+    gated on `settings.budget_alert_delivery_configured`) — otherwise every
+    alert resolves to no channels and the outbox is left queuing quietly."""
 
     async def _dispatch_once(app: Litestar) -> None:
         session_maker = app.state[database.config.session_maker_app_state_key]
         async with session_maker() as session:
-            delivered = await SQLAlchemyBudgetAlertStateRepository(session).dispatch_pending(
-                channels, limit=_DISPATCH_BATCH
-            )
+            repo = SQLAlchemyBudgetAlertStateRepository(session)
+            resolve = make_channel_resolver(SQLAlchemyBudgetRepository(session), settings)
+            delivered = await repo.dispatch_pending(resolve, limit=_DISPATCH_BATCH)
             if delivered:
                 logger.info("delivered %d pending budget alert(s)", delivered)
 

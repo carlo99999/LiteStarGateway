@@ -21,7 +21,15 @@ class Budget:
     of `limit_cost` — e.g. `[50, 80, 100]` — that drive proactive alerts as
     spend approaches the cap. Validate with `domain.budget.validate_thresholds`
     before constructing. Unused by any request path until Plan 07 Phase 1
-    wires evaluation into settlement; enforcement above is unaffected."""
+    wires evaluation into settlement; enforcement above is unaffected.
+
+    `alert_webhook_url` / `alert_email` (Plan 07 Phase 3, design doc §8) are the
+    optional per-team delivery targets for fired alerts. Each is a single
+    target for v1; the outbox worker resolves them per alert and dispatches
+    through the matching channel(s). `alert_webhook_url` overrides the
+    platform-wide webhook target; `alert_email` is delivered via the
+    platform-wide SMTP server. Both stay abstract data here — no transport
+    types (URLs are plain strings, SMTP config lives in `config.Settings`)."""
 
     id: UUID
     team_id: UUID
@@ -29,6 +37,8 @@ class Budget:
     window: BudgetWindow  # noqa: F821
     created_at: datetime
     thresholds: list[int] = field(default_factory=list)
+    alert_webhook_url: str | None = None
+    alert_email: str | None = None
 
 
 @dataclass(frozen=True)

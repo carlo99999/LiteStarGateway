@@ -40,7 +40,7 @@ async def test_dispatcher_loop_ticks_survives_errors_and_shuts_down_cleanly(
         def __init__(self, _session: object) -> None:
             pass
 
-        async def dispatch_pending(self, channels: list, *, limit: int) -> int:
+        async def dispatch_pending(self, resolve_channels, *, limit: int) -> int:
             state["ticks"] += 1
             if state["ticks"] == 2:
                 raise RuntimeError("transient dispatch failure")  # must not kill the loop
@@ -58,19 +58,19 @@ async def test_dispatcher_loop_ticks_survives_errors_and_shuts_down_cleanly(
     app = Litestar(route_handlers=[])
     app.state[database.config.session_maker_app_state_key] = maker
 
-    lifespan = reconciler_mod.make_budget_alert_dispatcher(database, settings, channels=[])
+    lifespan = reconciler_mod.make_budget_alert_dispatcher(database, settings)
     async with lifespan(app):
         await asyncio.wait_for(reached.wait(), timeout=5)
     assert state["ticks"] >= 3
     await engine.dispose()
 
 
-async def test_a_channel_exception_never_propagates_out_of_dispatch_once(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+async def test_dispatcher_constructs_and_tears_down_cleanly(
+    tmp_path: Path,
 ) -> None:
-    """The worker is fully decoupled from any request: an exception raised
-    while dispatching one alert must never escape the loop tick, only be
-    logged and retried next cycle."""
+    """The worker is fully decoupled from any request: it must construct and
+    tear down without raising even when no channel is configured (every alert
+    resolves to nothing to deliver to)."""
     settings = Settings(
         database_url=f"sqlite+aiosqlite:///{tmp_path / 'alerts_loop2.db'}",
         admin_email="admin@example.com",
@@ -84,13 +84,7 @@ async def test_a_channel_exception_never_propagates_out_of_dispatch_once(
     app = Litestar(route_handlers=[])
     app.state[database.config.session_maker_app_state_key] = maker
 
-    class AlwaysFailingChannel:
-        async def send(self, alert: object) -> None:
-            raise RuntimeError("boom")
-
-    lifespan = reconciler_mod.make_budget_alert_dispatcher(
-        database, settings, channels=[AlwaysFailingChannel()]
-    )
+    lifespan = reconciler_mod.make_budget_alert_dispatcher(database, settings)
     async with lifespan(app):
         pass  # must construct + tear down without raising
     await engine.dispose()

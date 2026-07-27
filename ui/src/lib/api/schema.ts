@@ -557,6 +557,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/budget/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** BudgetAlerts */
+        get: operations["TeamsTeamIdBudgetAlertsBudgetAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams/{team_id}/keys": {
         parameters: {
             query?: never;
@@ -1579,6 +1596,17 @@ export interface components {
             csrf_token: string;
             expires_in: number;
         };
+        /** BudgetAlertResponse */
+        BudgetAlertResponse: {
+            /** Format: uuid */
+            team_id: string;
+            window: string;
+            /** Format: date-time */
+            period_start: string;
+            threshold: number;
+            /** Format: date-time */
+            fired_at: string;
+        };
         /** BudgetResponse */
         BudgetResponse: {
             /** Format: uuid */
@@ -1587,6 +1615,9 @@ export interface components {
             window: string;
             spent: number;
             remaining: number;
+            thresholds: number[];
+            alert_webhook_url: string | null;
+            alert_email: string | null;
         };
         /** CallableModelResponse */
         CallableModelResponse: {
@@ -2066,6 +2097,9 @@ export interface components {
         SetBudgetRequest: {
             limit_cost: number;
             window: string;
+            thresholds?: number[] | null;
+            alert_webhook_url?: string | null;
+            alert_email?: string | null;
         };
         /** SetRoleRequest */
         SetRoleRequest: {
@@ -3714,6 +3748,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MembershipResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdBudgetAlertsBudgetAlerts: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                offset?: number | null;
+            };
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetAlertResponse"][];
                 };
             };
             /** @description Bad request syntax or unsupported method */

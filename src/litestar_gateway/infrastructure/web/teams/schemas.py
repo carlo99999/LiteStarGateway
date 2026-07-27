@@ -10,6 +10,7 @@ from litestar_gateway.domain.entities import (
     APIKey,
     ApiKeySpend,
     Budget,
+    BudgetAlertState,
     IssuedKey,
     ServicePrincipal,
     Team,
@@ -24,6 +25,14 @@ from litestar_gateway.domain.exceptions import InvalidKeyExpiry
 class SetBudgetRequest:
     limit_cost: float  # USD, must be > 0
     window: str  # "monthly" | "daily"
+    # Alert config (Plan 07 Phase 3, design §8). All optional; omitted ⇒ no
+    # thresholds and no channel targets. `thresholds` are percentages of the
+    # cap (1..100), validated at the boundary. `alert_webhook_url` overrides
+    # the platform webhook (SSRF-validated); `alert_email` opts the team into
+    # email delivery via the platform SMTP server.
+    thresholds: list[int] | None = None
+    alert_webhook_url: str | None = None
+    alert_email: str | None = None
 
 
 @dataclass(frozen=True)
@@ -33,6 +42,9 @@ class BudgetResponse:
     window: str
     spent: float  # accumulated cost in the current window
     remaining: float  # never negative
+    thresholds: list[int]
+    alert_webhook_url: str | None
+    alert_email: str | None
 
     @classmethod
     def from_budget(cls, budget: Budget, spent: float) -> BudgetResponse:
@@ -42,6 +54,32 @@ class BudgetResponse:
             window=budget.window.value,
             spent=spent,
             remaining=max(0.0, budget.limit_cost - spent),
+            thresholds=list(budget.thresholds),
+            alert_webhook_url=budget.alert_webhook_url,
+            alert_email=budget.alert_email,
+        )
+
+
+@dataclass(frozen=True)
+class BudgetAlertResponse:
+    """One fired budget-threshold alert, for the console's recent-alerts list
+    (Plan 07 Phase 3, design §8). Read from the `budget_alert_state` dedup
+    ledger — the durable record of what fired and when."""
+
+    team_id: UUID
+    window: str
+    period_start: datetime
+    threshold: int
+    fired_at: datetime
+
+    @classmethod
+    def from_entity(cls, alert: BudgetAlertState) -> BudgetAlertResponse:
+        return cls(
+            team_id=alert.team_id,
+            window=alert.window.value,
+            period_start=alert.period_start,
+            threshold=alert.threshold,
+            fired_at=alert.fired_at,
         )
 
 
