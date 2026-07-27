@@ -129,6 +129,66 @@ console rendering.
 - **Done when:** billing viewer, auditor and admin flows render only authorized
   team data and totals do not depend on pagination.
 
+**Complete (27 July 2026, #380).** This completes Plan 10 entirely — all
+three phases (streamed-usage attribution, the timeseries endpoint, and the
+console charts below) are now shipped.
+
+Phase 1's endpoint returned one scalar series per call — filtered, but not
+grouped — so a per-team "which models, how often" chart would otherwise need
+one request per model. Rather than have the console fan out N requests,
+`UsageRepository.timeseries` (port + `SQLAlchemyUsageRepository`) gained an
+optional `group_by: Literal["model"] | None` parameter: when set, the
+existing single `GROUP BY bucket_key` SQL aggregate becomes
+`GROUP BY bucket_key, group_key` (still one query, still dialect-portable),
+emitting one row per `(bucket_start, group_key)` pair instead of one per
+`bucket_start`. `group_key` is `coalesce(requested_alias,
+canonical_model_name)` — the same label `UsageResponse.from_aggregate`
+already uses for the per-model table. `UsageBucket` gained a matching
+optional `group_key: str | None` field, and `GET
+/teams/{team_id}/usage/timeseries` gained the `group_by=model` query param
+(400 on any other value), covered by
+`tests/teams/test_usage_timeseries.py` (repository-level grouping, the
+alias-vs-canonical-name fallback, the ungrouped `group_key is None` case, the
+400 validation, and an end-to-end HTTP test through a real
+`/v1/chat/completions` call).
+
+The console (`ui/src/features/usage/`) gained `UsageChartsPanel.tsx`, mounted
+below the existing per-model usage table in `UsagePage.tsx` (additive only,
+same `usage:read`-gated `teamId` the existing table already uses — no new
+RBAC surface). It reuses Phase 1's existing `start`/`end`/`granularity`/
+`alias`/`api_key_id` filters, adds a cost/calls/tokens metric toggle, and
+renders a dependency-free inline-SVG stacked-area chart
+(`StackedAreaChart.tsx` — no charting library was added; none was already a
+dependency and `ui/package.json` still has none) with a legend, hover
+crosshair/tooltip, and a fixed, never-cycled categorical color order (folds
+to "other" past 8 series) drawn from the validated dataviz-skill palette,
+wired as `--chart-1..8` CSS custom properties for both themes in
+`globals.css`. The pure grouping/aggregation logic
+(`buildStackedSeries`/`totalMetric`/`maxStackedValue` in
+`timeseriesChart.ts`) is unit-tested with plain `node:test`
+(`timeseriesChart.test.ts`), mirroring `features/budgets/alertConfig.test.ts`'s
+convention — the chart's visual rendering itself was exercised by running the
+Vite dev server against a live gateway rather than a rendering test, matching
+this repo's established pattern.
+
+Three explicit states satisfy "distinguish errors from zeroes": an invalid
+date range, a request/query error (`EmptyState` with the error message,
+`border-destructive/40`), and a genuinely empty range (`no usage in range` —
+visually and textually distinct from the error state) are never conflated.
+An accessible table (bucket/model/calls/tokens/cost rows) always renders
+alongside the chart, built from the same non-paginated bucket list the chart
+uses, so neither view's total can depend on pagination.
+
+The budget/cache-savings overlay is opportunistic, per the plan's wording:
+`OverlayStats` reuses the *existing* `getTeamBudget` and `teamCacheSavings`
+endpoints only (no new backend aggregation), silently omitting itself on
+error/absence exactly like `ModelsPage.tsx`'s pre-existing
+`CacheSavingsPanel`. Per-router routing savings was deliberately **not**
+overlaid: `routerSavings` is scoped to one specific router with no team-wide
+aggregate to draw from, so overlaying it here would mean either picking an
+arbitrary router or adding new aggregation — neither of which this phase
+asks for.
+
 ## Verification
 
 - TDD per phase; Postgres tests for bucket SQL and migrations.
