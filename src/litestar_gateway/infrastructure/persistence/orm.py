@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from advanced_alchemy.extensions.litestar import base
-from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, UniqueConstraint, text
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, Numeric, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from litestar_gateway.domain.entities import (
@@ -38,6 +39,7 @@ from litestar_gateway.domain.entities import (
     User,
     parse_team_mapping,
 )
+from litestar_gateway.domain.money import MONEY_PRECISION, MONEY_SCALE, money
 from litestar_gateway.domain.routing import (
     CandidateModel,
     QualityTier,
@@ -45,6 +47,17 @@ from litestar_gateway.domain.routing import (
     RouterGrant,
     RoutingDecisionRecord,
 )
+
+
+def _money_column(**kwargs: Any) -> Any:
+    """A ``NUMERIC(MONEY_PRECISION, MONEY_SCALE)`` money column (Plan 13 Phase 2).
+
+    Every authoritative monetary value is stored as exact fixed-scale ``NUMERIC``
+    (Postgres) / ``Numeric`` (SQLite), so DB-side ``SUM`` aggregation is
+    order-independent and carries no binary-float drift — the property the
+    former ``Float`` columns could not guarantee. A fresh type instance per
+    column keeps SQLAlchemy from sharing mutable type state across mappings."""
+    return mapped_column(Numeric(MONEY_PRECISION, MONEY_SCALE), **kwargs)
 
 
 class UserModel(base.UUIDAuditBase):
@@ -381,10 +394,10 @@ class RoutingDecisionModel(base.UUIDAuditBase):
     is_shadow: Mapped[bool] = mapped_column(default=False)
     fallback_used: Mapped[bool] = mapped_column(default=False)
     api_key_id: Mapped[UUID | None] = mapped_column(default=None)
-    chosen_input_cost: Mapped[float | None] = mapped_column(default=None)
-    chosen_output_cost: Mapped[float | None] = mapped_column(default=None)
-    alt_input_cost: Mapped[float | None] = mapped_column(default=None)
-    alt_output_cost: Mapped[float | None] = mapped_column(default=None)
+    chosen_input_cost: Mapped[Decimal | None] = _money_column(default=None)
+    chosen_output_cost: Mapped[Decimal | None] = _money_column(default=None)
+    alt_input_cost: Mapped[Decimal | None] = _money_column(default=None)
+    alt_output_cost: Mapped[Decimal | None] = _money_column(default=None)
     prompt_tokens: Mapped[int | None] = mapped_column(default=None)
     completion_tokens: Mapped[int | None] = mapped_column(default=None)
     user_text: Mapped[str | None] = mapped_column(default=None)
@@ -510,7 +523,7 @@ class UsageEventModel(base.UUIDAuditBase):
     operation: Mapped[str] = mapped_column()
     prompt_tokens: Mapped[int] = mapped_column(default=0)
     completion_tokens: Mapped[int] = mapped_column(default=0)
-    cost: Mapped[float] = mapped_column(default=0.0)
+    cost: Mapped[Decimal] = _money_column(default=Decimal(0))
     cache_hit: Mapped[bool] = mapped_column(default=False)
     # Non-token billing dimensions (Plan 13 Phase 1): Anthropic prompt-cache
     # write/read token counts and the number of generated images.
@@ -570,7 +583,7 @@ class PendingUsageEventModel(base.UUIDAuditBase):
     operation: Mapped[str] = mapped_column()
     prompt_tokens: Mapped[int] = mapped_column(default=0)
     completion_tokens: Mapped[int] = mapped_column(default=0)
-    cost: Mapped[float] = mapped_column(default=0.0)
+    cost: Mapped[Decimal] = _money_column(default=Decimal(0))
     cache_hit: Mapped[bool] = mapped_column(default=False)
     # Non-token billing dimensions (Plan 13 Phase 1) — carried through to the
     # ledger row when the reconciler drains this dead-letter entry.
@@ -593,7 +606,7 @@ class TeamBudgetModel(base.UUIDAuditBase):
     __tablename__ = "team_budget"
 
     team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), unique=True, index=True)
-    limit_cost: Mapped[float] = mapped_column()
+    limit_cost: Mapped[Decimal] = _money_column()
     window: Mapped[str] = mapped_column()
     # Alert threshold percentages of limit_cost (Plan 07 Phase 0, design §2/§8),
     # e.g. [50, 80, 100]. server_default backfills existing rows for the
@@ -659,8 +672,8 @@ class PendingBudgetAlertModel(base.UUIDAuditBase):
     window: Mapped[str] = mapped_column()
     period_start: Mapped[datetime] = mapped_column()
     threshold: Mapped[int] = mapped_column()
-    spend: Mapped[float] = mapped_column()
-    limit_cost: Mapped[float] = mapped_column()
+    spend: Mapped[Decimal] = _money_column()
+    limit_cost: Mapped[Decimal] = _money_column()
     # Poison-message bookkeeping, unused until Phase 2's delivery worker exists —
     # reserved now so that phase doesn't need another migration.
     attempts: Mapped[int] = mapped_column(default=0)
@@ -780,8 +793,8 @@ class ModelRecord(base.UUIDAuditBase):
     params_enforced: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     max_output_tokens: Mapped[int | None] = mapped_column(default=None)
     api_version: Mapped[str | None] = mapped_column(default=None)
-    input_cost_per_token: Mapped[float | None] = mapped_column(default=None)
-    output_cost_per_token: Mapped[float | None] = mapped_column(default=None)
+    input_cost_per_token: Mapped[Decimal | None] = _money_column(default=None)
+    output_cost_per_token: Mapped[Decimal | None] = _money_column(default=None)
     enabled: Mapped[bool] = mapped_column(default=True)
     # The originally-owning team, kept when a model is promoted to global.
     origin_team_id: Mapped[UUID | None] = mapped_column(default=None)
@@ -791,10 +804,15 @@ class ModelRecord(base.UUIDAuditBase):
     # Semantic-tier opt-in (Plan 04 Phase 2) — see domain/entities/model.py.
     cache_semantic_enabled: Mapped[bool] = mapped_column(default=False)
     # Non-token pricing (Plan 13 Phase 1) — see domain/entities/model.py.
-    cache_write_cost_per_token: Mapped[float | None] = mapped_column(default=None)
-    cache_read_cost_per_token: Mapped[float | None] = mapped_column(default=None)
-    image_cost_per_image: Mapped[float | None] = mapped_column(default=None)
-    image_prices: Mapped[dict[str, float]] = mapped_column(JSON, default=dict)
+    cache_write_cost_per_token: Mapped[Decimal | None] = _money_column(default=None)
+    cache_read_cost_per_token: Mapped[Decimal | None] = _money_column(default=None)
+    image_cost_per_image: Mapped[Decimal | None] = _money_column(default=None)
+    # Per-size/quality image prices kept in a JSON blob (never SQL-aggregated).
+    # JSON can't hold a Decimal, so values are stored as decimal STRINGS and
+    # re-parsed with `money()` in `to_entity` (Plan 13 Phase 2). `money()` also
+    # accepts the legacy float form, so rows written before this migration read
+    # back exactly without a data backfill.
+    image_prices: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
     def to_entity(self) -> Model:
         return Model(
@@ -820,7 +838,7 @@ class ModelRecord(base.UUIDAuditBase):
             cache_write_cost_per_token=self.cache_write_cost_per_token,
             cache_read_cost_per_token=self.cache_read_cost_per_token,
             image_cost_per_image=self.image_cost_per_image,
-            image_prices=self.image_prices or {},
+            image_prices={k: money(v) for k, v in (self.image_prices or {}).items()},
         )
 
 

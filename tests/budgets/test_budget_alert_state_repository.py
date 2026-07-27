@@ -18,6 +18,7 @@ from advanced_alchemy.extensions.litestar import base
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from litestar_gateway.domain.entities import BudgetWindow, PendingBudgetAlert
+from litestar_gateway.domain.money import money
 from litestar_gateway.infrastructure.persistence.budget_alert_state_repository import (
     SQLAlchemyBudgetAlertStateRepository,
 )
@@ -110,8 +111,8 @@ async def test_enqueue_alert_is_readable_via_pending_alerts(session: AsyncSessio
         window=BudgetWindow.MONTHLY,
         period_start=period_start,
         threshold=80,
-        spend=85.0,
-        limit_cost=100.0,
+        spend=money(85.0),
+        limit_cost=money(100.0),
         created_at=datetime.now(UTC),
     )
 
@@ -147,8 +148,8 @@ async def test_pending_alerts_respects_limit_oldest_first(session: AsyncSession)
                 window=BudgetWindow.MONTHLY,
                 period_start=period_start,
                 threshold=threshold,
-                spend=float(threshold),
-                limit_cost=100.0,
+                spend=money(threshold),
+                limit_cost=money(100.0),
                 created_at=datetime.now(UTC),
             )
         )

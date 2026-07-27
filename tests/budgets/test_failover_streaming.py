@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -27,6 +28,7 @@ from litestar_gateway.domain.exceptions import (
     UpstreamRequestRejected,
     UpstreamUnavailable,
 )
+from litestar_gateway.domain.money import ZERO_MONEY, money
 from litestar_gateway.domain.routing import (
     CandidateModel,
     QualityTier,
@@ -51,8 +53,8 @@ def _model(name: str) -> Model:
         params={},
         params_enforced={},
         api_version=None,
-        input_cost_per_token=0.01,
-        output_cost_per_token=0.01,
+        input_cost_per_token=money(0.01),
+        output_cost_per_token=money(0.01),
         enabled=True,
         created_at=datetime.now(UTC),
     )
@@ -62,7 +64,7 @@ def _budget(limit: float) -> Budget:
     return Budget(
         id=uuid4(),
         team_id=TEAM_ID,
-        limit_cost=limit,
+        limit_cost=money(limit),
         window=BudgetWindow.MONTHLY,
         created_at=datetime.now(UTC),
     )
@@ -113,8 +115,8 @@ class FakeUsage:
     async def enqueue_pending(self, event: Any) -> None:  # pragma: no cover
         raise AssertionError("outbox must not be used in these tests")
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
-        return 0.0
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
+        return ZERO_MONEY
 
 
 class FakeBudgets:

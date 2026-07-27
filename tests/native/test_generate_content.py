@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, AsyncIterator
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -50,6 +51,7 @@ from litestar_gateway.domain.entities import (
 )
 from litestar_gateway.domain.entities.enums import BudgetWindow
 from litestar_gateway.domain.exceptions import BudgetExceeded
+from litestar_gateway.domain.money import ZERO_MONEY, money
 from litestar_gateway.infrastructure.llm import vertex_adapter
 
 _MODEL_ID = "gemini-1.5-pro-002"
@@ -469,8 +471,8 @@ def _priced_vertex_model() -> Model:
         provider_model_id=_MODEL_ID,
         params={},
         api_version=None,
-        input_cost_per_token=0.01,
-        output_cost_per_token=0.01,
+        input_cost_per_token=money(0.01),
+        output_cost_per_token=money(0.01),
         enabled=True,
         created_at=datetime.now(UTC),
     )
@@ -484,15 +486,15 @@ class _FakeBudgets:
         return Budget(
             id=uuid4(),
             team_id=team_id,
-            limit_cost=self._limit,
+            limit_cost=money(self._limit),
             window=BudgetWindow.MONTHLY,
             created_at=datetime.now(UTC),
         )
 
 
 class _SpendUsage(_FakeUsage):
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
-        return 0.0
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
+        return ZERO_MONEY
 
 
 class _NoUsageGateway:

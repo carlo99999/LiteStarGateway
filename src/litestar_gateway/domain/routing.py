@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Protocol
 from uuid import UUID
@@ -174,11 +175,13 @@ class RoutingDecisionRecord:
     api_key_id: UUID | None
     created_at: datetime
     # Unit costs captured at decision time: the chosen candidate's and the most
-    # expensive capable candidate's ("what this request would have cost").
-    chosen_input_cost: float | None = None
-    chosen_output_cost: float | None = None
-    alt_input_cost: float | None = None
-    alt_output_cost: float | None = None
+    # expensive capable candidate's ("what this request would have cost"). Exact
+    # money ``Decimal`` (Plan 13 Phase 2 — domain.money); the savings aggregate
+    # is (alt − chosen) × tokens, an exact Decimal delta with no float drift.
+    chosen_input_cost: Decimal | None = None
+    chosen_output_cost: Decimal | None = None
+    alt_input_cost: Decimal | None = None
+    alt_output_cost: Decimal | None = None
     # Actual usage, filled in after settlement (None for streams in phase 3).
     prompt_tokens: int | None = None
     completion_tokens: int | None = None

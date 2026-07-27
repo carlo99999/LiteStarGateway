@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import gc
 from datetime import UTC, datetime
+from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -29,6 +30,7 @@ from litestar_gateway.domain.entities import (
     UsageEvent,
 )
 from litestar_gateway.domain.exceptions import BudgetExceeded, UnsupportedOperation
+from litestar_gateway.domain.money import money
 from litestar_gateway.domain.routing import CandidateModel, QualityTier, RouterConfig
 
 TEAM_ID = uuid4()
@@ -54,8 +56,8 @@ def _model(
         params=params or {},
         params_enforced=params_enforced or {},
         api_version=None,
-        input_cost_per_token=0.01,
-        output_cost_per_token=0.01,
+        input_cost_per_token=money(0.01),
+        output_cost_per_token=money(0.01),
         enabled=True,
         created_at=datetime.now(UTC),
     )
@@ -65,7 +67,7 @@ def _budget(limit: float, window: BudgetWindow = BudgetWindow.MONTHLY) -> Budget
     return Budget(
         id=uuid4(),
         team_id=TEAM_ID,
-        limit_cost=limit,
+        limit_cost=money(limit),
         window=window,
         created_at=datetime.now(UTC),
     )
@@ -89,7 +91,7 @@ class FakeUsage:
 
     def __init__(self, spent: float = 0.0) -> None:
         self.events: list[UsageEvent] = []
-        self.spent = spent
+        self.spent = money(spent)
         self.spend_since_calls: list[tuple[UUID, datetime]] = []
 
     async def record(self, event: UsageEvent) -> None:
@@ -98,7 +100,7 @@ class FakeUsage:
     async def enqueue_pending(self, event: UsageEvent) -> None:  # pragma: no cover
         raise AssertionError("outbox must not be used in these tests")
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
         self.spend_since_calls.append((team_id, since))
         return self.spent
 

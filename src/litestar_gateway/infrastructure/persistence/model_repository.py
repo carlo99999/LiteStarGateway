@@ -56,7 +56,9 @@ class SQLAlchemyModelRepository:
             cache_write_cost_per_token=model.cache_write_cost_per_token,
             cache_read_cost_per_token=model.cache_read_cost_per_token,
             image_cost_per_image=model.image_cost_per_image,
-            image_prices=model.image_prices,
+            # Decimal money can't live in a JSON column — persist decimal strings
+            # (Plan 13 Phase 2); `ModelRecord.to_entity` re-parses them.
+            image_prices={k: str(v) for k, v in model.image_prices.items()},
         )
         try:
             self._session.add(record)
@@ -219,7 +221,8 @@ class SQLAlchemyModelRepository:
         record.cache_write_cost_per_token = model.cache_write_cost_per_token
         record.cache_read_cost_per_token = model.cache_read_cost_per_token
         record.image_cost_per_image = model.image_cost_per_image
-        record.image_prices = model.image_prices
+        # Decimal money → decimal strings for the JSON column (Plan 13 Phase 2).
+        record.image_prices = {k: str(v) for k, v in model.image_prices.items()}
 
     async def update_global(self, model: Model) -> Model | None:
         record = await lock_resource_lifecycle(self._session, CallableKind.MODEL, model.id)

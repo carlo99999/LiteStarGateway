@@ -351,7 +351,10 @@ class TeamService:
                 decisions_without_usage,
             ) = await self._routing.team_savings(team_id)
             routing_savings = {
-                "total_estimated_savings": total_savings,
+                # total_savings is an exact Decimal (Plan 13 Phase 2); widen to a
+                # JSON number at this response boundary (compatibility serializer),
+                # matching RouterService.savings.
+                "total_estimated_savings": float(total_savings),
                 "decisions_counted": decisions_counted,
                 "decisions_without_usage": decisions_without_usage,
             }

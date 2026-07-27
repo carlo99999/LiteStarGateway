@@ -52,7 +52,10 @@ class MLflowTraceSink:
             "provider": record.provider,
             "prompt_tokens": str(record.prompt_tokens),
             "completion_tokens": str(record.completion_tokens),
-            "cost": str(record.cost),
+            # cost is an exact Decimal (Plan 13 Phase 2); stringify via float so
+            # the span attribute keeps its prior form ("0.02", not the scale-12
+            # "0.020000000000") — observability display, never a comparison.
+            "cost": str(float(record.cost)),
             "latency_ms": str(record.latency_ms),
         }
         if record.error_type:

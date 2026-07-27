@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 
 from litestar_gateway.application.playground_service import PlaygroundService
 from litestar_gateway.domain.entities import Model, ModelType, Provider
+from litestar_gateway.domain.money import money
 from litestar_gateway.domain.ports import ModelRepository
 
 TEAM = uuid4()
@@ -30,8 +31,8 @@ def _model(name: str, *, enabled: bool = True, model_type: ModelType = ModelType
         params={},
         params_enforced={},
         api_version=None,
-        input_cost_per_token=1e-06,
-        output_cost_per_token=2e-06,
+        input_cost_per_token=money(1e-06),
+        output_cost_per_token=money(2e-06),
         enabled=enabled,
         created_at=datetime.now(UTC),
     )
@@ -75,8 +76,10 @@ async def test_compare_returns_ok_with_cost() -> None:
     assert res.content == "hi from a"
     assert res.prompt_tokens == 10
     assert res.completion_tokens == 5
-    # 10 * 1e-6 + 5 * 2e-6
-    assert res.cost == 10 * 1e-06 + 5 * 2e-06
+    # 10 * 1e-6 + 5 * 2e-6 = exactly 2e-5. The Decimal cost core (Plan 13
+    # Phase 2) eliminates the float drift the old RHS carried
+    # (10*1e-6 + 5*2e-6 == 1.9999999999999998e-05 in binary float).
+    assert res.cost == 2e-05
     assert res.latency_ms is not None
 
 

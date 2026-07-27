@@ -14,6 +14,7 @@ import dataclasses
 import logging
 import re
 from datetime import UTC, datetime
+from decimal import Decimal
 from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
@@ -37,6 +38,7 @@ from litestar_gateway.domain.exceptions import (
     RouterRevisionConflict,
     RouterShared,
 )
+from litestar_gateway.domain.money import money
 from litestar_gateway.domain.ports import (
     AuditLog,
     CallableModelResolver,
@@ -1117,13 +1119,18 @@ class RouterService:
     @staticmethod
     def _unit_costs(
         chosen_name: str, candidates: tuple[CandidateModel, ...]
-    ) -> tuple[float | None, float | None, float | None, float | None]:
+    ) -> tuple[Decimal | None, Decimal | None, Decimal | None, Decimal | None]:
         """(chosen_in, chosen_out, alt_in, alt_out) unit costs for savings (§7):
         `alt` is the most expensive capable candidate — what the request would
         have cost without routing. A candidate counts as priced when either
-        cost is set; its missing side reads as 0.0 so partially-priced
-        candidates still compete (and survive the savings query's NOT NULL
-        filter). None when profiles carry no costs."""
+        cost is set; its missing side reads as 0 so partially-priced candidates
+        still compete (and survive the savings query's NOT NULL filter). None
+        when profiles carry no costs.
+
+        Candidate rates come from router config as ``float`` (JSON); they are
+        decimalized here via :func:`money` (Plan 13 Phase 2) at the one seam that
+        writes them into the decision ledger's ``NUMERIC`` cost columns, so the
+        savings delta aggregated later is exact."""
         chosen = next((c for c in candidates if c.model_name == chosen_name), None)
         priced = [
             c
@@ -1136,10 +1143,14 @@ class RouterService:
             default=None,
         )
         return (
-            chosen.input_cost_per_token if chosen else None,
-            chosen.output_cost_per_token if chosen else None,
-            (alt.input_cost_per_token or 0.0) if alt else None,
-            (alt.output_cost_per_token or 0.0) if alt else None,
+            money(chosen.input_cost_per_token)
+            if chosen and chosen.input_cost_per_token is not None
+            else None,
+            money(chosen.output_cost_per_token)
+            if chosen and chosen.output_cost_per_token is not None
+            else None,
+            money(alt.input_cost_per_token or 0.0) if alt else None,
+            money(alt.output_cost_per_token or 0.0) if alt else None,
         )
 
     async def record_usage(self, prompt_tokens: int, completion_tokens: int) -> None:
@@ -1196,7 +1207,11 @@ class RouterService:
         total, counted, without_usage = await self._decisions.savings(team_id, router.id)
         return {
             "router": router.name,
-            "estimated_savings": total,
+            # Exact Decimal internally (domain.money); widened to a JSON number
+            # only here at the API boundary, preserving the wire format (Plan 13
+            # Phase 2 compatibility serializer). Display precision — never a
+            # budget comparison — so the float widening is safe.
+            "estimated_savings": float(total),
             "decisions_counted": counted,
             "decisions_without_usage": without_usage,
         }
@@ -1206,7 +1221,7 @@ class RouterService:
         figure. Authorization is the caller's job (admin-only endpoint)."""
         total, counted, without_usage = await self._decisions.platform_savings()
         return {
-            "estimated_savings": total,
+            "estimated_savings": float(total),  # exact Decimal internally; JSON number on the wire
             "decisions_counted": counted,
             "decisions_without_usage": without_usage,
         }
@@ -1217,7 +1232,7 @@ class RouterService:
         total, counted, without_usage = await self._decisions.team_savings(team_id)
         return {
             "team_id": str(team_id),
-            "estimated_savings": total,
+            "estimated_savings": float(total),  # exact Decimal internally; JSON number on the wire
             "decisions_counted": counted,
             "decisions_without_usage": without_usage,
         }

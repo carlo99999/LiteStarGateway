@@ -15,6 +15,7 @@ from typing import Any
 from uuid import uuid4
 
 from litestar_gateway.domain.entities import TraceRecord
+from litestar_gateway.domain.money import money
 from litestar_gateway.infrastructure.observability.mlflow_sink import MLflowTraceSink
 
 
@@ -74,7 +75,7 @@ def _record(status: str = "ok", error_type: str | None = None) -> TraceRecord:
         operation="chat.completions",
         prompt_tokens=5,
         completion_tokens=7,
-        cost=0.02,
+        cost=money(0.02),
         latency_ms=123.0,
         status=status,
         created_at=datetime.now(UTC),

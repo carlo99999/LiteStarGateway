@@ -13,6 +13,7 @@ from litestar_gateway.domain.exceptions import (
     OrganizationNotFound,
     PermissionDenied,
 )
+from litestar_gateway.domain.money import ZERO_MONEY
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.domain.ports import (
     OrganizationRepository,
@@ -107,13 +108,16 @@ class OrganizationService:
         _require_platform_admin(actor)
         if await self._orgs.get(organization_id) is None:
             raise OrganizationNotFound(str(organization_id))
+        # spend_since returns exact Decimals; accumulate in Decimal and widen to
+        # JSON numbers only at the response boundary (Plan 13 Phase 2 — this is a
+        # display rollup, not a budget comparison).
         per_team: list[TeamSpend] = []
-        total = 0.0
+        total = ZERO_MONEY
         for team in await self._all_teams(organization_id):
             cost = await self._usage.spend_since(team.id, since)
-            per_team.append(TeamSpend(team=team, cost=cost))
+            per_team.append(TeamSpend(team=team, cost=float(cost)))
             total += cost
-        return OrganizationSpend(since=since, total_cost=total, teams=per_team)
+        return OrganizationSpend(since=since, total_cost=float(total), teams=per_team)
 
     # Defined after the list[...]-returning methods above: a method named `list`
     # shadows the builtin `list` for annotations in later methods, so keep those

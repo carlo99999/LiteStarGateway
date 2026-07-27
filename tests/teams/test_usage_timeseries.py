@@ -13,6 +13,7 @@ from __future__ import annotations
 import itertools
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
@@ -22,6 +23,7 @@ from litestar.status_codes import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from litestar.testing import AsyncTestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from litestar_gateway.domain.money import money
 from litestar_gateway.infrastructure.llm import openai_adapter
 from litestar_gateway.infrastructure.persistence.orm import (
     APIKeyModel,
@@ -135,7 +137,7 @@ def _usage_event(
         "operation": "chat.completions",
         "prompt_tokens": 10,
         "completion_tokens": 5,
-        "cost": 1.0,
+        "cost": money(1.0),
         "created_at": created_at,
         **overrides,
     }
@@ -175,7 +177,7 @@ async def test_timeseries_hour_granularity_groups_within_the_hour(session: Async
     assert buckets[0].request_count == 2
     assert buckets[0].prompt_tokens == 20
     assert buckets[0].completion_tokens == 10
-    assert buckets[0].cost == pytest.approx(2.0)
+    assert buckets[0].cost == Decimal("2.0")
     assert buckets[1].request_count == 1
 
 

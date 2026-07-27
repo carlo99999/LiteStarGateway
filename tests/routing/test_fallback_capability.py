@@ -8,10 +8,12 @@ order) is chosen, so the request never reaches a model that would reject it.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import cast
 from uuid import UUID, uuid4
 
 from litestar_gateway.application.routing.service import RouterService
+from litestar_gateway.domain.money import ZERO_MONEY
 from litestar_gateway.domain.ports import ModelRepository, RouterRepository
 from litestar_gateway.domain.routing import (
     CandidateModel,
@@ -58,14 +60,14 @@ class RecordingDecisionLog:
     ) -> list[tuple[str, str | None, bool, int]]:
         return []
 
-    async def savings(self, team_id: UUID, router_id: UUID) -> tuple[float, int, int]:
-        return (0.0, 0, 0)
+    async def savings(self, team_id: UUID, router_id: UUID) -> tuple[Decimal, int, int]:
+        return (ZERO_MONEY, 0, 0)
 
-    async def platform_savings(self) -> tuple[float, int, int]:
-        return (0.0, 0, 0)
+    async def platform_savings(self) -> tuple[Decimal, int, int]:
+        return (ZERO_MONEY, 0, 0)
 
-    async def team_savings(self, team_id: UUID) -> tuple[float, int, int]:
-        return (0.0, 0, 0)
+    async def team_savings(self, team_id: UUID) -> tuple[Decimal, int, int]:
+        return (ZERO_MONEY, 0, 0)
 
 
 def _router(default_model: str) -> RouterConfig:

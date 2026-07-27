@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
@@ -13,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from litestar_gateway.domain.entities import UsageEvent
+from litestar_gateway.domain.money import ZERO_MONEY, money
 from litestar_gateway.infrastructure.persistence.orm import PendingUsageEventModel
 from litestar_gateway.infrastructure.persistence.usage_repository import (
     MAX_RECONCILE_ATTEMPTS,
@@ -41,7 +43,7 @@ def _event(created_at: datetime | None = None) -> UsageEvent:
         operation="chat.completions",
         prompt_tokens=5,
         completion_tokens=7,
-        cost=0.12,
+        cost=money("0.12"),
         created_at=created_at or datetime.now(UTC),
         requested_alias="m-global",
         resolved_model_id=None,
@@ -100,14 +102,16 @@ async def test_spend_since_counts_dead_lettered_cost(session: AsyncSession) -> N
     event = _event()
     await repo.enqueue_pending(event)
 
-    assert await repo.spend_since(event.team_id, event.created_at - timedelta(minutes=1)) == 0.12
+    before = event.created_at - timedelta(minutes=1)
+    after = event.created_at + timedelta(minutes=1)
+    assert await repo.spend_since(event.team_id, before) == Decimal("0.12")
     # Window filtering applies to the outbox too (by the event's own time).
-    assert await repo.spend_since(event.team_id, event.created_at + timedelta(minutes=1)) == 0.0
+    assert await repo.spend_since(event.team_id, after) == ZERO_MONEY
 
     # After the drain the event lives in the ledger instead — same total,
     # never double-counted.
     assert await repo.reconcile_pending() == 1
-    assert await repo.spend_since(event.team_id, event.created_at - timedelta(minutes=1)) == 0.12
+    assert await repo.spend_since(event.team_id, before) == Decimal("0.12")
 
 
 def _poison_get(session: AsyncSession, poison_event_id) -> None:
@@ -161,14 +165,14 @@ async def test_spend_since_excludes_quarantined_rows(session: AsyncSession) -> N
     window = poison.created_at - timedelta(minutes=1)
 
     # Still retriable: its cost gates (it may yet settle into the ledger).
-    assert await repo.spend_since(poison.team_id, window) == 0.12
+    assert await repo.spend_since(poison.team_id, window) == Decimal("0.12")
 
     _poison_get(session, poison.id)
     for _ in range(MAX_RECONCILE_ATTEMPTS):
         assert await repo.reconcile_pending(limit=1) == 0
 
     # Quarantined: never billable, so no longer gating.
-    assert await repo.spend_since(poison.team_id, window) == 0.0
+    assert await repo.spend_since(poison.team_id, window) == ZERO_MONEY
 
 
 async def test_transient_failure_is_retried_and_settles(session: AsyncSession) -> None:
@@ -201,8 +205,8 @@ async def test_reconcile_preserves_original_event_time(session: AsyncSession) ->
 
     # Same query the budget gate runs: a window containing the original time
     # sees the cost; a window that starts after it must not.
-    assert await repo.spend_since(event.team_id, happened_at - timedelta(days=1)) == 0.12
-    assert await repo.spend_since(event.team_id, happened_at + timedelta(days=1)) == 0.0
+    assert await repo.spend_since(event.team_id, happened_at - timedelta(days=1)) == Decimal("0.12")
+    assert await repo.spend_since(event.team_id, happened_at + timedelta(days=1)) == ZERO_MONEY
 
 
 async def test_record_preserves_event_time(session: AsyncSession) -> None:
@@ -214,8 +218,8 @@ async def test_record_preserves_event_time(session: AsyncSession) -> None:
 
     await repo.record(event)
 
-    assert await repo.spend_since(event.team_id, happened_at - timedelta(days=1)) == 0.12
-    assert await repo.spend_since(event.team_id, happened_at + timedelta(days=1)) == 0.0
+    assert await repo.spend_since(event.team_id, happened_at - timedelta(days=1)) == Decimal("0.12")
+    assert await repo.spend_since(event.team_id, happened_at + timedelta(days=1)) == ZERO_MONEY
 
 
 async def test_reconciler_loop_ticks_survives_errors_and_shuts_down_cleanly(

@@ -10,6 +10,7 @@ endpoints.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID, uuid4
@@ -23,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from litestar_gateway.app import create_app
 from litestar_gateway.config import Settings
+from litestar_gateway.domain.money import ZERO_MONEY, money
 from litestar_gateway.infrastructure.llm import openai_adapter
 from litestar_gateway.infrastructure.persistence.orm import (
     CredentialModel,
@@ -275,8 +277,8 @@ def _model_record(model_id: UUID, credential_id: UUID, **overrides: object) -> M
         "credential_id": credential_id,
         "type": "chat",
         "provider_model_id": "gpt-4o-mini",
-        "input_cost_per_token": 1e-6,
-        "output_cost_per_token": 2e-6,
+        "input_cost_per_token": money(1e-6),
+        "output_cost_per_token": money(2e-6),
         **overrides,
     }
     return ModelRecord(**fields)
@@ -291,7 +293,7 @@ def _usage_event(team_id: UUID, model_id: UUID, **overrides: object) -> UsageEve
         "operation": "chat.completions",
         "prompt_tokens": 10,
         "completion_tokens": 5,
-        "cost": 0.0,
+        "cost": ZERO_MONEY,
         "cache_hit": True,
         **overrides,
     }
@@ -302,7 +304,7 @@ async def test_cache_savings_empty_state_is_zero(session: AsyncSession) -> None:
     avoided, priced_hits, without_price, total = await SQLAlchemyUsageRepository(
         session
     ).cache_savings(uuid4())
-    assert (avoided, priced_hits, without_price, total) == (0.0, 0, 0, 0)
+    assert (avoided, priced_hits, without_price, total) == (ZERO_MONEY, 0, 0, 0)
 
 
 async def test_cache_savings_sums_avoided_cost_for_priced_hits(session: AsyncSession) -> None:
@@ -311,14 +313,14 @@ async def test_cache_savings_sums_avoided_cost_for_priced_hits(session: AsyncSes
     model_id = uuid4()
     session.add(_model_record(model_id, credential_id))
     session.add(_usage_event(team_id, model_id))  # a hit
-    session.add(_usage_event(team_id, model_id, cache_hit=False, cost=1.0))  # a miss
+    session.add(_usage_event(team_id, model_id, cache_hit=False, cost=money(1.0)))  # a miss
     await session.commit()
 
     avoided, priced_hits, without_price, total = await SQLAlchemyUsageRepository(
         session
     ).cache_savings(team_id)
     # (1e-6 * 10) + (2e-6 * 5) = 2e-5
-    assert avoided == pytest.approx(2e-5)
+    assert avoided == Decimal("2e-5")
     assert priced_hits == 1
     assert without_price == 0
     assert total == 2
@@ -335,7 +337,7 @@ async def test_cache_savings_counts_hit_without_price_when_model_missing(
     avoided, priced_hits, without_price, total = await SQLAlchemyUsageRepository(
         session
     ).cache_savings(team_id)
-    assert avoided == 0.0
+    assert avoided == ZERO_MONEY
     assert priced_hits == 0
     assert without_price == 1
     assert total == 1
@@ -355,7 +357,7 @@ async def test_cache_savings_is_tenant_isolated(session: AsyncSession) -> None:
     ).cache_savings(team_a)
     assert priced_hits == 1
     assert total == 1
-    assert avoided == pytest.approx(2e-5)
+    assert avoided == Decimal("2e-5")
 
 
 async def test_platform_cache_savings_aggregates_across_teams(session: AsyncSession) -> None:
@@ -365,7 +367,7 @@ async def test_platform_cache_savings_aggregates_across_teams(session: AsyncSess
     session.add(_model_record(model_id, credential_id))
     session.add(_usage_event(team_a, model_id))
     session.add(_usage_event(team_b, model_id))
-    session.add(_usage_event(team_b, model_id, cache_hit=False, cost=1.0))
+    session.add(_usage_event(team_b, model_id, cache_hit=False, cost=money(1.0)))
     await session.commit()
 
     repo = SQLAlchemyUsageRepository(session)
@@ -373,4 +375,4 @@ async def test_platform_cache_savings_aggregates_across_teams(session: AsyncSess
     assert priced_hits == 2
     assert without_price == 0
     assert total == 3
-    assert avoided == pytest.approx(4e-5)
+    assert avoided == Decimal("4e-5")

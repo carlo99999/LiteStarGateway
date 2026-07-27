@@ -8,6 +8,8 @@ Both are pure (no I/O) so they're exercised directly; wiring into
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from litestar_gateway.domain.budget import crossed_thresholds, validate_thresholds
@@ -17,13 +19,16 @@ from litestar_gateway.domain.exceptions import InvalidBudget
 class TestCrossedThresholds:
     def test_single_threshold_crossed_and_unfired_fires_once(self) -> None:
         assert crossed_thresholds(
-            spend=80.0, limit_cost=100.0, thresholds=[50, 80, 100], fired=set()
+            spend=Decimal("80"), limit_cost=Decimal("100"), thresholds=[50, 80, 100], fired=set()
         ) == [50, 80]
 
     def test_already_fired_thresholds_are_not_returned_again(self) -> None:
         assert (
             crossed_thresholds(
-                spend=85.0, limit_cost=100.0, thresholds=[50, 80, 100], fired={50, 80}
+                spend=Decimal("85"),
+                limit_cost=Decimal("100"),
+                thresholds=[50, 80, 100],
+                fired={50, 80},
             )
             == []
         )
@@ -33,14 +38,14 @@ class TestCrossedThresholds:
         helper must treat that identically to a brand-new team, re-firing
         every currently-crossed threshold."""
         assert crossed_thresholds(
-            spend=85.0, limit_cost=100.0, thresholds=[50, 80, 100], fired=set()
+            spend=Decimal("85"), limit_cost=Decimal("100"), thresholds=[50, 80, 100], fired=set()
         ) == [50, 80]
 
     def test_multiple_thresholds_crossed_in_one_settlement_all_fire(self) -> None:
         """Spend jumps from 40% to 95% in one settlement: 50 and 80 both cross,
         not just the nearest one."""
         assert crossed_thresholds(
-            spend=95.0, limit_cost=100.0, thresholds=[50, 80, 100], fired=set()
+            spend=Decimal("95"), limit_cost=Decimal("100"), thresholds=[50, 80, 100], fired=set()
         ) == [50, 80]
 
     def test_calling_twice_with_same_inputs_is_idempotent(self) -> None:
@@ -48,38 +53,54 @@ class TestCrossedThresholds:
         thresholds/fired-set returns nothing new the second time, once the
         first call's results are folded into the fired set."""
         first = crossed_thresholds(
-            spend=80.0, limit_cost=100.0, thresholds=[50, 80, 100], fired=set()
+            spend=Decimal("80"), limit_cost=Decimal("100"), thresholds=[50, 80, 100], fired=set()
         )
         assert first == [50, 80]
         second = crossed_thresholds(
-            spend=80.0, limit_cost=100.0, thresholds=[50, 80, 100], fired=set(first)
+            spend=Decimal("80"),
+            limit_cost=Decimal("100"),
+            thresholds=[50, 80, 100],
+            fired=set(first),
         )
         assert second == []
 
     def test_nothing_fires_below_the_lowest_threshold(self) -> None:
         assert (
-            crossed_thresholds(spend=10.0, limit_cost=100.0, thresholds=[50, 80, 100], fired=set())
+            crossed_thresholds(
+                spend=Decimal("10"),
+                limit_cost=Decimal("100"),
+                thresholds=[50, 80, 100],
+                fired=set(),
+            )
             == []
         )
 
     def test_hitting_cap_fires_the_100_percent_threshold(self) -> None:
         assert crossed_thresholds(
-            spend=100.0, limit_cost=100.0, thresholds=[50, 80, 100], fired=set()
+            spend=Decimal("100"), limit_cost=Decimal("100"), thresholds=[50, 80, 100], fired=set()
         ) == [50, 80, 100]
 
     def test_zero_or_negative_cap_never_fires(self) -> None:
         """A misconfigured (non-positive) cap must not divide-by-zero or
         spuriously fire every threshold."""
         assert (
-            crossed_thresholds(spend=10.0, limit_cost=0.0, thresholds=[50, 80], fired=set()) == []
+            crossed_thresholds(
+                spend=Decimal("10"), limit_cost=Decimal("0"), thresholds=[50, 80], fired=set()
+            )
+            == []
         )
 
     def test_empty_threshold_list_never_fires(self) -> None:
-        assert crossed_thresholds(spend=100.0, limit_cost=100.0, thresholds=[], fired=set()) == []
+        assert (
+            crossed_thresholds(
+                spend=Decimal("100"), limit_cost=Decimal("100"), thresholds=[], fired=set()
+            )
+            == []
+        )
 
     def test_result_preserves_ascending_threshold_order(self) -> None:
         assert crossed_thresholds(
-            spend=100.0, limit_cost=100.0, thresholds=[100, 50, 80], fired=set()
+            spend=Decimal("100"), limit_cost=Decimal("100"), thresholds=[100, 50, 80], fired=set()
         ) == [50, 80, 100]
 
 

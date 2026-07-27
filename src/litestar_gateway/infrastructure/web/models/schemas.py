@@ -4,11 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from litestar_gateway.application.model_service import CallableModel
 from litestar_gateway.domain.entities import Credential, Model, ModelGrant, ModelType, Provider
+
+
+def _as_float(value: Decimal | None) -> float | None:
+    """Widen an exact money ``Decimal`` to a JSON number for the wire, preserving
+    ``None`` (Plan 13 Phase 2 compatibility serializer)."""
+    return None if value is None else float(value)
 
 
 @dataclass(frozen=True)
@@ -89,6 +96,8 @@ class ModelResponse:
     params_enforced: dict[str, Any]
     max_output_tokens: int | None
     api_version: str | None
+    # Rates are exact ``Decimal`` on the entity (Plan 13 Phase 2); the wire keeps
+    # JSON numbers (``float``) for API/UI compatibility — see `from_entity`.
     input_cost_per_token: float | None
     output_cost_per_token: float | None
     enabled: bool
@@ -105,6 +114,10 @@ class ModelResponse:
 
     @classmethod
     def from_entity(cls, model: Model) -> ModelResponse:
+        # Money is exact Decimal on the entity; widen to float only here at the
+        # response boundary so the JSON wire format (and its OpenAPI schema, and
+        # the number-typed console) is unchanged (Plan 13 Phase 2 compatibility
+        # serializer). These are config/display values, never budget comparisons.
         return cls(
             id=model.id,
             team_id=model.team_id,
@@ -117,18 +130,18 @@ class ModelResponse:
             params_enforced=model.params_enforced,
             max_output_tokens=model.max_output_tokens,
             api_version=model.api_version,
-            input_cost_per_token=model.input_cost_per_token,
-            output_cost_per_token=model.output_cost_per_token,
+            input_cost_per_token=_as_float(model.input_cost_per_token),
+            output_cost_per_token=_as_float(model.output_cost_per_token),
             enabled=model.enabled,
             created_at=model.created_at,
             origin_team_id=model.origin_team_id,
             cache_enabled=model.cache_enabled,
             cache_allow_nondeterministic=model.cache_allow_nondeterministic,
             cache_semantic_enabled=model.cache_semantic_enabled,
-            cache_write_cost_per_token=model.cache_write_cost_per_token,
-            cache_read_cost_per_token=model.cache_read_cost_per_token,
-            image_cost_per_image=model.image_cost_per_image,
-            image_prices=model.image_prices,
+            cache_write_cost_per_token=_as_float(model.cache_write_cost_per_token),
+            cache_read_cost_per_token=_as_float(model.cache_read_cost_per_token),
+            image_cost_per_image=_as_float(model.image_cost_per_image),
+            image_prices={k: float(v) for k, v in model.image_prices.items()},
         )
 
 

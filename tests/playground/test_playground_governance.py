@@ -17,6 +17,7 @@ from litestar_gateway.domain.exceptions import (
     InvalidPlaygroundRequest,
     RateLimited,
 )
+from litestar_gateway.domain.money import money
 from litestar_gateway.domain.ports import ModelRepository
 from litestar_gateway.domain.routing import CandidateModel, QualityTier, RouterConfig
 
@@ -35,8 +36,8 @@ def _model(name: str) -> Model:
         params={},
         params_enforced={},
         api_version=None,
-        input_cost_per_token=1e-6,
-        output_cost_per_token=2e-6,
+        input_cost_per_token=money(1e-6),
+        output_cost_per_token=money(2e-6),
         enabled=True,
         created_at=datetime.now(UTC),
     )

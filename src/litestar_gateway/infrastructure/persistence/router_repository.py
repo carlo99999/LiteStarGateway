@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -21,6 +22,7 @@ from litestar_gateway.domain.exceptions import (
     RouterShared,
     SaltKeyMissing,
 )
+from litestar_gateway.domain.money import money
 from litestar_gateway.domain.routing import (
     BEARER_TOKEN_MASK,
     RouterConfig,
@@ -708,25 +710,25 @@ class SQLAlchemyRoutingDecisionLog:
         )
         return [tuple(row) for row in await self._session.execute(stmt)]
 
-    async def savings(self, team_id: UUID, router_id: UUID) -> tuple[float, int, int]:
+    async def savings(self, team_id: UUID, router_id: UUID) -> tuple[Decimal, int, int]:
         return await self._savings_aggregate(
             RoutingDecisionModel.team_id == team_id,
             RoutingDecisionModel.router_id == router_id,
             RoutingDecisionModel.is_shadow.is_(False),
         )
 
-    async def platform_savings(self) -> tuple[float, int, int]:
+    async def platform_savings(self) -> tuple[Decimal, int, int]:
         # Every team and router — the dashboard's platform-wide figure.
         return await self._savings_aggregate(RoutingDecisionModel.is_shadow.is_(False))
 
-    async def team_savings(self, team_id: UUID) -> tuple[float, int, int]:
+    async def team_savings(self, team_id: UUID) -> tuple[Decimal, int, int]:
         # One team, all of its routers.
         return await self._savings_aggregate(
             RoutingDecisionModel.team_id == team_id,
             RoutingDecisionModel.is_shadow.is_(False),
         )
 
-    async def _savings_aggregate(self, *base: Any) -> tuple[float, int, int]:
+    async def _savings_aggregate(self, *base: Any) -> tuple[Decimal, int, int]:
         # One point-in-time query (a single row snapshot, so the three figures
         # can't drift under concurrent inserts) for: Σ savings over *priced*
         # decisions, the priced count, and the total count. "Priced" = actual
@@ -754,4 +756,6 @@ class SQLAlchemyRoutingDecisionLog:
                 ).where(*base)
             )
         ).one()
-        return float(total or 0.0), int(counted_n or 0), int((all_n or 0) - (counted_n or 0))
+        # Savings = (alt − chosen) unit cost × tokens, aggregated over NUMERIC
+        # columns: an exact Decimal delta (Plan 13 Phase 2).
+        return money(total or 0), int(counted_n or 0), int((all_n or 0) - (counted_n or 0))

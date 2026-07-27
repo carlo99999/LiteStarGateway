@@ -63,8 +63,11 @@ class WebhookNotificationChannel:
             "window": alert.window.value,
             "period_start": alert.period_start.isoformat(),
             "threshold": alert.threshold,
-            "spend": alert.spend,
-            "limit_cost": alert.limit_cost,
+            # spend/limit_cost are exact Decimals (Plan 13 Phase 2); json.dumps
+            # can't serialize Decimal, so widen to JSON numbers at the payload
+            # boundary (the compatibility-serializer pattern).
+            "spend": float(alert.spend),
+            "limit_cost": float(alert.limit_cost),
         }
         auth_headers = (
             {"Authorization": f"Bearer {self._bearer_token}"} if self._bearer_token else {}

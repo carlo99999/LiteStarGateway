@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID, uuid4
@@ -17,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from litestar_gateway.app import create_app
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.config import Settings
+from litestar_gateway.domain.money import money
 from litestar_gateway.domain.routing import CandidateModel, QualityTier
 from litestar_gateway.infrastructure.llm import openai_adapter
 from litestar_gateway.infrastructure.persistence.orm import RoutingDecisionModel
@@ -260,7 +262,12 @@ def test_unit_costs_alt_includes_output_only_priced_candidate() -> None:
         _candidate("cheap", input_cost=1e-6, output_cost=2e-6),
         _candidate("out-only", output_cost=5e-5),
     )
-    assert RouterService._unit_costs("cheap", candidates) == (1e-6, 2e-6, 0.0, 5e-5)
+    assert RouterService._unit_costs("cheap", candidates) == (
+        Decimal("1e-6"),
+        Decimal("2e-6"),
+        Decimal("0"),
+        Decimal("5e-5"),
+    )
 
 
 def test_unit_costs_excludes_fully_unpriced_candidates() -> None:
@@ -273,7 +280,12 @@ def test_unit_costs_fully_priced_candidates_unchanged() -> None:
         _candidate("cheap", input_cost=1e-6, output_cost=2e-6),
         _candidate("big", input_cost=1e-5, output_cost=2e-5),
     )
-    assert RouterService._unit_costs("cheap", candidates) == (1e-6, 2e-6, 1e-5, 2e-5)
+    assert RouterService._unit_costs("cheap", candidates) == (
+        Decimal("1e-6"),
+        Decimal("2e-6"),
+        Decimal("1e-5"),
+        Decimal("2e-5"),
+    )
 
 
 @pytest.fixture
@@ -298,10 +310,10 @@ def _decision(team_id: UUID, **overrides: object) -> RoutingDecisionModel:
         "router_name": "auto",
         "strategy": "heuristic",
         "chosen_model": "cheap-model",
-        "chosen_input_cost": 1e-6,
-        "chosen_output_cost": 2e-6,
-        "alt_input_cost": 1e-5,
-        "alt_output_cost": 2e-5,
+        "chosen_input_cost": money(1e-6),
+        "chosen_output_cost": money(2e-6),
+        "alt_input_cost": money(1e-5),
+        "alt_output_cost": money(2e-5),
         "prompt_tokens": 10,
         "completion_tokens": 5,
         **overrides,
@@ -321,7 +333,7 @@ async def test_savings_excludes_row_with_null_completion_tokens(session: AsyncSe
     # The NULL-completion row cannot be priced: out of the SUM *and* the count.
     assert counted == 1
     assert without_usage == 1
-    assert total == pytest.approx(1.8e-4)
+    assert total == Decimal("1.8e-4")
 
 
 @pytest.mark.parametrize("field", ["alt_output_cost", "chosen_output_cost"])
@@ -339,7 +351,7 @@ async def test_savings_excludes_one_sided_output_cost_symmetrically(
     # A NULL output cost on either side excludes the row the same way.
     assert counted == 1
     assert without_usage == 1
-    assert total == pytest.approx(1.8e-4)
+    assert total == Decimal("1.8e-4")
 
 
 async def test_savings_counts_fully_priced_rows(session: AsyncSession) -> None:
@@ -353,7 +365,7 @@ async def test_savings_counts_fully_priced_rows(session: AsyncSession) -> None:
     )
     assert counted == 2
     assert without_usage == 0
-    assert total == pytest.approx(3.6e-4)
+    assert total == Decimal("3.6e-4")
 
 
 async def test_platform_and_team_savings_aggregate_across_scopes(
@@ -371,11 +383,11 @@ async def test_platform_and_team_savings_aggregate_across_scopes(
     log = SQLAlchemyRoutingDecisionLog(session)
     team_total, team_counted, _ = await log.team_savings(team_a)
     assert team_counted == 2
-    assert team_total == pytest.approx(3.6e-4)
+    assert team_total == Decimal("3.6e-4")
 
     platform_total, platform_counted, _ = await log.platform_savings()
     assert platform_counted == 3
-    assert platform_total == pytest.approx(5.4e-4)
+    assert platform_total == Decimal("5.4e-4")
 
 
 async def test_platform_savings_requires_platform_admin(client: AsyncTestClient) -> None:

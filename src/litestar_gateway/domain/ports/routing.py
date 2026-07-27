@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import AbstractAsyncContextManager
+from decimal import Decimal
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -110,19 +111,20 @@ class RoutingDecisionLog(Protocol):
         """(chosen_model, tier, is_shadow, count) rows for the router."""
         ...
 
-    async def savings(self, team_id: UUID, router_id: UUID) -> tuple[float, int, int]:
+    async def savings(self, team_id: UUID, router_id: UUID) -> tuple[Decimal, int, int]:
         """(total_estimated_savings, decisions_counted, decisions_without_usage)
         over one router's non-shadow decisions: Σ (alt−chosen unit cost) ×
-        actual tokens. Keyed by router id, so a deleted router's history never
-        leaks into a later router that reused its name."""
+        actual tokens, an exact money ``Decimal`` (Plan 13 Phase 2). Keyed by
+        router id, so a deleted router's history never leaks into a later router
+        that reused its name."""
         ...
 
-    async def platform_savings(self) -> tuple[float, int, int]:
+    async def platform_savings(self) -> tuple[Decimal, int, int]:
         """The same savings aggregate across every team and router — the
         platform-wide "what smart routing saved" figure (admin dashboard)."""
         ...
 
-    async def team_savings(self, team_id: UUID) -> tuple[float, int, int]:
+    async def team_savings(self, team_id: UUID) -> tuple[Decimal, int, int]:
         """The savings aggregate for one team across all of its routers."""
         ...
 

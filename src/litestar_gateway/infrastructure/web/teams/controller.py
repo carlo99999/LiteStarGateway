@@ -7,6 +7,7 @@ admin or team admin). Domain errors are mapped to HTTP by the central handler.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from email.utils import parseaddr
 from typing import Any
 from urllib.parse import urlsplit
@@ -36,6 +37,7 @@ from litestar_gateway.domain.exceptions import (
     InvalidKeyScope,
     InvalidUsageQuery,
 )
+from litestar_gateway.domain.money import money
 from litestar_gateway.domain.pagination import resolve_page
 from litestar_gateway.domain.ports import (
     AuditLog,
@@ -73,14 +75,16 @@ _TIMESERIES_GROUP_BY = frozenset({"model"})
 
 
 def _cache_savings_response(
-    avoided_cost: float, priced_hits: int, hits_without_price: int, total_events: int
+    avoided_cost: Decimal, priced_hits: int, hits_without_price: int, total_events: int
 ) -> dict[str, Any]:
     """Shared shape for the team-scoped and platform-wide cache-savings
-    endpoints (Plan 04 Phase 3), mirroring the routing savings dict shape."""
+    endpoints (Plan 04 Phase 3), mirroring the routing savings dict shape.
+    `avoided_cost` is an exact Decimal internally; widened to a JSON number here
+    at the API boundary (Plan 13 Phase 2 compatibility serializer)."""
     hits = priced_hits + hits_without_price
     return {
         "cache_hit_rate": (hits / total_events) if total_events else 0.0,
-        "estimated_cost_saved": avoided_cost,
+        "estimated_cost_saved": float(avoided_cost),
         "cache_hits": hits,
         "cache_hits_without_price": hits_without_price,
         "total_requests": total_events,
@@ -134,7 +138,10 @@ def _parse_budget(data: SetBudgetRequest, team_id: UUID) -> Budget:
     return Budget(
         id=uuid4(),
         team_id=team_id,
-        limit_cost=data.limit_cost,
+        # Decimalize the request's JSON-number limit at the API boundary (Plan 13
+        # Phase 2 — domain.money) so the cap is compared against spend as exact
+        # Decimals, never mixing float and Decimal at the budget gate.
+        limit_cost=money(data.limit_cost),
         window=window,
         created_at=datetime.now(UTC),
         thresholds=thresholds,

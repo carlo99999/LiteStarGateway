@@ -1,11 +1,14 @@
-"""Property-based tests for the float-based cost math (L31).
+"""Property-based tests for the Decimal-based cost math (Plan 13 Phase 2).
 
-Costs and budgets are plain `float` throughout (see `domain/entities.py`,
-`usage_meter.py`) rather than `Decimal`/integer micro-USD. That's an accepted
-tradeoff for now (see ISSUES round-6 L31) — these tests don't change the
-representation, they document and pin down the float-precision behavior the
-budget gate actually relies on, so a future change to the accumulation logic
-can't silently introduce drift without failing a test first.
+Costs and budgets are fixed-precision `Decimal` throughout (see `domain/money.py`,
+`domain/entities.py`, `usage_meter.py`) rather than binary `float`. These tests
+pin down the exact-arithmetic properties the budget gate relies on: reservations
+add and remove without drift (add-then-remove of the same amounts cancels to
+*exactly* zero), and the in-flight total is order-independent to the digit — the
+whole point of the migration. Generated floats are funnelled through `money()`
+(the same normalization every real money boundary uses) before feeding the money
+APIs, so a future change to the accumulation logic can't reintroduce drift
+without failing a test first.
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from litestar_gateway.application.usage_meter import (
     _reservation_cost,
 )
 from litestar_gateway.domain.entities import Model, ModelType, Provider
+from litestar_gateway.domain.money import ZERO_MONEY, money
 
 TEAM_ID = uuid4()
 
@@ -44,8 +48,8 @@ def _model(input_cost: float | None, output_cost: float | None) -> Model:
         provider_model_id="gpt-4o",
         params={},
         api_version=None,
-        input_cost_per_token=input_cost,
-        output_cost_per_token=output_cost,
+        input_cost_per_token=money(input_cost) if input_cost is not None else None,
+        output_cost_per_token=money(output_cost) if output_cost is not None else None,
         enabled=True,
         created_at=datetime.now(UTC),
     )
@@ -58,13 +62,13 @@ def _model(input_cost: float | None, output_cost: float | None) -> Model:
 def test_in_flight_spend_add_then_remove_all_returns_to_zero(amounts: list[float]) -> None:
     spend = InFlightSpend()
     for amount in amounts:
-        spend.add(TEAM_ID, amount)
+        spend.add(TEAM_ID, money(amount))
     for amount in amounts:
-        spend.remove(TEAM_ID, amount)
-    # Float summation isn't exactly associative, but removing exactly what was
-    # added (same values, any order) must land within float noise of zero —
-    # not accumulate a persistent drift.
-    assert abs(spend.total(TEAM_ID)) < 1e-6
+        spend.remove(TEAM_ID, money(amount))
+    # Decimal accumulation is exact: removing exactly what was added (same
+    # values, any order) returns to *exactly* zero — no residual drift, which
+    # is precisely what the float representation could not guarantee.
+    assert spend.total(TEAM_ID) == ZERO_MONEY
 
 
 @given(amounts=st.lists(_AMOUNT, min_size=1, max_size=50))
@@ -72,29 +76,29 @@ def test_in_flight_spend_never_goes_negative(amounts: list[float]) -> None:
     spend = InFlightSpend()
     total_added = 0.0
     for amount in amounts:
-        spend.add(TEAM_ID, amount)
+        spend.add(TEAM_ID, money(amount))
         total_added += amount
     # Remove more than was ever added — must clamp at zero, never go negative
     # (a negative in-flight reservation would let a team's committed spend
     # look smaller than it is, widening the budget gate).
-    spend.remove(TEAM_ID, total_added * 2 + 1.0)
-    assert spend.total(TEAM_ID) == 0.0
+    spend.remove(TEAM_ID, money(total_added * 2 + 1.0))
+    assert spend.total(TEAM_ID) == ZERO_MONEY
 
 
 @given(amounts=st.lists(_AMOUNT, min_size=2, max_size=20))
 def test_in_flight_spend_total_is_order_independent(amounts: list[float]) -> None:
     forward = InFlightSpend()
     for amount in amounts:
-        forward.add(TEAM_ID, amount)
+        forward.add(TEAM_ID, money(amount))
 
     backward = InFlightSpend()
     for amount in reversed(amounts):
-        backward.add(TEAM_ID, amount)
+        backward.add(TEAM_ID, money(amount))
 
     # Same multiset of reservations, different arrival order (concurrent
-    # requests can be admitted in any order) — the running total must agree
-    # within float noise, not diverge based on ordering.
-    assert abs(forward.total(TEAM_ID) - backward.total(TEAM_ID)) < 1e-9
+    # requests can be admitted in any order) — Decimal accumulation is
+    # order-independent, so the running totals agree to the digit.
+    assert forward.total(TEAM_ID) == backward.total(TEAM_ID)
 
 
 # ── Cost accumulation: non-negativity and monotonicity ───────────────────────
@@ -113,7 +117,7 @@ def test_parsed_usage_cost_is_never_negative(
     _, _, cost = _parse_usage(
         model, {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
     )
-    assert cost >= 0.0
+    assert cost >= ZERO_MONEY
 
 
 @given(
@@ -172,11 +176,11 @@ def test_reservation_cost_is_never_negative(
 ) -> None:
     model = _model(input_cost, output_cost)
     reservation = _reservation_cost(model, {"messages": [{"role": "user", "content": "hi"}]})
-    assert reservation >= 0.0
+    assert reservation >= ZERO_MONEY
     reservation_with_ceiling = _reservation_cost(
         model, {"messages": [{"role": "user", "content": "hi"}], "max_tokens": max_tokens}
     )
-    assert reservation_with_ceiling >= 0.0
+    assert reservation_with_ceiling >= ZERO_MONEY
     # A higher output ceiling (same prompt) reserves at least as much.
     assert reservation_with_ceiling >= reservation
 

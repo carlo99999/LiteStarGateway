@@ -10,6 +10,7 @@ that captures the recorded `UsageEvent`s — the money the ledger actually sees.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -23,6 +24,7 @@ from litestar_gateway.domain.entities import (
     UsageEvent,
 )
 from litestar_gateway.domain.entities.enums import ModelType
+from litestar_gateway.domain.money import ZERO_MONEY, money
 
 TEAM_ID = uuid4()
 
@@ -43,8 +45,8 @@ class _FakeUsageRepository:
     async def spend_by_api_key(self, team_id: UUID) -> list[ApiKeySpend]:
         return []
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
-        return 0.0
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
+        return ZERO_MONEY
 
     async def enqueue_pending(self, event: UsageEvent) -> None:
         raise AssertionError("outbox must not be used in this test")
@@ -52,11 +54,11 @@ class _FakeUsageRepository:
     async def reconcile_pending(self, *, limit: int = 100) -> int:
         return 0
 
-    async def cache_savings(self, team_id: UUID) -> tuple[float, int, int, int]:
-        return (0.0, 0, 0, 0)
+    async def cache_savings(self, team_id: UUID) -> tuple[Decimal, int, int, int]:
+        return (ZERO_MONEY, 0, 0, 0)
 
-    async def platform_cache_savings(self) -> tuple[float, int, int, int]:
-        return (0.0, 0, 0, 0)
+    async def platform_cache_savings(self) -> tuple[Decimal, int, int, int]:
+        return (ZERO_MONEY, 0, 0, 0)
 
     async def timeseries(self, team_id: UUID, **_: Any) -> list[UsageBucket]:
         return []
@@ -83,14 +85,24 @@ def _model(
         provider_model_id="m",
         params={},
         api_version=None,
-        input_cost_per_token=input_cost_per_token,
-        output_cost_per_token=output_cost_per_token,
+        input_cost_per_token=(
+            money(input_cost_per_token) if input_cost_per_token is not None else None
+        ),
+        output_cost_per_token=(
+            money(output_cost_per_token) if output_cost_per_token is not None else None
+        ),
         enabled=True,
         created_at=datetime.now(UTC),
-        cache_write_cost_per_token=cache_write_cost_per_token,
-        cache_read_cost_per_token=cache_read_cost_per_token,
-        image_cost_per_image=image_cost_per_image,
-        image_prices=image_prices or {},
+        cache_write_cost_per_token=money(cache_write_cost_per_token)
+        if cache_write_cost_per_token is not None
+        else None,
+        cache_read_cost_per_token=money(cache_read_cost_per_token)
+        if cache_read_cost_per_token is not None
+        else None,
+        image_cost_per_image=(
+            money(image_cost_per_image) if image_cost_per_image is not None else None
+        ),
+        image_prices={k: money(v) for k, v in (image_prices or {}).items()},
     )
 
 
@@ -115,10 +127,10 @@ async def test_image_generation_bills_per_image_and_records_the_count() -> None:
         request={"n": 3, "size": "1024x1024", "quality": "standard"},
     )
 
-    assert cost == 0.12  # 3 images * 0.04
+    assert cost == Decimal("0.12")  # 3 images * 0.04
     event = repo.recorded[0]
     assert event.image_count == 3
-    assert event.cost == 0.12
+    assert event.cost == Decimal("0.12")
     assert (event.prompt_tokens, event.completion_tokens) == (0, 0)
 
 
@@ -138,7 +150,7 @@ async def test_image_size_quality_specific_price_beats_flat_fallback() -> None:
         latency_ms=5.0,
         request={"n": 2, "size": "1024x1024", "quality": "hd"},
     )
-    assert cost == 0.16  # 2 * 0.08
+    assert cost == Decimal("0.16")  # 2 * 0.08
 
 
 async def test_image_reservation_is_an_upper_bound_on_settlement() -> None:
@@ -147,7 +159,7 @@ async def test_image_reservation_is_an_upper_bound_on_settlement() -> None:
     # its reservation.
     model = _model(model_type=ModelType.IMAGE, image_cost_per_image=0.04)
     reservation = _reservation_cost(model, {"n": 3, "size": "1024x1024", "quality": "standard"})
-    assert reservation == 0.12
+    assert reservation == Decimal("0.12")
 
     repo = _FakeUsageRepository()
     _, _, settled = await (_meter(repo)).settle_ok(
@@ -159,7 +171,7 @@ async def test_image_reservation_is_an_upper_bound_on_settlement() -> None:
         latency_ms=5.0,
         request={"n": 3, "size": "1024x1024", "quality": "standard"},
     )
-    assert settled == 0.04
+    assert settled == Decimal("0.04")
     assert settled <= reservation
 
 
@@ -190,7 +202,12 @@ async def test_cache_tokens_settle_at_their_own_rates_and_are_recorded() -> None
         },
         latency_ms=5.0,
     )
-    expected = 100 * 0.001 + 50 * 0.002 + 200 * 0.00125 + 400 * 0.0001
+    expected = (
+        Decimal("100") * Decimal("0.001")
+        + Decimal("50") * Decimal("0.002")
+        + Decimal("200") * Decimal("0.00125")
+        + Decimal("400") * Decimal("0.0001")
+    )
     assert cost == expected
     event = repo.recorded[0]
     assert event.cache_write_tokens == 200
@@ -228,7 +245,7 @@ async def test_plain_chat_call_bills_and_reserves_exactly_as_before() -> None:
         response={"usage": {"prompt_tokens": 1000, "completion_tokens": 500}},
         latency_ms=5.0,
     )
-    assert cost == 1000 * 0.001 + 500 * 0.002  # 2.0
+    assert cost == Decimal("1000") * Decimal("0.001") + Decimal("500") * Decimal("0.002")  # 2.0
     event = repo.recorded[0]
     assert (event.cache_write_tokens, event.cache_read_tokens, event.image_count) == (0, 0, 0)
 
@@ -237,5 +254,5 @@ async def test_plain_chat_call_bills_and_reserves_exactly_as_before() -> None:
     request = {"messages": [{"role": "user", "content": "hello"}], "max_tokens": 100}
     prompt_chars = len("hello")
     prompt_est = (prompt_chars + 3) // 4
-    expected_reservation = prompt_est * 0.001 + 100 * 1 * 0.002
+    expected_reservation = prompt_est * Decimal("0.001") + 100 * 1 * Decimal("0.002")
     assert _reservation_cost(model, request) == expected_reservation

@@ -5,6 +5,7 @@ relies on, exercised directly against the collaborator (no HTTP app needed)."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -21,6 +22,7 @@ from litestar_gateway.domain.entities import (
     UsageEvent,
 )
 from litestar_gateway.domain.entities.enums import ModelType
+from litestar_gateway.domain.money import ZERO_MONEY, money
 
 
 class _FakeUsageRepository:
@@ -41,8 +43,8 @@ class _FakeUsageRepository:
     async def spend_by_api_key(self, team_id: UUID) -> list[ApiKeySpend]:
         return []
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
-        return 0.0
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
+        return ZERO_MONEY
 
     async def enqueue_pending(self, event: UsageEvent) -> None:
         raise AssertionError("outbox must not be used in this test")
@@ -50,11 +52,11 @@ class _FakeUsageRepository:
     async def reconcile_pending(self, *, limit: int = 100) -> int:
         return 0
 
-    async def cache_savings(self, team_id: UUID) -> tuple[float, int, int, int]:
-        return (0.0, 0, 0, 0)
+    async def cache_savings(self, team_id: UUID) -> tuple[Decimal, int, int, int]:
+        return (ZERO_MONEY, 0, 0, 0)
 
-    async def platform_cache_savings(self) -> tuple[float, int, int, int]:
-        return (0.0, 0, 0, 0)
+    async def platform_cache_savings(self) -> tuple[Decimal, int, int, int]:
+        return (ZERO_MONEY, 0, 0, 0)
 
     async def timeseries(self, team_id: UUID, **_: Any) -> list[UsageBucket]:
         return []
@@ -71,8 +73,8 @@ def _model(team_id: UUID) -> Model:
         provider_model_id="gpt-4o",
         params={},
         api_version=None,
-        input_cost_per_token=0.0,
-        output_cost_per_token=0.0,
+        input_cost_per_token=money(0.0),
+        output_cost_per_token=money(0.0),
         enabled=True,
         created_at=datetime.now(UTC),
     )

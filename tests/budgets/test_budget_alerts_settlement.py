@@ -9,6 +9,7 @@ enqueue again; alert evaluation must never break the settlement itself.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -27,6 +28,7 @@ from litestar_gateway.domain.entities import (
     TraceRecord,
     UsageEvent,
 )
+from litestar_gateway.domain.money import ZERO_MONEY, money
 
 TEAM_ID = uuid4()
 KEY_ID = uuid4()
@@ -44,8 +46,8 @@ def _model(input_cost: float = 1.0, output_cost: float = 0.0) -> Model:
         params={},
         params_enforced={},
         api_version=None,
-        input_cost_per_token=input_cost,
-        output_cost_per_token=output_cost,
+        input_cost_per_token=money(input_cost),
+        output_cost_per_token=money(output_cost),
         enabled=True,
         created_at=datetime.now(UTC),
     )
@@ -59,7 +61,7 @@ def _budget(
     return Budget(
         id=uuid4(),
         team_id=TEAM_ID,
-        limit_cost=limit,
+        limit_cost=money(limit),
         window=window,
         created_at=datetime.now(UTC),
         thresholds=thresholds,
@@ -79,8 +81,11 @@ class FakeUsage:
     async def enqueue_pending(self, event: UsageEvent) -> None:  # pragma: no cover
         raise AssertionError("outbox must not be used in these tests")
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
-        return sum(e.cost for e in self.events if e.team_id == team_id and e.created_at >= since)
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
+        return sum(
+            (e.cost for e in self.events if e.team_id == team_id and e.created_at >= since),
+            ZERO_MONEY,
+        )
 
 
 class FakeBudgets:

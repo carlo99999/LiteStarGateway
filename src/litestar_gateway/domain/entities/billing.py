@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
@@ -34,7 +35,10 @@ class Budget:
 
     id: UUID
     team_id: UUID
-    limit_cost: float
+    # Exact money ``Decimal`` (Plan 13 Phase 2 — domain.money). The pre-call
+    # budget gate compares spend against this as Decimals, so no binary-float
+    # drift can nudge a request over or under the cap.
+    limit_cost: Decimal
     window: BudgetWindow  # noqa: F821
     created_at: datetime
     thresholds: list[int] = field(default_factory=list)
@@ -75,8 +79,8 @@ class PendingBudgetAlert:
     window: BudgetWindow  # noqa: F821
     period_start: datetime
     threshold: int
-    spend: float
-    limit_cost: float
+    spend: Decimal
+    limit_cost: Decimal
     created_at: datetime
 
 
@@ -94,7 +98,7 @@ class UsageEvent:
     operation: str
     prompt_tokens: int
     completion_tokens: int
-    cost: float
+    cost: Decimal  # exact money Decimal (Plan 13 Phase 2 — domain.money)
     created_at: datetime
     requested_alias: str | None = None
     resolved_model_id: UUID | None = None
@@ -132,7 +136,7 @@ class UsageAggregate:
     model_name: str
     prompt_tokens: int
     completion_tokens: int
-    cost: float
+    cost: Decimal  # exact money Decimal (Plan 13 Phase 2 — domain.money)
     calls: int
     requested_alias: str | None = None
     resolved_model_id: UUID | None = None
@@ -148,7 +152,7 @@ class ApiKeySpend:
     api_key_id: UUID
     prompt_tokens: int
     completion_tokens: int
-    cost: float
+    cost: Decimal  # exact money Decimal (Plan 13 Phase 2 — domain.money)
     calls: int
 
 
@@ -177,7 +181,7 @@ class UsageBucket:
     request_count: int
     prompt_tokens: int
     completion_tokens: int
-    cost: float
+    cost: Decimal  # exact money Decimal (Plan 13 Phase 2 — domain.money)
     group_key: str | None = None
 
 
@@ -207,7 +211,7 @@ class TraceRecord:
     operation: str
     prompt_tokens: int
     completion_tokens: int
-    cost: float
+    cost: Decimal  # exact money Decimal (Plan 13 Phase 2 — domain.money)
     latency_ms: float
     status: str
     created_at: datetime

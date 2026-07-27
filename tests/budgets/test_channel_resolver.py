@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.entities import Budget, BudgetWindow, PendingBudgetAlert
+from litestar_gateway.domain.money import money
 from litestar_gateway.infrastructure.notifications.channel_resolver import make_channel_resolver
 from litestar_gateway.infrastructure.notifications.email_channel import EmailNotificationChannel
 from litestar_gateway.infrastructure.notifications.webhook_channel import (
@@ -43,7 +44,7 @@ def _budget(**overrides) -> Budget:
     defaults = dict(
         id=uuid4(),
         team_id=TEAM,
-        limit_cost=100.0,
+        limit_cost=money(100.0),
         window=BudgetWindow.MONTHLY,
         created_at=datetime.now(UTC),
         thresholds=[50],
@@ -59,8 +60,8 @@ def _alert() -> PendingBudgetAlert:
         window=BudgetWindow.MONTHLY,
         period_start=datetime(2026, 7, 1, tzinfo=UTC),
         threshold=50,
-        spend=50.0,
-        limit_cost=100.0,
+        spend=money(50.0),
+        limit_cost=money(100.0),
         created_at=datetime.now(UTC),
     )
 

@@ -233,4 +233,6 @@ def _cost(model: Model, prompt: object, completion: object) -> float | None:
         return None
     if not isinstance(prompt, int) or not isinstance(completion, int):
         return None
-    return prompt * model.input_cost_per_token + completion * model.output_cost_per_token
+    # Rates are exact Decimals (Plan 13 Phase 2); this is a display-only estimate
+    # (real billing runs through the meter), so widen to a JSON number here.
+    return float(prompt * model.input_cost_per_token + completion * model.output_cost_per_token)

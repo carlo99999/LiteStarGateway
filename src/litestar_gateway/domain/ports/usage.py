@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal, Protocol, runtime_checkable
 from uuid import UUID
 
@@ -46,9 +47,11 @@ class UsageRepository(Protocol):
         are now revoked, as long as they have recorded usage)."""
         ...
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
-        """Total cost recorded for the team from `since` onwards. Read on the
-        hot path by the budget gate — must stay a cheap indexed aggregate."""
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
+        """Total cost recorded for the team from `since` onwards, as an exact
+        money ``Decimal`` (Plan 13 Phase 2 — a ``NUMERIC`` ``SUM``, so aggregation
+        is order-independent and carries no float drift into the budget gate).
+        Read on the hot path by the gate — must stay a cheap indexed aggregate."""
         ...
 
     async def enqueue_pending(self, event: UsageEvent) -> None:
@@ -61,9 +64,10 @@ class UsageRepository(Protocol):
         by event id), removing settled ones. Returns how many were settled."""
         ...
 
-    async def cache_savings(self, team_id: UUID) -> tuple[float, int, int, int]:
+    async def cache_savings(self, team_id: UUID) -> tuple[Decimal, int, int, int]:
         """Response-cache observability for one team (Plan 04 Phase 3):
         ``(avoided_cost, priced_hits, hits_without_price, total_events)``.
+        ``avoided_cost`` is an exact money ``Decimal`` (Plan 13 Phase 2).
 
         ``avoided_cost`` sums, over cache-hit events whose model still has a
         priced unit cost, the stored token counts × the model's *current* unit
@@ -72,7 +76,7 @@ class UsageRepository(Protocol):
         denominator)."""
         ...
 
-    async def platform_cache_savings(self) -> tuple[float, int, int, int]:
+    async def platform_cache_savings(self) -> tuple[Decimal, int, int, int]:
         """Same as `cache_savings`, across every team (platform-admin dashboard)."""
         ...
 

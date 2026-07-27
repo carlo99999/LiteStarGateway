@@ -24,10 +24,35 @@ from litestar_gateway.domain.exceptions import (
     ModelNotFound,
     ProviderMismatch,
 )
+from litestar_gateway.domain.money import money
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.domain.ports import CredentialRepository, ModelRepository
 
 _GLOBAL_SUFFIX = "-global"
+
+# Model fields carrying scalar money rates (Plan 13 Phase 2). Values arrive from
+# the API as `float`; they are decimalized here — the one seam between the model
+# API and the `Model` entity — so a `Model` only ever holds exact money Decimals.
+_MONEY_RATE_FIELDS = (
+    "input_cost_per_token",
+    "output_cost_per_token",
+    "cache_write_cost_per_token",
+    "cache_read_cost_per_token",
+    "image_cost_per_image",
+)
+
+
+def _decimalize_money_fields(fields: dict[str, Any]) -> dict[str, Any]:
+    """Return `fields` with any money rate/price entries converted to exact money
+    Decimals via :func:`money` (never `Decimal(float)` — see domain.money). Scalar
+    rates go through `money`; `image_prices` is decimalized per entry."""
+    out = dict(fields)
+    for key in _MONEY_RATE_FIELDS:
+        if out.get(key) is not None:
+            out[key] = money(out[key])
+    if out.get("image_prices"):
+        out["image_prices"] = {k: money(v) for k, v in out["image_prices"].items()}
+    return out
 
 
 def _now() -> datetime:
@@ -114,6 +139,16 @@ class ModelService:
             if taken:
                 raise ModelNameExists(name)
         await self._validate_credential(provider, credential_id)
+        rates = _decimalize_money_fields(
+            {
+                "input_cost_per_token": input_cost_per_token,
+                "output_cost_per_token": output_cost_per_token,
+                "cache_write_cost_per_token": cache_write_cost_per_token,
+                "cache_read_cost_per_token": cache_read_cost_per_token,
+                "image_cost_per_image": image_cost_per_image,
+                "image_prices": image_prices or {},
+            }
+        )
         return await self._models.add(
             Model(
                 id=uuid4(),
@@ -127,8 +162,8 @@ class ModelService:
                 params_enforced=params_enforced or {},
                 max_output_tokens=max_output_tokens,
                 api_version=api_version,
-                input_cost_per_token=input_cost_per_token,
-                output_cost_per_token=output_cost_per_token,
+                input_cost_per_token=rates["input_cost_per_token"],
+                output_cost_per_token=rates["output_cost_per_token"],
                 enabled=enabled,
                 created_at=_now(),
                 # Remember the owning team so provenance survives a later promote.
@@ -136,10 +171,10 @@ class ModelService:
                 cache_enabled=cache_enabled,
                 cache_allow_nondeterministic=cache_allow_nondeterministic,
                 cache_semantic_enabled=cache_semantic_enabled,
-                cache_write_cost_per_token=cache_write_cost_per_token,
-                cache_read_cost_per_token=cache_read_cost_per_token,
-                image_cost_per_image=image_cost_per_image,
-                image_prices=image_prices or {},
+                cache_write_cost_per_token=rates["cache_write_cost_per_token"],
+                cache_read_cost_per_token=rates["cache_read_cost_per_token"],
+                image_cost_per_image=rates["image_cost_per_image"],
+                image_prices=rates["image_prices"],
             )
         )
 
@@ -230,7 +265,7 @@ class ModelService:
             if team_id is None
             else await self._get_scoped(team_id, model_id)
         )
-        applied = {k: v for k, v in changes.items() if v is not None}
+        applied = _decimalize_money_fields({k: v for k, v in changes.items() if v is not None})
         updated = dataclasses.replace(model, **applied)
         if team_id is not None:
             return await self._models.update(updated)

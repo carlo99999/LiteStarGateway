@@ -14,6 +14,7 @@ import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
+from decimal import Decimal
 from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
@@ -30,6 +31,7 @@ from litestar_gateway.domain.entities import (
     UsageEvent,
 )
 from litestar_gateway.domain.exceptions import BudgetExceeded, RateLimited
+from litestar_gateway.domain.money import ZERO_MONEY
 from litestar_gateway.domain.ports import (
     APIKeyRepository,
     BudgetAlertStateRepository,
@@ -271,7 +273,7 @@ def _image_usage(request: dict[str, Any] | None, response: dict[str, Any]) -> Bi
     )
 
 
-def _parse_usage(model: Model, usage: dict[str, Any]) -> tuple[int, int, float]:
+def _parse_usage(model: Model, usage: dict[str, Any]) -> tuple[int, int, Decimal]:
     """Token counts + cost from a provider usage dict, via the one normalized
     pricing function (design §1). Returned as a `(prompt, completion, cost)` tuple
     for the token settlement/error paths; `_token_usage` exposes the full
@@ -291,9 +293,9 @@ def _worst_case_prompt_usage(
     upper-bound invariant, preserved once cache tokens enter the picture. With no
     cache rates configured the max is the ordinary input rate, so the reservation
     is byte-identical to the pre-Plan-13 formula."""
-    input_rate = rates.input_cost_per_token or 0.0
-    cache_write_rate = rates.cache_write_cost_per_token or 0.0
-    cache_read_rate = rates.cache_read_cost_per_token or 0.0
+    input_rate = rates.input_cost_per_token or ZERO_MONEY
+    cache_write_rate = rates.cache_write_cost_per_token or ZERO_MONEY
+    cache_read_rate = rates.cache_read_cost_per_token or ZERO_MONEY
     if cache_write_rate > input_rate and cache_write_rate >= cache_read_rate:
         return BillableUsage(cache_write_tokens=prompt_estimate, completion_tokens=output_estimate)
     if cache_read_rate > input_rate:
@@ -301,7 +303,7 @@ def _worst_case_prompt_usage(
     return BillableUsage(prompt_tokens=prompt_estimate, completion_tokens=output_estimate)
 
 
-def _reservation_cost(model: Model, request: dict[str, Any]) -> float:
+def _reservation_cost(model: Model, request: dict[str, Any]) -> Decimal:
     """Pessimistic pre-dispatch cost of a request, via the same normalized pricing
     function settlement uses. For image models: the requested image count at the
     request's size/quality (an upper bound — settlement bills the images actually
@@ -337,19 +339,22 @@ class InFlightSpend:
     overshoot bound is per replica, not global."""
 
     def __init__(self) -> None:
-        self._by_team: dict[UUID, float] = {}
+        # Exact money Decimals (Plan 13 Phase 2): the reserved total the budget
+        # gate adds to committed spend must accumulate without float drift, and
+        # add/remove of the same reservation must cancel to exactly zero.
+        self._by_team: dict[UUID, Decimal] = {}
 
-    def total(self, team_id: UUID) -> float:
-        return self._by_team.get(team_id, 0.0)
+    def total(self, team_id: UUID) -> Decimal:
+        return self._by_team.get(team_id, ZERO_MONEY)
 
-    def add(self, team_id: UUID, amount: float) -> None:
+    def add(self, team_id: UUID, amount: Decimal) -> None:
         if amount > 0:
-            self._by_team[team_id] = self._by_team.get(team_id, 0.0) + amount
+            self._by_team[team_id] = self._by_team.get(team_id, ZERO_MONEY) + amount
 
-    def remove(self, team_id: UUID, amount: float) -> None:
+    def remove(self, team_id: UUID, amount: Decimal) -> None:
         if amount <= 0:
             return
-        remaining = self._by_team.get(team_id, 0.0) - amount
+        remaining = self._by_team.get(team_id, ZERO_MONEY) - amount
         if remaining <= 0:
             self._by_team.pop(team_id, None)
         else:
@@ -398,7 +403,7 @@ class UsageMeter:
         *,
         api_key_id: UUID | None = None,
         skip_team_rate_limit: bool = False,
-    ) -> float:
+    ) -> Decimal:
         """Pre-call spend gate: reject once committed spend plus the estimated
         cost already reserved by in-flight requests reaches the budget limit.
         An admitted request immediately reserves its own pessimistic cost
@@ -419,10 +424,10 @@ class UsageMeter:
             await self._enforce_team_rate_limit(team_id)
         await self.enforce_key_rate_limit(api_key_id)
         if self._budgets is None:
-            return 0.0
+            return ZERO_MONEY
         budget = await self._budgets.get(team_id)
         if budget is None:
-            return 0.0
+            return ZERO_MONEY
         since = window_start(budget.window, datetime.now(UTC))
         spent = await self._usage.spend_since(team_id, since)
         # No await between reading the in-flight total and adding the new
@@ -470,7 +475,7 @@ class UsageMeter:
                 retry_after=decision.retry_after,
             )
 
-    def release(self, team_id: UUID, reservation: float) -> None:
+    def release(self, team_id: UUID, reservation: Decimal) -> None:
         """Give back a reservation taken at admission (settlement or failure)."""
         self._in_flight.remove(team_id, reservation)
 
@@ -484,7 +489,7 @@ class UsageMeter:
         latency_ms: float,
         request: dict[str, Any] | None = None,
         attribution: UsageAttribution | None = None,
-    ) -> tuple[int, int, float]:
+    ) -> tuple[int, int, Decimal]:
         """Record usage (billing) + emit an observability trace. Fail-safe.
 
         If the provider reported no usable token counts (e.g. an adapter that
@@ -555,7 +560,7 @@ class UsageMeter:
             model,
             operation,
             BillableUsage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens),
-            0.0,
+            ZERO_MONEY,
             now,
             attribution,
             cache_hit=True,
@@ -569,7 +574,7 @@ class UsageMeter:
                 operation=operation,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                cost=0.0,
+                cost=ZERO_MONEY,
                 latency_ms=latency_ms,
                 status="ok",
                 created_at=now,
@@ -589,7 +594,7 @@ class UsageMeter:
         exc: BaseException,
         request: dict[str, Any] | None = None,
         attribution: UsageAttribution | None = None,
-    ) -> tuple[int, int, float]:
+    ) -> tuple[int, int, Decimal]:
         """Bill a completed provider invocation whose response is unusable."""
         prompt, completion, cost, _ = await self._settle_usage(
             team_id,
@@ -622,7 +627,7 @@ class UsageMeter:
         response: dict[str, Any],
         request: dict[str, Any] | None,
         attribution: UsageAttribution | None,
-    ) -> tuple[int, int, float, datetime]:
+    ) -> tuple[int, int, Decimal, datetime]:
         if model.type is ModelType.IMAGE:
             # Image responses carry no token usage — bill on the image count/size/
             # quality dimensions instead of estimating a (meaningless) prompt.
@@ -659,7 +664,7 @@ class UsageMeter:
         *,
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
-        cost: float = 0.0,
+        cost: Decimal = ZERO_MONEY,
     ) -> None:
         """Emit a status='error' trace for a failed gateway call. Without this,
         provider outages/timeouts/rate-limits are invisible in tracing — exactly
@@ -724,7 +729,7 @@ class UsageMeter:
         model: Model,
         operation: str,
         usage: BillableUsage,
-        cost: float,
+        cost: Decimal,
         now: datetime,
         attribution: UsageAttribution | None = None,
         *,

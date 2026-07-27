@@ -19,6 +19,7 @@ import pytest
 
 import litestar_gateway.application.routing.webhook as webhook_module
 from litestar_gateway.domain.entities import BudgetWindow, PendingBudgetAlert
+from litestar_gateway.domain.money import money
 from litestar_gateway.infrastructure.notifications.webhook_channel import (
     WebhookNotificationChannel,
 )
@@ -31,8 +32,8 @@ def _alert(**overrides) -> PendingBudgetAlert:
         window=BudgetWindow.MONTHLY,
         period_start=datetime(2026, 7, 1, tzinfo=UTC),
         threshold=80,
-        spend=85.0,
-        limit_cost=100.0,
+        spend=money(85.0),
+        limit_cost=money(100.0),
         created_at=datetime.now(UTC),
     )
     defaults.update(overrides)

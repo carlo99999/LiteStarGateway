@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
@@ -11,6 +12,7 @@ from sqlalchemy import and_, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import ApiKeySpend, UsageAggregate, UsageBucket, UsageEvent
+from litestar_gateway.domain.money import money
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.infrastructure.persistence.orm import (
     ModelRecord,
@@ -183,7 +185,7 @@ class SQLAlchemyUsageRepository:
                 source_team_id=row[6],
                 prompt_tokens=int(row[7]),
                 completion_tokens=int(row[8]),
-                cost=float(row[9]),
+                cost=money(row[9] or 0),
                 calls=int(row[10]),
             )
             for row in rows
@@ -210,13 +212,13 @@ class SQLAlchemyUsageRepository:
                 api_key_id=row[0],
                 prompt_tokens=int(row[1]),
                 completion_tokens=int(row[2]),
-                cost=float(row[3]),
+                cost=money(row[3] or 0),
                 calls=int(row[4]),
             )
             for row in rows
         ]
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
         # Hot-path read for the budget gate: an indexed team_id filter + SUM.
         # If this ever gets hot enough to matter, move to a running counter.
         total = await self._session.scalar(
@@ -242,7 +244,9 @@ class SQLAlchemyUsageRepository:
                 PendingUsageEventModel.attempts < MAX_RECONCILE_ATTEMPTS,
             )
         )
-        return (total or 0.0) + (pending or 0.0)
+        # Both sums are exact NUMERIC Decimals; money() normalizes the empty-set
+        # coalesce fallback and pins the result to the money scale.
+        return money(total or 0) + money(pending or 0)
 
     async def enqueue_pending(self, event: UsageEvent) -> None:
         # The request session may be in a failed state after the ledger commit
@@ -326,13 +330,13 @@ class SQLAlchemyUsageRepository:
                 await self._mark_failed_attempt(row_id, event_id, attempts + 1, exc)
         return settled
 
-    async def cache_savings(self, team_id: UUID) -> tuple[float, int, int, int]:
+    async def cache_savings(self, team_id: UUID) -> tuple[Decimal, int, int, int]:
         return await self._cache_savings_aggregate(UsageEventModel.team_id == team_id)
 
-    async def platform_cache_savings(self) -> tuple[float, int, int, int]:
+    async def platform_cache_savings(self) -> tuple[Decimal, int, int, int]:
         return await self._cache_savings_aggregate()
 
-    async def _cache_savings_aggregate(self, *base: Any) -> tuple[float, int, int, int]:
+    async def _cache_savings_aggregate(self, *base: Any) -> tuple[Decimal, int, int, int]:
         # One point-in-time query, mirroring the routing savings aggregate
         # (`router_repository.py`'s `_savings_aggregate`): a cache-hit event's
         # own stored token counts × the model's *current* unit price (joined by
@@ -363,7 +367,7 @@ class SQLAlchemyUsageRepository:
             )
         ).one()
         return (
-            float(avoided or 0.0),
+            money(avoided or 0),
             int(priced_hits or 0),
             int((all_hits or 0) - (priced_hits or 0)),
             int(total or 0),
@@ -430,7 +434,7 @@ class SQLAlchemyUsageRepository:
                 request_count=int(row[1]),
                 prompt_tokens=int(row[2]),
                 completion_tokens=int(row[3]),
-                cost=float(row[4]),
+                cost=money(row[4] or 0),
                 group_key=(row[5] or "unknown") if group_by == "model" else None,
             )
             for row in rows

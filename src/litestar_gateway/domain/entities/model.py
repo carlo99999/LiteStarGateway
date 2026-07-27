@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -41,8 +42,10 @@ class Model:
     # Note: no api_base here — the endpoint comes from the (admin-managed)
     # credential, so a team admin cannot redirect the credential's secret.
     api_version: str | None
-    input_cost_per_token: float | None
-    output_cost_per_token: float | None
+    # Money rates are exact ``Decimal`` (Plan 13 Phase 2 — domain.money); token
+    # counts stay ``int``. ``None`` ⇒ the dimension bills at zero.
+    input_cost_per_token: Decimal | None
+    output_cost_per_token: Decimal | None
     enabled: bool
     created_at: datetime
     # Admin policy the client cannot override (applied last in the merge), e.g. a
@@ -73,12 +76,12 @@ class Model:
     # Anthropic prompt-cache rates are kept distinct from `input_cost_per_token`
     # because cache-write/read economics and audit meaning differ from ordinary
     # input tokens.
-    cache_write_cost_per_token: float | None = None
-    cache_read_cost_per_token: float | None = None
+    cache_write_cost_per_token: Decimal | None = None
+    cache_read_cost_per_token: Decimal | None = None
     # Image generation: a flat per-image fallback plus optional size/quality-
     # specific overrides keyed by `pricing.image_price_key(size, quality)`.
-    image_cost_per_image: float | None = None
-    image_prices: dict[str, float] = field(default_factory=dict)
+    image_cost_per_image: Decimal | None = None
+    image_prices: dict[str, Decimal] = field(default_factory=dict)
 
     def merge_params(self, request: dict[str, Any]) -> dict[str, Any]:
         """Effective request for a provider call: admin `params` (defaults the

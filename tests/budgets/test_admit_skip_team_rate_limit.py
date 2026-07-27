@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.entities import Model, ModelType, Provider, Team
+from litestar_gateway.domain.money import money
 from litestar_gateway.domain.ports.rate_limiter import RateLimitDecision
 
 TEAM_ID = uuid4()
@@ -29,8 +30,8 @@ def _model() -> Model:
         params={},
         params_enforced={},
         api_version=None,
-        input_cost_per_token=0.01,
-        output_cost_per_token=0.01,
+        input_cost_per_token=money(0.01),
+        output_cost_per_token=money(0.01),
         enabled=True,
         created_at=datetime.now(UTC),
     )
