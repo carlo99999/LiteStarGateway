@@ -32,6 +32,7 @@ from litestar_gateway.domain.ports import AuditLog
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.sso.dynamic import ResolvedSsoConfig
 from litestar_gateway.infrastructure.web.rate_limit import build_auth_rate_limit
+from litestar_gateway.infrastructure.web.request_id import current_request_id
 from litestar_gateway.infrastructure.web.session.jwt import issue_access_token
 from litestar_gateway.infrastructure.web.session.schemas import TokenResponse
 
@@ -89,6 +90,7 @@ async def _record_sso_audit(
             ip=request.client.host if request.client else None,
             detail=detail,
             created_at=datetime.now(UTC),
+            request_id=current_request_id(),
         )
     )
 

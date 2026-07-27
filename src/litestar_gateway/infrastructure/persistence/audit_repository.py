@@ -31,6 +31,7 @@ class SQLAlchemyAuditLog:
                 target_id=event.target_id,
                 ip=event.ip,
                 detail=event.detail,
+                request_id=event.request_id,
             )
         )
         await self._session.flush()

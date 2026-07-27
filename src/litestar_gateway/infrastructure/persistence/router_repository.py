@@ -633,6 +633,7 @@ class SQLAlchemyRoutingDecisionLog:
                 chosen_model_id=decision.chosen_model_id,
                 attempts=decision.attempts,
                 failover_used=decision.failover_used,
+                request_id=decision.request_id,
             )
         )
         await self._session.commit()

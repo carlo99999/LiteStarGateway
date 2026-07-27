@@ -34,6 +34,7 @@ from litestar_gateway.domain.exceptions import (
 )
 from litestar_gateway.domain.pagination import resolve_page
 from litestar_gateway.domain.ports import AuditLog
+from litestar_gateway.infrastructure.web.request_id import current_request_id
 from litestar_gateway.infrastructure.web.scim.schemas import (
     SCIM_MEDIA_TYPE,
     ScimUserAttrs,
@@ -93,6 +94,7 @@ async def _record_scim_audit(
             ip=request.client.host if request.client else None,
             detail=None,
             created_at=datetime.now(UTC),
+            request_id=current_request_id(),
         )
     )
 

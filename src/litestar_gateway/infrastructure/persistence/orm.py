@@ -99,6 +99,9 @@ class AuditEventModel(base.UUIDAuditBase):
     target_id: Mapped[str | None] = mapped_column(default=None, index=True)
     ip: Mapped[str | None] = mapped_column(default=None)
     detail: Mapped[str | None] = mapped_column(default=None)
+    # Request correlation id (Plan 11 Slice A). Nullable: historical rows and
+    # background-worker-originated events genuinely have no request to tag.
+    request_id: Mapped[str | None] = mapped_column(default=None)
 
     def to_entity(self) -> AuditEvent:
         return AuditEvent(
@@ -112,6 +115,7 @@ class AuditEventModel(base.UUIDAuditBase):
             ip=self.ip,
             detail=self.detail,
             created_at=self.created_at,
+            request_id=self.request_id,
         )
 
 
@@ -390,6 +394,9 @@ class RoutingDecisionModel(base.UUIDAuditBase):
     # Cross-provider failover observability (Plan 05 Phase 3).
     attempts: Mapped[int] = mapped_column(default=1)
     failover_used: Mapped[bool] = mapped_column(default=False)
+    # Request correlation id (Plan 11 Slice A). Nullable: rows written before
+    # the column existed, and shadow/background decisions outside a request.
+    request_id: Mapped[str | None] = mapped_column(default=None)
 
     def to_entity(self) -> RoutingDecisionRecord:
         return RoutingDecisionRecord(
@@ -419,6 +426,7 @@ class RoutingDecisionModel(base.UUIDAuditBase):
             chosen_model_id=self.chosen_model_id,
             attempts=self.attempts,
             failover_used=self.failover_used,
+            request_id=self.request_id,
         )
 
 
@@ -499,6 +507,9 @@ class UsageEventModel(base.UUIDAuditBase):
     completion_tokens: Mapped[int] = mapped_column(default=0)
     cost: Mapped[float] = mapped_column(default=0.0)
     cache_hit: Mapped[bool] = mapped_column(default=False)
+    # Request correlation id (Plan 11 Slice A). Nullable: historical rows and
+    # reconciler-drained rows may have none (see PendingUsageEventModel).
+    request_id: Mapped[str | None] = mapped_column(default=None)
 
     def to_entity(self) -> UsageEvent:
         return UsageEvent(
@@ -518,6 +529,7 @@ class UsageEventModel(base.UUIDAuditBase):
             callable_origin=self.callable_origin,
             source_team_id=self.source_team_id,
             cache_hit=self.cache_hit,
+            request_id=self.request_id,
         )
 
 
@@ -547,6 +559,9 @@ class PendingUsageEventModel(base.UUIDAuditBase):
     completion_tokens: Mapped[int] = mapped_column(default=0)
     cost: Mapped[float] = mapped_column(default=0.0)
     cache_hit: Mapped[bool] = mapped_column(default=False)
+    # Request correlation id (Plan 11 Slice A) — carried through to the
+    # ledger row when the reconciler drains this dead-letter entry.
+    request_id: Mapped[str | None] = mapped_column(default=None)
     event_created_at: Mapped[datetime] = mapped_column()
     # Poison-message bookkeeping: rows that keep failing the ledger insert are
     # quarantined after MAX_RECONCILE_ATTEMPTS instead of starving the batch.

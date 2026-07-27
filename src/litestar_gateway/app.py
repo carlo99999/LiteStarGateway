@@ -74,6 +74,7 @@ from litestar_gateway.infrastructure.web.organizations.dependencies import (
     provide_team_service,
 )
 from litestar_gateway.infrastructure.web.playground import PlaygroundController
+from litestar_gateway.infrastructure.web.request_id import RequestIDMiddleware
 from litestar_gateway.infrastructure.web.routing import (
     PlatformRouterController,
     RouterController,
@@ -152,6 +153,7 @@ def create_app(
         response_headers=_security_headers(settings),
         request_max_body_size=settings.max_body_size,
         exception_handlers={DomainError: domain_exception_handler},
+        middleware=[RequestIDMiddleware(settings)],
     )
     _register_shadow_drain(app)
     return app

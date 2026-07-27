@@ -193,6 +193,9 @@ class RoutingDecisionRecord:
     # decision itself is persisted before dispatch even starts.
     attempts: int = 1
     failover_used: bool = False
+    # Request correlation id (Plan 11 Slice A) — see
+    # `domain.entities.billing.TraceRecord.request_id`.
+    request_id: str | None = None
 
 
 class RoutingStrategy(Protocol):

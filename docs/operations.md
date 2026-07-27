@@ -23,6 +23,10 @@ The app expects to sit behind a reverse proxy that terminates TLS.
 - Configure the public OIDC callback URL from **Console → SSO** so it matches
   what is registered at the IdP. `OIDC_REDIRECT_URI` remains the legacy env
   fallback when no enabled DB-backed SSO configuration exists.
+- Set `TRUSTED_PROXY_IPS` to the same proxy IP/CIDR as `FORWARDED_ALLOW_IPS` if
+  you want the app to accept an inbound `X-Request-ID` from it verbatim (still
+  subject to length/charset validation); otherwise every request gets a freshly
+  generated correlation id. See [logging](logging.md) §2.
 - The app sets static security response headers (`X-Content-Type-Options`,
   `X-Frame-Options`, `Referrer-Policy`) on every response. It does **not** emit
   a Content-Security-Policy — set one at the proxy if you want it, since a

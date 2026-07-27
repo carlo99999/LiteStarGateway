@@ -37,6 +37,7 @@ from litestar_gateway.domain.ports import (
     TeamRepository,
     UsageRepository,
 )
+from litestar_gateway.request_context import current_request_id
 
 logger = logging.getLogger("litestar_gateway.usage")
 
@@ -445,6 +446,7 @@ class UsageMeter:
                 latency_ms=latency_ms,
                 status="ok",
                 created_at=now,
+                request_id=current_request_id(),
             )
         )
         return prompt, completion, cost
@@ -495,6 +497,7 @@ class UsageMeter:
                 status="ok",
                 created_at=now,
                 cache_hit=True,
+                request_id=current_request_id(),
             )
         )
 
@@ -604,6 +607,7 @@ class UsageMeter:
                 status="error",
                 created_at=datetime.now(UTC),
                 error_type=type(exc).__name__,
+                request_id=current_request_id(),
             )
         )
 
@@ -668,6 +672,7 @@ class UsageMeter:
                 completion_tokens=completion,
                 cost=cost,
                 created_at=now,
+                request_id=current_request_id(),
                 requested_alias=attribution.requested_alias if attribution else None,
                 resolved_model_id=model.id,
                 canonical_model_name=model.name,

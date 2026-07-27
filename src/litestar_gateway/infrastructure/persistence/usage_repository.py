@@ -84,6 +84,7 @@ class SQLAlchemyUsageRepository:
                 cost=event.cost,
                 created_at=event.created_at,
                 cache_hit=event.cache_hit,
+                request_id=event.request_id,
             )
         )
         await self._session.commit()
@@ -250,6 +251,7 @@ class SQLAlchemyUsageRepository:
                 cost=event.cost,
                 event_created_at=event.created_at,
                 cache_hit=event.cache_hit,
+                request_id=event.request_id,
             )
         )
         await self._session.commit()
@@ -288,6 +290,7 @@ class SQLAlchemyUsageRepository:
                             completion_tokens=row.completion_tokens,
                             cost=row.cost,
                             cache_hit=row.cache_hit,
+                            request_id=row.request_id,
                             # The time the event happened, not the reconcile
                             # time — a drain must not shift spend into the
                             # next budget window.
