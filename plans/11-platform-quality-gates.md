@@ -78,11 +78,28 @@ now pin `PYTHONHASHSEED=0` for reproducible regeneration. Separately,
 request-correlation-id columns landed, so the typed client was missing the new
 `request_id` field; regenerated and committed (no application code touched).
 
-### C — Browser E2E
+### C — Browser E2E ✅ (27 July 2026)
 
 - Add Playwright config, deterministic test app and the critical flows from the
   Plan 03 post-ship section.
 - Run after UI build in CI; capture trace/screenshot only on failure.
+
+**Done** (#385): Playwright (`ui/playwright.config.ts`) drives the built
+console (`ui/dist`, served at `/ui` by `ui_site.py`) against the real backend
+(`uv run uvicorn litestar_gateway.app:app`) on a fresh, throwaway SQLite
+database with a fixed `MASTER_KEY`/`ADMIN_EMAIL` — the existing `ensure_admin`
+bootstrap hook, not a new seed script. The specs create their own
+organization/team/API-key fixtures, which doubles as coverage for those
+creation forms. Covers, per the Plan 03 post-ship list: **login** (valid and
+invalid credentials), **RBAC** (unauthenticated redirect to `/login`;
+platform-admin-only nav items visible for the bootstrapped admin), **critical
+mutations** (create an organization, create a team in it, issue a personal API
+key for a team), and **Usage/Budgets** (both pages render for the admin).
+Model/credential creation is deliberately out of scope, per the plan's own
+"critical flows, not all flows" framing. Wired into the existing `ui` CI job
+right after `pnpm build`; `trace: 'retain-on-failure'` and
+`screenshot: 'only-on-failure'`, and the HTML report is uploaded as a CI
+artifact only `if: failure()`.
 
 ### D — Dependency ceiling ✅ (27 July 2026)
 
