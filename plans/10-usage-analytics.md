@@ -68,6 +68,59 @@ stream or billing).
 - **Done when:** SQLite and Postgres integration tests return identical bucket
   boundaries and totals, including DST-independent UTC handling.
 
+**Complete (27 July 2026, #379).** Two frozen dataclasses in
+`domain/entities/billing.py`: `UsageBucket` (`bucket_start` — UTC, tz-aware —
+plus `request_count`/`prompt_tokens`/`completion_tokens`/`cost`), and
+`UsageTimeseries` (`team_id`/`granularity`/`start`/`end`/`buckets`) as the
+metadata-carrying container the controller assembles the response from.
+`UsageRepository.timeseries(team_id, *, start, end, granularity, model_name=,
+requested_alias=, api_key_id=)` was added to the existing port (no parallel
+port), mirroring `aggregate`'s filter semantics exactly (`model_name` = broad
+alias-or-canonical match; `requested_alias`/`api_key_id` exact); a bucket is
+only emitted when it has ≥1 matching event, never zero-filled.
+
+`SQLAlchemyUsageRepository.timeseries` bucketing happens entirely in SQL — one
+`GROUP BY` over a dialect-portable bucket-key expression, never a Python-side
+scan:
+
+- **Postgres:** `date_trunc(granularity, created_at AT TIME ZONE 'UTC')`. The
+  explicit `AT TIME ZONE 'UTC'` conversion matters: `timestamptz` truncation
+  otherwise happens in the *session* timezone, which would make bucket
+  boundaries depend on whatever timezone the connection happens to be in.
+- **SQLite:** `strftime('%Y-%m-%d %H:00:00', created_at)` (hour) /
+  `strftime('%Y-%m-%d 00:00:00', created_at)` (day) — `created_at` is already
+  stored as a plain UTC string by `DateTimeUTC`, so no conversion is needed,
+  only truncation via a fixed minutes/seconds suffix.
+
+Both branches represent a UTC wall-clock instant with no reference to server
+or session-local time, so a range spanning a real DST transition still
+produces evenly-spaced, non-shifted buckets — covered by
+`tests/teams/test_usage_timeseries.py::test_timeseries_is_dst_independent_across_a_us_dst_transition`,
+which seeds ten consecutive UTC hours across 2026-03-08 (a US spring-forward
+date) and asserts every consecutive pair of `bucket_start`s is exactly one
+hour apart. The same test file runs its repository-level cases against both
+SQLite and Postgres via the shared `database_url` fixture (`just
+test-postgres`), asserting identical bucket boundaries/totals/filter behavior
+on both dialects.
+
+`GET /teams/{team_id}/usage/timeseries` (`infrastructure/web/teams/controller.py`)
+sits next to the existing `usage` aggregate endpoint, under the same
+`usage:read` RBAC scope and the same `ensure_principal_team_permission`
+check (JWT or management-scoped API key, own team only — verified by
+`tests/rbac/test_extended_team_roles.py::test_billing_viewer_cannot_read_another_teams_usage_timeseries`).
+Query params: `start`, `end` (RFC3339 datetimes), `granularity` (`hour` |
+`day`), and the same `model`/`alias`/`api_key_id` filters as `usage`. A new
+`InvalidUsageQuery` domain error (→ 400) rejects an unknown granularity or
+`end <= start`. The response (`UsageTimeseriesResponse`) is never paginated —
+a bounded date range already bounds the row count by construction, so totals
+can't depend on pagination, satisfying that "Done when" criterion ahead of
+Phase 2.
+
+Deferred to Phase 2 (as scoped): dense/gap-filled buckets, cache-hit and
+estimated-vs-authoritative breakdowns per bucket (mentioned in the design
+doc's contract sketch but not required by this phase's "Done when"), and all
+console rendering.
+
 ## Phase 2 — Console charts
 
 - Add cost, token and call charts with date/bucket/filter controls.

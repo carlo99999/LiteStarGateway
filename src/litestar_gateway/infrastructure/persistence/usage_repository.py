@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, Literal
 from uuid import UUID
 
 from sqlalchemy import and_, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_gateway.domain.entities import ApiKeySpend, UsageAggregate, UsageEvent
+from litestar_gateway.domain.entities import ApiKeySpend, UsageAggregate, UsageBucket, UsageEvent
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.infrastructure.persistence.orm import (
     ModelRecord,
@@ -25,6 +25,38 @@ logger = logging.getLogger("litestar_gateway.usage")
 # row (e.g. its team/key was deleted while it sat in the queue) can't occupy
 # the oldest-first batch forever and starve newer events.
 MAX_RECONCILE_ATTEMPTS = 10
+
+
+# SQLite has no `date_trunc`; strftime with a fixed minutes/seconds suffix
+# truncates instead. `created_at` is stored (via `DateTimeUTC`) as a plain
+# "YYYY-MM-DD HH:MM:SS.ffffff" string already normalized to UTC, so this needs
+# no timezone conversion of its own.
+_SQLITE_BUCKET_FORMAT: dict[str, str] = {
+    "hour": "%Y-%m-%d %H:00:00",
+    "day": "%Y-%m-%d 00:00:00",
+}
+
+
+def _bucket_key_expr(dialect_name: str, granularity: Literal["hour", "day"]) -> Any:
+    """A GROUP-BY-able, dialect-portable UTC bucket key. Bucketing happens
+    entirely in SQL (never a Python-side scan), and — critically for DST —
+    entirely in UTC: Postgres's `date_trunc` truncates in the *session*
+    timezone by default, so `created_at` (a `timestamptz`) is first converted
+    with `AT TIME ZONE 'UTC'` to a naive UTC timestamp before truncation,
+    regardless of what timezone the connection happens to be in."""
+    if dialect_name == "postgresql":
+        return func.date_trunc(granularity, func.timezone("UTC", UsageEventModel.created_at))
+    return func.strftime(_SQLITE_BUCKET_FORMAT[granularity], UsageEventModel.created_at)
+
+
+def _parse_bucket_key(value: Any, dialect_name: str) -> datetime:
+    """The inverse of `_bucket_key_expr`: both branches already represent a
+    UTC wall-clock instant, so this only needs to attach `tzinfo=UTC` (Postgres
+    driver returns a naive `datetime` for the `AT TIME ZONE` result; SQLite
+    returns the plain string produced by `strftime`)."""
+    if dialect_name == "postgresql":
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
 
 
 class SQLAlchemyUsageRepository:
@@ -312,6 +344,60 @@ class SQLAlchemyUsageRepository:
             int((all_hits or 0) - (priced_hits or 0)),
             int(total or 0),
         )
+
+    async def timeseries(
+        self,
+        team_id: UUID,
+        *,
+        start: datetime,
+        end: datetime,
+        granularity: Literal["hour", "day"],
+        model_name: str | None = None,
+        requested_alias: str | None = None,
+        api_key_id: UUID | None = None,
+    ) -> list[UsageBucket]:
+        dialect_name = self._session.get_bind().dialect.name
+        bucket_key = _bucket_key_expr(dialect_name, granularity)
+        query = (
+            select(
+                bucket_key.label("bucket_key"),
+                func.count(),
+                func.coalesce(func.sum(UsageEventModel.prompt_tokens), 0),
+                func.coalesce(func.sum(UsageEventModel.completion_tokens), 0),
+                func.coalesce(func.sum(UsageEventModel.cost), 0.0),
+            )
+            .where(
+                UsageEventModel.team_id == team_id,
+                UsageEventModel.created_at >= start,
+                UsageEventModel.created_at < end,
+            )
+            .group_by(bucket_key)
+            .order_by(bucket_key)
+        )
+        if model_name is not None:
+            query = query.where(
+                or_(
+                    UsageEventModel.requested_alias == model_name,
+                    UsageEventModel.canonical_model_name == model_name,
+                    UsageEventModel.model_name == model_name,
+                )
+            )
+        if requested_alias is not None:
+            query = query.where(UsageEventModel.requested_alias == requested_alias)
+        if api_key_id is not None:
+            query = query.where(UsageEventModel.api_key_id == api_key_id)
+
+        rows = (await self._session.execute(query)).all()
+        return [
+            UsageBucket(
+                bucket_start=_parse_bucket_key(row[0], dialect_name),
+                request_count=int(row[1]),
+                prompt_tokens=int(row[2]),
+                completion_tokens=int(row[3]),
+                cost=float(row[4]),
+            )
+            for row in rows
+        ]
 
     async def _mark_failed_attempt(
         self, row_id: UUID, event_id: UUID, attempts: int, exc: Exception

@@ -170,6 +170,11 @@ async def test_billing_viewer_reads_usage_budget_and_spend_only(client: AsyncTes
         client.get(f"/teams/{team}/usage", headers=_bearer(token)),
         client.get(f"/teams/{team}/budget", headers=_bearer(token)),
         client.get(f"/teams/{team}/keys/spending", headers=_bearer(token)),
+        client.get(
+            f"/teams/{team}/usage/timeseries"
+            "?start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z&granularity=day",
+            headers=_bearer(token),
+        ),
     ):
         assert (await request).status_code == HTTP_200_OK
 
@@ -184,6 +189,25 @@ async def test_billing_viewer_reads_usage_budget_and_spend_only(client: AsyncTes
         client.get(f"/teams/{team}/members", headers=_bearer(token)),
     ):
         assert (await request).status_code == HTTP_403_FORBIDDEN
+
+
+async def test_billing_viewer_cannot_read_another_teams_usage_timeseries(
+    client: AsyncTestClient,
+) -> None:
+    """Plan 10 Phase 1: `usage:read` is per-team, exactly like the existing
+    `/usage` aggregate — a billing-viewer of team A must not read team B's
+    `/usage/timeseries`, even though both teams grant them the same role."""
+    admin = await _admin(client)
+    team_a = await _team(client, admin)
+    team_b = await _team(client, admin)
+    token = await _member_token(client, admin, team_a, "bv-ts@corp.com", "billing-viewer")
+    query = "?start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z&granularity=day"
+
+    own = await client.get(f"/teams/{team_a}/usage/timeseries{query}", headers=_bearer(token))
+    assert own.status_code == HTTP_200_OK, own.text
+
+    other = await client.get(f"/teams/{team_b}/usage/timeseries{query}", headers=_bearer(token))
+    assert other.status_code == HTTP_403_FORBIDDEN
 
 
 async def test_billing_viewer_spending_redacts_key_identity(client: AsyncTestClient) -> None:

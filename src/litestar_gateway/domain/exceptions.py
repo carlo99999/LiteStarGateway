@@ -260,6 +260,11 @@ class InvalidBudget(DomainError):
     """The budget definition is invalid (non-positive limit or unknown window)."""
 
 
+class InvalidUsageQuery(DomainError):
+    """A usage-timeseries query is malformed (→ 400): unknown granularity or
+    an empty/inverted `[start, end)` range."""
+
+
 class UpstreamError(DomainError):
     """Base for provider-side failures surfaced by the gateway (not gateway bugs)."""
 

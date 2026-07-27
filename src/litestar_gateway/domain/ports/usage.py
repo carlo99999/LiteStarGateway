@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 from uuid import UUID
 
-from litestar_gateway.domain.entities import ApiKeySpend, UsageAggregate, UsageEvent
+from litestar_gateway.domain.entities import ApiKeySpend, UsageAggregate, UsageBucket, UsageEvent
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 
 
@@ -67,4 +67,25 @@ class UsageRepository(Protocol):
 
     async def platform_cache_savings(self) -> tuple[float, int, int, int]:
         """Same as `cache_savings`, across every team (platform-admin dashboard)."""
+        ...
+
+    async def timeseries(
+        self,
+        team_id: UUID,
+        *,
+        start: datetime,
+        end: datetime,
+        granularity: Literal["hour", "day"],
+        model_name: str | None = None,
+        requested_alias: str | None = None,
+        api_key_id: UUID | None = None,
+    ) -> list[UsageBucket]:
+        """Bucketed usage totals for the team over ``[start, end)`` (Plan 10
+        Phase 1), aggregated in SQL — never a Python-side full-table scan.
+
+        Bucket boundaries are UTC-aligned regardless of server timezone, so a
+        range spanning a DST transition still produces evenly-spaced buckets.
+        Filters mirror `aggregate`'s semantics: ``model_name`` is the broad
+        alias-or-canonical match, ``requested_alias``/``api_key_id`` are exact.
+        A bucket with no matching events is omitted, not zero-filled."""
         ...

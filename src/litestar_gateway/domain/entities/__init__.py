@@ -10,7 +10,9 @@ from .billing import (
     TraceRecord,
     UsageAggregate,
     UsageAttribution,
+    UsageBucket,
     UsageEvent,
+    UsageTimeseries,
 )
 from .enums import (
     BudgetWindow,
@@ -54,7 +56,9 @@ __all__ = [
     "TraceRecord",
     "UsageAggregate",
     "UsageAttribution",
+    "UsageBucket",
     "UsageEvent",
+    "UsageTimeseries",
     # Enums
     "BudgetWindow",
     "KeyPurpose",
