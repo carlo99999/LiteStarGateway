@@ -63,6 +63,46 @@ is untouched. Each threshold fires **at most once per budget period**, keyed on
 - **Done when:** integration tests prove crossing 80 % enqueues exactly one alert
   and re-crossing (a second settlement still ≥ 80 %) enqueues none; dedup key +
   outbox row commit atomically; rollover to a new period re-arms all thresholds.
+- **✅ Done (27 July 2026):** `UsageMeter._evaluate_budget_alerts` is called from
+  `settle_ok` right after `_settle_usage`'s ledger write, never from
+  `settle_error`/`settle_cache_hit`. It reads `spend_since` scoped to
+  `window_start(budget.window, now)`, runs Phase 0's `crossed_thresholds`
+  against `budget.thresholds` and the persisted fired set, and for each newly
+  crossed threshold calls `BudgetAlertStateRepository.record_fired` — only
+  enqueuing a `PendingBudgetAlert` via the new `enqueue_alert` if that insert
+  actually won the dedup race (a `None` return means a concurrent settlement,
+  same replica or another, already fired it). This ordering — dedup insert
+  strictly before outbox enqueue, enqueue skipped on `None` — is what makes
+  "fired but never enqueued" and "enqueued twice for one crossing" impossible.
+  Optional end-to-end: without a configured `Budget`, empty `thresholds`, or no
+  `BudgetAlertStateRepository` wired, evaluation is a silent no-op; any
+  exception during evaluation is caught and logged, never propagated, matching
+  `_record_usage`'s existing fail-safe stance (design doc §7).
+  **Transaction boundary:** this codebase's existing ledger write is *not* one
+  wrapping transaction already — `UsageRepository.record` and
+  `BudgetAlertStateRepository.record_fired` each commit per call, and
+  `_record_usage`'s own docstring accepts an at-most-once-on-crash gap as
+  out of scope. Phase 1 follows that same precedent rather than inventing a
+  stronger guarantee: `record_fired` and `enqueue_alert` commit as two
+  immediately sequential steps (no intervening `await` besides the two DB
+  calls). A crash in that narrow window is the same class of accepted gap the
+  ledger write already has, not a new one.
+  **Outbox shape:** `PendingBudgetAlert` (`domain/entities/billing.py`) carries
+  `team_id`/`window`/`period_start`/`threshold` plus `spend`/`limit_cost` as of
+  the firing settlement, persisted via a new `pending_budget_alert` table
+  (migration `9c3d5f7a1b6e`) that mirrors `pending_usage_event`'s shape,
+  including the `attempts`/`last_error` poison-quarantine columns — reserved
+  now, unused until Phase 2's delivery worker exists, so that phase needs no
+  further migration. **Deliberate simplification vs. the original phase
+  text:** no `reconcile_alerts` was built. Unlike the usage outbox (a
+  failure-only dead-letter with an obvious drain target — the ledger table),
+  every fired threshold's outbox row *is* the primary record of "needs
+  delivery," and there is nothing to drain it *into* until Phase 2's
+  `NotificationChannel` port exists; a `reconcile_alerts` with no dispatch
+  destination would be speculative dead code. Phase 1 ships `pending_alerts`
+  (read-only, oldest-first) instead, sufficient for tests and a natural base
+  for Phase 2's drain-and-dispatch method. Still no delivery worker of any
+  kind — nothing drains the outbox yet, exactly as scoped.
 
 ### Phase 2 — Webhook channel via SSRF-guarded egress
 
