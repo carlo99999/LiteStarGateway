@@ -134,3 +134,65 @@ async def test_a_different_request_contract_never_matches_an_identical_vector() 
     found = await cache.find(_scope(digest="d1"), [1.0, 0.0], threshold=0.97)
 
     assert found is None
+
+
+# ---------------------------------------------------------------------------
+# ISSUE-024: the store is bounded globally, not just per scope.
+# ---------------------------------------------------------------------------
+
+
+async def test_the_number_of_scopes_is_capped() -> None:
+    # Per-scope bounds do not bound the store: a team admin can mint keys (and
+    # a model/operation/policy combination is another scope), each creating a
+    # permanent bucket. The worker's memory has to stop growing somewhere.
+    cache = InMemorySemanticResponseCache(max_scopes=4)
+    for index in range(50):
+        await cache.add(_scope(api_key=uuid4()), [1.0, float(index)], _value(str(index)), ttl_s=60)
+
+    assert len(cache._buckets) == 4
+
+
+async def test_the_least_recently_used_scope_is_the_one_dropped() -> None:
+    cache = InMemorySemanticResponseCache(max_scopes=2)
+    first, second, third = _scope(api_key=uuid4()), _scope(api_key=uuid4()), _scope(api_key=uuid4())
+    await cache.add(first, [1.0, 0.0], _value("first"), ttl_s=60)
+    await cache.add(second, [1.0, 0.0], _value("second"), ttl_s=60)
+
+    # Touching `first` makes `second` the least recently used one.
+    assert await cache.find(first, [1.0, 0.0], threshold=0.9) == _value("first")
+    await cache.add(third, [1.0, 0.0], _value("third"), ttl_s=60)
+
+    assert await cache.find(first, [1.0, 0.0], threshold=0.9) == _value("first")
+    assert await cache.find(second, [1.0, 0.0], threshold=0.9) is None
+    assert await cache.find(third, [1.0, 0.0], threshold=0.9) == _value("third")
+
+
+async def test_expired_scopes_are_swept_without_being_revisited() -> None:
+    # The reported leak: `find` only ever pruned the bucket it was asked about,
+    # so a scope that is never looked up again kept its bodies and vectors
+    # resident long past their TTL.
+    clock_value = [0.0]
+    cache = InMemorySemanticResponseCache(max_scopes=1000, clock=lambda: clock_value[0])
+    for index in range(20):
+        await cache.add(_scope(api_key=uuid4()), [1.0, 0.0], _value(str(index)), ttl_s=60)
+    assert len(cache._buckets) == 20
+
+    clock_value[0] = 61.0
+    for index in range(20):
+        await cache.add(_scope(api_key=uuid4()), [1.0, 0.0], _value(f"new-{index}"), ttl_s=60)
+
+    # The 20 stale scopes are gone even though none of them was ever read again.
+    assert len(cache._buckets) == 20
+
+
+async def test_a_live_scope_is_never_swept() -> None:
+    clock_value = [0.0]
+    cache = InMemorySemanticResponseCache(clock=lambda: clock_value[0])
+    keeper = _scope(api_key=uuid4())
+    await cache.add(keeper, [1.0, 0.0], _value("keeper"), ttl_s=600)
+
+    clock_value[0] = 61.0
+    for index in range(20):
+        await cache.add(_scope(api_key=uuid4()), [1.0, 0.0], _value(str(index)), ttl_s=60)
+
+    assert await cache.find(keeper, [1.0, 0.0], threshold=0.9) == _value("keeper")

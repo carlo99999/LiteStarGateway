@@ -12,6 +12,7 @@ contract, regardless of similarity (design §3 and ISSUE-023).
 
 from __future__ import annotations
 
+import itertools
 import time
 from collections import OrderedDict
 from collections.abc import Callable
@@ -22,6 +23,19 @@ from litestar_gateway.domain.response_cache_semantic import cosine_similarity
 # Small and process-local by design (no vector DB); bounds memory and keeps the
 # linear cosine scan cheap per scope, mirroring embeddings.py's MAX_CACHE_ENTRIES.
 DEFAULT_MAX_ENTRIES_PER_TENANT = 50
+
+# The per-scope bound above says nothing about how many scopes exist, and a
+# scope is created by every distinct (team, api key, model, operation, request
+# contract) combination — a team admin can mint API keys, so the count is
+# attacker-influenced (ISSUE-024). This is the actual memory ceiling: scopes are
+# evicted least-recently-used first, exactly like the per-tenant list.
+DEFAULT_MAX_SCOPES = 512
+
+# How many of the least-recently-used scopes each `add` inspects for expiry.
+# `find` only ever prunes the scope it was asked about, so a scope nobody looks
+# up again would otherwise keep its bodies and vectors resident forever. A
+# constant budget keeps the sweep O(1) amortized instead of scanning the store.
+_SWEEP_BUDGET = 8
 
 _Entry = tuple[float, list[float], CachedResponse]  # (expires_at, vector, value)
 
@@ -35,9 +49,11 @@ class InMemorySemanticResponseCache:
         self,
         *,
         max_entries_per_tenant: int = DEFAULT_MAX_ENTRIES_PER_TENANT,
+        max_scopes: int = DEFAULT_MAX_SCOPES,
         clock: Callable[[], float] = time.time,
     ) -> None:
         self._max_entries_per_tenant = max_entries_per_tenant
+        self._max_scopes = max_scopes
         self._clock = clock
         self._buckets: OrderedDict[SemanticScope, list[_Entry]] = OrderedDict()
 
@@ -64,6 +80,7 @@ class InMemorySemanticResponseCache:
                 best_score, best_value = score, value
         if live:
             self._buckets[key] = live
+            self._buckets.move_to_end(key)  # LRU recency: a read counts as use
         else:
             self._buckets.pop(key, None)
         return best_value
@@ -76,9 +93,23 @@ class InMemorySemanticResponseCache:
         ttl_s: int,
     ) -> None:
         key = scope
+        self._sweep_expired()
         bucket = self._buckets.setdefault(key, [])
         bucket.append((self._clock() + ttl_s, vector, value))
         overflow = len(bucket) - self._max_entries_per_tenant
         if overflow > 0:
             del bucket[:overflow]
         self._buckets.move_to_end(key)
+        while len(self._buckets) > self._max_scopes:
+            self._buckets.popitem(last=False)  # least recently used scope
+
+    def _sweep_expired(self) -> None:
+        """Drop fully-expired scopes among the least recently used ones.
+
+        Bounded work per call: the LRU end is where a scope that stopped being
+        used ends up, which is exactly the population that would otherwise
+        never be revisited and never be pruned."""
+        now = self._clock()
+        for key in list(itertools.islice(self._buckets, _SWEEP_BUDGET)):
+            if all(expires_at <= now for expires_at, _, _ in self._buckets[key]):
+                del self._buckets[key]
