@@ -32,6 +32,24 @@ is untouched. Each threshold fires **at most once per budget period**, keyed on
   threshold once, returns nothing when all crossed thresholds are already fired,
   and that a new `period_start` yields a fresh (empty) fired set. Boundary
   validation (1..100, sorted, deduped) tested.
+- **✅ Done (27 July 2026):** `domain/budget.py` gained the pure
+  `crossed_thresholds(*, spend, limit_cost, thresholds, fired) -> list[int]`
+  helper and `validate_thresholds(thresholds) -> list[int]` (normalizes via
+  sort+dedup rather than rejecting out-of-order/duplicate input; only
+  non-`int` or out-of-`1..100` values raise `InvalidBudget`). The helper is
+  pure — no memory of its own — so period rollover correctness falls entirely
+  out of the caller scoping the `fired` set to the current `period_start`,
+  not out of any special-cased branch. `Budget` gained a `thresholds:
+  list[int]` field (stored as a Postgres `ARRAY(Integer)` column with
+  `server_default='{}'` on the already-populated `budget` table). New
+  `BudgetAlertState` entity + `BudgetAlertStateRepository` port
+  (`fired_thresholds`/`record_fired`) implemented by
+  `SQLAlchemyBudgetAlertStateRepository`, backed by a `budget_alert_state`
+  table with a unique constraint on `(team_id, window, period_start,
+  threshold)` (migration `5e4c132e7869`) — a concurrent `record_fired` loses
+  the unique-constraint race and returns `None` rather than erroring, the
+  same PK-conflict strategy as the usage reconciler. Nothing is wired into
+  `UsageMeter.settle_ok` yet — that's Phase 1, deliberately untouched here.
 
 ### Phase 1 — Evaluate at settlement + enqueue to the outbox
 
