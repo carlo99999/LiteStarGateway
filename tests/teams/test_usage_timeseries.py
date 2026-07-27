@@ -65,6 +65,7 @@ class _EchoClient:
             }
         )
 
+
 # --- Repository-level table-driven tests ------------------------------------
 
 
