@@ -4175,6 +4175,104 @@
                 "deprecated": false
             }
         },
+        "/teams/{team_id}/export": {
+            "get": {
+                "tags": [
+                    "teams"
+                ],
+                "summary": "ExportTeam",
+                "operationId": "TeamsTeamIdExportExportTeam",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TeamExportResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/teams/{team_id}/keys/spending": {
             "get": {
                 "tags": [
@@ -4394,6 +4492,97 @@
                                     },
                                     "type": "array"
                                 }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/teams/{team_id}/purge": {
+            "post": {
+                "tags": [
+                    "teams"
+                ],
+                "summary": "PurgeTeam",
+                "operationId": "TeamsTeamIdPurgePurgeTeam",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Request fulfilled, nothing follows",
+                        "headers": {
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
                             }
                         }
                     },
@@ -10590,7 +10779,7 @@
                             "application/json": {
                                 "schema": {
                                     "items": {
-                                        "$ref": "#/components/schemas/AuditEventResponse"
+                                        "$ref": "#/components/schemas/audit_controller_AuditEventResponse"
                                     },
                                     "type": "array"
                                 }
@@ -11718,117 +11907,6 @@
                     "email"
                 ],
                 "title": "AddMemberRequest"
-            },
-            "AuditEventResponse": {
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid"
-                    },
-                    "action": {
-                        "type": "string"
-                    },
-                    "actor_id": {
-                        "oneOf": [
-                            {
-                                "type": "string",
-                                "format": "uuid"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "actor_type": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "actor_email": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "target_type": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "target_id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "ip": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "detail": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "request_id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "action",
-                    "actor_email",
-                    "actor_id",
-                    "actor_type",
-                    "created_at",
-                    "detail",
-                    "id",
-                    "ip",
-                    "request_id",
-                    "target_id",
-                    "target_type"
-                ],
-                "title": "AuditEventResponse"
             },
             "BrowserSessionResponse": {
                 "properties": {
@@ -13736,6 +13814,26 @@
                 ],
                 "title": "RouterResponse"
             },
+            "RoutingSavingsResponse": {
+                "properties": {
+                    "total_estimated_savings": {
+                        "type": "number"
+                    },
+                    "decisions_counted": {
+                        "type": "integer"
+                    },
+                    "decisions_without_usage": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "decisions_counted",
+                    "decisions_without_usage",
+                    "total_estimated_savings"
+                ],
+                "title": "RoutingSavingsResponse"
+            },
             "ScimTokenCreateRequest": {
                 "properties": {
                     "name": {
@@ -14060,6 +14158,43 @@
                 ],
                 "title": "SsoSettingsResponse"
             },
+            "TeamExportResponse": {
+                "properties": {
+                    "team": {
+                        "$ref": "#/components/schemas/TeamResponse"
+                    },
+                    "usage_events": {
+                        "items": {
+                            "$ref": "#/components/schemas/UsageEventResponse"
+                        },
+                        "type": "array"
+                    },
+                    "audit_events": {
+                        "items": {
+                            "$ref": "#/components/schemas/teams_schemas_AuditEventResponse"
+                        },
+                        "type": "array"
+                    },
+                    "routing_savings": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/RoutingSavingsResponse"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "audit_events",
+                    "routing_savings",
+                    "team",
+                    "usage_events"
+                ],
+                "title": "TeamExportResponse"
+            },
             "TeamResponse": {
                 "properties": {
                     "id": {
@@ -14097,6 +14232,17 @@
                         "oneOf": [
                             {
                                 "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "deleted_at": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
                             },
                             {
                                 "type": "null"
@@ -14587,6 +14733,92 @@
                 ],
                 "title": "UsageBucketResponse"
             },
+            "UsageEventResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "team_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "api_key_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "model_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "model_name": {
+                        "type": "string"
+                    },
+                    "operation": {
+                        "type": "string"
+                    },
+                    "prompt_tokens": {
+                        "type": "integer"
+                    },
+                    "completion_tokens": {
+                        "type": "integer"
+                    },
+                    "cost": {
+                        "type": "number"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "requested_alias": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "cache_hit": {
+                        "type": "boolean"
+                    },
+                    "request_id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "api_key_id",
+                    "cache_hit",
+                    "completion_tokens",
+                    "cost",
+                    "created_at",
+                    "id",
+                    "model_id",
+                    "model_name",
+                    "operation",
+                    "prompt_tokens",
+                    "request_id",
+                    "requested_alias",
+                    "team_id"
+                ],
+                "title": "UsageEventResponse"
+            },
             "UsageResponse": {
                 "properties": {
                     "model": {
@@ -14719,6 +14951,184 @@
                     "is_auditor"
                 ],
                 "title": "UserResponse"
+            },
+            "audit_controller_AuditEventResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "action": {
+                        "type": "string"
+                    },
+                    "actor_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "actor_type": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "actor_email": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "target_type": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "target_id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "ip": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "detail": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "request_id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "action",
+                    "actor_email",
+                    "actor_id",
+                    "actor_type",
+                    "created_at",
+                    "detail",
+                    "id",
+                    "ip",
+                    "request_id",
+                    "target_id",
+                    "target_type"
+                ],
+                "title": "AuditEventResponse"
+            },
+            "teams_schemas_AuditEventResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "action": {
+                        "type": "string"
+                    },
+                    "actor_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "actor_type": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "actor_email": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "detail": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "action",
+                    "actor_email",
+                    "actor_id",
+                    "actor_type",
+                    "created_at",
+                    "detail",
+                    "id"
+                ],
+                "title": "AuditEventResponse"
             }
         }
     }
