@@ -517,15 +517,26 @@ class CompletionService:
 
     async def _attach_routing_usage(self, response: dict[str, Any]) -> None:
         """Savings observability (§7): give the routing decision, if one was
-        made for this request, its actual token usage. Streams are settled
-        inside the meter and are not attached in this phase."""
-        if self._router_service is None:
-            return
+        made for this request, its actual token usage. Non-streaming path;
+        the streaming counterpart is `_metered`'s `on_settled` callback into
+        `UsageMeter.metered_stream` (Plan 10 Phase 0) — both funnel into
+        `_record_router_usage`, the single call to `RouterService.record_usage`."""
         usage = response.get("usage") or {}
         prompt = usage.get("prompt_tokens", usage.get("input_tokens"))
         completion = usage.get("completion_tokens", usage.get("output_tokens"))
         if isinstance(prompt, int) and isinstance(completion, int):
-            await self._router_service.record_usage(prompt, completion)
+            await self._record_router_usage(prompt, completion)
+
+    async def _record_router_usage(self, prompt_tokens: int, completion_tokens: int) -> None:
+        """Attach settled usage to this request's routing decision, if one was
+        made (`RouterService.record_usage` is itself a no-op + fail-safe
+        without a decision or on any attach failure). Shared by the
+        non-streaming path (`_attach_routing_usage`) and the streaming
+        settlement callback (`_metered`) so both contribute identically to
+        the router's savings tracking."""
+        if self._router_service is None:
+            return
+        await self._router_service.record_usage(prompt_tokens, completion_tokens)
 
     @staticmethod
     def _ensure_usable(model: Model | None, alias: object, expected_type: ModelType) -> Model:
@@ -1433,7 +1444,15 @@ class CompletionService:
         finally when iterated; a `weakref.finalize` covers the case where the
         SSE layer returns without ever starting it (client drops before the
         first byte) — otherwise the reservation would leak into InFlightSpend
-        forever and eventually 402 the whole team (M27)."""
+        forever and eventually 402 the whole team (M27).
+
+        `on_settled` (Plan 10 Phase 0) attaches the stream's settled usage to
+        this request's routing decision the moment it is billed — the
+        streaming counterpart of `_attach_routing_usage`, which only ever ran
+        for non-streamed responses. `_record_router_usage` is itself a no-op
+        without a router-routed request, and `metered_stream` swallows any
+        exception the callback raises, so this can never break the stream or
+        the billing that already committed."""
         released = False
 
         def release() -> None:
@@ -1443,7 +1462,15 @@ class CompletionService:
                 self._meter.release(team_id, reservation)
 
         gen = self._meter.metered_stream(
-            team_id, api_key_id, model, operation, stream, request, release, attribution
+            team_id,
+            api_key_id,
+            model,
+            operation,
+            stream,
+            request,
+            release,
+            attribution,
+            on_settled=self._record_router_usage,
         )
         weakref.finalize(gen, release)
         return gen
