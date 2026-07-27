@@ -19,39 +19,66 @@ from litestar_gateway.domain.ports.response_cache import CacheKey
 # streaming endpoints never call into this). Embeddings/images/native bypass.
 CACHEABLE_OPERATIONS = frozenset({"chat.completions", "responses"})
 
-# Determinism-affecting fields: part of the key, so a different value is a
-# different request. `stream` and `user` are deliberately excluded (design §2).
-_KEY_FIELDS = (
-    "messages",
-    "input",
-    "instructions",
-    "system",
-    "temperature",
-    "top_p",
-    "seed",
-    "max_tokens",
-    "max_completion_tokens",
-    "max_output_tokens",
-    "stop",
-    "tools",
-    "tool_choice",
-    "response_format",
+# Fields that provably cannot change the generated content: everything else in
+# the request is part of the key. A deny-list (not an allow-list) is what makes
+# a field the gateway starts accepting later cacheable-safe by default —
+# ISSUE-023 was an allow-list silently ignoring `n`, `parallel_tool_calls`,
+# penalties and reasoning options, so a request that differed only in those
+# received another request's answer.
+_NON_DETERMINING_FIELDS = frozenset(
+    {
+        # The name the client called: an alias and the model it resolves to must
+        # share a hit, and the resolved identity is in the key explicitly below.
+        "model",
+        "stream",  # transport, not content (a cached body is replayed as a stream)
+        "stream_options",
+        "user",  # end-user attribution label
+        "metadata",  # caller-defined tags, echoed not interpreted
+    }
 )
+
+# Bumped whenever the derivation changes. Entries written by an older gateway
+# then simply never match, instead of matching under different semantics.
+_KEY_SCHEMA_VERSION = "v2"
 
 
 def derive_cache_key(
-    team_id: UUID, api_key_id: UUID | None, canonical_model_name: str, request: dict[str, Any]
+    team_id: UUID,
+    api_key_id: UUID | None,
+    model: Model,
+    operation: str,
+    effective_request: dict[str, Any],
 ) -> CacheKey:
-    """A pure, canonical view of the request, hashed. `canonical_model_name`
-    must be the *resolved* `Model.name` (post-alias/router resolution), so an
-    alias and the model it points at share a hit. `json.dumps(sort_keys=True)`
-    canonicalizes object-key order at every nesting level without touching
-    string content, so semantically-significant whitespace inside message text
-    is preserved verbatim."""
-    canonical: dict[str, Any] = {"model": canonical_model_name}
-    for field in _KEY_FIELDS:
-        if field in request:
-            canonical[field] = request[field]
+    """A pure, canonical view of *what will actually be sent*, hashed.
+
+    `effective_request` must be the post-merge request (`Model.merge_params`),
+    so admin defaults and enforced policy are part of the key: a policy change
+    is a different request, not a silent hit on the pre-change answer. The
+    model is identified by `id` as well as name — a delete/recreate under the
+    same name, or two models sharing a name across scopes, must not share
+    entries — plus the provider-side coordinates that select the upstream
+    deployment. `operation` separates chat from Responses, whose bodies differ
+    in shape for the same text.
+
+    `json.dumps(sort_keys=True)` canonicalizes object-key order at every nesting
+    level without touching string content, so semantically-significant
+    whitespace inside message text is preserved verbatim.
+    """
+    canonical: dict[str, Any] = {
+        "v": _KEY_SCHEMA_VERSION,
+        "operation": operation,
+        "model_id": str(model.id),
+        "model_name": model.name,
+        "provider": model.provider.value,
+        "provider_model_id": model.provider_model_id,
+        "api_version": model.api_version,
+        "max_output_tokens": model.max_output_tokens,
+        "request": {
+            field: value
+            for field, value in effective_request.items()
+            if field not in _NON_DETERMINING_FIELDS
+        },
+    }
     digest = hashlib.sha256(
         json.dumps(canonical, sort_keys=True, default=str, ensure_ascii=False).encode()
     ).hexdigest()

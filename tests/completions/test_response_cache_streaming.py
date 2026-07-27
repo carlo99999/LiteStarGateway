@@ -134,10 +134,18 @@ class Gateway:
 
 
 def _service(
-    gateway: Gateway, usage: FakeUsage, traces: list[TraceRecord], *, response_cache: object
+    gateway: Gateway,
+    usage: FakeUsage,
+    traces: list[TraceRecord],
+    *,
+    response_cache: object,
+    model: Model | None = None,
 ) -> CompletionService:
+    """`model` is explicit for the multi-replica test: two replicas read the
+    same model row, so they must be given the same `Model` — the cache key
+    includes the model's id (ISSUE-023a)."""
     return CompletionService(
-        models=FakeModels(_model()),  # type: ignore[arg-type]
+        models=FakeModels(model or _model()),  # type: ignore[arg-type]
         credentials=FakeCredentials(),  # type: ignore[arg-type]
         gateway=gateway,  # type: ignore[arg-type]
         meter=UsageMeter(usage=usage, emit_trace=traces.append),  # type: ignore[arg-type]
@@ -202,15 +210,20 @@ async def test_two_service_instances_sharing_one_fake_redis_client_share_hits() 
     call), instance 2 — a wholly separate `CompletionService`/cache-adapter
     pair standing in for a second replica — reads the hit."""
     client = FakeRedis()
+    model = _model()  # the one model row both replicas resolve
     traces_1: list[TraceRecord] = []
     usage_1 = FakeUsage()
     gateway_1 = Gateway(allow_stream=True)
-    service_1 = _service(gateway_1, usage_1, traces_1, response_cache=RedisResponseCache(client))
+    service_1 = _service(
+        gateway_1, usage_1, traces_1, response_cache=RedisResponseCache(client), model=model
+    )
 
     traces_2: list[TraceRecord] = []
     usage_2 = FakeUsage()
     gateway_2 = Gateway(allow_stream=False)
-    service_2 = _service(gateway_2, usage_2, traces_2, response_cache=RedisResponseCache(client))
+    service_2 = _service(
+        gateway_2, usage_2, traces_2, response_cache=RedisResponseCache(client), model=model
+    )
 
     await service_1.chat_completion(TEAM_ID, KEY_ID, dict(_CHAT_REQUEST))
     stream = await service_2.open_chat_stream(TEAM_ID, KEY_ID, dict(_CHAT_REQUEST))
