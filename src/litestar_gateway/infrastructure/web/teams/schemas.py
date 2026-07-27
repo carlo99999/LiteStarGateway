@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from litestar_gateway.domain.entities import (
     APIKey,
     ApiKeySpend,
+    AuditEvent,
     Budget,
     BudgetAlertState,
     IssuedKey,
@@ -18,6 +20,7 @@ from litestar_gateway.domain.entities import (
     TeamRole,
     UsageAggregate,
     UsageBucket,
+    UsageEvent,
     UsageTimeseries,
 )
 from litestar_gateway.domain.exceptions import InvalidKeyExpiry
@@ -199,6 +202,10 @@ class TeamResponse:
     description: str | None
     tags: list[str]
     rate_limit_rpm: int | None
+    # Tombstone timestamp (Plan 13 Phase 5); None for a live team. Only visible
+    # through the export/purge admin actions — `get`/`list` hide the team
+    # entirely once this is set, so it never appears here otherwise.
+    deleted_at: datetime | None = None
 
     @classmethod
     def from_entity(cls, team: Team) -> TeamResponse:
@@ -210,6 +217,7 @@ class TeamResponse:
             description=team.description,
             tags=list(team.tags),
             rate_limit_rpm=team.rate_limit_rpm,
+            deleted_at=team.deleted_at,
         )
 
 
@@ -398,4 +406,99 @@ class ServicePrincipalResponse:
             name=sp.name,
             enabled=sp.enabled,
             created_at=sp.created_at,
+        )
+
+
+@dataclass(frozen=True)
+class TeamUsageEventResponse:
+    """One raw usage_event row (export-before-delete, Plan 13 Phase 5) — the
+    same fields the ledger records, unaggregated."""
+
+    id: UUID
+    team_id: UUID
+    api_key_id: UUID | None
+    model_id: UUID
+    model_name: str
+    operation: str
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+    created_at: datetime
+    requested_alias: str | None
+    cache_hit: bool
+    request_id: str | None
+
+    @classmethod
+    def from_entity(cls, e: UsageEvent) -> TeamUsageEventResponse:
+        return cls(
+            id=e.id,
+            team_id=e.team_id,
+            api_key_id=e.api_key_id,
+            model_id=e.model_id,
+            model_name=e.model_name,
+            operation=e.operation,
+            prompt_tokens=e.prompt_tokens,
+            completion_tokens=e.completion_tokens,
+            cost=e.cost,
+            created_at=e.created_at,
+            requested_alias=e.requested_alias,
+            cache_hit=e.cache_hit,
+            request_id=e.request_id,
+        )
+
+
+@dataclass(frozen=True)
+class TeamAuditEventResponse:
+    """One audit_event row targeting the team (export-before-delete)."""
+
+    id: UUID
+    action: str
+    actor_id: UUID | None
+    actor_type: str | None
+    actor_email: str | None
+    detail: str | None
+    created_at: datetime
+
+    @classmethod
+    def from_entity(cls, e: AuditEvent) -> TeamAuditEventResponse:
+        return cls(
+            id=e.id,
+            action=e.action,
+            actor_id=e.actor_id,
+            actor_type=e.actor_type,
+            actor_email=e.actor_email,
+            detail=e.detail,
+            created_at=e.created_at,
+        )
+
+
+@dataclass(frozen=True)
+class RoutingSavingsResponse:
+    """Routing-decision aggregate for the team (see `export_team_data`'s
+    docstring for why this is an aggregate, not a raw per-decision dump)."""
+
+    total_estimated_savings: float
+    decisions_counted: int
+    decisions_without_usage: int
+
+
+@dataclass(frozen=True)
+class TeamExportResponse:
+    """Full export-before-delete payload for one team (Plan 13 Phase 5):
+    the team itself, its raw usage history, its audit trail, and a routing
+    savings summary."""
+
+    team: TeamResponse
+    usage_events: list[TeamUsageEventResponse]
+    audit_events: list[TeamAuditEventResponse]
+    routing_savings: RoutingSavingsResponse | None
+
+    @classmethod
+    def from_export(cls, export: dict[str, Any]) -> TeamExportResponse:
+        savings = export["routing_savings"]
+        return cls(
+            team=TeamResponse.from_entity(export["team"]),
+            usage_events=[TeamUsageEventResponse.from_entity(e) for e in export["usage_events"]],
+            audit_events=[TeamAuditEventResponse.from_entity(e) for e in export["audit_events"]],
+            routing_savings=RoutingSavingsResponse(**savings) if savings is not None else None,
         )

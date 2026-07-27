@@ -115,6 +115,12 @@ class TeamNotEmpty(DomainError):
     history are removed with the team."""
 
 
+class TeamNotSoftDeleted(DomainError):
+    """The purge action requires the team to already be soft-deleted (tombstoned)
+    — purge is the deliberate second step of a two-step lifecycle, never a
+    shortcut around it (→ 409)."""
+
+
 class AlreadyMember(DomainError):
     """The user is already a member of the team."""
 

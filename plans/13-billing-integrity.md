@@ -81,6 +81,54 @@ console today; the rates are configurable via the model create/update API now.
 - Soft-delete teams with billed history; add explicit export and audited purge.
 - Prevent accidental FK cascades across usage, decisions and audit data.
 
+**Complete (27 July 2026).** Ordinary `DELETE /teams/{id}` now branches on
+whether the team has *billed history* — any `usage_event` or
+`pending_usage_event` row: with none, it hard-deletes exactly as before
+(regression-covered); with any, it soft-deletes (tombstones) the team instead
+of touching its usage/routing/audit data. `Team.deleted_at` (a new nullable,
+indexed column, migration `47e59bf43231`) is the tombstone marker; every
+ordinary read path (`get`, `list`, `list_by_organization`, `list_by_ids`,
+`lock_for_lifecycle`) filters it out, so a tombstoned team reads as gone to
+every normal operation — the same "hidden but intact" contract the design doc
+asked for. No ORM relationship in `orm.py` carries `cascade="all,
+delete-orphan"` on `usage_event`/`routing_decision`/`audit_event`; the
+`routing_decision` table was already found to carry no FK to `team` at all
+(by design, so decision history outlives router deletion), and `audit_event`
+has no FK either — the "accidental cascade" this phase guards against was
+actually the *application-level* unconditional child-deletion loop in
+`team_repository.py`'s `delete()`, now gated behind the billed-history check.
+
+`Settings.team_retention_days` (default 90, `TEAM_RETENTION_DAYS` env var)
+documents the anonymization-eligibility window for a tombstoned team's ledger
+attribution. This phase does **not** ship the automatic anonymization job —
+only the config surface and the `deleted_at` timestamp a future job needs to
+compute eligibility (`deleted_at + team_retention_days`). Building that job
+was judged out of scope for "choose and document," per the phase's own
+wording; it's a natural, low-risk follow-up once a retention job runner
+exists.
+
+`GET /teams/{id}/export` (platform-admin only, works on a live or tombstoned
+team) returns the team's full raw `usage_event` history, its full audit trail
+(`AuditLog.list_by_target("team", team_id)`, a new port method), and a
+routing-savings aggregate (`RoutingDecisionLog.team_savings`) rather than a
+raw per-decision dump — `routing_decision` has no team-wide raw query today
+(only per-router `list_decisions`), so a complete raw routing export is
+deliberately deferred rather than built as a partial/misleading one.
+
+`POST /teams/{id}/purge` is the separate, irreversible, platform-admin-only
+action: it requires the team already tombstoned (409 `TeamNotSoftDeleted`
+otherwise — no direct live-team purge), stages an `AuditEvent` via
+`TeamService.purge_team`'s own unit of work, and only then hard-deletes the
+team and its data in the SAME commit — so a crash between the two is
+impossible, not just unlikely. Audit records themselves are never removed by
+purge (or by ordinary delete): they are the forensic record that the
+destructive action happened, and outlive it by design. Regression-tested:
+non-admin purge → 403; purge of a live (non-tombstoned) team → 409; a
+successful purge removes the team/usage rows (verified via a direct
+repository query, not just the hidden API view) and leaves exactly one
+`team.purge` audit record with the acting admin's email
+(`tests/teams/test_retention_lifecycle.py`).
+
 ## Verification and sequencing
 
 - TDD for normalized pricing and decimal rounding before migrations.

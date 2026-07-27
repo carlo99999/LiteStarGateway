@@ -50,3 +50,18 @@ class SQLAlchemyAuditLog:
             .offset(offset)
         )
         return [r.to_entity() for r in rows]
+
+    async def list_by_target(
+        self, target_type: str, target_id: str, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[AuditEvent]:
+        rows = await self._session.scalars(
+            select(AuditEventModel)
+            .where(
+                AuditEventModel.target_type == target_type,
+                AuditEventModel.target_id == target_id,
+            )
+            .order_by(AuditEventModel.created_at, AuditEventModel.id)
+            .limit(limit)
+            .offset(offset)
+        )
+        return [r.to_entity() for r in rows]

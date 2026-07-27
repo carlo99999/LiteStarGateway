@@ -58,6 +58,12 @@ DEFAULT_BUDGET_ALERT_WEBHOOK_TIMEOUT_MS = 2000
 # SMTP server config; the per-team recipient is data on the team's budget, not
 # config here. 587 is the STARTTLS submission port (default when SMTP_USE_TLS).
 DEFAULT_SMTP_PORT = 587
+# Retention/anonymization window (Plan 13 Phase 5, docs/next-steps/billing-integrity.md
+# §5): days after a team is soft-deleted (tombstoned) before its ledger PII/
+# attribution is eligible for anonymization. Documents the policy and bounds a
+# future anonymization job; this phase does not run that job automatically —
+# see the design doc for what "eligible" means and why.
+DEFAULT_TEAM_RETENTION_DAYS = 90
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -261,6 +267,11 @@ class Settings:
     smtp_password: str | None = None
     smtp_use_tls: bool = True
     smtp_from_address: str | None = None
+    # Retention/anonymization window, in days, for a soft-deleted team's ledger
+    # attribution (Plan 13 Phase 5). Structural/documentation only this phase —
+    # no background job reads it yet; it's here so that job has a config surface
+    # to land on without another migration.
+    team_retention_days: int = DEFAULT_TEAM_RETENTION_DAYS
 
     @property
     def smtp_configured(self) -> bool:
@@ -454,4 +465,7 @@ class Settings:
             smtp_password=os.environ.get("SMTP_PASSWORD"),
             smtp_use_tls=_env_bool("SMTP_USE_TLS", True),
             smtp_from_address=os.environ.get("SMTP_FROM_ADDRESS"),
+            team_retention_days=_env_int(
+                "TEAM_RETENTION_DAYS", DEFAULT_TEAM_RETENTION_DAYS, minimum=1
+            ),
         )

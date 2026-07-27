@@ -16,6 +16,13 @@ class UsageRepository(Protocol):
 
     async def record(self, event: UsageEvent) -> None: ...
 
+    async def list_events(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[UsageEvent]:
+        """Raw (non-aggregated) usage events for the team, oldest first — the
+        export-before-delete action's usage dump (Plan 13 Phase 5)."""
+        ...
+
     async def aggregate(
         self,
         team_id: UUID,

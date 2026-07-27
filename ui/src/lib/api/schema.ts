@@ -630,6 +630,23 @@ export interface paths {
         patch: operations["TeamsTeamIdUpdateTeam"];
         trace?: never;
     };
+    "/teams/{team_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ExportTeam */
+        get: operations["TeamsTeamIdExportExportTeam"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams/{team_id}/keys/spending": {
         parameters: {
             query?: never;
@@ -658,6 +675,23 @@ export interface paths {
         get: operations["TeamsListTeams"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** PurgeTeam */
+        post: operations["TeamsTeamIdPurgePurgeTeam"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2090,6 +2124,12 @@ export interface components {
             max_attempts: number;
             overall_deadline_ms?: number | null;
         };
+        /** RoutingSavingsResponse */
+        RoutingSavingsResponse: {
+            total_estimated_savings: number;
+            decisions_counted: number;
+            decisions_without_usage: number;
+        };
         /** ScimTokenCreateRequest */
         ScimTokenCreateRequest: {
             name: string;
@@ -2179,6 +2219,25 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        /** TeamAuditEventResponse */
+        TeamAuditEventResponse: {
+            /** Format: uuid */
+            id: string;
+            action: string;
+            actor_id: string | null;
+            actor_type: string | null;
+            actor_email: string | null;
+            detail: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        /** TeamExportResponse */
+        TeamExportResponse: {
+            team: components["schemas"]["TeamResponse"];
+            usage_events: components["schemas"]["TeamUsageEventResponse"][];
+            audit_events: components["schemas"]["TeamAuditEventResponse"][];
+            routing_savings: components["schemas"]["RoutingSavingsResponse"] | null;
+        };
         /** TeamResponse */
         TeamResponse: {
             /** Format: uuid */
@@ -2191,6 +2250,7 @@ export interface components {
             description: string | null;
             tags: string[];
             rate_limit_rpm: number | null;
+            deleted_at?: string | null;
         };
         /**
          * TeamRole
@@ -2207,6 +2267,26 @@ export interface components {
             team_id: string;
             name: string;
             cost: number;
+        };
+        /** TeamUsageEventResponse */
+        TeamUsageEventResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            team_id: string;
+            api_key_id: string | null;
+            /** Format: uuid */
+            model_id: string;
+            model_name: string;
+            operation: string;
+            prompt_tokens: number;
+            completion_tokens: number;
+            cost: number;
+            /** Format: date-time */
+            created_at: string;
+            requested_alias: string | null;
+            cache_hit: boolean;
+            request_id: string | null;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -4226,6 +4306,49 @@ export interface operations {
             };
         };
     };
+    TeamsTeamIdExportExportTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamExportResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
     TeamsTeamIdKeysSpendingKeysSpending: {
         parameters: {
             query?: {
@@ -4298,6 +4421,47 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TeamResponse"][];
                 };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdPurgePurgeTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, nothing follows */
+            204: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad request syntax or unsupported method */
             400: {

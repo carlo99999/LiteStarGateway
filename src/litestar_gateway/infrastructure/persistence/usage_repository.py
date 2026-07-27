@@ -92,6 +92,18 @@ class SQLAlchemyUsageRepository:
         )
         await self._session.commit()
 
+    async def list_events(
+        self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[UsageEvent]:
+        rows = await self._session.scalars(
+            select(UsageEventModel)
+            .where(UsageEventModel.team_id == team_id)
+            .order_by(UsageEventModel.created_at, UsageEventModel.id)
+            .limit(limit)
+            .offset(offset)
+        )
+        return [row.to_entity() for row in rows]
+
     async def aggregate(
         self,
         team_id: UUID,

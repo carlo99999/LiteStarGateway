@@ -23,11 +23,32 @@ class TeamLifecycleRepository(Protocol):
 
 
 class TeamRepository(TeamLifecycleRepository, Protocol):
-    """Persistence port for teams."""
+    """Persistence port for teams.
+
+    ``get``/``list``/``list_by_organization``/``list_by_ids`` all hide
+    soft-deleted (tombstoned) teams — they read like the team no longer
+    exists. ``get_any`` is the one exception: it bypasses the tombstone
+    filter, for the purge flow and the export action, which must still be
+    able to reach a soft-deleted team.
+    """
 
     async def add(self, team: Team) -> Team: ...
 
     async def get(self, team_id: UUID) -> Team | None: ...
+
+    async def get_any(self, team_id: UUID) -> Team | None:
+        """Like `get`, but also returns a soft-deleted team (purge/export)."""
+        ...
+
+    async def has_billed_history(self, team_id: UUID) -> bool:
+        """True if the team has any usage_event or pending_usage_event row —
+        the "billed history" test that decides soft- vs. hard-delete."""
+        ...
+
+    async def soft_delete(self, team_id: UUID) -> Team | None:
+        """Tombstone the team (set `deleted_at`) instead of removing it.
+        Returns the updated entity, or None if the team no longer exists."""
+        ...
 
     async def list_by_ids(self, team_ids: Sequence[UUID]) -> list[Team]:
         """Fetch many teams in one query (batch lookup, avoids N+1). Missing ids
@@ -55,10 +76,16 @@ class TeamRepository(TeamLifecycleRepository, Protocol):
         ...
 
     async def delete(self, team_id: UUID) -> None:
-        """Delete the team and its intrinsic children (memberships, budget,
+        """Hard-delete the team and its intrinsic children (memberships, budget,
         routers, service principals, invites, and usage history). The caller is
         responsible for refusing when models or API keys still exist — those are
-        NOT removed here."""
+        NOT removed here.
+
+        Two, and only two, callers may invoke this: the ordinary team-delete
+        path when the team has NO billed history (regression-safe fast path),
+        and the explicit, audited purge action on an already soft-deleted team.
+        Any other caller risks the accidental destructive-cascade this port is
+        designed to prevent — use `soft_delete` instead."""
         ...
 
 

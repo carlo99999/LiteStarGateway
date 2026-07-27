@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -31,6 +32,10 @@ from litestar_gateway.infrastructure.persistence.orm import (
 )
 
 
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
 class SQLAlchemyTeamRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -51,22 +56,58 @@ class SQLAlchemyTeamRepository:
         return model.to_entity()
 
     async def get(self, team_id: UUID) -> Team | None:
+        # A soft-deleted (tombstoned) team reads as absent everywhere ordinary
+        # operations look it up — `get_any` is the deliberate bypass.
+        model = await self._session.get(TeamModel, team_id)
+        return model.to_entity() if model and model.deleted_at is None else None
+
+    async def get_any(self, team_id: UUID) -> Team | None:
         model = await self._session.get(TeamModel, team_id)
         return model.to_entity() if model else None
+
+    async def has_billed_history(self, team_id: UUID) -> bool:
+        # Either table having a row is "billed history": a settled ledger entry,
+        # or a dead-lettered one still awaiting the reconciler — both represent
+        # real spend that must not be silently lost by an ordinary delete.
+        settled = await self._session.scalar(
+            select(UsageEventModel.id).where(UsageEventModel.team_id == team_id).limit(1)
+        )
+        if settled is not None:
+            return True
+        pending = await self._session.scalar(
+            select(PendingUsageEventModel.id)
+            .where(PendingUsageEventModel.team_id == team_id)
+            .limit(1)
+        )
+        return pending is not None
+
+    async def soft_delete(self, team_id: UUID) -> Team | None:
+        # Stage only (flush); the service owns the commit (unit of work).
+        model = await self._session.get(TeamModel, team_id)
+        if model is None:
+            return None
+        model.deleted_at = _now()
+        await self._session.flush()
+        await self._session.refresh(model)
+        return model.to_entity()
 
     async def list_by_ids(self, team_ids: Sequence[UUID]) -> list[Team]:
         if not team_ids:
             return []
-        models = await self._session.scalars(select(TeamModel).where(TeamModel.id.in_(team_ids)))
+        models = await self._session.scalars(
+            select(TeamModel).where(TeamModel.id.in_(team_ids), TeamModel.deleted_at.is_(None))
+        )
         return [model.to_entity() for model in models]
 
     async def lock_for_lifecycle(self, team_id: UUID) -> Team | None:
         # A no-op write is a cross-database lifecycle mutex: PostgreSQL takes a
         # row-level NO KEY UPDATE lock and SQLite takes its writer lock. Raw SQL
         # avoids SQLAlchemy's automatic `updated_at` value on ORM updates.
-        statement = text("UPDATE team SET name = name WHERE id = :team_id").bindparams(
-            bindparam("team_id", type_=TeamModel.id.type)
-        )
+        # A soft-deleted team is excluded, same as `get`: it reads as gone to
+        # every ordinary lifecycle operation (delete-team, invite creation).
+        statement = text(
+            "UPDATE team SET name = name WHERE id = :team_id AND deleted_at IS NULL"
+        ).bindparams(bindparam("team_id", type_=TeamModel.id.type))
         result: Any = await self._session.execute(statement, {"team_id": team_id})
         if result.rowcount != 1:
             return None
@@ -78,7 +119,7 @@ class SQLAlchemyTeamRepository:
     ) -> list[Team]:
         models = await self._session.scalars(
             select(TeamModel)
-            .where(TeamModel.organization_id == organization_id)
+            .where(TeamModel.organization_id == organization_id, TeamModel.deleted_at.is_(None))
             .order_by(TeamModel.created_at, TeamModel.id)
             .limit(limit)
             .offset(offset)
@@ -88,6 +129,7 @@ class SQLAlchemyTeamRepository:
     async def list(self, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0) -> list[Team]:
         models = await self._session.scalars(
             select(TeamModel)
+            .where(TeamModel.deleted_at.is_(None))
             .order_by(TeamModel.created_at, TeamModel.id)
             .limit(limit)
             .offset(offset)
@@ -104,7 +146,7 @@ class SQLAlchemyTeamRepository:
     ) -> Team | None:
         # Stage only (flush); the service owns the commit (unit of work).
         model = await self._session.get(TeamModel, team_id)
-        if model is None:
+        if model is None or model.deleted_at is not None:
             return None
         model.name = name
         model.description = description

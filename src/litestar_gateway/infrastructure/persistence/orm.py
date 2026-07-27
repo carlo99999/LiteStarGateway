@@ -455,6 +455,10 @@ class TeamModel(base.UUIDAuditBase):
     description: Mapped[str | None] = mapped_column(default=None)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     rate_limit_rpm: Mapped[int | None] = mapped_column(default=None)
+    # Tombstone (Plan 13 Phase 5). NULL = live team. Set instead of a hard
+    # delete when the team has billed history; indexed so "hide soft-deleted
+    # teams" filters stay cheap on the list/lookup paths.
+    deleted_at: Mapped[datetime | None] = mapped_column(default=None, index=True)
 
     def to_entity(self) -> Team:
         return Team(
@@ -465,6 +469,7 @@ class TeamModel(base.UUIDAuditBase):
             description=self.description,
             tags=list(self.tags or []),
             rate_limit_rpm=self.rate_limit_rpm,
+            deleted_at=self.deleted_at,
         )
 
 
