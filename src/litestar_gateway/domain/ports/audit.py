@@ -23,3 +23,10 @@ class AuditLog(Protocol):
     ) -> list[AuditEvent]:
         """Most recent audit events first (for the admin read API)."""
         ...
+
+    async def list_by_target(
+        self, target_type: str, target_id: str, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+    ) -> list[AuditEvent]:
+        """Every audit event recorded against one target (oldest first) — the
+        export-before-delete action's audit-trail dump (Plan 13 Phase 5)."""
+        ...

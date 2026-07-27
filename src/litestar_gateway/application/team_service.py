@@ -26,7 +26,7 @@ import dataclasses
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from litestar_gateway.domain.authorization import (
@@ -34,7 +34,14 @@ from litestar_gateway.domain.authorization import (
     Permission,
     role_grants,
 )
-from litestar_gateway.domain.entities import Principal, Team, TeamMembership, TeamRole, User
+from litestar_gateway.domain.entities import (
+    AuditEvent,
+    Principal,
+    Team,
+    TeamMembership,
+    TeamRole,
+    User,
+)
 from litestar_gateway.domain.exceptions import (
     AlreadyMember,
     LastTeamAdmin,
@@ -43,16 +50,20 @@ from litestar_gateway.domain.exceptions import (
     PermissionDenied,
     TeamNotEmpty,
     TeamNotFound,
+    TeamNotSoftDeleted,
     UserNotFound,
 )
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.domain.ports import (
     APIKeyRepository,
+    AuditLog,
     ModelRepository,
     OrganizationRepository,
+    RoutingDecisionLog,
     TeamMembershipRepository,
     TeamRepository,
     Transaction,
+    UsageRepository,
     UserRepository,
 )
 
@@ -85,6 +96,10 @@ class TeamService:
         transaction: Transaction,
         models: ModelRepository,
         api_keys: APIKeyRepository,
+        *,
+        usage: UsageRepository | None = None,
+        audit_log: AuditLog | None = None,
+        routing: RoutingDecisionLog | None = None,
     ) -> None:
         self._orgs = organizations
         self._teams = teams
@@ -93,6 +108,11 @@ class TeamService:
         self._transaction = transaction
         self._models = models
         self._api_keys = api_keys
+        # Optional: only export/purge (Plan 13 Phase 5) need these, so existing
+        # callers/tests that build a TeamService without them keep working.
+        self._usage = usage
+        self._audit = audit_log
+        self._routing = routing
 
     @asynccontextmanager
     async def _unit_of_work(self) -> AsyncGenerator[None]:
@@ -259,9 +279,16 @@ class TeamService:
 
     async def delete_team(self, actor: User, team_id: UUID) -> Team:
         """Delete a team — platform-admin only. Refuses (TeamNotEmpty → 409) if it
-        still has models or API keys; otherwise removes the team with its intrinsic
-        children (members, budget, routers, service principals, usage history).
-        Returns the deleted team for the audit trail."""
+        still has models or API keys.
+
+        A team with NO billed history (no usage_event/pending_usage_event row) is
+        hard-deleted exactly as before, with its intrinsic children (members,
+        budget, routers, service principals, invites). A team WITH billed
+        history is soft-deleted (tombstoned) instead: it disappears from normal
+        listings/operations, but its usage/routing/audit history stays intact
+        and queryable until the separate, audited `purge_team` action removes it
+        for good (Plan 13 Phase 5). Returns the (pre-delete, or now-tombstoned)
+        team for the caller's audit trail."""
         if not actor.is_admin:
             raise PermissionDenied("Platform admin privileges required")
         async with self._unit_of_work():
@@ -272,6 +299,92 @@ class TeamService:
                 raise TeamNotEmpty(str(team_id))
             if await self._api_keys.list_by_team(team_id, limit=1, offset=0):
                 raise TeamNotEmpty(str(team_id))
+            if await self._teams.has_billed_history(team_id):
+                tombstoned = await self._teams.soft_delete(team_id)
+                return tombstoned if tombstoned is not None else team
+            await self._teams.delete(team_id)
+        return team
+
+    async def export_team_data(self, actor: User, team_id: UUID) -> dict[str, Any]:
+        """Full usage/audit history for one team, as a JSON-serializable dict —
+        the export-before-delete workflow (Plan 13 Phase 5). Platform-admin
+        only; works on a live OR already soft-deleted team (an admin exporting
+        right before purge must still be able to reach a tombstoned team)."""
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        team = await self._teams.get_any(team_id)
+        if team is None:
+            raise TeamNotFound(str(team_id))
+        usage_events: list[Any] = []
+        if self._usage is not None:
+            offset = 0
+            while True:
+                page = await self._usage.list_events(
+                    team_id, limit=DEFAULT_PAGE_SIZE, offset=offset
+                )
+                usage_events.extend(page)
+                if len(page) < DEFAULT_PAGE_SIZE:
+                    break
+                offset += len(page)
+        audit_events: list[Any] = []
+        if self._audit is not None:
+            offset = 0
+            while True:
+                page = await self._audit.list_by_target(
+                    "team", str(team_id), limit=DEFAULT_PAGE_SIZE, offset=offset
+                )
+                audit_events.extend(page)
+                if len(page) < DEFAULT_PAGE_SIZE:
+                    break
+                offset += len(page)
+        # Routing history is exported as the same savings aggregate the console
+        # already shows for a team, not a raw per-decision dump: routing
+        # decisions have no FK to team and no team-wide raw query exists yet
+        # (only per-router `list_decisions`), so a complete raw export is left
+        # for a follow-up; the aggregate keeps this export honest about what it
+        # actually contains.
+        routing_savings = None
+        if self._routing is not None:
+            (
+                total_savings,
+                decisions_counted,
+                decisions_without_usage,
+            ) = await self._routing.team_savings(team_id)
+            routing_savings = {
+                "total_estimated_savings": total_savings,
+                "decisions_counted": decisions_counted,
+                "decisions_without_usage": decisions_without_usage,
+            }
+        return {
+            "team": team,
+            "usage_events": usage_events,
+            "audit_events": audit_events,
+            "routing_savings": routing_savings,
+        }
+
+    async def purge_team(self, actor: User, team_id: UUID, audit_event: AuditEvent) -> Team:
+        """Irreversibly remove a soft-deleted team's data — the separate,
+        explicit, audited purge action (Plan 13 Phase 5). Platform-admin only,
+        and only on a team already tombstoned by `delete_team`; a live team
+        must go through the tombstone step first (→ 409 TeamNotSoftDeleted).
+
+        `audit_event` is staged in the SAME transaction as the deletion, before
+        it, so a crash mid-purge can never leave the destructive action
+        unaudited: either both the audit record and the deletion commit, or
+        neither does. Audit records themselves are never removed by purge —
+        they are the forensic evidence that the purge happened, and outlive it
+        (see docs/next-steps/billing-integrity.md §5)."""
+        if not actor.is_admin:
+            raise PermissionDenied("Platform admin privileges required")
+        async with self._unit_of_work():
+            team = await self._teams.get_any(team_id)
+            if team is None:
+                raise TeamNotFound(str(team_id))
+            if team.deleted_at is None:
+                raise TeamNotSoftDeleted(str(team_id))
+            if self._audit is None:  # pragma: no cover - wiring invariant
+                raise RuntimeError("Audit log is required to purge a team")
+            await self._audit.stage(audit_event)
             await self._teams.delete(team_id)
         return team
 

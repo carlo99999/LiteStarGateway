@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 from litestar import Controller, Request, delete, get, patch, post, put
 from litestar.di import NamedDependency, Provide
 from litestar.params import FromPath, FromQuery
+from litestar.status_codes import HTTP_204_NO_CONTENT
 
 from litestar_gateway.application.routing.webhook import _is_blocked, _literal_ip
 from litestar_gateway.application.service import APIKeyService
@@ -59,6 +60,7 @@ from litestar_gateway.infrastructure.web.teams.schemas import (
     MembershipResponse,
     SetBudgetRequest,
     SetRoleRequest,
+    TeamExportResponse,
     TeamResponse,
     UpdateTeamRequest,
     UsageResponse,
@@ -212,7 +214,9 @@ class TeamController(Controller):
         audit_log: NamedDependency[AuditLog],
     ) -> None:
         # Refuses with 409 (TeamNotEmpty) if the team still has models or API
-        # keys; otherwise removes the team and its intrinsic children.
+        # keys. Otherwise removes the team: hard-deleted with its intrinsic
+        # children if it has no billed history, or soft-deleted (tombstoned) if
+        # it does — see `TeamService.delete_team` (Plan 13 Phase 5).
         team = await team_service.delete_team(current_admin, team_id)
         await record_audit(
             audit_log,
@@ -223,6 +227,51 @@ class TeamController(Controller):
             target_id=team.id,
             detail=team.name,
         )
+
+    @get(
+        "/{team_id:uuid}/export",
+        dependencies={"current_admin": Provide(provide_current_admin)},
+    )
+    async def export_team(
+        self,
+        team_id: FromPath[UUID],
+        current_admin: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+    ) -> TeamExportResponse:
+        """Export a team's full usage/audit/routing-savings history as JSON
+        (Plan 13 Phase 5) — the optional export-before-delete workflow.
+        Platform-admin only. Works on a live team or one already tombstoned
+        by `delete_team`, so an admin can export right before purging."""
+        export = await team_service.export_team_data(current_admin, team_id)
+        return TeamExportResponse.from_export(export)
+
+    @post(
+        "/{team_id:uuid}/purge",
+        status_code=HTTP_204_NO_CONTENT,
+        dependencies={"current_admin": Provide(provide_current_admin)},
+    )
+    async def purge_team(
+        self,
+        request: Request,
+        team_id: FromPath[UUID],
+        current_admin: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        audit_log: NamedDependency[AuditLog],
+    ) -> None:
+        """Irreversibly purge a soft-deleted team's data (Plan 13 Phase 5):
+        separate from, and stronger than, ordinary delete. Platform-admin
+        only; refuses (409 TeamNotSoftDeleted) unless `delete_team` already
+        tombstoned this team. The audit record is staged and committed
+        atomically with the deletion inside the service — never recorded
+        after the fact, so a crash mid-purge can't leave it unaudited."""
+        audit_event = make_audit_event(
+            request,
+            current_admin,
+            "team.purge",
+            target_type="team",
+            target_id=team_id,
+        )
+        await team_service.purge_team(current_admin, team_id, audit_event)
 
     @get("/{team_id:uuid}/members")
     async def list_members(

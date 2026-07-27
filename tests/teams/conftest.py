@@ -3,6 +3,7 @@ repositories) plus the integration `client` + helpers for the API-level tests.""
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import cast
@@ -49,25 +50,48 @@ class FakeOrgRepo:
 class FakeTeamRepo:
     def __init__(self) -> None:
         self.items: dict[UUID, Team] = {}
+        # Team ids the test wants `has_billed_history` to report True for
+        # (default: none — matches the real repo's "no usage" starting state).
+        self.billed: set[UUID] = set()
 
     async def add(self, team: Team) -> Team:
         self.items[team.id] = team
         return team
 
     async def get(self, team_id: UUID) -> Team | None:
+        team = self.items.get(team_id)
+        return team if team is not None and team.deleted_at is None else None
+
+    async def get_any(self, team_id: UUID) -> Team | None:
         return self.items.get(team_id)
+
+    async def has_billed_history(self, team_id: UUID) -> bool:
+        return team_id in self.billed
+
+    async def soft_delete(self, team_id: UUID) -> Team | None:
+        team = self.items.get(team_id)
+        if team is None:
+            return None
+        tombstoned = dataclasses.replace(team, deleted_at=_now())
+        self.items[team_id] = tombstoned
+        return tombstoned
 
     async def list_by_ids(self, team_ids) -> list[Team]:  # noqa: ANN001
         wanted = set(team_ids)
-        return [t for t in self.items.values() if t.id in wanted]
+        return [t for t in self.items.values() if t.id in wanted and t.deleted_at is None]
 
     async def lock_for_lifecycle(self, team_id: UUID) -> Team | None:
-        return self.items.get(team_id)
+        team = self.items.get(team_id)
+        return team if team is not None and team.deleted_at is None else None
 
     async def list_by_organization(
         self, organization_id: UUID, *, limit: int = 100, offset: int = 0
     ) -> list[Team]:
-        rows = [t for t in self.items.values() if t.organization_id == organization_id]
+        rows = [
+            t
+            for t in self.items.values()
+            if t.organization_id == organization_id and t.deleted_at is None
+        ]
         return rows[offset : offset + limit]
 
     async def delete(self, team_id: UUID) -> None:

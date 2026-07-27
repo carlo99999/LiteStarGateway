@@ -32,6 +32,15 @@ class Team:
     tags: list[str] = field(default_factory=list)
     # Requests/minute cap for the whole team (all keys); None = unlimited.
     rate_limit_rpm: int | None = None
+    # Tombstone timestamp (Plan 13 Phase 5): set instead of a hard delete when
+    # the team has billed history (any usage_event/pending_usage_event row).
+    # None = live team. A soft-deleted team is hidden from normal listings and
+    # operations; only the explicit, audited purge action removes it for good.
+    deleted_at: datetime | None = None
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
 
 
 @dataclass(frozen=True)
