@@ -52,11 +52,31 @@ Also verified (no rework needed): the design doc's already-shipped catch-all
 `log_exceptions="always"`) already returns a generic body while logging full
 detail server-side.
 
-### B — CI drift gates
+### B — CI drift gates ✅ (27 July 2026)
 
 - Wire `just migration-check`.
 - Regenerate OpenAPI + TypeScript schema into temporary outputs and diff.
 - Add a Markdown link checker for roadmap/design docs.
+
+**Done** (#384): the `checks` job now applies migrations to a fresh SQLite DB
+and runs `just migration-check` (`litestar database check`, an autogenerate-diff
+gate) — fails on any ORM change shipped without a migration. A new
+`schema-drift` CI job + `just ui-schema-check` regenerate `ui/openapi.json` and
+`ui/src/lib/api/schema.ts` into a scratch directory (never overwriting the
+committed files) and diff against what's checked in. A new
+`scripts/check_doc_links.py` + `just docs-check-links` scan every Markdown link
+in `plans/*.md` and `docs/**/*.md` and fail on a broken internal relative link
+(external URLs and in-file anchors are skipped).
+
+Verifying these gates were clean on `main` surfaced two pieces of real drift,
+fixed as part of this slice: response-header key ordering in the generated
+OpenAPI schema was non-deterministic (Litestar resolves a route's response
+headers via `frozenset[ResponseHeader]`, so byte-diffing two regenerations
+depends on Python's randomized string-hash seed) — `ui-schema`/`ui-schema-check`
+now pin `PYTHONHASHSEED=0` for reproducible regeneration. Separately,
+`ui/openapi.json`/`schema.ts` hadn't been regenerated after Slice A's
+request-correlation-id columns landed, so the typed client was missing the new
+`request_id` field; regenerated and committed (no application code touched).
 
 ### C — Browser E2E
 
