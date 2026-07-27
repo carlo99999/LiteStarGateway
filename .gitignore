@@ -44,4 +44,10 @@ ui/dist/
 ui/*.tsbuildinfo
 ui/.vite/
 
+# Playwright E2E: throwaway backend database, reports, and failure artifacts.
+.e2e-data/
+ui/playwright-report/
+ui/test-results/
+ui/blob-report/
+
 **/*/.DS_Store
