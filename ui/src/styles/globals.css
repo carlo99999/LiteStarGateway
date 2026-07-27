@@ -41,6 +41,17 @@
 
     /* Subtle background grid (light) */
     --grid-line: rgba(22, 163, 74, 0.06);
+
+    /* Categorical chart palette (light) — validated ordering, see
+     * dataviz skill's references/palette.md. Fixed order, never cycled. */
+    --chart-1: #2a78d6;
+    --chart-2: #eb6834;
+    --chart-3: #1baf7a;
+    --chart-4: #eda100;
+    --chart-5: #e87ba4;
+    --chart-6: #008300;
+    --chart-7: #4a3aa7;
+    --chart-8: #e34948;
   }
 
   .dark {
@@ -74,6 +85,17 @@
 
     /* Subtle background grid (dark) */
     --grid-line: rgba(34, 197, 94, 0.05);
+
+    /* Categorical chart palette (dark) — same eight hues, stepped for the
+     * dark surface (dataviz skill's references/palette.md). */
+    --chart-1: #3987e5;
+    --chart-2: #d95926;
+    --chart-3: #199e70;
+    --chart-4: #c98500;
+    --chart-5: #d55181;
+    --chart-6: #008300;
+    --chart-7: #9085e9;
+    --chart-8: #e66767;
   }
 }
 

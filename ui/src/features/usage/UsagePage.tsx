@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { canReadUsage } from "@/features/teams/access";
 import { useAccessibleTeams } from "@/features/teams/useAccessibleTeams";
 import { listTeamUsagePage, type TeamUsage } from "@/features/usage/api";
+import { UsageChartsPanel } from "@/features/usage/UsageChartsPanel";
 import { TABLE_PAGE_SIZE, previousPageOffset } from "@/lib/api/pagination";
 import { toError } from "@/lib/toError";
 
@@ -161,6 +162,7 @@ export function UsagePage() {
           onOffsetChange={setOffset}
         />
       ) : null}
+      {teamId ? <UsageChartsPanel teamId={teamId} /> : null}
     </>
   );
 }

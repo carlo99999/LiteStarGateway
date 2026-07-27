@@ -312,6 +312,88 @@ async def test_timeseries_is_tenant_isolated(session: AsyncSession) -> None:
     assert buckets[0].request_count == 1
 
 
+async def test_timeseries_group_by_model_emits_one_row_per_bucket_and_model(
+    session: AsyncSession,
+) -> None:
+    team_id = await _seed_team(session)
+    model_a, model_b = uuid4(), uuid4()
+    day = datetime(2026, 3, 1, tzinfo=UTC)
+    session.add(
+        _usage_event(
+            team_id,
+            model_a,
+            day,
+            requested_alias="fast",
+            canonical_model_name="gpt-4o-mini",
+        )
+    )
+    session.add(
+        _usage_event(
+            team_id,
+            model_a,
+            day,
+            requested_alias="fast",
+            canonical_model_name="gpt-4o-mini",
+        )
+    )
+    session.add(
+        _usage_event(
+            team_id,
+            model_b,
+            day,
+            requested_alias="smart",
+            canonical_model_name="gpt-4o",
+        )
+    )
+    await session.commit()
+
+    buckets = await SQLAlchemyUsageRepository(session).timeseries(
+        team_id,
+        start=day,
+        end=day + timedelta(days=1),
+        granularity="day",
+        group_by="model",
+    )
+    assert len(buckets) == 2
+    by_key = {b.group_key: b for b in buckets}
+    assert set(by_key) == {"fast", "smart"}
+    assert by_key["fast"].request_count == 2
+    assert by_key["smart"].request_count == 1
+    assert by_key["fast"].bucket_start == day
+
+
+async def test_timeseries_group_by_model_falls_back_to_canonical_name_without_alias(
+    session: AsyncSession,
+) -> None:
+    team_id = await _seed_team(session)
+    model_id = uuid4()
+    day = datetime(2026, 3, 1, tzinfo=UTC)
+    session.add(
+        _usage_event(team_id, model_id, day, requested_alias=None, canonical_model_name="gpt-4o")
+    )
+    await session.commit()
+
+    buckets = await SQLAlchemyUsageRepository(session).timeseries(
+        team_id, start=day, end=day + timedelta(days=1), granularity="day", group_by="model"
+    )
+    assert len(buckets) == 1
+    assert buckets[0].group_key == "gpt-4o"
+
+
+async def test_timeseries_without_group_by_leaves_group_key_none(session: AsyncSession) -> None:
+    team_id = await _seed_team(session)
+    model_id = uuid4()
+    day = datetime(2026, 3, 1, tzinfo=UTC)
+    session.add(_usage_event(team_id, model_id, day))
+    await session.commit()
+
+    buckets = await SQLAlchemyUsageRepository(session).timeseries(
+        team_id, start=day, end=day + timedelta(days=1), granularity="day"
+    )
+    assert len(buckets) == 1
+    assert buckets[0].group_key is None
+
+
 async def test_timeseries_is_dst_independent_across_a_us_dst_transition(
     session: AsyncSession,
 ) -> None:
@@ -364,6 +446,63 @@ async def test_usage_timeseries_returns_bucketed_data(client: AsyncTestClient) -
     assert body["team_id"] == team
     assert body["granularity"] == "day"
     assert body["buckets"] == []
+
+
+async def test_usage_timeseries_rejects_bad_group_by(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    team, _cred = await _team_and_credential(client, admin, "bad-group-by")
+
+    resp = await client.get(
+        f"/teams/{team}/usage/timeseries"
+        "?start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z&granularity=day"
+        "&group_by=api_key",
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_400_BAD_REQUEST
+
+
+async def test_usage_timeseries_group_by_model_reflects_a_real_call(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(openai_adapter, "AsyncOpenAI", _EchoClient)
+    admin = await _admin(client)
+    team, cred = await _team_and_credential(client, admin, "e2e-group-by")
+    await client.post(
+        f"/teams/{team}/models",
+        json={
+            "name": "ts-group-model",
+            "provider": "openai",
+            "credential_id": cred,
+            "type": "chat",
+            "provider_model_id": "gpt-4o-mini",
+        },
+        headers=_bearer(admin),
+    )
+    key = (
+        await client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(admin))
+    ).json()["plaintext"]
+
+    chat = await client.post(
+        "/v1/chat/completions",
+        json={"model": "ts-group-model", "messages": [{"role": "user", "content": "hi"}]},
+        headers=_bearer(key),
+    )
+    assert chat.status_code == HTTP_200_OK, chat.text
+
+    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow = today + timedelta(days=1)
+    resp = await client.get(
+        f"/teams/{team}/usage/timeseries"
+        f"?start={today.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+        f"&end={tomorrow.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+        "&granularity=day&group_by=model",
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_200_OK, resp.text
+    buckets = resp.json()["buckets"]
+    assert len(buckets) == 1
+    assert buckets[0]["group_key"] == "ts-group-model"
+    assert buckets[0]["request_count"] == 1
 
 
 async def test_usage_timeseries_rejects_bad_granularity(client: AsyncTestClient) -> None:

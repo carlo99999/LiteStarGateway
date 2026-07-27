@@ -133,6 +133,9 @@ class UsageBucketResponse:
     completion_tokens: int
     total_tokens: int
     cost: float
+    # Non-None only when the request passed `group_by=model` (Plan 10 Phase 2):
+    # the requested-alias-or-canonical-model-name label for this row.
+    group_key: str | None = None
 
     @classmethod
     def from_bucket(cls, b: UsageBucket) -> UsageBucketResponse:
@@ -143,6 +146,7 @@ class UsageBucketResponse:
             completion_tokens=b.completion_tokens,
             total_tokens=b.prompt_tokens + b.completion_tokens,
             cost=b.cost,
+            group_key=b.group_key,
         )
 
 

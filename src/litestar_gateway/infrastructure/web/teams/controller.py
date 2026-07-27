@@ -67,6 +67,7 @@ from litestar_gateway.infrastructure.web.teams.schemas import (
 )
 
 _TIMESERIES_GRANULARITIES = frozenset({"hour", "day"})
+_TIMESERIES_GROUP_BY = frozenset({"model"})
 
 
 def _cache_savings_response(
@@ -597,13 +598,19 @@ class TeamController(Controller):
         model: FromQuery[str | None] = None,
         alias: FromQuery[str | None] = None,
         api_key_id: FromQuery[UUID | None] = None,
+        group_by: FromQuery[str | None] = None,
     ) -> UsageTimeseriesResponse:
         """Bucketed usage over ``[start, end)`` (Plan 10 Phase 1) — the data
-        layer the console's per-model-over-time chart will consume. Same
-        filter semantics as `usage` (``model`` = alias-or-canonical match,
+        layer the console's per-model-over-time chart consumes. Same filter
+        semantics as `usage` (``model`` = alias-or-canonical match,
         ``alias``/``api_key_id`` exact); ``granularity`` is ``hour`` or
         ``day``. Accepts a JWT or a management-scoped API key (own team only),
-        same as `usage`."""
+        same as `usage`.
+
+        ``group_by=model`` (Plan 10 Phase 2) emits one bucket row per
+        ``(bucket_start, group_key)`` pair instead of one per ``bucket_start``,
+        so the console's "which models, how often" stacked chart can be built
+        from a single call rather than fanning out one request per model."""
         await team_service.ensure_principal_team_permission(
             principal, team_id, Permission.USAGE_READ
         )
@@ -612,6 +619,9 @@ class TeamController(Controller):
             raise InvalidUsageQuery(f"granularity must be one of {valid}, got {granularity!r}")
         if end <= start:
             raise InvalidUsageQuery("end must be after start")
+        if group_by is not None and group_by not in _TIMESERIES_GROUP_BY:
+            valid_group_by = sorted(_TIMESERIES_GROUP_BY)
+            raise InvalidUsageQuery(f"group_by must be one of {valid_group_by}, got {group_by!r}")
         buckets = await usage_repository.timeseries(
             team_id,
             start=start,
@@ -620,6 +630,7 @@ class TeamController(Controller):
             model_name=model,
             requested_alias=alias,
             api_key_id=api_key_id,
+            group_by=group_by,  # type: ignore[arg-type]  # validated above
         )
         series = UsageTimeseries(
             team_id=team_id,
