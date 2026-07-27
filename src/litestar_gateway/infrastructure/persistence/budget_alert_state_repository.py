@@ -2,19 +2,30 @@
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import BudgetAlertState, BudgetWindow, PendingBudgetAlert
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.domain.ports.notification_channel import NotificationChannel
 from litestar_gateway.infrastructure.persistence.orm import (
     BudgetAlertStateModel,
     PendingBudgetAlertModel,
 )
+
+logger = logging.getLogger("litestar_gateway.budget_alerts")
+
+# Mirrors usage_repository.MAX_RECONCILE_ATTEMPTS: after this many failed
+# delivery attempts a pending alert is quarantined (stays in the table for
+# inspection but is no longer selected), so a permanently-failing target
+# can't occupy the oldest-first batch forever and starve newer alerts.
+MAX_DISPATCH_ATTEMPTS = 10
 
 
 class SQLAlchemyBudgetAlertStateRepository:
@@ -82,3 +93,81 @@ class SQLAlchemyBudgetAlertStateRepository:
             .limit(limit)
         )
         return [row.to_entity() for row in rows.all()]
+
+    async def dispatch_pending(
+        self, channels: Sequence[NotificationChannel], *, limit: int = DEFAULT_PAGE_SIZE
+    ) -> int:
+        """Drain up to `limit` pending alerts oldest-first (Plan 07 Phase 2):
+        dispatch each through every configured channel, delete the row on
+        success, or bump attempts/last_error and leave it queued for retry on
+        failure. Mirrors `SQLAlchemyUsageRepository.reconcile_pending`'s
+        shape and poison-quarantine policy exactly, reusing the
+        `attempts`/`last_error` columns Phase 1 reserved. A row is retried in
+        full (all channels) on any single channel's failure — Phase 2 ships
+        only one channel (webhook), so no partial-delivery/fan-out dedup
+        logic is built; revisit if Phase 3's email channel makes that a real
+        concern. No channels configured ⇒ a no-op (nothing is dispatched or
+        marked failed), so an alert simply waits for a channel to be wired up."""
+        if not channels:
+            return 0
+        pending = (
+            await self._session.scalars(
+                select(PendingBudgetAlertModel)
+                .where(PendingBudgetAlertModel.attempts < MAX_DISPATCH_ATTEMPTS)
+                .order_by(PendingBudgetAlertModel.created_at)
+                .limit(limit)
+            )
+        ).all()
+        # Snapshot everything needed for the whole batch up front: `rollback()`
+        # expires every ORM instance in the session, not just the row that
+        # failed, so touching a later row's still-ORM-bound attributes after
+        # an earlier row's rollback would force a synchronous re-fetch (and
+        # blow up under the async engine). Deleting by id (below) means we
+        # never need the ORM instance itself again.
+        batch = [(row.id, row.attempts, row.to_entity()) for row in pending]
+        delivered = 0
+        for row_id, attempts, alert in batch:
+            try:
+                for channel in channels:
+                    await channel.send(alert)
+                await self._session.execute(
+                    delete(PendingBudgetAlertModel).where(PendingBudgetAlertModel.id == row_id)
+                )
+                await self._session.commit()
+                delivered += 1
+            except Exception as exc:  # one bad row must not stop the batch
+                await self._session.rollback()
+                await self._mark_failed_attempt(row_id, attempts + 1, exc)
+        return delivered
+
+    async def _mark_failed_attempt(self, row_id: UUID, attempts: int, exc: Exception) -> None:
+        """Failure bookkeeping for one pending alert: count the attempt and
+        keep the last error. At MAX_DISPATCH_ATTEMPTS the row stops being
+        selected (quarantined) — escalate to ERROR so an operator resolves
+        the permanently-failing target by hand."""
+        try:
+            await self._session.execute(
+                update(PendingBudgetAlertModel)
+                .where(PendingBudgetAlertModel.id == row_id)
+                .values(attempts=attempts, last_error=repr(exc)[:500])
+            )
+            await self._session.commit()
+        except Exception:  # bookkeeping is best-effort; the row stays selectable
+            await self._session.rollback()
+            logger.warning("failed to record alert dispatch attempt", exc_info=True)
+            return
+        if attempts >= MAX_DISPATCH_ATTEMPTS:
+            logger.error(
+                "pending budget alert quarantined after %d failed attempts: id=%s",
+                attempts,
+                row_id,
+                exc_info=exc,
+            )
+        else:
+            logger.warning(
+                "failed to dispatch pending budget alert (attempt %d/%d): id=%s",
+                attempts,
+                MAX_DISPATCH_ATTEMPTS,
+                row_id,
+                exc_info=exc,
+            )

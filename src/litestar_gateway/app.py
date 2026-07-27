@@ -18,8 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from litestar_gateway.application.routing.service import drain_shadow_tasks
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.exceptions import DomainError
-from litestar_gateway.domain.ports import IdentityProvider, LLMGateway
+from litestar_gateway.domain.ports import IdentityProvider, LLMGateway, NotificationChannel
 from litestar_gateway.infrastructure.bootstrap import make_bootstrap_admin
+from litestar_gateway.infrastructure.budget_alert_reconciler import make_budget_alert_dispatcher
 from litestar_gateway.infrastructure.cache import (
     build_response_cache,
     build_semantic_response_cache,
@@ -28,6 +29,9 @@ from litestar_gateway.infrastructure.circuit_breaker import build_circuit_breake
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
 from litestar_gateway.infrastructure.logging import build_logging_config
+from litestar_gateway.infrastructure.notifications.webhook_channel import (
+    WebhookNotificationChannel,
+)
 from litestar_gateway.infrastructure.observability.aggregator import MetricsAggregator
 from litestar_gateway.infrastructure.observability.composite import CompositeTraceSink
 from litestar_gateway.infrastructure.observability.dispatcher import TraceDispatcher
@@ -441,6 +445,23 @@ def _make_llm_gateway_lifespan(llm_gateway: LLMGatewayImpl):
     return lifespan
 
 
+def _build_notification_channels(settings: Settings) -> list[NotificationChannel]:
+    """Configured budget-alert delivery channels (Plan 07 Phase 2). Empty
+    when no target is set — the caller skips registering the dispatcher
+    lifespan entirely in that case, per `make_budget_alert_dispatcher`'s
+    docstring, rather than running a worker with nowhere to deliver to."""
+    channels: list[NotificationChannel] = []
+    if settings.budget_alert_webhook_url:
+        channels.append(
+            WebhookNotificationChannel(
+                settings.budget_alert_webhook_url,
+                bearer_token=settings.budget_alert_webhook_bearer_token,
+                timeout_ms=settings.budget_alert_webhook_timeout_ms,
+            )
+        )
+    return channels
+
+
 def _build_lifespan(
     database: Database,
     settings: Settings,
@@ -448,10 +469,16 @@ def _build_lifespan(
     metrics_aggregator: MetricsAggregator | None,
     llm_gateway: LLMGatewayImpl,
 ) -> list:
+    notification_channels = _build_notification_channels(settings)
     return [
         _make_llm_gateway_lifespan(llm_gateway),
         make_rotation_scheduler(database, settings),
         make_usage_reconciler(database, settings),
+        *(
+            [make_budget_alert_dispatcher(database, settings, notification_channels)]
+            if notification_channels
+            else []
+        ),
         trace_dispatcher.run,
         *(
             [
