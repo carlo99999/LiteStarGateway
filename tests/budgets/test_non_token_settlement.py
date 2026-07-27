@@ -34,6 +34,9 @@ class _FakeUsageRepository:
     async def record(self, event: UsageEvent) -> None:
         self.recorded.append(event)
 
+    async def list_events(self, team_id: UUID, **_: Any) -> list[UsageEvent]:
+        return []
+
     async def aggregate(self, team_id: UUID, **_: Any) -> list[UsageAggregate]:
         return []
 
