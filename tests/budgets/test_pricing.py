@@ -9,14 +9,26 @@ reservation and the authoritative settlement call.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
+from litestar_gateway.domain.exceptions import InvalidModelPricing
 from litestar_gateway.domain.pricing import (
     BillableUsage,
     RateCard,
     compute_cost,
     image_price_key,
     image_unit_price,
+    validate_rate_card,
+)
+
+RATE_FIELDS = (
+    "input_cost_per_token",
+    "output_cost_per_token",
+    "cache_write_cost_per_token",
+    "cache_read_cost_per_token",
+    "image_cost_per_image",
 )
 
 # ── Token pricing (regression: byte-identical to the pre-Plan-13 formula) ─────
@@ -152,3 +164,71 @@ def test_all_dimensions_sum_independently() -> None:
     )
     expected = 10 * 1 + 20 * 2 + 30 * 3 + 40 * 4 + 2 * 5
     assert compute_cost(usage, rates) == pytest.approx(expected)
+
+
+# ── Rate validation: a rate is never negative or non-finite (ISSUE-022) ───────
+
+
+@pytest.mark.parametrize("field", RATE_FIELDS)
+@pytest.mark.parametrize("bad", [-1.0, -0.000001, -5, float("nan"), float("inf"), float("-inf")])
+def test_validate_rate_card_rejects_negative_or_non_finite_rate(field: str, bad: float) -> None:
+    # Every dimension, not just tokens: a negative rate makes `compute_cost`
+    # return a credit, which the ledger and the budget gate both trust.
+    rates: dict[str, Any] = {field: bad}
+    with pytest.raises(InvalidModelPricing, match=field):
+        validate_rate_card(RateCard(**rates))
+
+
+@pytest.mark.parametrize("field", RATE_FIELDS)
+def test_validate_rate_card_accepts_zero_and_none(field: str) -> None:
+    zero: dict[str, Any] = {field: 0.0}
+    unset: dict[str, Any] = {field: None}
+    validate_rate_card(RateCard(**zero))
+    validate_rate_card(RateCard(**unset))
+
+
+def test_validate_rate_card_accepts_ordinary_positive_rates() -> None:
+    validate_rate_card(
+        RateCard(
+            input_cost_per_token=0.000005,
+            output_cost_per_token=0.000015,
+            cache_write_cost_per_token=0.00000625,
+            cache_read_cost_per_token=0.0000005,
+            image_cost_per_image=0.04,
+            image_prices={"1024x1024/hd": 0.08, "1024x1024/standard": 0.0},
+        )
+    )
+
+
+@pytest.mark.parametrize("bad", [-0.01, float("nan"), float("inf")])
+def test_validate_rate_card_rejects_bad_image_price_entry(bad: float) -> None:
+    with pytest.raises(InvalidModelPricing, match="1024x1024/hd"):
+        validate_rate_card(RateCard(image_prices={"1024x1024/hd": bad}))
+
+
+@pytest.mark.parametrize("bad", ["0.01", None, True, [], {}])
+def test_validate_rate_card_rejects_non_numeric_rate(bad: object) -> None:
+    # `None` means "unpriced" on a scalar rate, but an explicit entry in
+    # `image_prices` must be a real number — a JSON body reaches here untyped.
+    with pytest.raises(InvalidModelPricing):
+        validate_rate_card(RateCard(image_prices={"1024x1024/hd": bad}))  # type: ignore[dict-item]
+
+
+def test_validated_rate_card_can_never_produce_a_credit() -> None:
+    # The invariant the validation exists to protect: cost is never negative,
+    # so settlement can only ever debit the ledger.
+    rates = RateCard(
+        input_cost_per_token=0.001,
+        output_cost_per_token=0.0,
+        image_cost_per_image=0.04,
+        image_prices={"1024x1024/hd": 0.0},
+    )
+    validate_rate_card(rates)
+    usage = BillableUsage(
+        prompt_tokens=7,
+        completion_tokens=3,
+        image_count=1,
+        image_size="1024x1024",
+        image_quality="hd",
+    )
+    assert compute_cost(usage, rates) >= 0.0

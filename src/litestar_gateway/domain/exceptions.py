@@ -266,6 +266,12 @@ class InvalidBudget(DomainError):
     """The budget definition is invalid (non-positive limit or unknown window)."""
 
 
+class InvalidModelPricing(DomainError):
+    """A model rate is negative or not a finite number. A negative rate would
+    make settlement credit the ledger the budget gate reads, so it is refused
+    on every write path (→ 400)."""
+
+
 class InvalidUsageQuery(DomainError):
     """A usage-timeseries query is malformed (→ 400): unknown granularity or
     an empty/inverted `[start, end)` range."""

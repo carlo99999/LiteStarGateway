@@ -62,7 +62,7 @@ Counts: **0 CRITICAL · 2 HIGH · 7 MEDIUM · 0 LOW**.
 
 | ID | Title | Severity | Files | Status |
 |---|---|---|---|---|
-| ISSUE-022 | Prezzi negativi accreditano il ledger e aumentano il budget disponibile | HIGH | `web/models/schemas.py`; `model_service.py`; `pricing.py` | Open |
+| ISSUE-022 | Prezzi negativi accreditano il ledger e aumentano il budget disponibile | HIGH | `web/models/schemas.py`; `model_service.py`; `pricing.py` | Fixed by #392 |
 | ISSUE-023 | Le cache possono riusare risposte tra modello, operazione e policy differenti | HIGH | `response_cache_key.py`; `response_cache_semantic.py`; `semantic.py`; `completion_service.py` | Open |
 | ISSUE-024 | La cache semantica ha retention globale illimitata dei bucket | MEDIUM | `infrastructure/cache/semantic.py`; `web/teams/controller.py` | Open |
 | ISSUE-025 | Il client registry perde il client sostitutivo durante close-on-release | MEDIUM | `infrastructure/llm/client_registry.py` | Open |
@@ -414,8 +414,12 @@ del purge presente.
   sul tree corrente; non sono state rilevate regressioni nelle superfici
   precedentemente chiuse, salvo la **nuova superficie DB-backed** descritta in
   ISSUE-028 per la classe storica R4-M31.
-- ISSUE-022–ISSUE-030: finding nuovi di questo round, tutti **Open**. Questa è
-  una review report-only: nessuna modifica al prodotto è stata applicata.
+- ISSUE-022–ISSUE-030: finding nuovi di questo round. La review era
+  report-only; la remediation procede una PR per issue secondo
+  [plans/16-round-13-remediation.md](../plans/16-round-13-remediation.md).
+  **ISSUE-022 è chiuso da #392** (validazione dominio delle tariffe, CHECK sulle
+  colonne di prezzo e clamp dei valori negativi preesistenti); gli altri restano
+  **Open**.
 
 ## Deferred / product decision
 

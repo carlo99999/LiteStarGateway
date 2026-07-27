@@ -26,12 +26,29 @@ from litestar_gateway.domain.exceptions import (
 )
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.domain.ports import CredentialRepository, ModelRepository
+from litestar_gateway.domain.pricing import RateCard, validate_rate_card
 
 _GLOBAL_SUFFIX = "-global"
 
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _ensure_valid_pricing(model: Model) -> None:
+    """Refuse a model whose rates would make settlement credit the ledger.
+    Applied to the *resulting* entity, so a partial update that leaves other
+    rates untouched is validated as a whole (ISSUE-022)."""
+    validate_rate_card(
+        RateCard(
+            input_cost_per_token=model.input_cost_per_token,
+            output_cost_per_token=model.output_cost_per_token,
+            cache_write_cost_per_token=model.cache_write_cost_per_token,
+            cache_read_cost_per_token=model.cache_read_cost_per_token,
+            image_cost_per_image=model.image_cost_per_image,
+            image_prices=model.image_prices,
+        )
+    )
 
 
 def _slug(text: str) -> str:
@@ -114,34 +131,34 @@ class ModelService:
             if taken:
                 raise ModelNameExists(name)
         await self._validate_credential(provider, credential_id)
-        return await self._models.add(
-            Model(
-                id=uuid4(),
-                team_id=team_id,
-                name=name,
-                provider=provider,
-                credential_id=credential_id,
-                type=model_type,
-                provider_model_id=provider_model_id,
-                params=params or {},
-                params_enforced=params_enforced or {},
-                max_output_tokens=max_output_tokens,
-                api_version=api_version,
-                input_cost_per_token=input_cost_per_token,
-                output_cost_per_token=output_cost_per_token,
-                enabled=enabled,
-                created_at=_now(),
-                # Remember the owning team so provenance survives a later promote.
-                origin_team_id=team_id,
-                cache_enabled=cache_enabled,
-                cache_allow_nondeterministic=cache_allow_nondeterministic,
-                cache_semantic_enabled=cache_semantic_enabled,
-                cache_write_cost_per_token=cache_write_cost_per_token,
-                cache_read_cost_per_token=cache_read_cost_per_token,
-                image_cost_per_image=image_cost_per_image,
-                image_prices=image_prices or {},
-            )
+        model = Model(
+            id=uuid4(),
+            team_id=team_id,
+            name=name,
+            provider=provider,
+            credential_id=credential_id,
+            type=model_type,
+            provider_model_id=provider_model_id,
+            params=params or {},
+            params_enforced=params_enforced or {},
+            max_output_tokens=max_output_tokens,
+            api_version=api_version,
+            input_cost_per_token=input_cost_per_token,
+            output_cost_per_token=output_cost_per_token,
+            enabled=enabled,
+            created_at=_now(),
+            # Remember the owning team so provenance survives a later promote.
+            origin_team_id=team_id,
+            cache_enabled=cache_enabled,
+            cache_allow_nondeterministic=cache_allow_nondeterministic,
+            cache_semantic_enabled=cache_semantic_enabled,
+            cache_write_cost_per_token=cache_write_cost_per_token,
+            cache_read_cost_per_token=cache_read_cost_per_token,
+            image_cost_per_image=image_cost_per_image,
+            image_prices=image_prices or {},
         )
+        _ensure_valid_pricing(model)
+        return await self._models.add(model)
 
     async def list_for_team(
         self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
@@ -232,6 +249,7 @@ class ModelService:
         )
         applied = {k: v for k, v in changes.items() if v is not None}
         updated = dataclasses.replace(model, **applied)
+        _ensure_valid_pricing(updated)
         if team_id is not None:
             return await self._models.update(updated)
         persisted = await self._models.update_global(updated)
