@@ -11,11 +11,46 @@ impossible to merge unnoticed.
 
 ## Independent slices
 
-### A — Request correlation
+### A — Request correlation ✅ (27 July 2026)
 
 - Request-ID middleware/hook, trusted-proxy validation and response header.
 - Bind to structlog and propagate to audit/usage/routing/trace records.
 - Tests prove ID consistency and absence of secrets.
+
+**Done** (#382): `RequestIDMiddleware`
+(`src/litestar_gateway/infrastructure/web/request_id.py`, registered app-wide
+in `app.py`) resolves/binds/echoes an `X-Request-ID` per request. Header name:
+`X-Request-ID`, 1-128 chars, charset `[A-Za-z0-9_-]`. Trusted-proxy policy: an
+inbound value is accepted verbatim only when the direct connecting peer is in
+the new `Settings.trusted_proxy_ips` (`TRUSTED_PROXY_IPS`, comma-separated
+IPs/CIDRs) **and** passes the length/charset check — mirroring
+`FORWARDED_ALLOW_IPS` (the existing ASGI-server-level trusted-proxy concept in
+`docs/operations.md`), which lives outside app code and so needed an
+analogous, minimal app-level allowlist rather than a parallel mechanism.
+Every other case (untrusted source, malformed value, absent header) generates
+a fresh id.
+
+Propagation is contextvar-based, not parameter-threaded: `current_request_id()`
+(`src/litestar_gateway/request_context.py` — a top-level module importing only
+`structlog`, no `litestar`/`infrastructure`) reads the id bound to
+`structlog.contextvars` by the middleware. `TraceRecord`, `UsageEvent`,
+`AuditEvent` and `RoutingDecisionRecord` each gained a nullable `request_id`
+field, set via this accessor at their construction sites (`usage_meter.py`,
+`routing/service.py`, `audit/recorder.py`, the SCIM/SSO audit-event
+constructors) — no `UsageMeter`/`RouterService`/`CompletionService` signature
+had to change, and the domain/application → infrastructure/litestar boundary
+stayed intact. `GET /audit` also now returns `request_id`.
+
+Migration `2026-07-27_add_request_correlation_id_columns_7750ec93d00f` adds a
+nullable `request_id` column (no `server_default`) to `usage_event`,
+`pending_usage_event`, `audit_event` and `routing_decision` — nullable because
+historical rows and background-worker-originated records (key rotation,
+budget-alert reconciler, shadow routing) genuinely have no request to tag.
+
+Also verified (no rework needed): the design doc's already-shipped catch-all
+500 handling — Litestar's default exception path (no `debug=True`,
+`log_exceptions="always"`) already returns a generic body while logging full
+detail server-side.
 
 ### B — CI drift gates
 
