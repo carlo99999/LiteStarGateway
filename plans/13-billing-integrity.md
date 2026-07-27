@@ -7,13 +7,51 @@
 **Theme:** make every priced operation billable, money exact, concurrency
 cross-replica safe and history intentionally retained.
 
-## Phase 1 — Image and cache-token pricing
+## Phase 1 — Image and cache-token pricing ✅ (27 July 2026, #388)
 
 - Add explicit image price dimensions and Anthropic cache read/create rates.
 - Extend usage/outbox entities, settlement and API aggregates.
 - Reserve and settle from one normalized pricing function.
 - **Done when:** image/cache-token calls bill known fixtures exactly and appear in
   budgets, usage API and console.
+
+**Done:** the normalized pricing function lives in `domain/pricing.py` as a pure,
+`Model`-free calculator so **Phase 2 can decimalize it in place** without touching
+model config or the meter:
+
+- `compute_cost(usage: BillableUsage, rates: RateCard) -> float` — the single
+  usage→cost calculation. Cost is additive across independent dimensions, each
+  priced at its own rate:
+  `prompt_tokens*input + completion_tokens*output + cache_write_tokens*cache_write
+  + cache_read_tokens*cache_read + image_count*image_unit_price(size, quality)`.
+  A `None` rate prices its dimension at `0.0`, so a token-only call on a model with
+  no image/cache rates is byte-identical to before this plan.
+- `RateCard` fields: `input_cost_per_token`, `output_cost_per_token`,
+  `cache_write_cost_per_token`, `cache_read_cost_per_token`, `image_cost_per_image`
+  (flat fallback), `image_prices: dict[str,float]` keyed by
+  `image_price_key(size, quality)` == `"{size}/{quality}"`.
+- `BillableUsage` fields: `prompt_tokens`, `completion_tokens`, `cache_write_tokens`,
+  `cache_read_tokens`, `image_count`, `image_size`, `image_quality` (all default to a
+  no-cost zero/None).
+
+Meter (`application/usage_meter.py`): `_rate_card(model)` projects `Model` →
+`RateCard`; `_token_usage(usage_dict)` and `_image_usage(request, response)` build
+`BillableUsage`. Both `admit`/`_reservation_cost` and `_settle_usage` now call
+`compute_cost`. Reservation prices the prompt estimate at the priciest input-side
+rate (`max(input, cache_write, cache_read)`) so it stays an upper bound once cache
+tokens exist; images reserve the requested `n` and settle the count actually
+returned.
+
+New `Model`/`ModelRecord` rate fields: `cache_write_cost_per_token`,
+`cache_read_cost_per_token`, `image_cost_per_image`, `image_prices` (JSON).
+New ledger/outbox fields on `UsageEvent` + `usage_event`/`pending_usage_event`:
+`cache_write_tokens`, `cache_read_tokens`, `image_count`. Anthropic adapter surfaces
+`cache_creation_input_tokens`/`cache_read_input_tokens` as distinct dimensions
+(omitted when zero, so uncached usage is unchanged). Cost aggregates (usage
+timeseries, budget spend) are a plain `SUM(cost)` and needed no changes. Migration:
+`c7d13f0a9b21` (rehearsed on Postgres via `just test-postgres`). Console UI form
+fields for editing the new rates are deferred — cost totals already surface in the
+console today; the rates are configurable via the model create/update API now.
 
 ## Phase 2 — Decimal migration
 
