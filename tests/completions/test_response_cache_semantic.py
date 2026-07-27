@@ -14,6 +14,7 @@ Unit tests for `CompletionService` with fake ports (mirrors
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -280,3 +281,119 @@ async def test_exact_match_is_still_tried_first_and_skips_semantic_lookup_on_a_h
 
     assert gateway.chat_calls == 1
     assert gateway.embed_calls == embeds_after_first_request  # no further embed on the exact hit
+
+
+# ---------------------------------------------------------------------------
+# ISSUE-023b: similarity may blur the text, never the model, operation or
+# request contract.
+# ---------------------------------------------------------------------------
+
+
+class MultiModelEmbeddingGateway(FakeEmbeddingGateway):
+    """Also serves the Responses API, so a chat entry and a Responses entry are
+    distinguishable by which method produced the body."""
+
+    async def aresponses(self, request, model, credentials) -> dict[str, Any]:
+        self.chat_calls += 1
+        return {
+            "id": f"resp-{self.chat_calls}",
+            "output": [{"content": [{"type": "output_text", "text": "hello"}]}],
+            "usage": {"input_tokens": 2, "output_tokens": 3},
+        }
+
+
+class NamedModels:
+    def __init__(self, *models: Model) -> None:
+        self._by_name = {m.name: m for m in models}
+
+    async def get_by_name(self, team_id: UUID, name: str) -> Model | None:
+        return self._by_name.get(name)
+
+
+def _multi_service(
+    gateway: FakeEmbeddingGateway,
+    usage: FakeUsage,
+    traces: list[TraceRecord],
+    *models: Model,
+) -> CompletionService:
+    return CompletionService(
+        models=NamedModels(*models, _embed_model()),  # type: ignore[arg-type]
+        credentials=FakeCredentials(),  # type: ignore[arg-type]
+        gateway=gateway,  # type: ignore[arg-type]
+        meter=UsageMeter(usage=usage, emit_trace=traces.append),  # type: ignore[arg-type]
+        response_cache=InMemoryResponseCache(max_entries=8),
+        semantic_cache=InMemorySemanticResponseCache(),
+        semantic_threshold=0.97,
+        semantic_embedding_model=EMBED_MODEL_NAME,
+    )
+
+
+def _named(name: str) -> Model:
+    return replace(_model(), id=uuid4(), name=name)
+
+
+async def test_a_second_model_never_serves_the_first_models_semantic_entry() -> None:
+    # The reported leak: identical text, similarity 1.0, different model.
+    traces: list[TraceRecord] = []
+    usage = FakeUsage()
+    gateway = MultiModelEmbeddingGateway({"hi there": [1.0, 0.0]})
+    service = _multi_service(gateway, usage, traces, _named("model-a"), _named("model-b"))
+
+    first = await service.chat_completion(TEAM_ID, KEY_ID, {**_CHAT_REQUEST, "model": "model-a"})
+    second = await service.chat_completion(TEAM_ID, KEY_ID, {**_CHAT_REQUEST, "model": "model-b"})
+
+    assert gateway.chat_calls == 2
+    assert first["id"] != second["id"]
+
+
+async def test_responses_never_serves_a_chat_semantic_entry() -> None:
+    traces: list[TraceRecord] = []
+    usage = FakeUsage()
+    gateway = MultiModelEmbeddingGateway({"hi there": [1.0, 0.0]})
+    service = _multi_service(gateway, usage, traces, _named("model-a"))
+
+    chat = await service.chat_completion(TEAM_ID, KEY_ID, {**_CHAT_REQUEST, "model": "model-a"})
+    responses = await service.responses(
+        TEAM_ID, KEY_ID, {"model": "model-a", "input": "hi there", "temperature": 0}
+    )
+
+    assert gateway.chat_calls == 2
+    assert "choices" in chat and "output" in responses
+
+
+async def test_a_different_request_contract_never_serves_a_semantic_hit() -> None:
+    # Same text, similarity 1.0, but a different tool set / output format /
+    # instructions: the answer's contract differs, so reuse would be corruption.
+    traces: list[TraceRecord] = []
+    usage = FakeUsage()
+    gateway = MultiModelEmbeddingGateway({"hi there": [1.0, 0.0], "hi there!": [1.0, 0.0]})
+    service = _multi_service(gateway, usage, traces, _named("model-a"))
+    base = {**_CHAT_REQUEST, "model": "model-a"}
+
+    await service.chat_completion(TEAM_ID, KEY_ID, dict(base))
+    await service.chat_completion(
+        TEAM_ID,
+        KEY_ID,
+        {**_NEAR_DUP_REQUEST, "model": "model-a", "tools": [{"type": "function"}]},
+    )
+    await service.chat_completion(
+        TEAM_ID,
+        KEY_ID,
+        {**_NEAR_DUP_REQUEST, "model": "model-a", "response_format": {"type": "json_object"}},
+    )
+
+    assert gateway.chat_calls == 3
+
+
+async def test_a_near_duplicate_in_the_same_scope_still_hits() -> None:
+    # The feature itself must survive the tightening: same model, same
+    # operation, same contract, only the wording differs.
+    traces: list[TraceRecord] = []
+    usage = FakeUsage()
+    gateway = MultiModelEmbeddingGateway({"hi there": [1.0, 0.0], "hi there!": [1.0, 0.0]})
+    service = _multi_service(gateway, usage, traces, _named("model-a"))
+
+    await service.chat_completion(TEAM_ID, KEY_ID, {**_CHAT_REQUEST, "model": "model-a"})
+    await service.chat_completion(TEAM_ID, KEY_ID, {**_NEAR_DUP_REQUEST, "model": "model-a"})
+
+    assert gateway.chat_calls == 1
