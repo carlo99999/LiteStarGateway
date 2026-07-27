@@ -633,6 +633,7 @@ async def _setup_team(
     max_output_tokens: int | None = None,
     input_cost_per_token: float | None = None,
     output_cost_per_token: float | None = None,
+    image_cost_per_image: float | None = None,
 ) -> tuple[str, str, str]:
     """Configure a credential + team + model 'm' + key.
 
@@ -677,6 +678,8 @@ async def _setup_team(
         model_json["input_cost_per_token"] = input_cost_per_token
     if output_cost_per_token is not None:
         model_json["output_cost_per_token"] = output_cost_per_token
+    if image_cost_per_image is not None:
+        model_json["image_cost_per_image"] = image_cost_per_image
     await client.post(f"/teams/{team}/models", json=model_json, headers=_bearer(admin))
     key = (
         await client.post(f"/teams/{team}/keys", json={"name": "k"}, headers=_bearer(admin))

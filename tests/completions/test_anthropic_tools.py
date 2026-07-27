@@ -253,6 +253,56 @@ def test_response_preserves_text_parallel_calls_ids_and_usage() -> None:
     }
 
 
+def test_response_surfaces_anthropic_cache_tokens_when_present() -> None:
+    # Plan 13 Phase 1: prompt-cache tokens are surfaced as distinct dimensions,
+    # never folded into prompt_tokens.
+    response = from_anthropic_response(
+        {
+            "id": "msg_c",
+            "model": "claude-sonnet-4-5",
+            "content": [{"type": "text", "text": "hi"}],
+            "stop_reason": "end_turn",
+            "usage": {
+                "input_tokens": 9,
+                "output_tokens": 11,
+                "cache_creation_input_tokens": 100,
+                "cache_read_input_tokens": 200,
+            },
+        }
+    )
+    assert response["usage"] == {
+        "prompt_tokens": 9,
+        "completion_tokens": 11,
+        "total_tokens": 20,
+        "cache_creation_input_tokens": 100,
+        "cache_read_input_tokens": 200,
+    }
+
+
+def test_response_omits_cache_tokens_when_absent_or_zero() -> None:
+    # Backward-compat: an uncached call's usage shape is byte-identical to before
+    # this plan, even when the provider reports explicit zeros.
+    response = from_anthropic_response(
+        {
+            "id": "msg_z",
+            "model": "claude-sonnet-4-5",
+            "content": [{"type": "text", "text": "hi"}],
+            "stop_reason": "end_turn",
+            "usage": {
+                "input_tokens": 9,
+                "output_tokens": 11,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+            },
+        }
+    )
+    assert response["usage"] == {
+        "prompt_tokens": 9,
+        "completion_tokens": 11,
+        "total_tokens": 20,
+    }
+
+
 @pytest.mark.parametrize(
     ("payload", "expected"),
     [

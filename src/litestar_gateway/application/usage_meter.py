@@ -23,6 +23,7 @@ import anyio
 from litestar_gateway.domain.budget import crossed_thresholds, window_start
 from litestar_gateway.domain.entities import (
     Model,
+    ModelType,
     PendingBudgetAlert,
     TraceRecord,
     UsageAttribution,
@@ -37,6 +38,7 @@ from litestar_gateway.domain.ports import (
     TeamRepository,
     UsageRepository,
 )
+from litestar_gateway.domain.pricing import BillableUsage, RateCard, compute_cost
 from litestar_gateway.request_context import current_request_id
 
 logger = logging.getLogger("litestar_gateway.usage")
@@ -215,10 +217,27 @@ def _max_output_tokens(request: dict[str, Any]) -> int:
     return 0
 
 
-def _parse_usage(model: Model, usage: dict[str, Any]) -> tuple[int, int, float]:
-    """Token counts + cost from a provider usage dict. Chat completions report
-    prompt/completion_tokens; the Responses API reports input/output_tokens.
-    Bill either shape. Explicit key-presence checks (not `or`-chaining) so a
+def _rate_card(model: Model) -> RateCard:
+    """The model's pricing inputs as the pure `RateCard` the normalized pricing
+    function consumes. Isolating the `Model → RateCard` projection here keeps
+    `domain.pricing` free of the `Model` entity, so Phase 2 can decimalize the
+    pricing math without reaching into model config."""
+    return RateCard(
+        input_cost_per_token=model.input_cost_per_token,
+        output_cost_per_token=model.output_cost_per_token,
+        cache_write_cost_per_token=model.cache_write_cost_per_token,
+        cache_read_cost_per_token=model.cache_read_cost_per_token,
+        image_cost_per_image=model.image_cost_per_image,
+        image_prices=model.image_prices,
+    )
+
+
+def _token_usage(usage: dict[str, Any]) -> BillableUsage:
+    """Normalize a provider usage dict into `BillableUsage` token quantities.
+    Chat completions report prompt/completion_tokens; the Responses API reports
+    input/output_tokens — bill either shape. Anthropic additionally reports
+    `cache_creation_input_tokens`/`cache_read_input_tokens`, kept as distinct
+    dimensions (design §1). Explicit key-presence checks (not `or`-chaining) so a
     legitimate 0 is never overridden."""
     if "prompt_tokens" in usage:
         prompt = int(usage.get("prompt_tokens") or 0)
@@ -228,24 +247,83 @@ def _parse_usage(model: Model, usage: dict[str, Any]) -> tuple[int, int, float]:
         completion = int(usage.get("completion_tokens") or 0)
     else:
         completion = int(usage.get("output_tokens") or 0)
-    cost = prompt * (model.input_cost_per_token or 0.0) + completion * (
-        model.output_cost_per_token or 0.0
+    return BillableUsage(
+        prompt_tokens=prompt,
+        completion_tokens=completion,
+        cache_write_tokens=int(usage.get("cache_creation_input_tokens") or 0),
+        cache_read_tokens=int(usage.get("cache_read_input_tokens") or 0),
     )
-    return prompt, completion, cost
+
+
+def _image_usage(request: dict[str, Any] | None, response: dict[str, Any]) -> BillableUsage:
+    """Normalize an image-generation call into `BillableUsage`: the authoritative
+    image count is how many images the response actually returned (`data`), priced
+    by the request's size/quality. An errored image call has no `data`, so it bills
+    zero — the requested-`n` upper bound was already reserved at admission."""
+    data = response.get("data")
+    count = len(data) if isinstance(data, list) else 0
+    size = request.get("size") if request else None
+    quality = request.get("quality") if request else None
+    return BillableUsage(
+        image_count=count,
+        image_size=size if isinstance(size, str) else None,
+        image_quality=quality if isinstance(quality, str) else None,
+    )
+
+
+def _parse_usage(model: Model, usage: dict[str, Any]) -> tuple[int, int, float]:
+    """Token counts + cost from a provider usage dict, via the one normalized
+    pricing function (design §1). Returned as a `(prompt, completion, cost)` tuple
+    for the token settlement/error paths; `_token_usage` exposes the full
+    `BillableUsage` (incl. cache tokens) that `_bill` persists."""
+    billable = _token_usage(usage)
+    cost = compute_cost(billable, _rate_card(model))
+    return billable.prompt_tokens, billable.completion_tokens, cost
+
+
+def _worst_case_prompt_usage(
+    prompt_estimate: int, output_estimate: int, rates: RateCard
+) -> BillableUsage:
+    """Assign the whole estimated prompt to the priciest input-side bucket
+    (ordinary input vs. cache-write vs. cache-read). Settlement later splits the
+    real prompt across those buckets, each priced at or below this max, so the
+    reservation can never under-estimate the eventual charge — the budget-gate
+    upper-bound invariant, preserved once cache tokens enter the picture. With no
+    cache rates configured the max is the ordinary input rate, so the reservation
+    is byte-identical to the pre-Plan-13 formula."""
+    input_rate = rates.input_cost_per_token or 0.0
+    cache_write_rate = rates.cache_write_cost_per_token or 0.0
+    cache_read_rate = rates.cache_read_cost_per_token or 0.0
+    if cache_write_rate > input_rate and cache_write_rate >= cache_read_rate:
+        return BillableUsage(cache_write_tokens=prompt_estimate, completion_tokens=output_estimate)
+    if cache_read_rate > input_rate:
+        return BillableUsage(cache_read_tokens=prompt_estimate, completion_tokens=output_estimate)
+    return BillableUsage(prompt_tokens=prompt_estimate, completion_tokens=output_estimate)
 
 
 def _reservation_cost(model: Model, request: dict[str, Any]) -> float:
-    """Pessimistic pre-dispatch cost of a request: the estimated prompt plus
-    the requested output ceiling per choice — `n` choices each regenerate the
-    full output ceiling (providers bill the prompt once). A request without a
-    max-tokens field (or on an unpriced model) reserves only what can be
-    known — those bursts stay bounded by the prompt estimate alone. Callers
-    pass the sanitized request, so `n`/max-tokens are already clamped."""
-    prompt = _estimate_tokens(len(_request_text(request))) * (model.input_cost_per_token or 0.0)
+    """Pessimistic pre-dispatch cost of a request, via the same normalized pricing
+    function settlement uses. For image models: the requested image count at the
+    request's size/quality (an upper bound — settlement bills the images actually
+    returned). For token models: the estimated prompt plus the requested output
+    ceiling per choice — `n` choices each regenerate the full output ceiling
+    (providers bill the prompt once). Callers pass the sanitized request, so
+    `n`/max-tokens are already clamped."""
+    rates = _rate_card(model)
     n = request.get("n")
     choices = n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else 1
-    output = _max_output_tokens(request) * choices * (model.output_cost_per_token or 0.0)
-    return prompt + output
+    if model.type is ModelType.IMAGE:
+        size = request.get("size")
+        quality = request.get("quality")
+        usage = BillableUsage(
+            image_count=choices,
+            image_size=size if isinstance(size, str) else None,
+            image_quality=quality if isinstance(quality, str) else None,
+        )
+        return compute_cost(usage, rates)
+    prompt_estimate = _estimate_tokens(len(_request_text(request)))
+    output_estimate = _max_output_tokens(request) * choices
+    return compute_cost(_worst_case_prompt_usage(prompt_estimate, output_estimate, rates), rates)
 
 
 class InFlightSpend:
@@ -476,8 +554,7 @@ class UsageMeter:
             api_key_id,
             model,
             operation,
-            prompt_tokens,
-            completion_tokens,
+            BillableUsage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens),
             0.0,
             now,
             attribution,
@@ -546,34 +623,30 @@ class UsageMeter:
         request: dict[str, Any] | None,
         attribution: UsageAttribution | None,
     ) -> tuple[int, int, float, datetime]:
-        usage = response.get("usage") or {}
-        uncharged_refusal = _is_uncharged_refusal(response, usage)
-        if not _has_tokens(usage) and not uncharged_refusal and request is not None:
-            estimate = {"prompt_tokens": _estimate_tokens(len(_request_text(request)))}
-            if _has_tokens(estimate):
-                usage = estimate
-                logger.warning(
-                    "no authoritative usage from provider; billing estimate: "
-                    "team=%s model=%s op=%s prompt=%s",
-                    team_id,
-                    model.name,
-                    operation,
-                    usage["prompt_tokens"],
-                )
-        prompt, completion, cost = _parse_usage(model, usage)
+        if model.type is ModelType.IMAGE:
+            # Image responses carry no token usage — bill on the image count/size/
+            # quality dimensions instead of estimating a (meaningless) prompt.
+            billable = _image_usage(request, response)
+        else:
+            usage = response.get("usage") or {}
+            uncharged_refusal = _is_uncharged_refusal(response, usage)
+            if not _has_tokens(usage) and not uncharged_refusal and request is not None:
+                estimate = {"prompt_tokens": _estimate_tokens(len(_request_text(request)))}
+                if _has_tokens(estimate):
+                    usage = estimate
+                    logger.warning(
+                        "no authoritative usage from provider; billing estimate: "
+                        "team=%s model=%s op=%s prompt=%s",
+                        team_id,
+                        model.name,
+                        operation,
+                        usage["prompt_tokens"],
+                    )
+            billable = _token_usage(usage)
+        cost = compute_cost(billable, _rate_card(model))
         now = datetime.now(UTC)
-        await self._bill(
-            team_id,
-            api_key_id,
-            model,
-            operation,
-            prompt,
-            completion,
-            cost,
-            now,
-            attribution,
-        )
-        return prompt, completion, cost, now
+        await self._bill(team_id, api_key_id, model, operation, billable, cost, now, attribution)
+        return billable.prompt_tokens, billable.completion_tokens, cost, now
 
     def trace_error(
         self,
@@ -650,8 +723,7 @@ class UsageMeter:
         api_key_id: UUID | None,
         model: Model,
         operation: str,
-        prompt: int,
-        completion: int,
+        usage: BillableUsage,
         cost: float,
         now: datetime,
         attribution: UsageAttribution | None = None,
@@ -659,7 +731,8 @@ class UsageMeter:
         cache_hit: bool = False,
     ) -> None:
         """Persist the authoritative billing record (no trace — callers emit
-        their own 'ok' or 'error' trace alongside)."""
+        their own 'ok' or 'error' trace alongside). Records every billable
+        dimension of the normalized usage so the ledger stays auditable."""
         await self._record_usage(
             UsageEvent(
                 id=uuid4(),
@@ -668,8 +741,8 @@ class UsageMeter:
                 model_id=model.id,
                 model_name=model.name,
                 operation=operation,
-                prompt_tokens=prompt,
-                completion_tokens=completion,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
                 cost=cost,
                 created_at=now,
                 request_id=current_request_id(),
@@ -679,6 +752,9 @@ class UsageMeter:
                 callable_origin=attribution.callable_origin if attribution else None,
                 source_team_id=attribution.source_team_id if attribution else None,
                 cache_hit=cache_hit,
+                cache_write_tokens=usage.cache_write_tokens,
+                cache_read_tokens=usage.cache_read_tokens,
+                image_count=usage.image_count,
             )
         )
 
@@ -875,6 +951,11 @@ class UsageMeter:
                         usage["input_tokens"] = start_usage.get("input_tokens") or 0
                     if "output_tokens" in start_usage:
                         usage["output_tokens"] = start_usage.get("output_tokens") or 0
+                    # Prompt-cache tokens are reported once, on message_start
+                    # (Plan 13 Phase 1); settle them at their own rates.
+                    for cache_key in ("cache_creation_input_tokens", "cache_read_input_tokens"):
+                        if cache_key in start_usage:
+                            usage[cache_key] = start_usage.get(cache_key) or 0
                 elif etype == "message_delta":
                     delta_usage = event.get("usage") or {}
                     if "output_tokens" in delta_usage:
@@ -1025,15 +1106,16 @@ class UsageMeter:
                 # Bill what was seen (nothing, if the provider produced
                 # nothing), but keep the honest error trace instead of a
                 # fake 'ok' one — carrying the billed usage.
-                prompt, completion, cost = _parse_usage(model, usage)
+                billable = _token_usage(usage)
+                prompt, completion = billable.prompt_tokens, billable.completion_tokens
+                cost = compute_cost(billable, _rate_card(model))
                 if _has_tokens(usage):
                     await self._bill(
                         team_id,
                         api_key_id,
                         model,
                         operation,
-                        prompt,
-                        completion,
+                        billable,
                         cost,
                         datetime.now(UTC),
                         attribution,

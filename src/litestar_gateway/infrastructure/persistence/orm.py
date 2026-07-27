@@ -507,6 +507,11 @@ class UsageEventModel(base.UUIDAuditBase):
     completion_tokens: Mapped[int] = mapped_column(default=0)
     cost: Mapped[float] = mapped_column(default=0.0)
     cache_hit: Mapped[bool] = mapped_column(default=False)
+    # Non-token billing dimensions (Plan 13 Phase 1): Anthropic prompt-cache
+    # write/read token counts and the number of generated images.
+    cache_write_tokens: Mapped[int] = mapped_column(default=0)
+    cache_read_tokens: Mapped[int] = mapped_column(default=0)
+    image_count: Mapped[int] = mapped_column(default=0)
     # Request correlation id (Plan 11 Slice A). Nullable: historical rows and
     # reconciler-drained rows may have none (see PendingUsageEventModel).
     request_id: Mapped[str | None] = mapped_column(default=None)
@@ -529,6 +534,9 @@ class UsageEventModel(base.UUIDAuditBase):
             callable_origin=self.callable_origin,
             source_team_id=self.source_team_id,
             cache_hit=self.cache_hit,
+            cache_write_tokens=self.cache_write_tokens,
+            cache_read_tokens=self.cache_read_tokens,
+            image_count=self.image_count,
             request_id=self.request_id,
         )
 
@@ -559,6 +567,11 @@ class PendingUsageEventModel(base.UUIDAuditBase):
     completion_tokens: Mapped[int] = mapped_column(default=0)
     cost: Mapped[float] = mapped_column(default=0.0)
     cache_hit: Mapped[bool] = mapped_column(default=False)
+    # Non-token billing dimensions (Plan 13 Phase 1) — carried through to the
+    # ledger row when the reconciler drains this dead-letter entry.
+    cache_write_tokens: Mapped[int] = mapped_column(default=0)
+    cache_read_tokens: Mapped[int] = mapped_column(default=0)
+    image_count: Mapped[int] = mapped_column(default=0)
     # Request correlation id (Plan 11 Slice A) — carried through to the
     # ledger row when the reconciler drains this dead-letter entry.
     request_id: Mapped[str | None] = mapped_column(default=None)
@@ -772,6 +785,11 @@ class ModelRecord(base.UUIDAuditBase):
     cache_allow_nondeterministic: Mapped[bool] = mapped_column(default=False)
     # Semantic-tier opt-in (Plan 04 Phase 2) — see domain/entities/model.py.
     cache_semantic_enabled: Mapped[bool] = mapped_column(default=False)
+    # Non-token pricing (Plan 13 Phase 1) — see domain/entities/model.py.
+    cache_write_cost_per_token: Mapped[float | None] = mapped_column(default=None)
+    cache_read_cost_per_token: Mapped[float | None] = mapped_column(default=None)
+    image_cost_per_image: Mapped[float | None] = mapped_column(default=None)
+    image_prices: Mapped[dict[str, float]] = mapped_column(JSON, default=dict)
 
     def to_entity(self) -> Model:
         return Model(
@@ -794,6 +812,10 @@ class ModelRecord(base.UUIDAuditBase):
             cache_enabled=self.cache_enabled,
             cache_allow_nondeterministic=self.cache_allow_nondeterministic,
             cache_semantic_enabled=self.cache_semantic_enabled,
+            cache_write_cost_per_token=self.cache_write_cost_per_token,
+            cache_read_cost_per_token=self.cache_read_cost_per_token,
+            image_cost_per_image=self.image_cost_per_image,
+            image_prices=self.image_prices or {},
         )
 
 

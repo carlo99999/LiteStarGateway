@@ -201,6 +201,20 @@ def to_anthropic_request(request: dict[str, Any], model: Model) -> dict[str, Any
     return kwargs
 
 
+def _cache_usage_fields(raw: dict[str, Any]) -> dict[str, int]:
+    """Anthropic prompt-cache token counts (Plan 13 Phase 1), surfaced only when
+    present and positive so an ordinary uncached call's usage stays byte-identical
+    to its pre-Plan-13 shape. Kept distinct from `prompt_tokens`: Anthropic reports
+    `input_tokens` net of cached tokens, so folding these in would double-count and
+    lose the separate cache-write/read audit dimensions (design §1)."""
+    fields: dict[str, int] = {}
+    for key in ("cache_creation_input_tokens", "cache_read_input_tokens"):
+        value = raw.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            fields[key] = value
+    return fields
+
+
 def _billable_response(message: dict[str, Any]) -> dict[str, Any]:
     raw = message.get("usage")
     if not isinstance(raw, dict):
@@ -220,6 +234,7 @@ def _billable_response(message: dict[str, Any]) -> dict[str, Any]:
         "prompt_tokens": prompt,
         "completion_tokens": completion,
         "total_tokens": prompt + completion,
+        **_cache_usage_fields(raw),
     }
     return {"usage": usage}
 
@@ -628,6 +643,9 @@ class AnthropicAdapter:
         # OpenAI-style usage chunk so streamed calls can be metered.
         input_tokens = 0
         output_tokens = 0
+        # Prompt-cache tokens are reported once, on message_start (Plan 13 Phase 1).
+        cache_creation_tokens = 0
+        cache_read_tokens = 0
         refused = False
         tool_call_state: dict[int, dict[str, Any]] = {}
         # The client is leased for the whole stream and released (not force-
@@ -641,6 +659,8 @@ class AnthropicAdapter:
                     start_usage = (raw.get("message") or {}).get("usage") or {}
                     input_tokens = start_usage.get("input_tokens") or 0
                     output_tokens = start_usage.get("output_tokens") or 0
+                    cache_creation_tokens = start_usage.get("cache_creation_input_tokens") or 0
+                    cache_read_tokens = start_usage.get("cache_read_input_tokens") or 0
                 elif raw.get("type") == "message_delta":
                     delta_usage = raw.get("usage") or {}
                     output_tokens = delta_usage.get("output_tokens") or output_tokens
@@ -656,16 +676,20 @@ class AnthropicAdapter:
                     **base,
                     "choices": [{"index": 0, "delta": delta or {}, "finish_reason": finish}],
                 }
-            yield {
-                **base,
-                "choices": [],
-                "usage": {
-                    "prompt_tokens": 0 if refused and output_tokens == 0 else input_tokens,
-                    "completion_tokens": output_tokens,
-                    "total_tokens": (
-                        output_tokens
-                        if refused and output_tokens == 0
-                        else input_tokens + output_tokens
-                    ),
-                },
+            usage_out: dict[str, Any] = {
+                "prompt_tokens": 0 if refused and output_tokens == 0 else input_tokens,
+                "completion_tokens": output_tokens,
+                "total_tokens": (
+                    output_tokens
+                    if refused and output_tokens == 0
+                    else input_tokens + output_tokens
+                ),
             }
+            # A pre-output refusal isn't charged, so it carries no cache tokens;
+            # otherwise surface them (when positive) at their own audit dimensions.
+            if not (refused and output_tokens == 0):
+                if cache_creation_tokens > 0:
+                    usage_out["cache_creation_input_tokens"] = cache_creation_tokens
+                if cache_read_tokens > 0:
+                    usage_out["cache_read_input_tokens"] = cache_read_tokens
+            yield {**base, "choices": [], "usage": usage_out}

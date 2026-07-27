@@ -89,6 +89,10 @@ class ModelService:
         cache_enabled: bool = False,
         cache_allow_nondeterministic: bool = False,
         cache_semantic_enabled: bool = False,
+        cache_write_cost_per_token: float | None = None,
+        cache_read_cost_per_token: float | None = None,
+        image_cost_per_image: float | None = None,
+        image_prices: dict[str, float] | None = None,
     ) -> Model:
         """Create a team-owned model (`team_id` set) or a global one (`team_id`
         None). A team may reuse a name that only exists as a global (it shadows
@@ -132,6 +136,10 @@ class ModelService:
                 cache_enabled=cache_enabled,
                 cache_allow_nondeterministic=cache_allow_nondeterministic,
                 cache_semantic_enabled=cache_semantic_enabled,
+                cache_write_cost_per_token=cache_write_cost_per_token,
+                cache_read_cost_per_token=cache_read_cost_per_token,
+                image_cost_per_image=image_cost_per_image,
+                image_prices=image_prices or {},
             )
         )
 

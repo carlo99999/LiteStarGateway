@@ -53,6 +53,10 @@ class SQLAlchemyModelRepository:
             origin_team_id=model.origin_team_id,
             cache_enabled=model.cache_enabled,
             cache_allow_nondeterministic=model.cache_allow_nondeterministic,
+            cache_write_cost_per_token=model.cache_write_cost_per_token,
+            cache_read_cost_per_token=model.cache_read_cost_per_token,
+            image_cost_per_image=model.image_cost_per_image,
+            image_prices=model.image_prices,
         )
         try:
             self._session.add(record)
@@ -212,6 +216,10 @@ class SQLAlchemyModelRepository:
         record.enabled = model.enabled
         record.cache_enabled = model.cache_enabled
         record.cache_allow_nondeterministic = model.cache_allow_nondeterministic
+        record.cache_write_cost_per_token = model.cache_write_cost_per_token
+        record.cache_read_cost_per_token = model.cache_read_cost_per_token
+        record.image_cost_per_image = model.image_cost_per_image
+        record.image_prices = model.image_prices
 
     async def update_global(self, model: Model) -> Model | None:
         record = await lock_resource_lifecycle(self._session, CallableKind.MODEL, model.id)

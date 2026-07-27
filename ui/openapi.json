@@ -12307,6 +12307,42 @@
                     "cache_semantic_enabled": {
                         "type": "boolean",
                         "default": false
+                    },
+                    "cache_write_cost_per_token": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "cache_read_cost_per_token": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "image_cost_per_image": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "image_prices": {
+                        "additionalProperties": {
+                            "type": "number"
+                        },
+                        "type": "object"
                     }
                 },
                 "type": "object",
@@ -13126,6 +13162,42 @@
                     "cache_semantic_enabled": {
                         "type": "boolean",
                         "default": false
+                    },
+                    "cache_write_cost_per_token": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "cache_read_cost_per_token": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "image_cost_per_image": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "image_prices": {
+                        "additionalProperties": {
+                            "type": "number"
+                        },
+                        "type": "object"
                     }
                 },
                 "type": "object",
@@ -14238,6 +14310,49 @@
                         "oneOf": [
                             {
                                 "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "cache_write_cost_per_token": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "cache_read_cost_per_token": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "image_cost_per_image": {
+                        "oneOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "image_prices": {
+                        "oneOf": [
+                            {
+                                "additionalProperties": {
+                                    "type": "number"
+                                },
+                                "type": "object"
                             },
                             {
                                 "type": "null"

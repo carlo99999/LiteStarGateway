@@ -153,6 +153,31 @@ async def test_images_vertex(client: AsyncTestClient, monkeypatch: pytest.Monkey
     assert resp.json()["data"][0]["b64_json"] == base64.b64encode(b"PNGBYTES").decode("ascii")
 
 
+async def test_images_openai_bills_per_image_and_appears_in_usage(
+    client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Plan 13 Phase 1: image generation used to record zero cost (no token usage
+    # in the response). With a per-image rate configured it now bills a real cost
+    # that shows up in the team's usage aggregate / budget spend.
+    _patch(monkeypatch)
+    key, team, admin = await _setup_team(
+        client,
+        provider_model_id="dall-e-3",
+        model_type="image",
+        image_cost_per_image=0.05,
+    )
+    resp = await client.post(
+        "/v1/images/generations",
+        json={"model": "m", "prompt": "a cat", "size": "1024x1024"},
+        headers=_bearer(key),
+    )
+    assert resp.status_code == HTTP_200_OK
+    rows = await _team_usage(client, team, admin)
+    assert len(rows) == 1
+    # FakeClient returns exactly one image → 1 * 0.05.
+    assert rows[0]["cost"] == pytest.approx(0.05)
+
+
 async def test_images_wrong_model_type_400(
     client: AsyncTestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
