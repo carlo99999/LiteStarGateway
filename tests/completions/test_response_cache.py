@@ -16,6 +16,7 @@ strategy; this module adds one end-to-end confirmation through the service.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -217,3 +218,109 @@ async def test_a_different_team_never_gets_a_cached_response_for_the_same_body()
     await service.chat_completion(OTHER_TEAM_ID, KEY_ID, dict(_CHAT_REQUEST))
 
     assert gateway.calls == 2  # never served from the first team's cache entry
+
+
+# ---------------------------------------------------------------------------
+# ISSUE-023a: an entry belongs to one model, one operation, one policy.
+# ---------------------------------------------------------------------------
+
+
+class MultiModelGateway(CountingGateway):
+    """Also serves the Responses API, so a chat entry and a Responses entry for
+    the same text can be told apart by which method produced the body."""
+
+    async def aresponses(self, request, model, credentials) -> dict[str, Any]:
+        self.calls += 1
+        return {
+            "id": f"resp-{self.calls}",
+            "output": [{"content": [{"type": "output_text", "text": "hello"}]}],
+            "usage": {"input_tokens": 2, "output_tokens": 3},
+        }
+
+
+class NamedModels:
+    """Resolves each model by its own name, so one service can serve two."""
+
+    def __init__(self, *models: Model) -> None:
+        self._by_name = {m.name: m for m in models}
+
+    async def get_by_name(self, team_id: UUID, name: str) -> Model | None:
+        return self._by_name.get(name)
+
+
+def _named_model(name: str, **overrides: Any) -> Model:
+    base = _model()
+    return replace(base, id=uuid4(), name=name, **overrides)
+
+
+def _multi_service(
+    gateway: CountingGateway, usage: FakeUsage, traces: list[TraceRecord], *models: Model
+) -> CompletionService:
+    return CompletionService(
+        models=NamedModels(*models),  # type: ignore[arg-type]
+        credentials=FakeCredentials(),  # type: ignore[arg-type]
+        gateway=gateway,  # type: ignore[arg-type]
+        meter=UsageMeter(usage=usage, emit_trace=traces.append),  # type: ignore[arg-type]
+        response_cache=InMemoryResponseCache(max_entries=8),
+    )
+
+
+async def test_a_second_model_never_serves_the_first_models_cached_body() -> None:
+    traces: list[TraceRecord] = []
+    usage = FakeUsage()
+    gateway = MultiModelGateway()
+    a, b = _named_model("model-a"), _named_model("model-b")
+    service = _multi_service(gateway, usage, traces, a, b)
+
+    first = await service.chat_completion(TEAM_ID, KEY_ID, {**_CHAT_REQUEST, "model": "model-a"})
+    second = await service.chat_completion(TEAM_ID, KEY_ID, {**_CHAT_REQUEST, "model": "model-b"})
+
+    assert gateway.calls == 2
+    assert first["id"] != second["id"]
+
+
+async def test_responses_never_serves_a_chat_cached_body() -> None:
+    # The reported cross-operation hit: same text, same model, different API.
+    traces: list[TraceRecord] = []
+    usage = FakeUsage()
+    gateway = MultiModelGateway()
+    model = _named_model("model-a")
+    service = _multi_service(gateway, usage, traces, model)
+
+    chat = await service.chat_completion(TEAM_ID, KEY_ID, {**_CHAT_REQUEST, "model": "model-a"})
+    responses = await service.responses(
+        TEAM_ID, KEY_ID, {"model": "model-a", "input": "hi", "temperature": 0}
+    )
+
+    assert gateway.calls == 2
+    assert "choices" in chat and "output" in responses
+
+
+async def test_a_behavior_affecting_field_outside_the_old_allow_list_misses() -> None:
+    traces: list[TraceRecord] = []
+    usage = FakeUsage()
+    gateway = MultiModelGateway()
+    service = _multi_service(gateway, usage, traces, _named_model("model-a"))
+
+    base = {**_CHAT_REQUEST, "model": "model-a"}
+    await service.chat_completion(TEAM_ID, KEY_ID, dict(base))
+    await service.chat_completion(TEAM_ID, KEY_ID, {**base, "parallel_tool_calls": False})
+    await service.chat_completion(TEAM_ID, KEY_ID, {**base, "frequency_penalty": 0.5})
+
+    assert gateway.calls == 3
+
+
+async def test_tightening_enforced_policy_invalidates_earlier_entries() -> None:
+    traces: list[TraceRecord] = []
+    usage = FakeUsage()
+    gateway = MultiModelGateway()
+    before = _named_model("model-a")
+    service = _multi_service(gateway, usage, traces, before)
+    await service.chat_completion(TEAM_ID, KEY_ID, {**_CHAT_REQUEST, "model": "model-a"})
+
+    after = replace(before, params_enforced={"tool_choice": "none"})
+    reconfigured = _multi_service(gateway, usage, traces, after)
+    reconfigured._response_cache = service._response_cache  # same shared store
+    await reconfigured.chat_completion(TEAM_ID, KEY_ID, {**_CHAT_REQUEST, "model": "model-a"})
+
+    assert gateway.calls == 2

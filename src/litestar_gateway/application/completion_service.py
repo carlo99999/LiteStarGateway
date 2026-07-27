@@ -1001,10 +1001,18 @@ class CompletionService:
         Not wired into the cross-provider failover retry path (Plan 05): each
         retry targets a different candidate model, and caching a failover
         response is deferred to a later slice rather than reasoning about
-        per-attempt keys under this Phase 0's time budget."""
-        if self._response_cache is None or not is_cacheable(operation, request, model):
+        per-attempt keys under this Phase 0's time budget.
+
+        Both the eligibility check and the key are derived from the *effective*
+        request — the same `merge_params` view admission and the adapter use, so
+        admin defaults and enforced policy are part of the key and an enforced
+        `temperature` cannot slip past the non-determinism gate (ISSUE-023)."""
+        if self._response_cache is None:
             return None
-        return derive_cache_key(team_id, api_key_id, model.name, request)
+        effective = model.merge_params(request)
+        if not is_cacheable(operation, effective, model):
+            return None
+        return derive_cache_key(team_id, api_key_id, model, operation, effective)
 
     def _semantic_text_for(
         self, operation: str, request: dict[str, Any], model: Model

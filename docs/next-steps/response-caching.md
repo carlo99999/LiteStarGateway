@@ -51,18 +51,27 @@ The semantic tier reuses the S3 `EmbedFn` and cosine helper verbatim
 
 The key is a hash over a **canonicalized** view, never the raw body:
 
-- **Canonical model name** — the resolved `Model.name` after alias/router
-  resolution (`_prepare`, `completion_service.py:497`), never the requested
-  alias, so `gpt-4o` and an alias pointing at it share a hit.
+- **Resolved model identity** — `Model.id` *and* name after alias/router
+  resolution (`_prepare`), never the requested alias, so `gpt-4o` and an alias
+  pointing at it share a hit while a delete/recreate under the same name does
+  not inherit the old model's entries. The provider coordinates that select the
+  upstream deployment (`provider`, `provider_model_id`, `api_version`,
+  `max_output_tokens`) are part of the key too.
+- **Operation** — `chat.completions` and `responses` never share an entry: the
+  same text produces differently-shaped bodies.
+- **The effective request** — the post-`merge_params` view, so admin `params`
+  and `params_enforced` are in the key and a policy change invalidates entries
+  written under the old policy.
 - **Messages / input** — normalized: JSON with sorted object keys, whitespace
   preserved (semantically significant), multimodal blocks kept structurally.
-- **Determinism-affecting params** — `temperature`, `top_p`, `seed`,
-  `max_tokens`/`max_completion_tokens`/`max_output_tokens`, `stop`, `tools`,
-  `tool_choice`, `response_format`. All part of the key: a different
-  `response_format` or tool set is a different request.
+- **Everything else in the request by default** — the key is built from a
+  **deny-list**, not an allow-list, so a field the gateway starts accepting
+  later (an `n`, a penalty, a reasoning option) is cacheable-safe by default
+  instead of being silently ignored (ISSUE-023).
 - **`stream`** is NOT part of the key (see §5) — a cached non-streamed body can
   replay as a synthetic stream.
-- **Ignored** — `user`, request id, and other non-determinism-affecting metadata.
+- **Ignored** — only the deny-list: `model` (the alias; the resolved identity is
+  in the key already), `stream`, `stream_options`, `user`, `metadata`.
 
 Derivation is a pure function with its own unit tests; it is the single most
 important thing to get right and the easiest to regress.
