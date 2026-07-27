@@ -18,7 +18,6 @@ from litestar_gateway.domain.entities import (
     ApiKeySpend,
     Model,
     Provider,
-    TraceRecord,
     UsageAggregate,
     UsageBucket,
     UsageEvent,

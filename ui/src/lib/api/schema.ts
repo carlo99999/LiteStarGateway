@@ -1750,6 +1750,12 @@ export interface components {
             cache_allow_nondeterministic: boolean;
             /** @default false */
             cache_semantic_enabled: boolean;
+            cache_write_cost_per_token?: number | null;
+            cache_read_cost_per_token?: number | null;
+            image_cost_per_image?: number | null;
+            image_prices?: {
+                [key: string]: number;
+            };
         };
         /** CreateOrganizationRequest */
         CreateOrganizationRequest: {
@@ -1949,6 +1955,12 @@ export interface components {
             cache_allow_nondeterministic: boolean;
             /** @default false */
             cache_semantic_enabled: boolean;
+            cache_write_cost_per_token?: number | null;
+            cache_read_cost_per_token?: number | null;
+            image_cost_per_image?: number | null;
+            image_prices?: {
+                [key: string]: number;
+            };
         };
         /**
          * ModelType
@@ -2228,6 +2240,12 @@ export interface components {
             cache_enabled?: boolean | null;
             cache_allow_nondeterministic?: boolean | null;
             cache_semantic_enabled?: boolean | null;
+            cache_write_cost_per_token?: number | null;
+            cache_read_cost_per_token?: number | null;
+            image_cost_per_image?: number | null;
+            image_prices?: {
+                [key: string]: number;
+            } | null;
         };
         /** UpdateOrganizationRequest */
         UpdateOrganizationRequest: {

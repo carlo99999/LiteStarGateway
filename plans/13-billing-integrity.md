@@ -21,11 +21,10 @@ model config or the meter:
 
 - `compute_cost(usage: BillableUsage, rates: RateCard) -> float` — the single
   usage→cost calculation. Cost is additive across independent dimensions, each
-  priced at its own rate:
-  `prompt_tokens*input + completion_tokens*output + cache_write_tokens*cache_write
-  + cache_read_tokens*cache_read + image_count*image_unit_price(size, quality)`.
-  A `None` rate prices its dimension at `0.0`, so a token-only call on a model with
-  no image/cache rates is byte-identical to before this plan.
+  priced at its own rate (ordinary input/output tokens, cache-write and cache-read
+  tokens, and images at `image_unit_price(size, quality)`). A `None` rate prices its
+  dimension at `0.0`, so a token-only call on a model with no image/cache rates is
+  byte-identical to before this plan.
 - `RateCard` fields: `input_cost_per_token`, `output_cost_per_token`,
   `cache_write_cost_per_token`, `cache_read_cost_per_token`, `image_cost_per_image`
   (flat fallback), `image_prices: dict[str,float]` keyed by
