@@ -1626,6 +1626,22 @@ export interface components {
             email: string;
             role?: components["schemas"]["TeamRole"];
         };
+        /** AuditEventResponse */
+        AuditEventResponse: {
+            /** Format: uuid */
+            id: string;
+            action: string;
+            actor_id: string | null;
+            actor_type: string | null;
+            actor_email: string | null;
+            target_type: string | null;
+            target_id: string | null;
+            ip: string | null;
+            detail: string | null;
+            /** Format: date-time */
+            created_at: string;
+            request_id: string | null;
+        };
         /** BrowserSessionResponse */
         BrowserSessionResponse: {
             user: components["schemas"]["UserResponse"];
@@ -2203,11 +2219,23 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        /** TeamAuditEventResponse */
+        TeamAuditEventResponse: {
+            /** Format: uuid */
+            id: string;
+            action: string;
+            actor_id: string | null;
+            actor_type: string | null;
+            actor_email: string | null;
+            detail: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
         /** TeamExportResponse */
         TeamExportResponse: {
             team: components["schemas"]["TeamResponse"];
-            usage_events: components["schemas"]["UsageEventResponse"][];
-            audit_events: components["schemas"]["teams_schemas_AuditEventResponse"][];
+            usage_events: components["schemas"]["TeamUsageEventResponse"][];
+            audit_events: components["schemas"]["TeamAuditEventResponse"][];
             routing_savings: components["schemas"]["RoutingSavingsResponse"] | null;
         };
         /** TeamResponse */
@@ -2239,6 +2267,26 @@ export interface components {
             team_id: string;
             name: string;
             cost: number;
+        };
+        /** TeamUsageEventResponse */
+        TeamUsageEventResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            team_id: string;
+            api_key_id: string | null;
+            /** Format: uuid */
+            model_id: string;
+            model_name: string;
+            operation: string;
+            prompt_tokens: number;
+            completion_tokens: number;
+            cost: number;
+            /** Format: date-time */
+            created_at: string;
+            requested_alias: string | null;
+            cache_hit: boolean;
+            request_id: string | null;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -2348,26 +2396,6 @@ export interface components {
             cost: number;
             group_key?: string | null;
         };
-        /** UsageEventResponse */
-        UsageEventResponse: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            team_id: string;
-            api_key_id: string | null;
-            /** Format: uuid */
-            model_id: string;
-            model_name: string;
-            operation: string;
-            prompt_tokens: number;
-            completion_tokens: number;
-            cost: number;
-            /** Format: date-time */
-            created_at: string;
-            requested_alias: string | null;
-            cache_hit: boolean;
-            request_id: string | null;
-        };
         /** UsageResponse */
         UsageResponse: {
             model: string;
@@ -2403,34 +2431,6 @@ export interface components {
             is_admin: boolean;
             is_auditor: boolean;
             is_active: boolean;
-            /** Format: date-time */
-            created_at: string;
-        };
-        /** AuditEventResponse */
-        audit_controller_AuditEventResponse: {
-            /** Format: uuid */
-            id: string;
-            action: string;
-            actor_id: string | null;
-            actor_type: string | null;
-            actor_email: string | null;
-            target_type: string | null;
-            target_id: string | null;
-            ip: string | null;
-            detail: string | null;
-            /** Format: date-time */
-            created_at: string;
-            request_id: string | null;
-        };
-        /** AuditEventResponse */
-        teams_schemas_AuditEventResponse: {
-            /** Format: uuid */
-            id: string;
-            action: string;
-            actor_id: string | null;
-            actor_type: string | null;
-            actor_email: string | null;
-            detail: string | null;
             /** Format: date-time */
             created_at: string;
         };
@@ -6954,7 +6954,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["audit_controller_AuditEventResponse"][];
+                    "application/json": components["schemas"]["AuditEventResponse"][];
                 };
             };
             /** @description Bad request syntax or unsupported method */

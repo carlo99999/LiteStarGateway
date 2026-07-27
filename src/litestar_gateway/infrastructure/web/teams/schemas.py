@@ -410,7 +410,7 @@ class ServicePrincipalResponse:
 
 
 @dataclass(frozen=True)
-class UsageEventResponse:
+class TeamUsageEventResponse:
     """One raw usage_event row (export-before-delete, Plan 13 Phase 5) — the
     same fields the ledger records, unaggregated."""
 
@@ -429,7 +429,7 @@ class UsageEventResponse:
     request_id: str | None
 
     @classmethod
-    def from_entity(cls, e: UsageEvent) -> UsageEventResponse:
+    def from_entity(cls, e: UsageEvent) -> TeamUsageEventResponse:
         return cls(
             id=e.id,
             team_id=e.team_id,
@@ -448,7 +448,7 @@ class UsageEventResponse:
 
 
 @dataclass(frozen=True)
-class AuditEventResponse:
+class TeamAuditEventResponse:
     """One audit_event row targeting the team (export-before-delete)."""
 
     id: UUID
@@ -460,7 +460,7 @@ class AuditEventResponse:
     created_at: datetime
 
     @classmethod
-    def from_entity(cls, e: AuditEvent) -> AuditEventResponse:
+    def from_entity(cls, e: AuditEvent) -> TeamAuditEventResponse:
         return cls(
             id=e.id,
             action=e.action,
@@ -489,8 +489,8 @@ class TeamExportResponse:
     savings summary."""
 
     team: TeamResponse
-    usage_events: list[UsageEventResponse]
-    audit_events: list[AuditEventResponse]
+    usage_events: list[TeamUsageEventResponse]
+    audit_events: list[TeamAuditEventResponse]
     routing_savings: RoutingSavingsResponse | None
 
     @classmethod
@@ -498,7 +498,7 @@ class TeamExportResponse:
         savings = export["routing_savings"]
         return cls(
             team=TeamResponse.from_entity(export["team"]),
-            usage_events=[UsageEventResponse.from_entity(e) for e in export["usage_events"]],
-            audit_events=[AuditEventResponse.from_entity(e) for e in export["audit_events"]],
+            usage_events=[TeamUsageEventResponse.from_entity(e) for e in export["usage_events"]],
+            audit_events=[TeamAuditEventResponse.from_entity(e) for e in export["audit_events"]],
             routing_savings=RoutingSavingsResponse(**savings) if savings is not None else None,
         )

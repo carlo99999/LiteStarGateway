@@ -10779,7 +10779,7 @@
                             "application/json": {
                                 "schema": {
                                     "items": {
-                                        "$ref": "#/components/schemas/audit_controller_AuditEventResponse"
+                                        "$ref": "#/components/schemas/AuditEventResponse"
                                     },
                                     "type": "array"
                                 }
@@ -11907,6 +11907,117 @@
                     "email"
                 ],
                 "title": "AddMemberRequest"
+            },
+            "AuditEventResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "action": {
+                        "type": "string"
+                    },
+                    "actor_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "actor_type": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "actor_email": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "target_type": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "target_id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "ip": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "detail": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "request_id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "action",
+                    "actor_email",
+                    "actor_id",
+                    "actor_type",
+                    "created_at",
+                    "detail",
+                    "id",
+                    "ip",
+                    "request_id",
+                    "target_id",
+                    "target_type"
+                ],
+                "title": "AuditEventResponse"
             },
             "BrowserSessionResponse": {
                 "properties": {
@@ -14158,6 +14269,73 @@
                 ],
                 "title": "SsoSettingsResponse"
             },
+            "TeamAuditEventResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "action": {
+                        "type": "string"
+                    },
+                    "actor_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "actor_type": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "actor_email": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "detail": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "action",
+                    "actor_email",
+                    "actor_id",
+                    "actor_type",
+                    "created_at",
+                    "detail",
+                    "id"
+                ],
+                "title": "TeamAuditEventResponse"
+            },
             "TeamExportResponse": {
                 "properties": {
                     "team": {
@@ -14165,13 +14343,13 @@
                     },
                     "usage_events": {
                         "items": {
-                            "$ref": "#/components/schemas/UsageEventResponse"
+                            "$ref": "#/components/schemas/TeamUsageEventResponse"
                         },
                         "type": "array"
                     },
                     "audit_events": {
                         "items": {
-                            "$ref": "#/components/schemas/teams_schemas_AuditEventResponse"
+                            "$ref": "#/components/schemas/TeamAuditEventResponse"
                         },
                         "type": "array"
                     },
@@ -14295,6 +14473,92 @@
                     "team_id"
                 ],
                 "title": "TeamSpendResponse"
+            },
+            "TeamUsageEventResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "team_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "api_key_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "model_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "model_name": {
+                        "type": "string"
+                    },
+                    "operation": {
+                        "type": "string"
+                    },
+                    "prompt_tokens": {
+                        "type": "integer"
+                    },
+                    "completion_tokens": {
+                        "type": "integer"
+                    },
+                    "cost": {
+                        "type": "number"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "requested_alias": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "cache_hit": {
+                        "type": "boolean"
+                    },
+                    "request_id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "api_key_id",
+                    "cache_hit",
+                    "completion_tokens",
+                    "cost",
+                    "created_at",
+                    "id",
+                    "model_id",
+                    "model_name",
+                    "operation",
+                    "prompt_tokens",
+                    "request_id",
+                    "requested_alias",
+                    "team_id"
+                ],
+                "title": "TeamUsageEventResponse"
             },
             "TokenResponse": {
                 "properties": {
@@ -14733,92 +14997,6 @@
                 ],
                 "title": "UsageBucketResponse"
             },
-            "UsageEventResponse": {
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid"
-                    },
-                    "team_id": {
-                        "type": "string",
-                        "format": "uuid"
-                    },
-                    "api_key_id": {
-                        "oneOf": [
-                            {
-                                "type": "string",
-                                "format": "uuid"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "model_id": {
-                        "type": "string",
-                        "format": "uuid"
-                    },
-                    "model_name": {
-                        "type": "string"
-                    },
-                    "operation": {
-                        "type": "string"
-                    },
-                    "prompt_tokens": {
-                        "type": "integer"
-                    },
-                    "completion_tokens": {
-                        "type": "integer"
-                    },
-                    "cost": {
-                        "type": "number"
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "requested_alias": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "cache_hit": {
-                        "type": "boolean"
-                    },
-                    "request_id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "api_key_id",
-                    "cache_hit",
-                    "completion_tokens",
-                    "cost",
-                    "created_at",
-                    "id",
-                    "model_id",
-                    "model_name",
-                    "operation",
-                    "prompt_tokens",
-                    "request_id",
-                    "requested_alias",
-                    "team_id"
-                ],
-                "title": "UsageEventResponse"
-            },
             "UsageResponse": {
                 "properties": {
                     "model": {
@@ -14951,184 +15129,6 @@
                     "is_auditor"
                 ],
                 "title": "UserResponse"
-            },
-            "audit_controller_AuditEventResponse": {
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid"
-                    },
-                    "action": {
-                        "type": "string"
-                    },
-                    "actor_id": {
-                        "oneOf": [
-                            {
-                                "type": "string",
-                                "format": "uuid"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "actor_type": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "actor_email": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "target_type": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "target_id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "ip": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "detail": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "request_id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "action",
-                    "actor_email",
-                    "actor_id",
-                    "actor_type",
-                    "created_at",
-                    "detail",
-                    "id",
-                    "ip",
-                    "request_id",
-                    "target_id",
-                    "target_type"
-                ],
-                "title": "AuditEventResponse"
-            },
-            "teams_schemas_AuditEventResponse": {
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid"
-                    },
-                    "action": {
-                        "type": "string"
-                    },
-                    "actor_id": {
-                        "oneOf": [
-                            {
-                                "type": "string",
-                                "format": "uuid"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "actor_type": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "actor_email": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "detail": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "action",
-                    "actor_email",
-                    "actor_id",
-                    "actor_type",
-                    "created_at",
-                    "detail",
-                    "id"
-                ],
-                "title": "AuditEventResponse"
             }
         }
     }
