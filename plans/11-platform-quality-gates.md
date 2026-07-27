@@ -29,10 +29,23 @@ impossible to merge unnoticed.
   Plan 03 post-ship section.
 - Run after UI build in CI; capture trace/screenshot only on failure.
 
-### D — Dependency ceiling
+### D — Dependency ceiling ✅ (27 July 2026)
 
 - Pin `mlflow-skinny>=3.14,<4`.
 - Add a scheduled non-blocking next-major compatibility job.
+
+**Done:** `pyproject.toml` pins `mlflow-skinny>=3.14,<4` (`uv.lock` re-resolved
+to the same `3.14.0`, only the constraint metadata changed). Added
+`.github/workflows/dependency-next-major.yml` — triggers on `schedule`
+(`0 5 * * 1`, Monday 05:00 UTC) plus `workflow_dispatch`, never on
+`pull_request`/`push`. It force-installs `mlflow-skinny>=4,<5` via `uv pip
+install --upgrade` (bypassing the pyproject ceiling for that job only,
+without touching the committed lockfile) and runs the full suite against it,
+with `continue-on-error: true` at both job and step level and a pass/fail
+summary written to the job summary. Confirmed via the GitHub API that this
+repo has no `required_status_checks` configured, so there was nothing to
+accidentally wire this informational job into. Existing `.github/workflows/*`
+files that run on every PR were left untouched.
 
 ## Order and verification
 
