@@ -50,6 +50,26 @@ class BudgetAlertState:
 
 
 @dataclass(frozen=True)
+class PendingBudgetAlert:
+    """Durable outbox row for one newly-fired threshold (Plan 07 Phase 1,
+    design doc §4). Written alongside the `BudgetAlertState` dedup row when a
+    threshold is newly crossed at settlement; a background worker (Phase 2)
+    will drain this table and dispatch through configured `NotificationChannel`s,
+    deleting the row on success. `spend`/`limit_cost` are captured as of the
+    firing settlement so a delayed delivery still reports accurate figures
+    even if spend has moved on by the time it's sent."""
+
+    id: UUID
+    team_id: UUID
+    window: BudgetWindow  # noqa: F821
+    period_start: datetime
+    threshold: int
+    spend: float
+    limit_cost: float
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class UsageEvent:
     """One recorded model call: token counts and estimated cost, tagged with the
     API key (when the caller used one) and model so usage can be broken down by

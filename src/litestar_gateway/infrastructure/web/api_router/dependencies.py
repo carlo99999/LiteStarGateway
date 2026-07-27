@@ -25,6 +25,9 @@ from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.observability.dispatcher import TraceDispatcher
+from litestar_gateway.infrastructure.persistence.budget_alert_state_repository import (
+    SQLAlchemyBudgetAlertStateRepository,
+)
 from litestar_gateway.infrastructure.persistence.budget_repository import (
     SQLAlchemyBudgetRepository,
 )
@@ -101,6 +104,7 @@ def provide_completion_service(
         rate_limiter=rate_limiter,
         teams=SQLAlchemyTeamRepository(db_session),
         api_keys=SQLAlchemyAPIKeyRepository(db_session),
+        budget_alert_state=SQLAlchemyBudgetAlertStateRepository(db_session),
     )
     models = SQLAlchemyModelRepository(db_session)
     routers = SQLAlchemyRouterRepository(db_session, keyring)

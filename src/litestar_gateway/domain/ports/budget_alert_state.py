@@ -1,4 +1,11 @@
-"""Port — dedup ledger for fired budget-threshold alerts (Plan 07 Phase 0)."""
+"""Port — dedup ledger + delivery outbox for budget-threshold alerts.
+
+Phase 0 shipped the dedup ledger (`fired_thresholds`/`record_fired`). Plan 07
+Phase 1 adds the outbox side (`enqueue_alert`/`pending_alerts`): once a
+threshold is newly recorded as fired, a `PendingBudgetAlert` row is queued for
+later delivery, mirroring how `UsageRepository` combines the usage ledger and
+its `pending_usage_event` outbox on one port (`domain/ports/usage.py:47-55`).
+"""
 
 from __future__ import annotations
 
@@ -6,17 +13,18 @@ from datetime import datetime
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
-from litestar_gateway.domain.entities import BudgetAlertState, BudgetWindow
+from litestar_gateway.domain.entities import BudgetAlertState, BudgetWindow, PendingBudgetAlert
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 
 
 @runtime_checkable
 class BudgetAlertStateRepository(Protocol):
     """Persistence port for the `(team_id, window, period_start, threshold)`
-    dedup ledger. Deliberately minimal: just enough for the Phase 0 pure
-    helper (`domain.budget.crossed_thresholds`) to be fed an already-fired set
-    and for a newly-crossed threshold to be recorded. Phase 1 wires this into
-    `UsageMeter.settle_ok`, in the same transaction as the outbox enqueue —
-    not used by any request path yet."""
+    dedup ledger plus the `pending_budget_alert` delivery outbox. Phase 1 wires
+    this into `UsageMeter.settle_ok`: a newly-crossed threshold is recorded via
+    `record_fired`, and only if that returns a new row is `enqueue_alert`
+    called — never the reverse, so a threshold can never be queued for
+    delivery without also being marked fired."""
 
     async def fired_thresholds(
         self, team_id: UUID, window: BudgetWindow, period_start: datetime
@@ -36,4 +44,19 @@ class BudgetAlertStateRepository(Protocol):
         unique constraint on `(team_id, window, period_start, threshold)`
         makes the loser's insert a no-op rather than an error — the same
         PK-conflict strategy as the usage reconciler)."""
+        ...
+
+    async def enqueue_alert(self, alert: PendingBudgetAlert) -> None:
+        """Durable outbox row for a newly-fired threshold, so delivery survives
+        restarts and stays off the settlement hot path (Plan 07 Phase 1, design
+        doc §4). Callers must only enqueue after `record_fired` returns a new
+        row — never for a dedup key that was already fired."""
+        ...
+
+    async def pending_alerts(self, *, limit: int = DEFAULT_PAGE_SIZE) -> list[PendingBudgetAlert]:
+        """Queued alerts oldest-first, for tests and the Phase 2 delivery
+        worker to build on. Phase 1 defines only the enqueue+read shape; the
+        drain-and-dispatch behavior (delete on success, retry with poison
+        quarantine like `pending_usage_event`) lands with the `NotificationChannel`
+        port in Phase 2, once there's somewhere to dispatch to."""
         ...
