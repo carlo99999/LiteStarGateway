@@ -58,6 +58,7 @@ from litestar_gateway.domain.routing import (
     build_routing_context,
     filter_candidates,
 )
+from litestar_gateway.request_context import current_request_id
 
 logger = logging.getLogger("litestar_gateway.routing")
 
@@ -1065,6 +1066,7 @@ class RouterService:
                         system_prompt=system_prompt,
                         router_revision_id=router.revision_id,
                         chosen_model_id=decision.model_id,
+                        request_id=current_request_id(),
                     )
                 )
         except Exception:
@@ -1262,6 +1264,7 @@ class RouterService:
                     system_prompt=system_prompt,
                     router_revision_id=router.revision_id,
                     chosen_model_id=decision.model_id,
+                    request_id=current_request_id(),
                 )
             )
             self.last_decision_record_id = record_id

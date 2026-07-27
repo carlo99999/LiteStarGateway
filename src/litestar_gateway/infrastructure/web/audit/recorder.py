@@ -13,6 +13,7 @@ from litestar import Request
 
 from litestar_gateway.domain.entities import AuditEvent, Principal, User
 from litestar_gateway.domain.ports import AuditLog
+from litestar_gateway.infrastructure.web.request_id import current_request_id
 
 
 def make_audit_event(
@@ -43,6 +44,7 @@ def make_audit_event(
         ip=request.client.host if request.client else None,
         detail=detail,
         created_at=datetime.now(UTC),
+        request_id=current_request_id(),
     )
 
 

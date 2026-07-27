@@ -28,6 +28,9 @@ class AuditEventResponse:
     ip: str | None
     detail: str | None
     created_at: datetime
+    # Request correlation id (Plan 11 Slice A): lets an operator jump from an
+    # audit row to the matching request's logs/traces/usage/routing decision.
+    request_id: str | None
 
     @classmethod
     def from_entity(cls, e: AuditEvent) -> AuditEventResponse:
@@ -42,6 +45,7 @@ class AuditEventResponse:
             ip=e.ip,
             detail=e.detail,
             created_at=e.created_at,
+            request_id=e.request_id,
         )
 
 

@@ -104,6 +104,8 @@ class UsageEvent:
     # True when this event settled from the response cache (Plan 04 Phase 0)
     # rather than a real provider call — cost is always 0.0 on such an event.
     cache_hit: bool = False
+    # Request correlation id (Plan 11 Slice A) — see `TraceRecord.request_id`.
+    request_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -206,3 +208,7 @@ class TraceRecord:
     error_type: str | None = None
     # True when this trace observed a response-cache hit (Plan 04 Phase 0).
     cache_hit: bool = False
+    # Request correlation id (Plan 11 Slice A, docs/logging.md §2): carries the
+    # same opaque id the response header/log lines use, so one inference can be
+    # followed end-to-end. None outside a request context (e.g. background jobs).
+    request_id: str | None = None

@@ -1,11 +1,39 @@
 # Design doc — Structured logging & error hygiene
 
-> **Status:** Partially implemented. Structured logging + error hygiene shipped:
-> `build_logging_config` (`src/litestar_gateway/infrastructure/logging.py`,
-> wired in `app.py`) emits structured **JSON** (structlog) in production and
-> human-readable console logs in dev, with `log_exceptions="always"`; the app
-> never runs `debug=True`, so 5xx responses stay generic. The **request/
-> correlation-id** middleware + `X-Request-ID` echo (§2) is NOT yet implemented.
+> **Status:** Fully implemented (Plan 11 Slice A, 27 July 2026). Structured
+> logging + error hygiene: `build_logging_config`
+> (`src/litestar_gateway/infrastructure/logging.py`, wired in `app.py`) emits
+> structured **JSON** (structlog) in production and human-readable console logs
+> in dev, with `log_exceptions="always"`; the app never runs `debug=True`, so
+> 5xx responses stay generic. The **request/correlation-id** middleware +
+> `X-Request-ID` echo (§2) is implemented in
+> `src/litestar_gateway/infrastructure/web/request_id.py`
+> (`RequestIDMiddleware`, registered app-wide in `app.py`):
+>
+> - Header name: `X-Request-ID` (decision 2 below), 1-128 chars, charset
+>   `[A-Za-z0-9_-]`.
+> - Trust model: an inbound value is accepted verbatim only when the direct
+>   connecting peer is in `Settings.trusted_proxy_ips` (`TRUSTED_PROXY_IPS`,
+>   comma-separated IPs/CIDRs) **and** passes the length/charset check;
+>   otherwise a fresh id is generated. This mirrors `FORWARDED_ALLOW_IPS` (the
+>   ASGI-server-level trusted-proxy concept in `docs/operations.md`) but lives
+>   in app config too, since the app — not just uvicorn — decides whether to
+>   trust the header.
+> - Propagation: the id is bound to `structlog.contextvars` for the whole
+>   request (so every structlog line — including Litestar's own uncaught-
+>   exception log — carries it) and read back via
+>   `current_request_id()` (`src/litestar_gateway/request_context.py`, a
+>   domain/application-safe accessor that doesn't import litestar/infrastructure)
+>   at the point each `TraceRecord`, `UsageEvent`, `AuditEvent` and
+>   `RoutingDecisionRecord` is constructed — no extra parameter threaded through
+>   the intervening service call chains. The audit read API
+>   (`GET /audit`) also returns it.
+> - Migration: `request_id` (nullable `String`) added to `usage_event`,
+>   `pending_usage_event`, `audit_event` and `routing_decision`. Nullable, no
+>   `server_default`: historical rows and background-worker-originated records
+>   (e.g. the key-rotation scheduler, budget-alert reconciler) genuinely have no
+>   request to tag, so a synthetic backfill value would be misleading.
+>
 > The rest of this doc is the original design rationale.
 
 ## 1. Goal

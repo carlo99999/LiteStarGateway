@@ -212,6 +212,15 @@ class Settings:
     # Optional Redis backing for the rate-limit store, shared across replicas. When
     # unset, an in-memory per-process store is used (fine for a single instance).
     redis_url: str | None = None
+    # Trusted reverse-proxy allowlist (IPs/CIDRs, comma-separated) for the
+    # request-correlation middleware (Plan 11 Slice A, docs/logging.md §2): an
+    # inbound `X-Request-ID` is trusted verbatim only when the direct connecting
+    # peer is in this list. Mirrors `FORWARDED_ALLOW_IPS` (the ASGI-server-level
+    # trusted-proxy concept documented in docs/operations.md) but must live in
+    # app config too, since the app itself — not just uvicorn — needs to decide
+    # whether to trust the header. Empty ⇒ no inbound id is ever trusted; every
+    # request gets a freshly generated one.
+    trusted_proxy_ips: tuple[str, ...] = ()
     # SSO via OIDC. No discovery URL ⇒ disabled. `oidc_admin_groups` (comma-sep)
     # maps IdP groups to platform admin.
     oidc_discovery_url: str | None = None
@@ -419,6 +428,9 @@ class Settings:
             # requests also force Secure at response time.
             session_cookie_secure=_env_bool("SESSION_COOKIE_SECURE", not is_local),
             redis_url=os.environ.get("REDIS_URL"),
+            trusted_proxy_ips=tuple(
+                v.strip() for v in os.environ.get("TRUSTED_PROXY_IPS", "").split(",") if v.strip()
+            ),
             oidc_discovery_url=os.environ.get("OIDC_DISCOVERY_URL"),
             oidc_client_id=os.environ.get("OIDC_CLIENT_ID"),
             oidc_client_secret=os.environ.get("OIDC_CLIENT_SECRET"),

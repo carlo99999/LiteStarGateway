@@ -25,3 +25,7 @@ class AuditEvent:
     ip: str | None
     detail: str | None
     created_at: datetime
+    # Request correlation id (Plan 11 Slice A, docs/logging.md §2): the same
+    # opaque id carried in the response header and log lines for the request
+    # that triggered this action, so it can be followed end-to-end.
+    request_id: str | None = None
