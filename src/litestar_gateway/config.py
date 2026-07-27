@@ -50,6 +50,10 @@ DEFAULT_OIDC_SCOPES = "openid email profile groups"
 # when not matched by OIDC_ADMIN_GROUPS. The platform role is binary.
 DEFAULT_PLATFORM_ROLE = "member"
 _PLATFORM_ROLES = frozenset({"admin", "member"})
+# Budget-alert webhook delivery (Plan 07 Phase 2): matches the routing
+# webhook's own default call timeout (`application/routing/webhook.py`'s
+# DEFAULT_TIMEOUT_MS).
+DEFAULT_BUDGET_ALERT_WEBHOOK_TIMEOUT_MS = 2000
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -224,6 +228,15 @@ class Settings:
     # is upgrade-only — re-login never downgrades it (see UserService), so demotion
     # is the explicit job of the platform-admin endpoint.
     default_role: str = DEFAULT_PLATFORM_ROLE
+    # Budget-alert webhook delivery (Plan 07 Phase 2, design doc §4/§8). A
+    # single platform-wide target for now: every team's fired threshold
+    # alert is POSTed here. None ⇒ the delivery worker isn't started at all
+    # (nothing to drain into yet — Phase 1's outbox just queues quietly).
+    # Per-team targets are Phase 3's config-surface work on the existing
+    # budget endpoints (`GET/PUT/DELETE /teams/{id}/budget`), not this.
+    budget_alert_webhook_url: str | None = None
+    budget_alert_webhook_bearer_token: str | None = None
+    budget_alert_webhook_timeout_ms: int = DEFAULT_BUDGET_ALERT_WEBHOOK_TIMEOUT_MS
 
     @property
     def default_admin(self) -> bool:
@@ -385,4 +398,11 @@ class Settings:
             oidc_redirect_uri=os.environ.get("OIDC_REDIRECT_URI"),
             default_role=_env_choice("DEFAULT_ROLE", DEFAULT_PLATFORM_ROLE, _PLATFORM_ROLES),
             oidc_team_mapping=_env_team_mapping("SSO_TEAM_MAPPING"),
+            budget_alert_webhook_url=os.environ.get("BUDGET_ALERT_WEBHOOK_URL"),
+            budget_alert_webhook_bearer_token=os.environ.get("BUDGET_ALERT_WEBHOOK_BEARER_TOKEN"),
+            budget_alert_webhook_timeout_ms=_env_int(
+                "BUDGET_ALERT_WEBHOOK_TIMEOUT_MS",
+                DEFAULT_BUDGET_ALERT_WEBHOOK_TIMEOUT_MS,
+                minimum=1,
+            ),
         )

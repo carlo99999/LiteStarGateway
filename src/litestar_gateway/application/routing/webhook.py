@@ -68,6 +68,62 @@ def _is_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     )
 
 
+async def resolve_approved_addresses(
+    host: str,
+) -> tuple[ipaddress.IPv4Address | ipaddress.IPv6Address, ...]:
+    """SSRF guard (R6-H18), re-checked on every call to resist DNS rebinding
+    between config-save and use: every address `host` resolves to must be
+    public. A blocked target raises. Extracted so other guarded-egress
+    callers (the Plan 07 budget-alert webhook channel,
+    `infrastructure/notifications/webhook_channel.py`) go through the exact
+    same deny-list rather than a re-implementation of it."""
+    literal = _literal_ip(host)
+    addresses = (literal,) if literal is not None else None
+    if addresses is None:
+        resolved = await _resolve_host_addresses(host)
+        addresses = tuple(ipaddress.ip_address(address) for address in resolved)
+    if not addresses:
+        raise ValueError(f"host {host!r} did not resolve to any address")
+    for address in addresses:
+        if _is_blocked(address):
+            raise ValueError(
+                f"host {host!r} resolves to blocked address {address}; "
+                "only public endpoints are allowed"
+            )
+    return addresses
+
+
+async def post_to_approved_address(
+    client: httpx.AsyncClient,
+    url: httpx.URL,
+    host: str,
+    addresses: tuple[ipaddress.IPv4Address | ipaddress.IPv6Address, ...],
+    payload: dict[str, Any],
+    headers: dict[str, str],
+) -> httpx.Response:
+    """Connect to validated IPs while retaining the original HTTP/TLS
+    identity (Host header + SNI = `host`, not the pinned IP). Shared by
+    `WebhookStrategy` and the Plan 07 budget-alert webhook channel."""
+    for index, address in enumerate(addresses):
+        pinned_url = url.copy_with(host=str(address))
+        try:
+            # The URL's host is an already validated IP, so the transport
+            # cannot resolve the user-controlled hostname again. Host and
+            # SNI remain the original hostname for virtual hosting and TLS
+            # certificate validation. Redirects stay disabled.
+            return await client.post(
+                pinned_url,
+                json=payload,
+                headers=headers,
+                follow_redirects=False,
+                extensions={"sni_hostname": host},
+            )
+        except httpx.ConnectError, httpx.ConnectTimeout:
+            if index == len(addresses) - 1:
+                raise
+    raise RuntimeError("validated address list is unexpectedly empty")  # pragma: no cover
+
+
 class WebhookStrategy:
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         config = config or {}
@@ -125,49 +181,21 @@ class WebhookStrategy:
         payload: dict[str, Any],
         headers: dict[str, str],
     ) -> httpx.Response:
-        """Connect to validated IPs while retaining the original HTTP/TLS identity."""
-        for index, address in enumerate(addresses):
-            pinned_url = self._url.copy_with(host=str(address))
-            try:
-                # The URL's host is an already validated IP, so the transport
-                # cannot resolve the user-controlled hostname again. Host and
-                # SNI remain the original hostname for virtual hosting and TLS
-                # certificate validation. Redirects stay disabled.
-                return await client.post(
-                    pinned_url,
-                    json=payload,
-                    headers=headers,
-                    follow_redirects=False,
-                    extensions={"sni_hostname": self._host},
-                )
-            except httpx.ConnectError, httpx.ConnectTimeout:
-                if index == len(addresses) - 1:
-                    raise
-        raise RuntimeError(
-            "validated webhook address list is unexpectedly empty"
-        )  # pragma: no cover
+        """Connect to validated IPs while retaining the original HTTP/TLS
+        identity. Delegates to the module-level `post_to_approved_address`
+        (shared with the Plan 07 budget-alert webhook channel)."""
+        return await post_to_approved_address(
+            client, self._url, self._host, addresses, payload, headers
+        )
 
     async def _ensure_public_target(
         self,
     ) -> tuple[ipaddress.IPv4Address | ipaddress.IPv6Address, ...]:
-        """SSRF guard (R6-H18), re-checked on every call to resist DNS
-        rebinding between config-save and use: every address the host resolves
-        to must be public. A blocked target raises, which the caller treats as
-        any other strategy failure (fallback to default_model, §4)."""
-        literal = _literal_ip(self._host)
-        addresses = (literal,) if literal is not None else None
-        if addresses is None:
-            resolved = await _resolve_host_addresses(self._host)
-            addresses = tuple(ipaddress.ip_address(address) for address in resolved)
-        if not addresses:
-            raise ValueError(f"webhook host {self._host!r} did not resolve to any address")
-        for address in addresses:
-            if _is_blocked(address):
-                raise ValueError(
-                    f"webhook host {self._host!r} resolves to blocked address {address}; "
-                    "only public endpoints are allowed"
-                )
-        return addresses
+        """SSRF guard (R6-H18); a blocked target raises, which the caller
+        treats as any other strategy failure (fallback to default_model, §4).
+        Delegates to the module-level `resolve_approved_addresses` (shared
+        with the Plan 07 budget-alert webhook channel)."""
+        return await resolve_approved_addresses(self._host)
 
     @staticmethod
     def _parse_choice(body: Any, names: list[str]) -> str:

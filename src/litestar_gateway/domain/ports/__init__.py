@@ -24,6 +24,7 @@ from litestar_gateway.domain.ports.invite import InviteRepository, PasswordReset
 from litestar_gateway.domain.ports.llm_gateway import LLMGateway
 from litestar_gateway.domain.ports.lock import DistributedLock
 from litestar_gateway.domain.ports.model import ModelRepository
+from litestar_gateway.domain.ports.notification_channel import NotificationChannel
 from litestar_gateway.domain.ports.organization import OrganizationRepository
 from litestar_gateway.domain.ports.rate_limiter import RateLimitDecision, RateLimiter
 from litestar_gateway.domain.ports.response_cache import (
@@ -68,6 +69,7 @@ __all__ = [
     "InviteRepository",
     "LLMGateway",
     "ModelRepository",
+    "NotificationChannel",
     "OrganizationRepository",
     "RateLimitDecision",
     "RateLimiter",

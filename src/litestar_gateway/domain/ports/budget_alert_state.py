@@ -9,12 +9,14 @@ its `pending_usage_event` outbox on one port (`domain/ports/usage.py:47-55`).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from litestar_gateway.domain.entities import BudgetAlertState, BudgetWindow, PendingBudgetAlert
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.domain.ports.notification_channel import NotificationChannel
 
 
 @runtime_checkable
@@ -54,9 +56,17 @@ class BudgetAlertStateRepository(Protocol):
         ...
 
     async def pending_alerts(self, *, limit: int = DEFAULT_PAGE_SIZE) -> list[PendingBudgetAlert]:
-        """Queued alerts oldest-first, for tests and the Phase 2 delivery
-        worker to build on. Phase 1 defines only the enqueue+read shape; the
-        drain-and-dispatch behavior (delete on success, retry with poison
-        quarantine like `pending_usage_event`) lands with the `NotificationChannel`
-        port in Phase 2, once there's somewhere to dispatch to."""
+        """Queued alerts oldest-first, for tests and `dispatch_pending` to
+        build on."""
+        ...
+
+    async def dispatch_pending(
+        self, channels: Sequence[NotificationChannel], *, limit: int = DEFAULT_PAGE_SIZE
+    ) -> int:
+        """Drain up to `limit` pending alerts oldest-first (Plan 07 Phase 2):
+        dispatch each through every `channel`, delete the row on success, or
+        bump `attempts`/`last_error` and leave it queued for retry on
+        failure — the same poison-quarantine convention as
+        `UsageRepository.reconcile_pending`. Returns how many were
+        delivered. An empty `channels` sequence is a no-op."""
         ...
