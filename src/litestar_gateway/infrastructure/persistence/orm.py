@@ -14,6 +14,7 @@ from litestar_gateway.domain.entities import (
     APIKey,
     AuditEvent,
     Budget,
+    BudgetAlertState,
     BudgetWindow,
     Credential,
     Invite,
@@ -560,6 +561,11 @@ class TeamBudgetModel(base.UUIDAuditBase):
     team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), unique=True, index=True)
     limit_cost: Mapped[float] = mapped_column()
     window: Mapped[str] = mapped_column()
+    # Alert threshold percentages of limit_cost (Plan 07 Phase 0, design §2/§8),
+    # e.g. [50, 80, 100]. server_default backfills existing rows for the
+    # NOT NULL add (migration f358c2474285's successor); unused by any request
+    # path until Plan 07 Phase 1.
+    thresholds: Mapped[list[int]] = mapped_column(JSON, default=list)
 
     def to_entity(self) -> Budget:
         return Budget(
@@ -568,6 +574,33 @@ class TeamBudgetModel(base.UUIDAuditBase):
             limit_cost=self.limit_cost,
             window=BudgetWindow(self.window),
             created_at=self.created_at,
+            thresholds=list(self.thresholds or []),
+        )
+
+
+class BudgetAlertStateModel(base.UUIDAuditBase):
+    """Dedup ledger for fired budget-threshold alerts (Plan 07 Phase 0). One
+    row per `(team_id, window, period_start, threshold)` that has fired; the
+    unique constraint is the concurrency guard — a losing concurrent insert
+    for the same key hits it and is treated as a no-op by the repository."""
+
+    __tablename__ = "budget_alert_state"
+    __table_args__ = (UniqueConstraint("team_id", "window", "period_start", "threshold"),)
+
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    window: Mapped[str] = mapped_column()
+    period_start: Mapped[datetime] = mapped_column()
+    threshold: Mapped[int] = mapped_column()
+    fired_at: Mapped[datetime] = mapped_column()
+
+    def to_entity(self) -> BudgetAlertState:
+        return BudgetAlertState(
+            id=self.id,
+            team_id=self.team_id,
+            window=BudgetWindow(self.window),
+            period_start=self.period_start,
+            threshold=self.threshold,
+            fired_at=self.fired_at,
         )
 
 

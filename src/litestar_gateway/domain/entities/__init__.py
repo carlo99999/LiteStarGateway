@@ -5,6 +5,7 @@ from .audit import AuditEvent
 from .billing import (
     ApiKeySpend,
     Budget,
+    BudgetAlertState,
     TraceRecord,
     UsageAggregate,
     UsageAttribution,
@@ -47,6 +48,7 @@ __all__ = [
     # Billing
     "ApiKeySpend",
     "Budget",
+    "BudgetAlertState",
     "TraceRecord",
     "UsageAggregate",
     "UsageAttribution",

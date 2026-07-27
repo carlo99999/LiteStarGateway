@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
@@ -15,13 +15,38 @@ class Budget:
 
     Enforcement is pre-call: once the window's accumulated cost reaches
     `limit_cost`, further inference calls are rejected. Requests already in
-    flight when the limit is crossed may still complete (bounded overshoot)."""
+    flight when the limit is crossed may still complete (bounded overshoot).
+
+    `thresholds` (Plan 07 Phase 0, design doc §2/§8) are optional percentages
+    of `limit_cost` — e.g. `[50, 80, 100]` — that drive proactive alerts as
+    spend approaches the cap. Validate with `domain.budget.validate_thresholds`
+    before constructing. Unused by any request path until Plan 07 Phase 1
+    wires evaluation into settlement; enforcement above is unaffected."""
 
     id: UUID
     team_id: UUID
     limit_cost: float
     window: BudgetWindow  # noqa: F821
     created_at: datetime
+    thresholds: list[int] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class BudgetAlertState:
+    """Dedup ledger row: one per `(team_id, window, period_start, threshold)`
+    that has already fired (Plan 07 Phase 0, design doc §2). `period_start`
+    is the calendar anchor from `domain.budget.window_start` for `window` —
+    the same anchor the pre-call budget gate uses. Persisted so the
+    at-most-once-per-period guarantee survives process restarts; a new
+    `period_start` (window rollover) is a new row, not a mutation of this
+    one."""
+
+    id: UUID
+    team_id: UUID
+    window: BudgetWindow  # noqa: F821
+    period_start: datetime
+    threshold: int
+    fired_at: datetime
 
 
 @dataclass(frozen=True)

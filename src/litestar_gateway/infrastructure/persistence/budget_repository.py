@@ -41,11 +41,13 @@ class SQLAlchemyBudgetRepository:
                 team_id=budget.team_id,
                 limit_cost=budget.limit_cost,
                 window=budget.window.value,
+                thresholds=list(budget.thresholds),
             )
             self._session.add(row)
         else:
             row.limit_cost = budget.limit_cost
             row.window = budget.window.value
+            row.thresholds = list(budget.thresholds)
         await self._session.commit()
         await self._session.refresh(row)
         return row.to_entity()
