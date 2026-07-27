@@ -9,7 +9,9 @@ logical request consumes exactly one team-RPM hit across every attempt.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
+from time import perf_counter
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -29,6 +31,7 @@ from litestar_gateway.domain.exceptions import (
     BudgetExceeded,
     UpstreamRequestRejected,
     UpstreamResponseInvalid,
+    UpstreamTimeout,
     UpstreamUnavailable,
 )
 from litestar_gateway.domain.ports.rate_limiter import RateLimitDecision
@@ -226,7 +229,7 @@ class ScriptedGateway:
 
 
 def _service(
-    gateway: ScriptedGateway,
+    gateway: Any,
     usage: FakeUsage,
     router: RouterConfig,
     models: dict[UUID, Model],
@@ -347,17 +350,18 @@ async def test_already_billed_response_invalid_never_retries() -> None:
 
 
 async def test_overall_deadline_stops_further_retries() -> None:
-    # A deadline already in the past (RouterService._validate would reject
-    # this at the admin API; the raw entity has no such guard) deterministically
-    # exercises the "deadline exceeded" branch without a real sleep in the test.
+    # A realistic deadline (the admin API rejects a non-positive one, so the
+    # old `-1` exercised a state production cannot reach): the first candidate
+    # is still failing when the budget runs out, so the chain ends there
+    # instead of spending another candidate's timeout on top.
     primary, secondary = _model("primary"), _model("secondary")
-    router = _router(primary, secondary, overall_deadline_ms=-1)
+    router = _router(primary, secondary, overall_deadline_ms=20)
     models = {primary.id: primary, secondary.id: secondary}
-    gateway = ScriptedGateway([UpstreamUnavailable("503")])
+    gateway = SlowGateway(0.2, fail_with=UpstreamUnavailable("503"))
     usage = FakeUsage()
     service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
 
-    with pytest.raises(UpstreamUnavailable, match="503"):
+    with pytest.raises(UpstreamTimeout):
         await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
 
     assert gateway.calls == [primary]  # the deadline stopped it before the retry
@@ -564,3 +568,106 @@ async def test_a_success_clears_prior_failures_before_the_threshold_trips() -> N
     # secondary was NOT skipped -- its earlier failure was reset by the
     # outright success on request B above.
     assert gateway_c.calls == [primary, secondary]
+
+
+# ---------------------------------------------------------------------------
+# ISSUE-027: `overall_deadline_ms` bounds the whole chain, not just the gaps
+# between attempts.
+# ---------------------------------------------------------------------------
+
+
+class SlowGateway:
+    """Sleeps before answering, so a test can outlast a deadline without
+    depending on wall-clock precision beyond the sleep itself."""
+
+    def __init__(self, delay_s: float, *, fail_with: Exception | None = None) -> None:
+        self._delay_s = delay_s
+        self._fail_with = fail_with
+        self.calls: list[Model] = []
+        self.completed = 0
+
+    async def achat_completion(self, request, model, credentials) -> dict[str, Any]:
+        self.calls.append(model)
+        await asyncio.sleep(self._delay_s)
+        self.completed += 1
+        if self._fail_with is not None:
+            raise self._fail_with
+        return {"usage": {"prompt_tokens": 1, "completion_tokens": 1}}
+
+    async def astream_chat_completion(self, request, model, credentials):
+        self.calls.append(model)
+        await asyncio.sleep(self._delay_s)
+        self.completed += 1
+
+        async def _chunks():
+            yield {"choices": [{"delta": {"content": "hi"}}]}
+
+        return _chunks()
+
+
+async def test_a_slow_first_attempt_is_cut_off_at_the_overall_deadline() -> None:
+    # The reported behaviour: deadline 10 ms, primary answers successfully
+    # after 120 ms, and the call returned 200 at ~122 ms. The deadline is a
+    # wall-clock budget for the whole chain, so it must abort the attempt in
+    # flight, not merely refuse to start another one.
+    primary, secondary = _model("primary"), _model("secondary")
+    router = _router(primary, secondary, overall_deadline_ms=10)
+    models = {primary.id: primary, secondary.id: secondary}
+    gateway = SlowGateway(0.2)
+    usage = FakeUsage()
+    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+
+    started = perf_counter()
+    with pytest.raises(UpstreamTimeout):
+        await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+    elapsed_ms = (perf_counter() - started) * 1000
+
+    assert gateway.completed == 0  # the provider call never ran to completion
+    assert elapsed_ms < 150  # and the caller was not made to wait it out
+    assert usage.events == []  # nothing billed for an aborted attempt
+
+
+async def test_a_slow_stream_open_is_cut_off_at_the_overall_deadline() -> None:
+    primary, secondary = _model("primary"), _model("secondary")
+    router = _router(primary, secondary, overall_deadline_ms=10)
+    models = {primary.id: primary, secondary.id: secondary}
+    gateway = SlowGateway(0.2)
+    usage = FakeUsage()
+    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+
+    started = perf_counter()
+    with pytest.raises(UpstreamTimeout):
+        await service.open_chat_stream(TEAM_ID, KEY_ID, dict(REQUEST))
+    elapsed_ms = (perf_counter() - started) * 1000
+
+    assert gateway.completed == 0
+    assert elapsed_ms < 150
+
+
+async def test_an_attempt_that_finishes_inside_the_deadline_is_untouched() -> None:
+    # The budget must not turn into a latency cap on healthy calls.
+    primary, secondary = _model("primary"), _model("secondary")
+    router = _router(primary, secondary, overall_deadline_ms=5000)
+    models = {primary.id: primary, secondary.id: secondary}
+    gateway = SlowGateway(0.01)
+    usage = FakeUsage()
+    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+
+    response = await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+
+    assert response["usage"]["prompt_tokens"] == 1
+    assert gateway.completed == 1
+    assert len(usage.events) == 1
+
+
+async def test_no_deadline_configured_never_interrupts_a_slow_attempt() -> None:
+    primary, secondary = _model("primary"), _model("secondary")
+    router = _router(primary, secondary)  # overall_deadline_ms=None
+    models = {primary.id: primary, secondary.id: secondary}
+    gateway = SlowGateway(0.05)
+    usage = FakeUsage()
+    service = _service(gateway, usage, router, models, FixedDecisionRouter(primary))
+
+    await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+
+    assert gateway.completed == 1

@@ -93,8 +93,12 @@ Bounds (all configurable, all with safe defaults):
 - **per-attempt timeout:** the existing SDK `timeout` (`resilience.py:17`) already
   bounds one call; failover adds no new per-attempt timer beyond it.
 - **overall deadline:** a wall-clock budget for the whole chain (default ~90 s)
-  so a slow-timeout × many-candidates chain cannot exceed the caller's patience;
-  once exceeded, stop and surface the last error.
+  so a slow-timeout × many-candidates chain cannot exceed the caller's patience.
+  It bounds the attempt **in flight**, not only the decision to start another
+  one: each dispatch (and each stream open + prime) runs under whatever is left
+  of the budget, and expiry surfaces as `UpstreamTimeout` (→ 504). A chain that
+  runs out of budget mid-attempt therefore ends there instead of running that
+  attempt to the SDK timeout.
 
 Interaction with per-SDK retries — **avoid a retry storm.** The SDK
 `max_retries=2` (`resilience.py:17`) handles *same-provider transient blips*
