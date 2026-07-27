@@ -665,6 +665,11 @@ class PendingBudgetAlertModel(base.UUIDAuditBase):
     # reserved now so that phase doesn't need another migration.
     attempts: Mapped[int] = mapped_column(default=0)
     last_error: Mapped[str | None] = mapped_column(default=None)
+    # Dispatch lease (ISSUE-026): set by the dispatcher that owns this row, so
+    # two replicas cannot both deliver it. A lease in the past is claimable
+    # again, which is what makes a worker dying mid-delivery recoverable
+    # without operator action.
+    claimed_until: Mapped[datetime | None] = mapped_column(default=None)
 
     def to_entity(self) -> PendingBudgetAlert:
         return PendingBudgetAlert(

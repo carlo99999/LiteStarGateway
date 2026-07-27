@@ -10,7 +10,7 @@ fixed platform-wide channel list, so these tests pass a resolver."""
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from litestar_gateway.domain.entities import BudgetWindow, PendingBudgetAlert
 from litestar_gateway.domain.ports.notification_channel import NotificationChannel
 from litestar_gateway.infrastructure.persistence.budget_alert_state_repository import (
+    DISPATCH_LEASE_SECONDS,
     MAX_DISPATCH_ATTEMPTS,
     SQLAlchemyBudgetAlertStateRepository,
 )
@@ -195,3 +196,96 @@ async def test_row_is_quarantined_after_max_attempts(session: AsyncSession) -> N
     delivered = await repo.dispatch_pending(_const(channel))
     assert delivered == 0
     assert channel.calls == MAX_DISPATCH_ATTEMPTS  # not retried once quarantined
+
+
+# ---------------------------------------------------------------------------
+# ISSUE-026: two dispatchers must not both deliver the same alert.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+async def two_sessions(tmp_path: Path) -> AsyncIterator[tuple[AsyncSession, AsyncSession]]:
+    """Two independent sessions over ONE database file — the closest a test can
+    get to two replicas draining the same outbox."""
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'replicas.db'}")
+    async with engine.begin() as conn:
+        await conn.run_sync(base.UUIDAuditBase.metadata.create_all)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with maker() as first, maker() as second:
+        yield first, second
+    await engine.dispose()
+
+
+async def test_two_dispatchers_deliver_one_alert_exactly_once(
+    two_sessions: tuple[AsyncSession, AsyncSession],
+) -> None:
+    """The second replica drains *while the first is mid-send* — the window the
+    previous select-send-delete left open, where both replicas had already
+    selected the row and both delivered it before either deleted it."""
+    first_session, second_session = two_sessions
+    replica_one = SQLAlchemyBudgetAlertStateRepository(first_session)
+    replica_two = SQLAlchemyBudgetAlertStateRepository(second_session)
+    await replica_one.enqueue_alert(_alert())
+
+    sent: list[str] = []
+    second_delivered: list[int] = []
+
+    class _ReentrantChannel:
+        """Replica one's channel: the other replica drains inside its send."""
+
+        async def send(self, alert: PendingBudgetAlert) -> None:
+            sent.append("one")
+            second_delivered.append(
+                await replica_two.dispatch_pending(_const(_SecondReplicaChannel()))
+            )
+
+    class _SecondReplicaChannel:
+        async def send(self, alert: PendingBudgetAlert) -> None:
+            sent.append("two")
+
+    delivered = await replica_one.dispatch_pending(_const(_ReentrantChannel()))
+
+    assert sent == ["one"]  # the second replica never sent the same alert
+    assert (delivered, second_delivered) == (1, [0])
+    assert (await first_session.scalars(select(PendingBudgetAlertModel))).all() == []
+
+
+async def test_an_expired_claim_is_reclaimable(session: AsyncSession) -> None:
+    """A dispatcher killed mid-delivery must not strand the alert: the lease is
+    what makes the claim recoverable without operator action."""
+    repo = SQLAlchemyBudgetAlertStateRepository(session)
+    await repo.enqueue_alert(_alert())
+    row = (await session.scalars(select(PendingBudgetAlertModel))).one()
+    row.claimed_until = datetime.now(UTC) - timedelta(seconds=1)  # a dead worker's stale lease
+    await session.commit()
+
+    channel = _RecordingChannel()
+    assert await repo.dispatch_pending(_const(channel)) == 1
+    assert len(channel.sent) == 1
+
+
+async def test_a_live_claim_is_not_stolen(session: AsyncSession) -> None:
+    repo = SQLAlchemyBudgetAlertStateRepository(session)
+    await repo.enqueue_alert(_alert())
+    row = (await session.scalars(select(PendingBudgetAlertModel))).one()
+    row.claimed_until = datetime.now(UTC) + timedelta(seconds=DISPATCH_LEASE_SECONDS)
+    await session.commit()
+
+    channel = _RecordingChannel()
+    assert await repo.dispatch_pending(_const(channel)) == 0
+    assert channel.sent == []
+
+
+async def test_a_failed_delivery_releases_the_claim_for_the_next_drain(
+    session: AsyncSession,
+) -> None:
+    repo = SQLAlchemyBudgetAlertStateRepository(session)
+    await repo.enqueue_alert(_alert())
+
+    assert await repo.dispatch_pending(_const(_FailingChannel(RuntimeError("boom")))) == 0
+    row = (await session.scalars(select(PendingBudgetAlertModel))).one()
+    assert row.attempts == 1
+    assert row.claimed_until is None  # not stuck for the whole lease
+
+    channel = _RecordingChannel()
+    assert await repo.dispatch_pending(_const(channel)) == 1

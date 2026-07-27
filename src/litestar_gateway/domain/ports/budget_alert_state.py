@@ -23,9 +23,10 @@ class BudgetAlertStateRepository(Protocol):
     """Persistence port for the `(team_id, window, period_start, threshold)`
     dedup ledger plus the `pending_budget_alert` delivery outbox. Phase 1 wires
     this into `UsageMeter.settle_ok`: a newly-crossed threshold is recorded via
-    `record_fired`, and only if that returns a new row is `enqueue_alert`
-    called — never the reverse, so a threshold can never be queued for
-    delivery without also being marked fired."""
+    `record_fired_and_enqueue`, which writes the dedup row and the outbox row
+    in a single transaction: "fired" and "queued" are one durable fact, so
+    neither a crash between two commits nor a concurrent settlement can leave a
+    threshold marked fired with nothing to deliver (ISSUE-026)."""
 
     async def fired_thresholds(
         self, team_id: UUID, window: BudgetWindow, period_start: datetime
@@ -33,25 +34,18 @@ class BudgetAlertStateRepository(Protocol):
         """Thresholds already recorded as fired for this team/window/period."""
         ...
 
-    async def record_fired(
-        self,
-        team_id: UUID,
-        window: BudgetWindow,
-        period_start: datetime,
-        threshold: int,
-    ) -> BudgetAlertState | None:
-        """Persist a newly-fired threshold. Returns the created row, or `None`
-        if a concurrent settlement already recorded the same dedup key (the
-        unique constraint on `(team_id, window, period_start, threshold)`
-        makes the loser's insert a no-op rather than an error — the same
-        PK-conflict strategy as the usage reconciler)."""
-        ...
+    async def record_fired_and_enqueue(self, alert: PendingBudgetAlert) -> BudgetAlertState | None:
+        """Record a newly-fired threshold in the dedup ledger AND queue its
+        delivery, atomically. Returns the created ledger row, or `None` if a
+        concurrent settlement already recorded the same dedup key — in which
+        case nothing is queued either (the unique constraint on
+        `(team_id, window, period_start, threshold)` makes the loser's insert a
+        no-op rather than an error, the same PK-conflict strategy as the usage
+        reconciler).
 
-    async def enqueue_alert(self, alert: PendingBudgetAlert) -> None:
-        """Durable outbox row for a newly-fired threshold, so delivery survives
-        restarts and stays off the settlement hot path (Plan 07 Phase 1, design
-        doc §4). Callers must only enqueue after `record_fired` returns a new
-        row — never for a dedup key that was already fired."""
+        Deliberately the only write on this port: exposing the two inserts
+        separately is what allowed a fired-but-never-queued threshold to be
+        skipped forever by later evaluations (ISSUE-026)."""
         ...
 
     async def pending_alerts(self, *, limit: int = DEFAULT_PAGE_SIZE) -> list[PendingBudgetAlert]:

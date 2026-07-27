@@ -156,3 +156,47 @@ async def test_pending_alerts_respects_limit_oldest_first(session: AsyncSession)
     pending = await repo.pending_alerts(limit=2)
 
     assert [row.threshold for row in pending] == [50, 80]
+
+
+# ---------------------------------------------------------------------------
+# ISSUE-026: the dedup row and the outbox row are one durable fact.
+# ---------------------------------------------------------------------------
+
+
+def _pending(team_id, threshold: int = 80, period_start=None) -> PendingBudgetAlert:
+    return PendingBudgetAlert(
+        id=uuid4(),
+        team_id=team_id,
+        window=BudgetWindow.MONTHLY,
+        period_start=period_start or datetime(2026, 7, 1, tzinfo=UTC),
+        threshold=threshold,
+        spend=85.0,
+        limit_cost=100.0,
+        created_at=datetime.now(UTC),
+    )
+
+
+async def test_record_fired_and_enqueue_writes_both_rows(session: AsyncSession) -> None:
+    repo = SQLAlchemyBudgetAlertStateRepository(session)
+    team_id = uuid4()
+    alert = _pending(team_id)
+
+    state = await repo.record_fired_and_enqueue(alert)
+
+    assert state is not None
+    assert await repo.fired_thresholds(team_id, BudgetWindow.MONTHLY, alert.period_start) == {80}
+    assert [a.id for a in await repo.pending_alerts()] == [alert.id]
+
+
+async def test_a_duplicate_dedup_key_queues_nothing(session: AsyncSession) -> None:
+    # The loser of the race must not leave a second outbox row behind: its
+    # rollback has to discard both inserts, not just the conflicting one.
+    repo = SQLAlchemyBudgetAlertStateRepository(session)
+    team_id = uuid4()
+    first = _pending(team_id)
+    assert await repo.record_fired_and_enqueue(first) is not None
+
+    second = _pending(team_id)  # same dedup key, different row id
+    assert await repo.record_fired_and_enqueue(second) is None
+
+    assert [a.id for a in await repo.pending_alerts()] == [first.id]

@@ -791,12 +791,7 @@ class UsageMeter:
                 fired=fired,
             )
             for threshold in newly_crossed:
-                state = await self._budget_alert_state.record_fired(
-                    team_id, budget.window, period_start, threshold
-                )
-                if state is None:
-                    continue
-                await self._budget_alert_state.enqueue_alert(
+                await self._budget_alert_state.record_fired_and_enqueue(
                     PendingBudgetAlert(
                         id=uuid4(),
                         team_id=team_id,

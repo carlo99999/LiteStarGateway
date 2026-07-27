@@ -10,9 +10,12 @@ of the outbox, and never touches any in-flight inference request (this
 worker isn't on that path at all).
 
 Deliberately NOT guarded by the `DistributedLock` port, for the same reason
-`usage_reconciler.py` isn't: each row settles as dispatch-then-delete in one
-transaction, so two replicas racing the same row are safe (whichever deletes
-first wins; the loser's delete of an already-gone row is a no-op)."""
+`usage_reconciler.py` isn't — but safety here comes from the row-level lease,
+not from the delete. Each row is claimed with an atomic compare-and-swap before
+anything is sent, so of two replicas racing the same alert exactly one delivers
+it; an idempotent delete alone would not have prevented both from sending
+first (ISSUE-026). A claim whose holder dies is reclaimable once the lease
+expires."""
 
 from __future__ import annotations
 
