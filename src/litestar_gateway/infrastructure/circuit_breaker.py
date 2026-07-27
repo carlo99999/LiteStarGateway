@@ -116,6 +116,23 @@ class RedisCircuitBreaker:
         self._cooldown_seconds = cooldown_seconds
         self._clock = clock
 
+    def _open_marker_ttl(self) -> int:
+        """How long the `opened` marker lives.
+
+        It must OUTLIVE the cooldown (ISSUE-029): the marker is what tells
+        `allow()` the breaker is open, and the half-open branch — the one that
+        claims the single trial — is only reached while it exists. With a TTL
+        equal to the cooldown the marker vanished at the exact moment the
+        breaker should have moved to half-open, so `allow()` read "closed" and
+        admitted every concurrent caller at once, stampeding a provider that
+        had just failed.
+
+        One extra cooldown of retention is enough for the transition to be
+        observed by whatever traffic arrives. Beyond that the key is allowed to
+        expire: with no traffic at all there is no stampede to protect against,
+        and a stale marker must never wedge a provider that has recovered."""
+        return max(1, self._cooldown_seconds * 2)
+
     def _failures_key(self, key: str) -> str:
         return f"cb:failures:{key}"
 
@@ -132,7 +149,10 @@ class RedisCircuitBreaker:
         opened_at = float(opened_raw)
         if self._clock() < opened_at + self._cooldown_seconds:
             return False  # still cooling down
-        # Cooldown elapsed: claim the single half-open trial atomically.
+        # Cooldown elapsed: claim the single half-open trial. `SET NX` is the
+        # atomic part — concurrent callers all attempt it and exactly one wins,
+        # so no Lua script is needed for the grant itself; the marker's TTL
+        # above is what guarantees they reach this branch at all.
         claimed = await self._redis.set(  # type: ignore[attr-defined]
             self._trial_key(key), "1", nx=True, ex=self._cooldown_seconds
         )
@@ -146,7 +166,7 @@ class RedisCircuitBreaker:
             # a new one.
             await self._redis.delete(self._trial_key(key))  # type: ignore[attr-defined]
             await self._redis.set(  # type: ignore[attr-defined]
-                self._opened_key(key), str(self._clock()), ex=self._cooldown_seconds
+                self._opened_key(key), str(self._clock()), ex=self._open_marker_ttl()
             )
             return
         opened_raw = await self._redis.get(self._opened_key(key))  # type: ignore[attr-defined]
@@ -160,7 +180,7 @@ class RedisCircuitBreaker:
         if count >= self._failure_threshold:
             await self._redis.delete(self._failures_key(key))  # type: ignore[attr-defined]
             await self._redis.set(  # type: ignore[attr-defined]
-                self._opened_key(key), str(self._clock()), ex=self._cooldown_seconds
+                self._opened_key(key), str(self._clock()), ex=self._open_marker_ttl()
             )
 
     async def record_success(self, key: str) -> None:
