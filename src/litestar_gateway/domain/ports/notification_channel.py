@@ -8,6 +8,7 @@ implement the exact same Protocol."""
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Protocol, runtime_checkable
 
 from litestar_gateway.domain.entities import PendingBudgetAlert
@@ -24,3 +25,12 @@ class NotificationChannel(Protocol):
         be called from the request path — only the background worker calls
         this."""
         ...
+
+
+# Per-alert channel resolution (Plan 07 Phase 3). Delivery targets are per-team
+# data, not a fixed platform-wide list, so the outbox worker resolves the
+# channels for each alert's owning team just before dispatch. Kept as an
+# abstract callable over domain types only — the concrete resolver
+# (`infrastructure/notifications/channel_resolver.py`) knows about webhooks and
+# SMTP; this port does not.
+ChannelResolver = Callable[[PendingBudgetAlert], Awaitable[Sequence[NotificationChannel]]]

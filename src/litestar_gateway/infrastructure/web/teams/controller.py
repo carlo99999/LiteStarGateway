@@ -7,21 +7,29 @@ admin or team admin). Domain errors are mapped to HTTP by the central handler.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from email.utils import parseaddr
 from typing import Any
+from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 from litestar import Controller, Request, delete, get, patch, post, put
 from litestar.di import NamedDependency, Provide
 from litestar.params import FromPath, FromQuery
 
+from litestar_gateway.application.routing.webhook import _is_blocked, _literal_ip
 from litestar_gateway.application.service import APIKeyService
 from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.domain.authorization import Permission
-from litestar_gateway.domain.budget import window_start
+from litestar_gateway.domain.budget import validate_thresholds, window_start
 from litestar_gateway.domain.entities import Budget, BudgetWindow, KeyScope, Principal, User
 from litestar_gateway.domain.exceptions import BudgetNotFound, InvalidBudget, InvalidKeyScope
 from litestar_gateway.domain.pagination import resolve_page
-from litestar_gateway.domain.ports import AuditLog, BudgetRepository, UsageRepository
+from litestar_gateway.domain.ports import (
+    AuditLog,
+    BudgetAlertStateRepository,
+    BudgetRepository,
+    UsageRepository,
+)
 from litestar_gateway.infrastructure.web.audit.recorder import make_audit_event, record_audit
 from litestar_gateway.infrastructure.web.principal import provide_principal
 from litestar_gateway.infrastructure.web.session.dependencies import (
@@ -30,6 +38,7 @@ from litestar_gateway.infrastructure.web.session.dependencies import (
 )
 from litestar_gateway.infrastructure.web.teams.schemas import (
     AddMemberRequest,
+    BudgetAlertResponse,
     BudgetResponse,
     CreatedKeyResponse,
     CreateKeyRequest,
@@ -60,6 +69,37 @@ def _cache_savings_response(
     }
 
 
+def _validate_alert_webhook_url(url: str) -> str:
+    """Boundary-validate an operator-supplied per-team alert webhook URL with
+    the SAME SSRF deny-list the send path uses (Plan 07 Phase 2/3): an
+    http(s) URL whose host is not a private/loopback/link-local literal IP.
+    A hostname is re-resolved and re-checked on every send by the channel
+    (DNS-rebinding guard); this is the config-time literal check that mirrors
+    `WebhookNotificationChannel.__init__`."""
+    if not url.startswith(("http://", "https://")):
+        raise InvalidBudget("alert_webhook_url must be an http(s) URL")
+    host = urlsplit(url).hostname
+    if not host:
+        raise InvalidBudget("alert_webhook_url has no host")
+    literal = _literal_ip(host)
+    if literal is not None and _is_blocked(literal):
+        raise InvalidBudget(
+            "alert_webhook_url targets a private/loopback/link-local address; "
+            "only public endpoints are allowed"
+        )
+    return url
+
+
+def _validate_alert_email(value: str) -> str:
+    """A basic sanity check on an alert recipient — NOT the security boundary
+    (email is not an egress target). Rejects obviously malformed addresses."""
+    address = parseaddr(value)[1]
+    local, _, domain = address.partition("@")
+    if not local or "." not in domain:
+        raise InvalidBudget("alert_email must be a valid email address")
+    return address
+
+
 def _parse_budget(data: SetBudgetRequest, team_id: UUID) -> Budget:
     if data.limit_cost <= 0:
         raise InvalidBudget("limit_cost must be a positive USD amount")
@@ -68,12 +108,20 @@ def _parse_budget(data: SetBudgetRequest, team_id: UUID) -> Budget:
     except ValueError:
         valid = ", ".join(w.value for w in BudgetWindow)
         raise InvalidBudget(f"window must be one of: {valid}") from None
+    thresholds = validate_thresholds(data.thresholds or [])
+    webhook_url = (
+        _validate_alert_webhook_url(data.alert_webhook_url) if data.alert_webhook_url else None
+    )
+    email = _validate_alert_email(data.alert_email) if data.alert_email else None
     return Budget(
         id=uuid4(),
         team_id=team_id,
         limit_cost=data.limit_cost,
         window=window,
         created_at=datetime.now(UTC),
+        thresholds=thresholds,
+        alert_webhook_url=webhook_url,
+        alert_email=email,
     )
 
 
@@ -400,6 +448,30 @@ class TeamController(Controller):
             team_id, window_start(budget.window, datetime.now(UTC))
         )
         return BudgetResponse.from_budget(budget, spent)
+
+    @get(
+        "/{team_id:uuid}/budget/alerts",
+        dependencies={"principal": Provide(provide_principal)},
+    )
+    async def budget_alerts(
+        self,
+        team_id: FromPath[UUID],
+        principal: NamedDependency[Principal],
+        team_service: NamedDependency[TeamService],
+        budget_alert_state_repository: NamedDependency[BudgetAlertStateRepository],
+        limit: FromQuery[int | None] = None,
+        offset: FromQuery[int | None] = None,
+    ) -> list[BudgetAlertResponse]:
+        """The team's most-recently fired budget-threshold alerts, newest-first
+        (Plan 07 Phase 3, design §8). Same read gate as `get_budget`
+        (`BUDGET_READ`); accepts a JWT or a management-scoped API key (own team
+        only). Read from the `budget_alert_state` dedup ledger."""
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.BUDGET_READ
+        )
+        page_limit, _ = resolve_page(limit, offset)
+        alerts = await budget_alert_state_repository.recent_fired(team_id, limit=page_limit)
+        return [BudgetAlertResponse.from_entity(a) for a in alerts]
 
     @put(
         "/{team_id:uuid}/budget",

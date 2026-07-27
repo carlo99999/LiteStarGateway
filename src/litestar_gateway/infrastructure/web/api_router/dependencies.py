@@ -11,6 +11,7 @@ from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import InFlightSpend, UsageMeter
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.ports import (
+    BudgetAlertStateRepository,
     BudgetRepository,
     CircuitBreaker,
     LLMGateway,
@@ -70,6 +71,12 @@ def provide_usage_repository(db_session: NamedDependency[AsyncSession]) -> Usage
 
 def provide_budget_repository(db_session: NamedDependency[AsyncSession]) -> BudgetRepository:
     return SQLAlchemyBudgetRepository(db_session)
+
+
+def provide_budget_alert_state_repository(
+    db_session: NamedDependency[AsyncSession],
+) -> BudgetAlertStateRepository:
+    return SQLAlchemyBudgetAlertStateRepository(db_session)
 
 
 # Process-wide: request-scoped meters must share the in-flight reservations

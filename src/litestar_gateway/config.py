@@ -54,6 +54,10 @@ _PLATFORM_ROLES = frozenset({"admin", "member"})
 # webhook's own default call timeout (`application/routing/webhook.py`'s
 # DEFAULT_TIMEOUT_MS).
 DEFAULT_BUDGET_ALERT_WEBHOOK_TIMEOUT_MS = 2000
+# Budget-alert email delivery (Plan 07 Phase 3, design doc §4/§8). Platform-wide
+# SMTP server config; the per-team recipient is data on the team's budget, not
+# config here. 587 is the STARTTLS submission port (default when SMTP_USE_TLS).
+DEFAULT_SMTP_PORT = 587
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -237,6 +241,33 @@ class Settings:
     budget_alert_webhook_url: str | None = None
     budget_alert_webhook_bearer_token: str | None = None
     budget_alert_webhook_timeout_ms: int = DEFAULT_BUDGET_ALERT_WEBHOOK_TIMEOUT_MS
+    # Budget-alert email delivery (Plan 07 Phase 3, design doc §4/§8). A single
+    # platform-wide SMTP server; a team opts in per-budget by setting
+    # `Budget.alert_email` (the recipient). Without a host + from-address,
+    # email delivery is disabled and any team's `alert_email` simply never
+    # dispatches — the per-team webhook still works independently.
+    smtp_host: str | None = None
+    smtp_port: int = DEFAULT_SMTP_PORT
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_use_tls: bool = True
+    smtp_from_address: str | None = None
+
+    @property
+    def smtp_configured(self) -> bool:
+        """Whether the platform can send budget-alert email at all. Both a
+        server host and a From address are required; missing either disables
+        the email channel (per-team `alert_email` values are then ignored)."""
+        return bool(self.smtp_host and self.smtp_from_address)
+
+    @property
+    def budget_alert_delivery_configured(self) -> bool:
+        """Whether any budget-alert delivery capability exists platform-wide,
+        gating whether the outbox worker is started at all (mirroring Phase 2's
+        `budget_alert_webhook_url`-only gate). Per-team webhook overrides ride
+        on the same worker, so a platform webhook OR SMTP being configured is
+        enough to start it."""
+        return bool(self.budget_alert_webhook_url) or self.smtp_configured
 
     @property
     def default_admin(self) -> bool:
@@ -405,4 +436,10 @@ class Settings:
                 DEFAULT_BUDGET_ALERT_WEBHOOK_TIMEOUT_MS,
                 minimum=1,
             ),
+            smtp_host=os.environ.get("SMTP_HOST"),
+            smtp_port=_env_int("SMTP_PORT", DEFAULT_SMTP_PORT, minimum=1),
+            smtp_username=os.environ.get("SMTP_USERNAME"),
+            smtp_password=os.environ.get("SMTP_PASSWORD"),
+            smtp_use_tls=_env_bool("SMTP_USE_TLS", True),
+            smtp_from_address=os.environ.get("SMTP_FROM_ADDRESS"),
         )

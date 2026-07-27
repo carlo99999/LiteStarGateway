@@ -42,12 +42,16 @@ class SQLAlchemyBudgetRepository:
                 limit_cost=budget.limit_cost,
                 window=budget.window.value,
                 thresholds=list(budget.thresholds),
+                alert_webhook_url=budget.alert_webhook_url,
+                alert_email=budget.alert_email,
             )
             self._session.add(row)
         else:
             row.limit_cost = budget.limit_cost
             row.window = budget.window.value
             row.thresholds = list(budget.thresholds)
+            row.alert_webhook_url = budget.alert_webhook_url
+            row.alert_email = budget.alert_email
         await self._session.commit()
         await self._session.refresh(row)
         return row.to_entity()

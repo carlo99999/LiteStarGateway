@@ -265,3 +265,122 @@ async def test_only_platform_admin_can_set_or_remove_budget(client: AsyncTestCli
     resp = await client.get(f"/teams/{team}/budget", headers=_bearer(dev))
     assert resp.status_code == HTTP_200_OK
     assert resp.json()["limit_cost"] == 1.0
+
+
+# ── Plan 07 Phase 3: alert thresholds + channel config ───────────────────────
+
+
+async def test_budget_thresholds_and_channels_round_trip(client: AsyncTestClient) -> None:
+    _, team, admin = await _setup_team(client)
+
+    resp = await client.put(
+        f"/teams/{team}/budget",
+        json={
+            "limit_cost": 100.0,
+            "window": "monthly",
+            # Deliberately out of order + duplicated: the boundary normalizes
+            # (sort + dedup) rather than rejecting.
+            "thresholds": [80, 50, 80, 100],
+            "alert_webhook_url": "https://alerts.example.com/hook",
+            "alert_email": "team@example.com",
+        },
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_200_OK
+    body = resp.json()
+    assert body["thresholds"] == [50, 80, 100]
+    assert body["alert_webhook_url"] == "https://alerts.example.com/hook"
+    assert body["alert_email"] == "team@example.com"
+
+    # GET reflects the same config.
+    got = (await client.get(f"/teams/{team}/budget", headers=_bearer(admin))).json()
+    assert got["thresholds"] == [50, 80, 100]
+    assert got["alert_webhook_url"] == "https://alerts.example.com/hook"
+    assert got["alert_email"] == "team@example.com"
+
+    # Omitting the alert fields on a later PUT clears them (upsert replaces).
+    cleared = (
+        await client.put(
+            f"/teams/{team}/budget",
+            json={"limit_cost": 100.0, "window": "monthly"},
+            headers=_bearer(admin),
+        )
+    ).json()
+    assert cleared["thresholds"] == []
+    assert cleared["alert_webhook_url"] is None
+    assert cleared["alert_email"] is None
+
+
+async def test_budget_alert_config_validation(client: AsyncTestClient) -> None:
+    _, team, admin = await _setup_team(client)
+
+    for bad in (
+        {"limit_cost": 1.0, "window": "monthly", "thresholds": [0]},  # < 1
+        {"limit_cost": 1.0, "window": "monthly", "thresholds": [101]},  # > 100
+        # SSRF: private / loopback / link-local webhook targets are rejected.
+        {"limit_cost": 1.0, "window": "monthly", "alert_webhook_url": "http://127.0.0.1/hook"},
+        {"limit_cost": 1.0, "window": "monthly", "alert_webhook_url": "http://10.0.0.5/hook"},
+        {
+            "limit_cost": 1.0,
+            "window": "monthly",
+            "alert_webhook_url": "http://169.254.169.254/latest",
+        },
+        {"limit_cost": 1.0, "window": "monthly", "alert_webhook_url": "ftp://x"},  # not http(s)
+        {"limit_cost": 1.0, "window": "monthly", "alert_email": "not-an-email"},
+    ):
+        resp = await client.put(f"/teams/{team}/budget", json=bad, headers=_bearer(admin))
+        assert resp.status_code == HTTP_400_BAD_REQUEST, bad
+
+
+async def test_budget_alerts_list_reflects_fired_thresholds(client: AsyncTestClient) -> None:
+    """End-to-end: a settlement that crosses a configured threshold records a
+    fired alert, and the read-only alerts endpoint surfaces it."""
+    key, team, admin = await _setup_team(client)
+
+    # Cap 0.04/monthly, alert at 50% (= 0.02). One 0.02 call crosses it.
+    resp = await client.put(
+        f"/teams/{team}/budget",
+        json={"limit_cost": 0.04, "window": "monthly", "thresholds": [50]},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == HTTP_200_OK
+
+    # No alerts fired yet.
+    assert (await client.get(f"/teams/{team}/budget/alerts", headers=_bearer(admin))).json() == []
+
+    assert (await _chat(client, key)).status_code == HTTP_200_OK  # spend 0.02 ⇒ 50%
+
+    alerts = (await client.get(f"/teams/{team}/budget/alerts", headers=_bearer(admin))).json()
+    assert len(alerts) == 1
+    assert alerts[0]["threshold"] == 50
+    assert alerts[0]["window"] == "monthly"
+
+
+async def test_budget_alerts_requires_team_read_permission(client: AsyncTestClient) -> None:
+    """A caller with no access to the team cannot read its fired alerts —
+    same team-scoped gate as GET /budget (mirrors team-isolation convention)."""
+    _, team, admin = await _setup_team(client)
+    await client.put(
+        f"/teams/{team}/budget",
+        json={"limit_cost": 1.0, "window": "monthly", "thresholds": [50]},
+        headers=_bearer(admin),
+    )
+
+    # An unrelated user who is not a member of the team and not a platform admin.
+    invite = await seed_team_and_invite(client, admin)
+    await client.post(
+        "/signup",
+        json={
+            "invite_token": invite,
+            "email": "outsider@example.com",
+            "password": DEV_PASSWORD,
+        },
+    )
+    outsider = (
+        await client.post(
+            "/login", json={"email": "outsider@example.com", "password": DEV_PASSWORD}
+        )
+    ).json()["access_token"]
+
+    resp = await client.get(f"/teams/{team}/budget/alerts", headers=_bearer(outsider))
+    assert resp.status_code == HTTP_403_FORBIDDEN
