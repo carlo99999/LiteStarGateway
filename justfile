@@ -260,6 +260,11 @@ docs-build: docs-prepare
 docs-serve: docs-prepare
     uv run mkdocs serve
 
+# Check that internal relative Markdown links in plans/ and docs/ resolve
+# (catches renamed/moved doc files breaking a cross-reference).
+docs-check-links:
+    uv run python scripts/check_doc_links.py
+
 # ── Admin UI (ui/) ──────────────────────────────────────────────────────────────
 # React/Vite admin console (Plan 03). Served under `/ui/`; the gateway API stays
 # at the root. Requires Node + pnpm (https://pnpm.io). All recipes run in ui/.
@@ -286,13 +291,42 @@ ui-typegen:
     cd ui && pnpm typegen
 
 # Regenerate ui/openapi.json from the app, then the typed client. No server needed.
+# PYTHONHASHSEED is pinned because response-header ordering in the generated
+# schema depends on Python's (otherwise randomized) string hashing; a fixed
+# seed keeps regeneration byte-for-byte reproducible, which `ui-schema-check`
+# (and CI) rely on.
 ui-schema:
-    uv run litestar --app {{app}} schema openapi --output ui/openapi.json
+    PYTHONHASHSEED=0 uv run litestar --app {{app}} schema openapi --output ui/openapi.json
     cd ui && pnpm typegen
 
 # Lint the UI sources (eslint).
 ui-lint:
     cd ui && pnpm lint
+
+# Regenerate the OpenAPI schema + typed client into a scratch directory and
+# diff against the committed ui/openapi.json + ui/src/lib/api/schema.ts. Fails
+# if an endpoint/model changed without re-running `just ui-schema` (CI gate).
+ui-schema-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    scratch="$(mktemp -d)"
+    trap 'rm -rf "$scratch"' EXIT
+    PYTHONHASHSEED=0 uv run litestar --app {{app}} schema openapi --output "$scratch/openapi.json"
+    cd ui && pnpm exec openapi-typescript "$scratch/openapi.json" -o "$scratch/schema.ts"
+    cd ..
+    # The CLI doesn't emit a trailing newline; the committed file has one
+    # (pre-commit's end-of-file-fixer enforces it). Match that so the only
+    # thing this diffs on is real schema content.
+    [ -z "$(tail -c1 "$scratch/openapi.json")" ] || printf '\n' >> "$scratch/openapi.json"
+    diff -u ui/openapi.json "$scratch/openapi.json" || {
+        echo "ui/openapi.json is out of date — run 'just ui-schema' and commit the result." >&2
+        exit 1
+    }
+    diff -u ui/src/lib/api/schema.ts "$scratch/schema.ts" || {
+        echo "ui/src/lib/api/schema.ts is out of date — run 'just ui-schema' and commit the result." >&2
+        exit 1
+    }
+    echo "OpenAPI schema and typed client are up to date."
 
 # ── Aggregates ─────────────────────────────────────────────────────────────────
 

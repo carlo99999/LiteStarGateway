@@ -78,6 +78,61 @@ jobs:
       - name: Tests (pytest + coverage gate)
         run: uv run pytest -q --cov=src/litestar_gateway --cov-report=term --cov-fail-under=80
 
+      - name: Install just
+        uses: extractions/setup-just@v4
+
+      # Fresh SQLite database at head (checked-out repo never ships gateway.db),
+      # then assert there's no pending autogenerate diff between the models and
+      # the migration chain — catches an ORM change shipped without a migration.
+      - name: Apply migrations to head (fresh SQLite)
+        run: uv run litestar --app litestar_gateway.app:app database upgrade --no-prompt
+
+      - name: Migration drift check
+        run: just migration-check
+
+      # Catches a broken internal cross-reference (e.g. a renamed doc file) in
+      # the roadmap/design docs.
+      - name: Doc link check (plans/ + docs/)
+        run: just docs-check-links
+
+  # Regenerates the OpenAPI schema + typed client into a scratch directory and
+  # diffs against the committed ui/openapi.json + ui/src/lib/api/schema.ts —
+  # catches an endpoint/model changed without regenerating the schema.
+  schema-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      # Installs the Python pinned in .python-version and the locked deps.
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Install just
+        uses: extractions/setup-just@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.6.0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Install UI dependencies
+        run: cd ui && pnpm install --frozen-lockfile --config.strict-dep-builds=false
+
+      - name: OpenAPI + typed client drift check
+        run: just ui-schema-check
+
   # The `checks` job above runs entirely on in-process SQLite. Prod runs on
   # Postgres and applies migrations via `litestar database upgrade` on every
   # deploy (docker-entrypoint.sh) — a migration valid under SQLite's permissive
