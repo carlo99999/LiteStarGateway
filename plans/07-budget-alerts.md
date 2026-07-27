@@ -116,6 +116,55 @@ is untouched. Each threshold fires **at most once per budget period**, keyed on
 - **Done when:** an enqueued alert delivers to a public webhook; a private/
   loopback/link-local URL is rejected at config time and at send; a failing
   webhook is retried and never surfaces to the request.
+- **✅ Done (27 July 2026):** `domain/ports/notification_channel.py` ships the
+  `NotificationChannel` Protocol exactly as design doc §4 specifies —
+  `async def send(self, alert: PendingBudgetAlert) -> None`, no `target`
+  parameter, so a channel resolves its own delivery target from its own
+  construction/config rather than from the port. `WebhookNotificationChannel`
+  (`infrastructure/notifications/webhook_channel.py`) implements it on top of
+  two functions extracted from `application/routing/webhook.py` —
+  `resolve_approved_addresses(host)` (the literal + resolved-IP deny-list,
+  re-run on every call to resist DNS rebinding) and
+  `post_to_approved_address(client, url, host, addresses, payload, headers)`
+  (the IP-pinned POST that keeps the original Host header and TLS SNI) —
+  rather than reimplementing either. `WebhookStrategy`'s own instance methods
+  now delegate to these same two functions (behavior-preserving refactor; all
+  pre-existing `test_webhook_shadow.py` tests pass unchanged), so the routing
+  webhook and the budget-alert webhook go through byte-for-byte the same SSRF
+  guard. **Worker:** `infrastructure/budget_alert_reconciler.py`'s
+  `make_budget_alert_dispatcher` is a lifespan mirroring
+  `usage_reconciler.py` exactly — 60s poll interval, 200-row batch, a
+  try/except around each tick so one failure never kills the loop. It
+  delegates the actual drain to a new
+  `SQLAlchemyBudgetAlertStateRepository.dispatch_pending(channels, limit=...)`:
+  oldest-first batch, dispatch through every configured channel, delete on
+  success, bump `attempts`/`last_error` and leave queued on failure,
+  quarantine past `MAX_DISPATCH_ATTEMPTS = 10` — the exact same cap as
+  `usage_repository.MAX_RECONCILE_ATTEMPTS`, no new backoff policy invented.
+  A row that fails is retried in full (all channels) rather than tracked
+  per-channel, an acceptable simplification while Phase 2 ships only one
+  channel. **Config:** no per-team config surface — that's Phase 3's job on
+  the existing budget endpoints per this plan's own phase split. Phase 2
+  instead adds a single platform-wide target on `Settings`:
+  `BUDGET_ALERT_WEBHOOK_URL` (+ optional `BUDGET_ALERT_WEBHOOK_BEARER_TOKEN`,
+  `BUDGET_ALERT_WEBHOOK_TIMEOUT_MS`), validated (SSRF deny-list) at app
+  construction so a bad URL fails startup rather than failing silently at
+  first send. `app.py`'s `_build_lifespan` only registers the dispatcher
+  lifespan when a channel is actually configured, so an unconfigured
+  deployment leaves Phase 1's outbox queuing quietly, exactly as before this
+  phase. No schema change was needed — Phase 1 already reserved the
+  `attempts`/`last_error` columns for this. Regression coverage: a
+  private/loopback/link-local literal IP is rejected at
+  `WebhookNotificationChannel` construction; a hostname that resolves to a
+  private address is rejected at send with zero bytes sent; a hostname that
+  passes construction (no literal IP) but resolves privately at send time
+  (simulated DNS rebinding) is still rejected, proving the per-call
+  re-validation; one bad row in a dispatch batch never blocks the rest
+  (caught a real bug along the way: `dispatch_pending` must snapshot each
+  row's id/attempts/entity before the loop, since SQLAlchemy's `rollback()`
+  after one row's failure expires every ORM instance in the session, not
+  just the failed one — touching a later row's attributes without the
+  snapshot raises `MissingGreenlet` under the async engine).
 
 ### Phase 3 — Email channel + console config
 
