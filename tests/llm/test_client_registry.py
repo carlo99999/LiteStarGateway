@@ -377,3 +377,59 @@ async def test_all_entries_leased_past_capacity_mark_oldest_for_close_on_release
         assert second_client.closed is False
 
     assert first_client.closed is True
+
+
+# ISSUE-025: reacquiring a key whose generation is marked close-on-release must
+# not make the registry forget the replacement.
+async def test_reacquire_during_close_on_release_keeps_tracking_the_new_generation() -> None:
+    registry = ClientRegistry(close=_close, capacity=1)
+    key_a = _key(material_value="sk-a")
+    a1, a2, b = _FakeClient("a1"), _FakeClient("a2"), _FakeClient("b")
+
+    lease_a1 = registry.lease(key_a, lambda: a1)
+    await lease_a1.__aenter__()
+    # A second key at capacity=1 marks the (leased) a1 entry close-on-release.
+    lease_b = registry.lease(_key(material_value="sk-b"), lambda: b)
+    await lease_b.__aenter__()
+    # a1 is `closing`, so a fresh lease of the same key builds a2 and takes the
+    # slot. Both generations are alive and leased at this point.
+    lease_a2 = registry.lease(key_a, lambda: a2)
+    await lease_a2.__aenter__()
+
+    # Releasing the OLD generation must close a1 and leave a2 tracked.
+    await lease_a1.__aexit__(None, None, None)
+    assert a1.closed is True
+    assert a2.closed is False
+    assert registry.metrics().live_clients >= 1
+
+    # a2 is still the registry's entry for the key: a new lease reuses it
+    # instead of building a third generation.
+    async with registry.lease(key_a, lambda: _FakeClient("a3")) as reused:
+        assert reused is a2
+
+    await lease_a2.__aexit__(None, None, None)
+    await lease_b.__aexit__(None, None, None)
+
+    # Shutdown closes every client the registry ever handed out, exactly once.
+    await registry.aclose()
+    assert a2.closed is True
+    assert (a1.close_count, a2.close_count, b.close_count) == (1, 1, 1)
+
+
+async def test_a_retired_generation_still_closes_exactly_once_at_shutdown() -> None:
+    # Same interleaving, but the old generation's lease is never released
+    # before shutdown: the retired entry must not leak its connection pool.
+    registry = ClientRegistry(close=_close, capacity=1)
+    key_a = _key(material_value="sk-a")
+    a1, a2, b = _FakeClient("a1"), _FakeClient("a2"), _FakeClient("b")
+
+    lease_a1 = registry.lease(key_a, lambda: a1)
+    await lease_a1.__aenter__()
+    lease_b = registry.lease(_key(material_value="sk-b"), lambda: b)
+    await lease_b.__aenter__()
+    lease_a2 = registry.lease(key_a, lambda: a2)
+    await lease_a2.__aenter__()
+
+    await registry.aclose()
+
+    assert (a1.close_count, a2.close_count, b.close_count) == (1, 1, 1)

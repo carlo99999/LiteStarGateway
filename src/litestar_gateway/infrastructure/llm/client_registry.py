@@ -110,6 +110,12 @@ class ClientRegistry:
         self._ttl_seconds = ttl_seconds
         self._close = close
         self._entries: dict[ClientKey, _Entry] = {}
+        # Generations displaced from `_entries` while still leased (a key was
+        # reacquired while its previous entry was marked close-on-release).
+        # They are no longer reusable, but they still own a connection pool and
+        # a TLS context, so the registry keeps closing them: on their last
+        # release, or at shutdown (ISSUE-025).
+        self._retired: list[tuple[ClientKey, _Entry]] = []
         self._creation_locks: dict[ClientKey, asyncio.Lock] = {}
         self._guard = asyncio.Lock()
         self._hits = 0
@@ -160,6 +166,12 @@ class ClientRegistry:
             now = time.monotonic()
             new_entry = _Entry(client=client, created_at=now, last_used_at=now, leases=1)
             async with self._guard:
+                displaced = self._entries.get(key)
+                if displaced is not None and not displaced.closed:
+                    # Only a `closing` entry can still be here (`_try_hit`
+                    # would have reused any other), and it is still leased —
+                    # otherwise its release would already have closed it.
+                    self._retired.append((key, displaced))
                 self._entries[key] = new_entry
                 self._creates += 1
                 await self._evict_locked()
@@ -233,7 +245,11 @@ class ClientRegistry:
         if entry.closed:
             return
         entry.closed = True
-        self._entries.pop(key, None)
+        # Remove the slot only if it still holds THIS entry: a newer generation
+        # may have taken the key while this one was draining (ISSUE-025).
+        if self._entries.get(key) is entry:
+            del self._entries[key]
+        self._retired = [(k, e) for k, e in self._retired if e is not entry]
         self._evictions += 1
         if self._close is not None:
             try:
@@ -249,13 +265,15 @@ class ClientRegistry:
         """Close every retained client exactly once. Idempotent."""
         async with self._guard:
             self._closed = True
-            entries = list(self._entries.items())
+            entries = list(self._entries.items()) + list(self._retired)
         for key, entry in entries:
             async with self._guard:
                 if entry.closed:
                     continue
                 entry.closed = True
-                self._entries.pop(key, None)
+                if self._entries.get(key) is entry:
+                    del self._entries[key]
+                self._retired = [(k, e) for k, e in self._retired if e is not entry]
             if self._close is not None:
                 try:
                     await self._close(entry.client)
@@ -268,12 +286,15 @@ class ClientRegistry:
                     )
 
     def metrics(self) -> RegistryMetrics:
-        active_leases = sum(e.leases for e in self._entries.values())
+        # Retired generations are still live clients holding live leases until
+        # their last holder releases, so they count in both figures.
+        live = list(self._entries.values()) + [e for _, e in self._retired]
+        active_leases = sum(e.leases for e in live)
         return RegistryMetrics(
             hits=self._hits,
             misses=self._misses,
             creates=self._creates,
             evictions=self._evictions,
             active_leases=active_leases,
-            live_clients=len(self._entries),
+            live_clients=len(live),
         )
