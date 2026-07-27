@@ -14,7 +14,10 @@ stay the single seam where money is calculated.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
+
+from litestar_gateway.domain.exceptions import InvalidModelPricing
 
 
 def image_price_key(size: str | None, quality: str | None) -> str | None:
@@ -65,6 +68,46 @@ class BillableUsage:
     image_count: int = 0
     image_size: str | None = None
     image_quality: str | None = None
+
+
+_RATE_FIELDS = (
+    "input_cost_per_token",
+    "output_cost_per_token",
+    "cache_write_cost_per_token",
+    "cache_read_cost_per_token",
+    "image_cost_per_image",
+)
+
+
+def _validate_rate(name: str, value: object, *, optional: bool = True) -> None:
+    if value is None and optional:
+        return  # unpriced dimension — bills at 0.0
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise InvalidModelPricing(f"{name} must be a number, got {value!r}")
+    if not math.isfinite(value):
+        raise InvalidModelPricing(f"{name} must be a finite number, got {value!r}")
+    if value < 0:
+        raise InvalidModelPricing(f"{name} must be zero or positive, got {value}")
+
+
+def validate_rate_card(rates: RateCard) -> None:
+    """Reject any rate that would make :func:`compute_cost` return a credit.
+
+    `compute_cost` multiplies these rates directly and the result is persisted
+    in the same ledger the budget gate reads, so a negative (or NaN/inf) rate is
+    not a display problem: it hands the team spend back and defeats a hard cap.
+    Every write path that can set a rate must call this — enforcement lives here,
+    in the domain, rather than in one controller, so a new caller inherits it.
+    `None` stays legal (the dimension is simply unpriced) and so does an explicit
+    zero.
+    """
+    for name in _RATE_FIELDS:
+        _validate_rate(name, getattr(rates, name))
+    for key, value in rates.image_prices.items():
+        # An explicit entry must be a real number: `image_unit_price` returns it
+        # verbatim, so a `null` from a JSON body would blow up settlement's
+        # arithmetic rather than fall back to the flat per-image rate.
+        _validate_rate(f"image_prices[{key}]", value, optional=False)
 
 
 def image_unit_price(rates: RateCard, size: str | None, quality: str | None) -> float:

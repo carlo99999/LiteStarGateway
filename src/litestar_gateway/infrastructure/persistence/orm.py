@@ -767,6 +767,22 @@ class ModelRecord(base.UUIDAuditBase):
             sqlite_where=text("team_id IS NULL"),
             postgresql_where=text("team_id IS NULL"),
         ),
+        # A negative rate makes `domain.pricing.compute_cost` return a credit,
+        # which settlement writes into the ledger the budget gate reads
+        # (ISSUE-022). `ModelService` refuses one on every write path; these
+        # keep a future writer that bypasses the service from reintroducing it.
+        # `image_prices` is JSON and has no portable CHECK — its values are
+        # covered by the application validation only.
+        *(
+            CheckConstraint(f"{column} IS NULL OR {column} >= 0", name=f"ck_model_{column}_non_neg")
+            for column in (
+                "input_cost_per_token",
+                "output_cost_per_token",
+                "cache_write_cost_per_token",
+                "cache_read_cost_per_token",
+                "image_cost_per_image",
+            )
+        ),
     )
 
     # NULL ⇒ a global (platform) model, callable by every team.
