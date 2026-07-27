@@ -25,7 +25,18 @@ from litestar.testing import AsyncTestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from litestar_gateway.infrastructure.persistence.orm import TeamModel, UsageEventModel
+from litestar_gateway.domain.entities import BudgetWindow
+from litestar_gateway.infrastructure.persistence.orm import (
+    BudgetAlertStateModel,
+    ModelGrantRecord,
+    ModelRecord,
+    PendingBudgetAlertModel,
+    RouterGrantModel,
+    RouterModel,
+    RoutingDecisionModel,
+    TeamModel,
+    UsageEventModel,
+)
 
 from .conftest import ADMIN_EMAIL, MASTER_KEY, _bearer, _team_and_credential
 
@@ -244,3 +255,182 @@ async def test_purge_twice_is_not_found_second_time(
 
     second = await client.post(f"/teams/{team_id}/purge", headers=_bearer(admin))
     assert second.status_code == HTTP_404_NOT_FOUND, second.text
+
+
+# ---------------------------------------------------------------------------
+# ISSUE-030: the purge must clear every team-scoped row, not just usage.
+# ---------------------------------------------------------------------------
+
+
+async def _seed_alert_history(session: AsyncSession, team_id: str) -> None:
+    """A fired threshold plus its queued notification — the ordinary state of
+    any team that has ever crossed a budget threshold."""
+    period_start = datetime(2026, 7, 1, tzinfo=UTC)
+    session.add(
+        BudgetAlertStateModel(
+            id=uuid4(),
+            team_id=UUID(team_id),
+            window=BudgetWindow.MONTHLY.value,
+            period_start=period_start,
+            threshold=80,
+            fired_at=datetime.now(UTC),
+        )
+    )
+    session.add(
+        PendingBudgetAlertModel(
+            id=uuid4(),
+            team_id=UUID(team_id),
+            window=BudgetWindow.MONTHLY.value,
+            period_start=period_start,
+            threshold=80,
+            spend=85.0,
+            limit_cost=100.0,
+        )
+    )
+    await session.commit()
+
+
+async def _seed_received_grants(
+    session: AsyncSession, team_id: str, other_team_id: str, credential_id: str
+) -> None:
+    """Grants this team RECEIVED: the FK points at `team.id` from a row the
+    team does not own, which the purge never looked at. The source model needs
+    a real credential — PostgreSQL enforces that FK even when SQLite does not."""
+    model_id, router_id = uuid4(), uuid4()
+    session.add(
+        ModelRecord(
+            id=model_id,
+            team_id=UUID(other_team_id),
+            name=f"shared-model-{model_id.hex[:6]}",
+            provider="openai",
+            credential_id=UUID(credential_id),
+            type="chat",
+            provider_model_id="gpt-4o",
+            params={},
+            params_enforced={},
+            enabled=True,
+            image_prices={},
+        )
+    )
+    session.add(
+        RouterModel(
+            id=router_id,
+            team_id=UUID(other_team_id),
+            name=f"shared-router-{router_id.hex[:6]}",
+            candidates=[],
+            default_model="gpt-4o",
+            strategy="rules",
+            enabled=True,
+        )
+    )
+    await session.flush()
+    session.add(
+        ModelGrantRecord(
+            id=uuid4(), model_id=model_id, team_id=UUID(team_id), alias="granted-model"
+        )
+    )
+    session.add(
+        RouterGrantModel(
+            id=uuid4(), router_id=router_id, team_id=UUID(team_id), alias="granted-router"
+        )
+    )
+    await session.commit()
+
+
+async def _seed_routing_decision(session: AsyncSession, team_id: str) -> None:
+    """A decision row: no FK, so it never blocked the delete — it just stayed
+    behind, prompts and all."""
+    session.add(
+        RoutingDecisionModel(
+            id=uuid4(),
+            team_id=UUID(team_id),
+            router_name="auto",
+            strategy="rules",
+            chosen_model="gpt-4o",
+            user_text="my private prompt",
+            system_prompt="my private system prompt",
+        )
+    )
+    await session.commit()
+
+
+async def _tombstoned_team(client: AsyncTestClient, admin: str, raw_session: AsyncSession) -> str:
+    org_id = (
+        await client.post(
+            "/organizations", json={"name": f"O-{uuid4().hex[:6]}"}, headers=_bearer(admin)
+        )
+    ).json()["id"]
+    team_id = (
+        await client.post(
+            f"/organizations/{org_id}/teams",
+            json={"name": f"T-{uuid4().hex[:6]}", "admin_email": ADMIN_EMAIL},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    await _seed_usage_event(raw_session, team_id)  # gives it billed history
+    assert (
+        await client.delete(f"/teams/{team_id}", headers=_bearer(admin))
+    ).status_code == HTTP_204_NO_CONTENT
+    return team_id
+
+
+async def test_a_team_with_budget_alert_history_can_still_be_purged(
+    client: AsyncTestClient, raw_session: AsyncSession
+) -> None:
+    """The reported false denial: the alert tables carry FKs to `team.id`, so
+    the delete failed and the IntegrityError surfaced as 409 TeamNotEmpty —
+    a team that ever crossed a threshold was simply not purgeable."""
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    team_id = await _tombstoned_team(client, admin, raw_session)
+    await _seed_alert_history(raw_session, team_id)
+
+    resp = await client.post(f"/teams/{team_id}/purge", headers=_bearer(admin))
+
+    assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
+    assert await raw_session.get(TeamModel, UUID(team_id)) is None
+    for model in (BudgetAlertStateModel, PendingBudgetAlertModel):
+        rows = (
+            await raw_session.scalars(select(model).where(model.team_id == UUID(team_id)))
+        ).all()
+        assert rows == [], model.__name__
+
+
+async def test_a_team_holding_received_grants_can_still_be_purged(
+    client: AsyncTestClient, raw_session: AsyncSession
+) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    # The granting team stays alive: what is under test is the receiving team's
+    # purge, blocked by rows another team owns.
+    other_team_id, credential_id = await _team_and_credential(client, admin, "Sharer")
+    team_id = await _tombstoned_team(client, admin, raw_session)
+    await _seed_received_grants(raw_session, team_id, other_team_id, credential_id)
+
+    resp = await client.post(f"/teams/{team_id}/purge", headers=_bearer(admin))
+
+    assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
+    for model in (ModelGrantRecord, RouterGrantModel):
+        rows = (
+            await raw_session.scalars(select(model).where(model.team_id == UUID(team_id)))
+        ).all()
+        assert rows == [], model.__name__
+
+
+async def test_purge_removes_routing_decisions_and_their_prompts(
+    client: AsyncTestClient, raw_session: AsyncSession
+) -> None:
+    """No FK means nothing blocked the delete — and nothing deleted the row
+    either. Routing decisions keep `user_text`/`system_prompt`, so an
+    irreversible purge that leaves them behind is not one."""
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    team_id = await _tombstoned_team(client, admin, raw_session)
+    await _seed_routing_decision(raw_session, team_id)
+
+    resp = await client.post(f"/teams/{team_id}/purge", headers=_bearer(admin))
+
+    assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
+    rows = (
+        await raw_session.scalars(
+            select(RoutingDecisionModel).where(RoutingDecisionModel.team_id == UUID(team_id))
+        )
+    ).all()
+    assert rows == []

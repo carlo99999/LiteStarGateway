@@ -20,10 +20,14 @@ from litestar_gateway.infrastructure.persistence.callable_alias_slots import (
     tombstone_resource,
 )
 from litestar_gateway.infrastructure.persistence.orm import (
+    BudgetAlertStateModel,
     InviteModel,
+    ModelGrantRecord,
+    PendingBudgetAlertModel,
     PendingUsageEventModel,
     RouterGrantModel,
     RouterModel,
+    RoutingDecisionModel,
     ServicePrincipalModel,
     TeamBudgetModel,
     TeamMembershipModel,
@@ -160,8 +164,21 @@ class SQLAlchemyTeamRepository:
         # Remove the intrinsic children first (all FK team.id with RESTRICT, so
         # the team row can't drop while they exist), then the team. Models and
         # API keys are intentionally NOT touched — the caller refuses the delete
-        # when any remain. pending_usage_event has no FK but is team-scoped, so
-        # it's cleared for hygiene. Staged only; the service commits.
+        # when any remain. Staged only; the service commits.
+        #
+        # The list below is every table that carries this team's id, whether or
+        # not it has an FK (ISSUE-030):
+        #   - budget-alert dedup ledger and outbox: FK team.id, so a team that
+        #     ever crossed a threshold could not be deleted at all — the
+        #     IntegrityError surfaced as a 409 TeamNotEmpty, a false denial;
+        #   - grants the team RECEIVED (`model_grant`/`router_grant` rows owned
+        #     by another team but pointing here): same FK, same false denial;
+        #   - `pending_usage_event` and `routing_decision`: no FK, so they never
+        #     blocked anything and were simply left behind. Routing decisions
+        #     retain `user_text`/`system_prompt`, so leaving them turns an
+        #     "irreversible purge" into a partial one.
+        # What deliberately survives: the audit trail (including this purge's
+        # own entry) and platform-level rows that are not team data.
         try:
             router_ids = list(
                 await self._session.scalars(
@@ -187,6 +204,11 @@ class SQLAlchemyTeamRepository:
                 InviteModel,
                 UsageEventModel,
                 PendingUsageEventModel,
+                RoutingDecisionModel,
+                PendingBudgetAlertModel,
+                BudgetAlertStateModel,
+                ModelGrantRecord,
+                RouterGrantModel,
                 RouterModel,
                 ServicePrincipalModel,
                 TeamMembershipModel,
