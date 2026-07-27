@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
@@ -405,12 +405,18 @@ class UsageMeter:
         latency_ms: float,
         request: dict[str, Any] | None = None,
         attribution: UsageAttribution | None = None,
-    ) -> None:
+    ) -> tuple[int, int, float]:
         """Record usage (billing) + emit an observability trace. Fail-safe.
 
         If the provider reported no usable token counts (e.g. an adapter that
         omits usage), estimate the prompt from the request rather than billing
-        zero silently — the non-streaming mirror of the stream estimate (H14)."""
+        zero silently — the non-streaming mirror of the stream estimate (H14).
+
+        Returns the settled `(prompt_tokens, completion_tokens, cost)` — the
+        exact counts written to the ledger — so a caller with its own
+        secondary bookkeeping (e.g. a stream's routing-decision usage
+        attachment, Plan 10 Phase 0) can reuse them instead of re-deriving
+        usage from the response body."""
         prompt, completion, cost, now = await self._settle_usage(
             team_id,
             api_key_id,
@@ -441,6 +447,7 @@ class UsageMeter:
                 created_at=now,
             )
         )
+        return prompt, completion, cost
 
     async def settle_cache_hit(
         self,
@@ -723,6 +730,24 @@ class UsageMeter:
         except Exception:  # alert evaluation must never fail the request
             logger.warning("budget alert evaluation failed", exc_info=True)
 
+    @staticmethod
+    async def _notify_settled(
+        on_settled: Callable[[int, int], Awaitable[None]] | None,
+        prompt_tokens: int,
+        completion_tokens: int,
+    ) -> None:
+        """Fail-safe invocation of a stream's settlement callback (Plan 10
+        Phase 0): a bug in the caller's secondary bookkeeping (e.g. attaching
+        usage to a routing decision) must never break billing, which has
+        already been durably written by the time this runs, or the SSE
+        response already in flight."""
+        if on_settled is None:
+            return
+        try:
+            await on_settled(prompt_tokens, completion_tokens)
+        except Exception:
+            logger.warning("stream settlement callback failed", exc_info=True)
+
     async def metered_stream(
         self,
         team_id: UUID,
@@ -733,6 +758,7 @@ class UsageMeter:
         request: dict[str, Any],
         release: Callable[[], None] | None = None,
         attribution: UsageAttribution | None = None,
+        on_settled: Callable[[int, int], Awaitable[None]] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Relay chunks unchanged while capturing usage as it flows, then record a
         UsageEvent + emit a trace once the stream finishes (or the client
@@ -807,6 +833,7 @@ class UsageMeter:
                     start,
                     attribution,
                     authoritative_zero=authoritative_zero,
+                    on_settled=on_settled,
                 )
 
     async def metered_native_stream(
@@ -942,10 +969,21 @@ class UsageMeter:
         attribution: UsageAttribution | None,
         *,
         authoritative_zero: bool = False,
+        on_settled: Callable[[int, int], Awaitable[None]] | None = None,
     ) -> None:
         """Post-stream settlement: estimate usage if none arrived, bill, and
         trace. Runs inside `metered_stream`'s shielded finally — callers must
-        already hold the cancellation shield."""
+        already hold the cancellation shield.
+
+        `on_settled` (Plan 10 Phase 0) is an optional callback invoked with the
+        exact `(prompt_tokens, completion_tokens)` pair once they are actually
+        billed — real counts on normal completion, the same partial/estimated
+        counts the ledger receives on a mid-stream error or client disconnect.
+        It is never invoked for the zero-consumption case (nothing was billed,
+        M26). Failure to notify must never fail settlement or the client
+        stream: `_notify_settled` swallows and logs any exception the callback
+        raises, mirroring `RouterService.record_usage`'s own fail-safe guard —
+        two independent safety nets around the same secondary write."""
         latency_ms = (perf_counter() - start) * 1000
         # A provider that rejects the request before emitting anything
         # (error, zero streamed output, no usage reported) consumed
@@ -995,6 +1033,7 @@ class UsageMeter:
                         datetime.now(UTC),
                         attribution,
                     )
+                    await self._notify_settled(on_settled, prompt, completion)
                 self.trace_error(
                     team_id,
                     api_key_id,
@@ -1007,7 +1046,7 @@ class UsageMeter:
                     cost=cost,
                 )
             else:
-                await self.settle_ok(
+                prompt, completion, _cost = await self.settle_ok(
                     team_id,
                     api_key_id,
                     model,
@@ -1016,6 +1055,7 @@ class UsageMeter:
                     latency_ms,
                     attribution=attribution,
                 )
+                await self._notify_settled(on_settled, prompt, completion)
         if settle_scope.cancelled_caught:
             logger.error(
                 "stream settlement timed out after %ss; spend may be unrecorded: "
