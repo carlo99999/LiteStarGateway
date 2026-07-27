@@ -178,6 +178,75 @@ is untouched. Each threshold fires **at most once per budget period**, keyed on
 - **Done when:** an email alert delivers via a fake SMTP/provider in tests;
   thresholds + channels round-trip through the API; the console renders and
   edits them RBAC-aware.
+- **✅ Done (27 July 2026) — completes Plan 07 (all four phases done):**
+  `EmailNotificationChannel` (`infrastructure/notifications/email_channel.py`)
+  is the second `NotificationChannel`, implementing the same abstract Protocol
+  as the webhook adapter on the standard library
+  (`smtplib` + `email.message.EmailMessage`) — no new dependency — with the
+  blocking send run via `asyncio.to_thread` so it never blocks the outbox loop,
+  and a module-level `_smtp_factory` seam so tests inject a fake transport
+  (mirroring the webhook suite's `_client_factory` patching). SMTP host/port/
+  credentials/TLS/from-address are platform-wide `Settings`
+  (`SMTP_*`, `smtp_configured` property); the per-team piece is just the
+  recipient, stored as budget **data**, so no transport type crosses into
+  `domain`/`application`. **Per-team config surface:** `Budget` and the
+  `team_budget` table gained nullable `alert_webhook_url` / `alert_email`
+  (migration `b1d4e8f2a7c9` — nullable columns, so NULL is the correct
+  "unset" and no `server_default` backfill was needed, unlike Phase 0's
+  `thresholds`). `SetBudgetRequest`/`BudgetResponse` now carry `thresholds`
+  plus both channel targets, and `_parse_budget` boundary-validates all three:
+  `thresholds` through Phase 0's `validate_thresholds` (still normalizing to
+  sorted+deduped 1..100, `InvalidBudget` → 400), the webhook URL through the
+  **same SSRF literal-IP deny-list** Phase 2's channel uses
+  (`_is_blocked`/`_literal_ip` from `application/routing/webhook.py`, so a team
+  can't point an alert at a private/loopback/link-local host either), and the
+  email through a basic `parseaddr` sanity check (deliberately not a security
+  boundary — email is not an egress target). **Reconciler resolves per-team
+  channels:** `dispatch_pending` no longer takes a fixed platform channel list
+  — it takes a `ChannelResolver` (a new abstract callable on the
+  notification-channel port over domain types only) and resolves the channel(s)
+  for **each alert's owning team** at drain time.
+  `make_channel_resolver` (`infrastructure/notifications/channel_resolver.py`,
+  wired with `SQLAlchemyBudgetRepository` in the reconciler's per-session loop)
+  builds a webhook channel from the team's `alert_webhook_url` — falling back
+  to the platform `BUDGET_ALERT_WEBHOOK_URL` when unset, so Phase 2's
+  single-target behavior is preserved for teams without an override — and an
+  email channel from the team's `alert_email` via platform SMTP; if a team sets
+  **both, both fire** for the same alert, and a team resolving to no channels
+  is skipped untouched (queued, not failed). **Deliberate simplifications:**
+  (a) a multi-channel row is retried in **full** (all its channels re-run) on
+  any single channel's failure — a consistent extension of Phase 2's already
+  accepted at-least-once posture rather than new per-channel delivery tracking,
+  so a partial delivery re-delivers to the already-succeeded channel next
+  attempt (noted in the `dispatch_pending` docstring); (b) the platform webhook
+  bearer token is applied **only** to the platform URL, never to a
+  team-supplied URL, so a team's endpoint never receives the platform's token;
+  (c) the dispatcher lifespan now starts when **any** platform delivery
+  capability is configured (`budget_alert_webhook_url` **or** SMTP), preserving
+  Phase 2's "no worker on a truly-unconfigured deployment" property.
+  **Read model + console:** `GET /teams/{id}/budget/alerts` (RBAC-gated
+  `BUDGET_READ`, same as `get_budget`) lists recent fired `budget_alert_state`
+  rows newest-first via a new `recent_fired` port/repo method; the console
+  Budgets page gained an **Alerts** section — thresholds (comma-separated,
+  parsed/validated client-side before PUT) + webhook + email, editable by a
+  **platform admin only** (matching the backend's platform-admin PUT gate),
+  and a recent-fired-alerts table visible to every budget reader.
+  **Verification:** email-channel unit tests use a fake SMTP transport
+  (recipient/subject/body content, failure propagation, no-TLS/no-login paths);
+  resolver tests cover both-channels / email-ignored-without-SMTP /
+  team-override / platform-fallback / no-budget-fallback / empty; dispatch
+  tests cover both-channels-fire and one-channel-raising-not-blocking-other-
+  rows; endpoint tests cover the thresholds+channels PUT→GET round-trip,
+  boundary validation (bad thresholds, private/loopback/link-local webhook
+  URLs, non-http(s), bad email), the fired-alerts end-to-end (a settlement
+  crossing 50 % is listed), and team-isolation RBAC (an outsider gets 403).
+  Full suite: 1676 passed on SQLite, 1682 on Postgres (migration applied over
+  the real chain via `just test-postgres`); frontend `alertConfig` logic tests
+  added to the `node --test` set. The PUT/GET/GET-alerts round-trip and all
+  three validation 400s were also driven against a live uvicorn server over
+  real HTTP; live-triggering a threshold crossing was deferred (needs a real
+  provider credential) and is covered instead by the fake-client integration
+  test.
 
 ## TDD strategy
 
