@@ -62,6 +62,10 @@ class PlatformModelController(Controller):
             cache_enabled=data.cache_enabled,
             cache_allow_nondeterministic=data.cache_allow_nondeterministic,
             cache_semantic_enabled=data.cache_semantic_enabled,
+            cache_write_cost_per_token=data.cache_write_cost_per_token,
+            cache_read_cost_per_token=data.cache_read_cost_per_token,
+            image_cost_per_image=data.image_cost_per_image,
+            image_prices=data.image_prices,
         )
         await record_audit(
             audit_log,
@@ -110,6 +114,10 @@ class PlatformModelController(Controller):
             cache_enabled=data.cache_enabled,
             cache_allow_nondeterministic=data.cache_allow_nondeterministic,
             cache_semantic_enabled=data.cache_semantic_enabled,
+            cache_write_cost_per_token=data.cache_write_cost_per_token,
+            cache_read_cost_per_token=data.cache_read_cost_per_token,
+            image_cost_per_image=data.image_cost_per_image,
+            image_prices=data.image_prices,
         )
         await record_audit(
             audit_log,

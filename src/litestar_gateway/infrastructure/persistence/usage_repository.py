@@ -84,6 +84,9 @@ class SQLAlchemyUsageRepository:
                 cost=event.cost,
                 created_at=event.created_at,
                 cache_hit=event.cache_hit,
+                cache_write_tokens=event.cache_write_tokens,
+                cache_read_tokens=event.cache_read_tokens,
+                image_count=event.image_count,
                 request_id=event.request_id,
             )
         )
@@ -251,6 +254,9 @@ class SQLAlchemyUsageRepository:
                 cost=event.cost,
                 event_created_at=event.created_at,
                 cache_hit=event.cache_hit,
+                cache_write_tokens=event.cache_write_tokens,
+                cache_read_tokens=event.cache_read_tokens,
+                image_count=event.image_count,
                 request_id=event.request_id,
             )
         )
@@ -290,6 +296,9 @@ class SQLAlchemyUsageRepository:
                             completion_tokens=row.completion_tokens,
                             cost=row.cost,
                             cache_hit=row.cache_hit,
+                            cache_write_tokens=row.cache_write_tokens,
+                            cache_read_tokens=row.cache_read_tokens,
+                            image_count=row.image_count,
                             request_id=row.request_id,
                             # The time the event happened, not the reconcile
                             # time — a drain must not shift spend into the

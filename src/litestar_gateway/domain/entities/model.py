@@ -68,6 +68,17 @@ class Model:
     # this only ever takes effect when `cache_enabled` is also true, but
     # exact-match may be on while this stays off (design §1/§7).
     cache_semantic_enabled: bool = False
+    # Non-token pricing (Plan 13 Phase 1, design §1). All optional and strictly
+    # opt-in: unset ⇒ the dimension bills at zero, exactly as before this plan.
+    # Anthropic prompt-cache rates are kept distinct from `input_cost_per_token`
+    # because cache-write/read economics and audit meaning differ from ordinary
+    # input tokens.
+    cache_write_cost_per_token: float | None = None
+    cache_read_cost_per_token: float | None = None
+    # Image generation: a flat per-image fallback plus optional size/quality-
+    # specific overrides keyed by `pricing.image_price_key(size, quality)`.
+    image_cost_per_image: float | None = None
+    image_prices: dict[str, float] = field(default_factory=dict)
 
     def merge_params(self, request: dict[str, Any]) -> dict[str, Any]:
         """Effective request for a provider call: admin `params` (defaults the

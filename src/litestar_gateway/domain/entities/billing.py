@@ -104,6 +104,13 @@ class UsageEvent:
     # True when this event settled from the response cache (Plan 04 Phase 0)
     # rather than a real provider call — cost is always 0.0 on such an event.
     cache_hit: bool = False
+    # Non-token billing dimensions (Plan 13 Phase 1, design §1), persisted so the
+    # ledger stays auditable: Anthropic prompt-cache write/read token counts and
+    # the number of generated images. All default 0 — a plain token call records
+    # them as zero, unchanged from before this plan.
+    cache_write_tokens: int = 0
+    cache_read_tokens: int = 0
+    image_count: int = 0
     # Request correlation id (Plan 11 Slice A) — see `TraceRecord.request_id`.
     request_id: str | None = None
 
