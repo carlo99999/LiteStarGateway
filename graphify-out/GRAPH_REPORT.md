@@ -1,16 +1,16 @@
-# Graph Report - Litestar test  (2026-07-26)
+# Graph Report - Litestar test  (2026-07-27)
 
 ## Corpus Check
-- 585 files · ~397,154 words
+- 614 files · ~424,871 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 7784 nodes · 19504 edges · 469 communities (315 shown, 154 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 2943 edges (avg confidence: 0.69)
+- 8379 nodes · 21079 edges · 496 communities (343 shown, 153 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 3246 edges (avg confidence: 0.69)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `748dce0e`
+- Built from commit: `59a750e7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -159,7 +159,7 @@
 - [[_COMMUNITY_client.ts|client.ts]]
 - [[_COMMUNITY_test_sso_upsert.py|test_sso_upsert.py]]
 - [[_COMMUNITY_DashboardPage.tsx|DashboardPage.tsx]]
-- [[_COMMUNITY_ensure_translatable_chat_request|ensure_translatable_chat_request]]
+- [[_COMMUNITY_UUID|UUID]]
 - [[_COMMUNITY_parse_response_format|parse_response_format]]
 - [[_COMMUNITY_provide_completion_service|provide_completion_service]]
 - [[_COMMUNITY_unlock_user|unlock_user]]
@@ -198,12 +198,12 @@
 - [[_COMMUNITY__patch_upstream|_patch_upstream]]
 - [[_COMMUNITY_Design doc — Proactive budget alerts|Design doc — Proactive budget alerts]]
 - [[_COMMUNITY_DockerStatsSampler|DockerStatsSampler]]
-- [[_COMMUNITY_CredentialMisconfigured|CredentialMisconfigured]]
+- [[_COMMUNITY_test_sso_settings.py|test_sso_settings.py]]
 - [[_COMMUNITY_test_organizations_crud.py|test_organizations_crud.py]]
 - [[_COMMUNITY_openai-compatible|openai-compatible.md]]
-- [[_COMMUNITY_PlatformRouterController|PlatformRouterController]]
+- [[_COMMUNITY_test_session.py|test_session.py]]
 - [[_COMMUNITY_LoadConfigurationError|LoadConfigurationError]]
-- [[_COMMUNITY_CallableKind|CallableKind]]
+- [[_COMMUNITY_SQLAlchemyBudgetAlertStateRepository|SQLAlchemyBudgetAlertStateRepository]]
 - [[_COMMUNITY_conftest.py|conftest.py]]
 - [[_COMMUNITY_test_browser_session.py|test_browser_session.py]]
 - [[_COMMUNITY_compilerOptions|compilerOptions]]
@@ -221,7 +221,7 @@
 - [[_COMMUNITY_Design doc — Enterprise SSO, SCIM, RBAC, audit|Design doc — Enterprise: SSO, SCIM, RBAC, audit]]
 - [[_COMMUNITY_Plan 08 — Extended OpenAI-compatible endpoints|Plan 08 — Extended OpenAI-compatible endpoints]]
 - [[_COMMUNITY_test_responses_emulation.py|test_responses_emulation.py]]
-- [[_COMMUNITY_.get_price|.get_price]]
+- [[_COMMUNITY_test_playground_service.py|test_playground_service.py]]
 - [[_COMMUNITY_test_migration.py|test_migration.py]]
 - [[_COMMUNITY_test_docker_compose_dev.py|test_docker_compose_dev.py]]
 - [[_COMMUNITY_Admin console|Admin console]]
@@ -267,29 +267,31 @@
 - [[_COMMUNITY_Design doc — Database migrations (Alembic)|Design doc — Database migrations (Alembic)]]
 - [[_COMMUNITY_Design doc — Usage & cost accounting + budgets|Design doc — Usage & cost accounting + budgets]]
 - [[_COMMUNITY_Plan 02 — Framework-agnostic wire-contract conformance|Plan 02 — Framework-agnostic wire-contract conformance]]
-- [[_COMMUNITY_SsoSettingsRepository|SsoSettingsRepository]]
+- [[_COMMUNITY__RaisingClient|_RaisingClient]]
 - [[_COMMUNITY_native_messages|native_messages]]
 - [[_COMMUNITY_test_feature_support.py|test_feature_support.py]]
-- [[_COMMUNITY__invite_helpers.py|_invite_helpers.py]]
+- [[_COMMUNITY_test_models.py|test_models.py]]
 - [[_COMMUNITY_test_sso_settings_migration.py|test_sso_settings_migration.py]]
 - [[_COMMUNITY_Design doc — Responses API Level B|Design doc — Responses API Level B]]
 - [[_COMMUNITY_Design doc — Request parameter allowlist|Design doc — Request parameter allowlist]]
 - [[_COMMUNITY_Design doc — Weighted multi-model routing|Design doc — Weighted multi-model routing]]
 - [[_COMMUNITY_Plan 09 — Responses API Level B|Plan 09 — Responses API Level B]]
 - [[_COMMUNITY_create_docs_router|create_docs_router]]
-- [[_COMMUNITY_test_playground_governance_api.py|test_playground_governance_api.py]]
-- [[_COMMUNITY_test_rate_limit.py|test_rate_limit.py]]
-- [[_COMMUNITY_test_provider_error_surfaces_as_client_status|test_provider_error_surfaces_as_client_status]]
-- [[_COMMUNITY_test_router_alias.py|test_router_alias.py]]
+- [[_COMMUNITY_PendingBudgetAlert|PendingBudgetAlert]]
+- [[_COMMUNITY_test_max_tokens_retry.py|test_max_tokens_retry.py]]
+- [[_COMMUNITY_EmbeddingsStrategy|EmbeddingsStrategy]]
+- [[_COMMUNITY_SsoSettingsRepository|SsoSettingsRepository]]
 - [[_COMMUNITY_test_docs_site.py|test_docs_site.py]]
 - [[_COMMUNITY_Design doc — Production Postgres|Design doc — Production Postgres]]
 - [[_COMMUNITY_Design doc — Provider resilience (timeouts, retries, circuit breaker)|Design doc — Provider resilience (timeouts, retries, circuit breaker)]]
 - [[_COMMUNITY_GatewayUser|GatewayUser]]
-- [[_COMMUNITY_OpenAI|OpenAI]]
+- [[_COMMUNITY_RoutingContext|RoutingContext]]
 - [[_COMMUNITY_dev-compose.sh|dev-compose.sh]]
-- [[_COMMUNITY_clamp_output_tokens|clamp_output_tokens]]
+- [[_COMMUNITY_test_playground_governance_api.py|test_playground_governance_api.py]]
 - [[_COMMUNITY_list_models|list_models]]
-- [[_COMMUNITY_test_model_prices.py|test_model_prices.py]]
+- [[_COMMUNITY_PasswordReset|PasswordReset]]
+- [[_COMMUNITY_FakeBedrockRuntime|FakeBedrockRuntime]]
+- [[_COMMUNITY_Plan 05 — Cross-provider failover|Plan 05 — Cross-provider failover]]
 - [[_COMMUNITY_preflight_global_resource_downgrade.py|preflight_global_resource_downgrade.py]]
 - [[_COMMUNITY_CLAUDE|CLAUDE.md]]
 - [[_COMMUNITY_benchmark-compose.sh|benchmark-compose.sh]]
@@ -300,8 +302,11 @@
 - [[_COMMUNITY_Design doc — Continuous Integration (GitHub Actions)|Design doc — Continuous Integration (GitHub Actions)]]
 - [[_COMMUNITY_theme-provider.tsx|theme-provider.tsx]]
 - [[_COMMUNITY_load-compose.sh|load-compose.sh]]
+- [[_COMMUNITY_native_messages|native_messages]]
 - [[_COMMUNITY_provide_principal|provide_principal]]
+- [[_COMMUNITY_provide_router_service|provide_router_service]]
 - [[_COMMUNITY_test_benchmark_compose.py|test_benchmark_compose.py]]
+- [[_COMMUNITY_build_response_cache|build_response_cache]]
 - [[_COMMUNITY_conftest.py|conftest.py]]
 - [[_COMMUNITY_test_docs_build_config.py|test_docs_build_config.py]]
 - [[_COMMUNITY_test_genai_private_api_contract.py|test_genai_private_api_contract.py]]
@@ -442,47 +447,68 @@
 - [[_COMMUNITY_SSO (OIDC) identity provider|SSO (OIDC) identity provider]]
 - [[_COMMUNITY_Usage accounting & per-team budgets|Usage accounting & per-team budgets]]
 - [[_COMMUNITY_Durable usage outbox + reconciler|Durable usage outbox + reconciler]]
+- [[_COMMUNITY_Design doc — Responses API Level B|Design doc — Responses API Level B]]
+- [[_COMMUNITY_list_models|list_models]]
+- [[_COMMUNITY_.record_fired|.record_fired]]
+- [[_COMMUNITY_create_invite|create_invite]]
+- [[_COMMUNITY_test_error_paths.py|test_error_paths.py]]
+- [[_COMMUNITY_test_concurrent_admin_changes_preserve_one_active_admin|test_concurrent_admin_changes_preserve_one_active_admin]]
+- [[_COMMUNITY_test_role_permissions.py|test_role_permissions.py]]
+- [[_COMMUNITY__close_genai_client|_close_genai_client]]
+- [[_COMMUNITY_create_api_router|create_api_router]]
+- [[_COMMUNITY_record_audit|record_audit]]
+- [[_COMMUNITY_delete_user|delete_user]]
+- [[_COMMUNITY__invite_helpers.py|_invite_helpers.py]]
+- [[_COMMUNITY_BudgetRepository|BudgetRepository]]
+- [[_COMMUNITY__setup|_setup]]
+- [[_COMMUNITY_clamp_output_tokens|clamp_output_tokens]]
+- [[_COMMUNITY_FakeOpenAI|FakeOpenAI]]
+- [[_COMMUNITY_BudgetRepository|BudgetRepository]]
+- [[_COMMUNITY_.__init__|.__init__]]
+- [[_COMMUNITY_budgetRequest.ts|budgetRequest.ts]]
+- [[_COMMUNITY_provide_user_service|provide_user_service]]
+- [[_COMMUNITY_generate_key|generate_key]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `_patch()` - 146 edges
-2. `Settings` - 134 edges
-3. `_bearer()` - 129 edges
-4. `CompletionService` - 127 edges
-5. `UnsupportedOperation` - 124 edges
-6. `RouterService` - 121 edges
-7. `UsageMeter` - 104 edges
-8. `TeamService` - 103 edges
-9. `create_app()` - 97 edges
+1. `CompletionService` - 152 edges
+2. `_patch()` - 146 edges
+3. `Settings` - 145 edges
+4. `UsageMeter` - 130 edges
+5. `_bearer()` - 129 edges
+6. `UnsupportedOperation` - 124 edges
+7. `RouterService` - 121 edges
+8. `TeamService` - 106 edges
+9. `create_app()` - 98 edges
 10. `UserService` - 88 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `test_app_imports_and_routes()` --calls--> `create_app()`  [INFERRED]
   tests/users/test_signup_integration.py → src/litestar_gateway/app.py
-- `_FakeClient` --uses--> `Settings`  [INFERRED]
-  tests/misc/test_rate_limit.py → src/litestar_gateway/config.py
 - `test_admin_holds_every_permission_and_member_none()` --indirect_call--> `Permission`  [INFERRED]
   tests/rbac/test_role_permissions.py → src/litestar_gateway/domain/authorization.py
 - `test_apikey_is_active_honours_expiry()` --calls--> `APIKey`  [INFERRED]
   tests/teams/test_api_keys.py → src/litestar_gateway/domain/entities/access.py
-- `test_streaming_content_filter_finishes_incomplete_and_discards_final_snapshot()` --calls--> `ChatToResponsesAdapter`  [INFERRED]
-  tests/completions/test_responses_emulation.py → src/litestar_gateway/infrastructure/llm/responses_emulation.py
+- `test_apikey_is_active_honours_grace_window()` --calls--> `APIKey`  [INFERRED]
+  tests/teams/test_api_keys.py → src/litestar_gateway/domain/entities/access.py
+- `test_run_metadata_whitelists_configuration_and_never_serializes_secrets()` --calls--> `build_safe_run_metadata()`  [INFERRED]
+  tests/load/test_load_artifacts.py → scripts/load_artifacts.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (469 total, 154 thin omitted)
+## Communities (496 total, 153 thin omitted)
 
 ### Community 0 - "translate_upstream_error"
 Cohesion: 0.07
-Nodes (44): ClientError, EventStreamError, Any, Base for provider-side failures surfaced by the gateway (not gateway bugs)., The provider rate-limited the request (429). `retry_after` carries the     provi, The provider rejected the gateway's credential (401/403): expired or     rotated, The provider did not respond within the configured timeout., UpstreamAuthFailed (+36 more)
+Nodes (35): BaseLoggingConfig, _env_bool(), _env_choice(), _env_float(), _env_int(), Application settings, loaded from environment variables (and an optional .env)., build_logging_config(), Logging factory: pick the logger type by environment.  Development gets human-re (+27 more)
 
 ### Community 1 - "create_app"
-Cohesion: 0.05
-Nodes (59): OpenAPIConfig, Provide, ResponseHeader, _build_dependencies(), _build_lifespan(), _build_observability(), _build_openapi_config(), _build_rate_limit_stores() (+51 more)
+Cohesion: 0.06
+Nodes (43): _build_lifespan(), Whether the platform can send budget-alert email at all. Both a         server h, Whether any budget-alert delivery capability exists platform-wide,         gatin, Whether a first-login SSO user defaults to platform admin (DEFAULT_ROLE)., Whether to auto-create the schema on startup: the explicit override         if s, Settings, make_bootstrap_admin(), Any (+35 more)
 
 ### Community 2 - "test_webhook_shadow.py"
-Cohesion: 0.08
-Nodes (56): IPv4Address, IPv6Address, _client_factory(), _is_blocked(), _literal_ip(), Any, AsyncClient, Response (+48 more)
+Cohesion: 0.07
+Nodes (61): IPv4Address, IPv6Address, _client_factory(), _is_blocked(), _literal_ip(), post_to_approved_address(), Any, AsyncClient (+53 more)
 
 ### Community 3 - "UsageMeter"
 Cohesion: 0.06
@@ -493,12 +519,12 @@ Cohesion: 0.10
 Nodes (51): ExternalIdentity, An identity resolved from an SSO provider's id_token claims., admin_identity_client(), _admin_token(), _callback(), _client(), _create_team(), FakeIdP (+43 more)
 
 ### Community 5 - "DomainError"
-Cohesion: 0.07
-Nodes (43): CredentialRepository, CachedResponse, CacheKey, Port — the gateway-wide response cache (Plan 04 Phase 0: exact-match only).  `Re, A tenant-scoped, canonicalized cache key.      `team_id` + `api_key_id` are the, The `cache:{team_id}:{api_key_id}:{digest}` form future Redis-backed         tie, A stored provider response body plus its authoritative token usage, so     a lat, Two tiers may sit behind this port (exact-match now, semantic in Phase     2); P (+35 more)
+Cohesion: 0.11
+Nodes (17): A cache failure must never fail the request (design §8): any         exception f, CachedResponse, CacheKey, UUID, Port — the gateway-wide response cache (Plan 04 Phase 0: exact-match only).  `Re, A tenant-scoped, canonicalized cache key.      `team_id` + `api_key_id` are the, The `cache:{team_id}:{api_key_id}:{digest}` form future Redis-backed         tie, A stored provider response body plus its authoritative token usage, so     a lat (+9 more)
 
 ### Community 6 - "test_budget_enforcement.py"
-Cohesion: 0.13
-Nodes (43): BudgetExceeded, The team's spend cap for the current window is exhausted (→ 402)., _budget(), CountingGateway, FakeBudgets, FakeCallableResolver, FakeCredentials, FakeModels (+35 more)
+Cohesion: 0.12
+Nodes (46): BudgetExceeded, The team's spend cap for the current window is exhausted (→ 402)., CandidateModel, A router candidate: a team model name plus its routing profile.      The profile, _budget(), CountingGateway, FakeBudgets, FakeCallableResolver (+38 more)
 
 ### Community 7 - "_scim_headers"
 Cohesion: 0.11
@@ -506,15 +532,15 @@ Nodes (48): _admin_headers(), client(), _create_user(), _mint_token(), AsyncTest
 
 ### Community 8 - "README.md"
 Cohesion: 0.06
-Nodes (26): Contributing, Developer Certificate of Origin (DCO), Development setup, Quality gate, Security issues, Cache behavior, Future shape, Runtime flow (+18 more)
+Nodes (29): Cache behavior, Future shape, Runtime flow, Semantic routing with embeddings, Vector DB decision, Failure semantics, Router config, Shadow mode (§6) (+21 more)
 
 ### Community 9 - "RouterService"
 Cohesion: 0.06
-Nodes (42): _as_uuid(), CallableRouter, _now(), Any, AuditEvent, CredentialRepository, datetime, Model (+34 more)
+Nodes (41): _as_uuid(), _now(), Any, AuditEvent, CredentialRepository, datetime, Model, RouterGrant (+33 more)
 
 ### Community 10 - "test_config.py"
-Cohesion: 0.07
-Nodes (44): _env_team_mapping(), InsecureConfigurationError, Raised at startup when a non-local deploy uses an insecure default., Parse SSO_TEAM_MAPPING: see `domain.entities.parse_team_mapping` for the     gra, MonkeyPatch, Unit tests for Settings validation (production fail-fast)., test_default_role_absent_defaults_to_member(), test_default_role_admin_sets_default_admin() (+36 more)
+Cohesion: 0.08
+Nodes (44): _env_team_mapping(), InsecureConfigurationError, Raised at startup when a non-local deploy uses an insecure default., Parse SSO_TEAM_MAPPING: see `domain.entities.parse_team_mapping` for the     gra, One (team, role) an IdP group confers via an SSO team mapping., TeamGrant, MonkeyPatch, Unit tests for Settings validation (production fail-fast). (+36 more)
 
 ### Community 11 - "OIDCIdentityProvider"
 Cohesion: 0.09
@@ -533,88 +559,88 @@ Cohesion: 0.10
 Nodes (33): EmbedFn, _cosine(), EmbeddingsStrategy, _parse_routes(), Any, S3 — semantic routes via embeddings.  The admin declares routes (name → target m, Built by the RouterService with an `embed` callable bound to the team's     embe, _Route (+25 more)
 
 ### Community 15 - "_bearer"
-Cohesion: 0.20
-Nodes (37): _admin(), _bearer(), client(), _credential(), _login(), _member_token(), _model_payload(), AsyncTestClient (+29 more)
+Cohesion: 0.19
+Nodes (39): _admin(), _bearer(), client(), _credential(), _login(), _member_token(), _model_payload(), AsyncTestClient (+31 more)
 
 ### Community 16 - "TeamService"
 Cohesion: 0.07
-Nodes (46): PlaygroundResult, _normalize_email(), _now(), datetime, Team, TeamRole, User, UUID (+38 more)
+Nodes (43): PlaygroundResult, _normalize_email(), _now(), datetime, Team, TeamRole, User, UUID (+35 more)
 
 ### Community 17 - "AuditLog"
-Cohesion: 0.06
-Nodes (55): InvalidKeyExpiry, The requested API-key TTL is not a positive number of days., Bounded pagination for list operations.  Keeps collection reads from loading an, Clamp client-supplied paging to a sane, bounded window (limit in     [1, MAX_PAG, resolve_page(), AuditLog, AuditEvent, Append-only audit trail of privileged actions. (+47 more)
+Cohesion: 0.08
+Nodes (43): BudgetNotFound, InvalidKeyScope, InvalidUsageQuery, The requested API-key scope is not one of inference/management/all., The team has no budget configured., A usage-timeseries query is malformed (→ 400): unknown granularity or     an emp, Bounded pagination for list operations.  Keeps collection reads from loading an, Clamp client-supplied paging to a sane, bounded window (limit in     [1, MAX_PAG (+35 more)
 
 ### Community 18 - "RouterConfig"
-Cohesion: 0.08
-Nodes (16): RouterGrant, UUID, Ports — router (virtual model) persistence + routing-decision log., (chosen_model, tier, is_shadow, count) rows for the router., (total_estimated_savings, decisions_counted, decisions_without_usage)         ov, The same savings aggregate across every team and router — the         platform-w, The savings aggregate for one team across all of its routers., Persistence port for routers (team-owned or global) and extension grants. (+8 more)
+Cohesion: 0.06
+Nodes (20): AbstractAsyncContextManager, CredentialRepository, RouterGrant, UUID, Ports — router (virtual model) persistence + routing-decision log., (chosen_model, tier, is_shadow, count) rows for the router., (total_estimated_savings, decisions_counted, decisions_without_usage)         ov, The same savings aggregate across every team and router — the         platform-w (+12 more)
 
 ### Community 19 - "test_bedrock.py"
-Cohesion: 0.11
-Nodes (44): to_converse_request(), _fake_boto3_client(), FakeBedrockRuntime, _model(), _patch_bedrock(), _patch_titan(), Any, AsyncTestClient (+36 more)
+Cohesion: 0.10
+Nodes (47): to_converse_request(), Configure a credential + team + model 'm' + key.      Returns (team API key, tea, _setup_team(), _fake_boto3_client(), FakeBedrockRuntime, _model(), _patch_bedrock(), _patch_titan() (+39 more)
 
 ### Community 20 - "conftest.py"
 Cohesion: 0.08
-Nodes (24): client(), FakeClient, _FakeGeminiApiClient, _FakeGeminiModels, FakeGenaiClient, _FakeStream, Path, SimpleNamespace (+16 more)
+Nodes (22): FakeClient, _FakeGeminiApiClient, _FakeGeminiModels, FakeGenaiClient, _FakeStream, SimpleNamespace, Shared fixtures for the OpenAI-compatible inference endpoint tests.  The provide, Captures construction + call kwargs; echoes an OpenAI-shaped response. (+14 more)
 
 ### Community 21 - "SQLAlchemyRouterRepository"
 Cohesion: 0.08
-Nodes (26): A router or model with this name already exists in the team., A router or grant revision changed since the caller last read it., RouterNameExists, RouterRevisionConflict, RouterGrant, UUID, SQLAlchemy ORM mappings (persistence detail)., Append-only router configuration snapshot. (+18 more)
+Nodes (30): A router or model with this name already exists in the team., The router still has extension grants and cannot be deleted or promoted., No active router grant exists for the requested identifier., A router or grant revision changed since the caller last read it., RouterGrantNotFound, RouterNameExists, RouterRevisionConflict, RouterShared (+22 more)
 
 ### Community 22 - "UserRepository"
-Cohesion: 0.08
-Nodes (20): datetime, User, UUID, Port — user persistence., Stage a hard-delete. Callers must first ensure the account has no         team m, Persistence port for users., Stage a user insert; the surrounding unit of work owns the commit., Load and lock a user for a transactional lifecycle change. (+12 more)
+Cohesion: 0.09
+Nodes (17): User, UUID, Stage a hard-delete. Callers must first ensure the account has no         team m, Persistence port for users., Stage a user insert; the surrounding unit of work owns the commit., Load and lock a user for a transactional lifecycle change., Serialize platform-admin lifecycle changes and return the live admins., Users in a stable order (creation time) for paged listing. (+9 more)
 
 ### Community 23 - "test_decisions_stats_savings.py"
-Cohesion: 0.06
-Nodes (85): (chosen_in, chosen_out, alt_in, alt_out) unit costs for savings (§7):         `a, _admin(), _bearer(), _chat(), client(), FakeClient, AsyncTestClient, MonkeyPatch (+77 more)
+Cohesion: 0.13
+Nodes (31): (chosen_in, chosen_out, alt_in, alt_out) unit costs for savings (§7):         `a, _bearer(), _candidate(), _chat(), client(), _decision(), EchoClient, AsyncSession (+23 more)
 
 ### Community 24 - "UserService"
-Cohesion: 0.06
-Nodes (54): _normalize_email(), _now(), datetime, TeamRole, User, UUID, Application service for users and invites — depends only on ports.  Use cases:, `upsert_sso_user` outcome: the resolved account plus what changed, so the     SS (+46 more)
+Cohesion: 0.05
+Nodes (69): Exception, lockout_duration(), _normalize_email(), _now(), datetime, TeamRole, timedelta, User (+61 more)
 
 ### Community 25 - "Any"
-Cohesion: 0.13
-Nodes (30): _bedrock_messages(), _bedrock_tool_choice(), _bedrock_tools(), BedrockAdapter, _client_tool_names(), converse_event_to_delta(), _embedding_inputs(), from_titan_image_response() (+22 more)
+Cohesion: 0.09
+Nodes (42): _bedrock_messages(), _bedrock_tool_choice(), _bedrock_tools(), BedrockAdapter, _billable_response(), _client_tool_names(), converse_event_to_delta(), _embedding_inputs() (+34 more)
 
 ### Community 26 - "button.tsx"
-Cohesion: 0.13
-Nodes (35): Button, ButtonProps, buttonVariants, Card, CardContent, CardHeader, CardTitle, DialogContent (+27 more)
+Cohesion: 0.10
+Nodes (48): Button, ButtonProps, buttonVariants, DialogContent, DialogDescription, DialogFooter(), DialogHeader(), DialogOverlay (+40 more)
 
 ### Community 27 - "SQLAlchemyModelRepository"
-Cohesion: 0.14
+Cohesion: 0.15
 Nodes (15): ModelNameExists, ModelShared, A model with this name already exists in the team., The model still has extension grants and cannot be deleted., lock_resource_lifecycle(), The single, ordered mutex for every alias-affecting lifecycle write., AsyncSession, Model (+7 more)
 
 ### Community 28 - "CompletionService"
-Cohesion: 0.06
-Nodes (54): RequestValidator, _cache_usage_tokens(), CompletionService, _empty_stream(), _gemini_usage(), _prime(), Any, Model (+46 more)
+Cohesion: 0.05
+Nodes (63): RequestValidator, _cache_usage_tokens(), CompletionService, _empty_stream(), _gemini_usage(), _prime(), Any, Model (+55 more)
 
 ### Community 29 - "__init__.py"
-Cohesion: 0.07
-Nodes (43): Return model-binding metadata without exposing credential values., IssuedKey, API key, secret key, and service principal entities., A team-owned, named machine identity (Databricks-style). Its keys carry     mana, Result of issuing a key: the entity plus the one-time plaintext., ServicePrincipal, KeyPurpose, KeyScope (+35 more)
+Cohesion: 0.09
+Nodes (32): A team-owned, named machine identity (Databricks-style). Its keys carry     mana, ServicePrincipal, AuditEvent, An append-only record of a privileged action: who did what, to what, from     wh, A user's role in one team. `admin` and `member` are the classic pair;     the ex, TeamRole, Invite, IssuedInvite (+24 more)
 
 ### Community 30 - "patch_scim_user"
-Cohesion: 0.19
-Nodes (30): _bad_request(), create_scim_user(), delete_scim_user(), get_scim_user(), list_scim_users(), patch_scim_user(), Any, FromPath (+22 more)
+Cohesion: 0.20
+Nodes (29): _bad_request(), create_scim_user(), delete_scim_user(), get_scim_user(), list_scim_users(), patch_scim_user(), Any, FromPath (+21 more)
 
 ### Community 31 - "RouterController"
 Cohesion: 0.18
-Nodes (17): CallableRouterResponse, DecisionResponse, _mask_strategy_config(), platform_routing_savings(), Any, FromPath, FromQuery, NamedDependency (+9 more)
+Nodes (18): _build_route_handlers(), CallableRouterResponse, DecisionResponse, _mask_strategy_config(), platform_routing_savings(), Any, FromPath, FromQuery (+10 more)
 
 ### Community 32 - "conftest.py"
 Cohesion: 0.07
 Nodes (28): AlreadyMember, The user is already a member of the team., client(), FakeApiKeyRepo, FakeMembershipRepo, FakeModelRepo, FakeOrgRepo, FakeTeamRepo (+20 more)
 
 ### Community 33 - "_bearer"
-Cohesion: 0.25
-Nodes (31): _admin(), _bearer(), _model(), AsyncTestClient, _sp(), _sp_key(), _team_and_credential(), _create_personal_key_for_member() (+23 more)
+Cohesion: 0.22
+Nodes (35): _admin(), _bearer(), _model(), AsyncTestClient, _sp(), _sp_key(), _team_and_credential(), _create_personal_key_for_member() (+27 more)
 
 ### Community 34 - "test_signup_integration.py"
-Cohesion: 0.06
-Nodes (82): Create an isolated org + team via the API and return the team id., seed_team(), _admin_token(), client(), _db(), _lock_account(), _login(), AsyncTestClient (+74 more)
+Cohesion: 0.13
+Nodes (38): Create an isolated org + team via the API and return the team id., seed_team(), _admin_token(), client(), _db_url(), _flatten(), _new_invite(), AsyncTestClient (+30 more)
 
 ### Community 35 - "TeamGrant"
 Cohesion: 0.13
-Nodes (21): AuditEvent, An append-only record of a privileged action: who did what, to what, from     wh, create_sso_router(), FromQuery, NamedDependency, QueryParameter, Redirect, Request (+13 more)
+Nodes (23): Everything `/sso/login` and `/sso/callback` need for this request,     read as o, ResolvedSsoConfig, issue_access_token(), Return (encoded_jwt, expires_in_seconds) for the given subject (user id).      E, create_sso_router(), FromQuery, NamedDependency, QueryParameter (+15 more)
 
 ### Community 36 - "SQLAlchemyOrganizationRepository"
 Cohesion: 0.17
@@ -622,75 +648,75 @@ Nodes (12): AsyncSession, Organization, UUID, SQLAlchemy adapter implementing th
 
 ### Community 37 - "OpenAICompatibleAdapter"
 Cohesion: 0.15
-Nodes (18): _achat_create(), _base_url(), _chat_create(), _is_max_tokens_error(), _kwargs(), _openai_client_kwargs(), OpenAICompatibleAdapter, Any (+10 more)
+Nodes (18): OpenAI, _achat_create(), _base_url(), _chat_create(), _is_max_tokens_error(), _kwargs(), _openai_client_kwargs(), OpenAICompatibleAdapter (+10 more)
 
 ### Community 38 - "OrganizationController"
 Cohesion: 0.09
 Nodes (41): Lock, RuntimeError, ClientKey, ClientRegistry, ClientRegistryClosed, _Entry, fingerprint_material(), Any (+33 more)
 
 ### Community 39 - "APIKeyService"
-Cohesion: 0.16
-Nodes (15): APIKeyService, _as_utc(), _now(), AuditEvent, datetime, IssuedKey, KeyScope, timedelta (+7 more)
+Cohesion: 0.15
+Nodes (21): _embed_model(), FakeCredentials, FakeEmbeddingGateway, FakeModels, FakeUsage, _model(), Any, UUID (+13 more)
 
 ### Community 40 - "InvalidKeyExpiry"
-Cohesion: 0.12
-Nodes (30): derive_cache_key(), is_cacheable(), Any, Model, UUID, Response-cache key derivation and cacheability (Plan 04 Phase 0, design §2/§7)., A pure, canonical view of the request, hashed. `canonical_model_name`     must b, Whether this request may look up / write the response cache at all —     the glo (+22 more)
+Cohesion: 0.06
+Nodes (58): derive_cache_key(), is_cacheable(), Any, Model, UUID, Response-cache key derivation and cacheability (Plan 04 Phase 0, design §2/§7)., A pure, canonical view of the request, hashed. `canonical_model_name`     must b, Whether this request may look up / write the response cache at all —     the glo (+50 more)
 
 ### Community 41 - "SQLAlchemyUsageRepository"
-Cohesion: 0.11
-Nodes (28): PendingUsageEventModel, Dead-letter outbox for usage events whose ledger write failed. A background, UsageEventModel, AsyncSession, datetime, Exception, UUID, SQLAlchemy adapter implementing the `UsageRepository` port. (+20 more)
+Cohesion: 0.12
+Nodes (25): PendingUsageEventModel, Dead-letter outbox for usage events whose ledger write failed. A background, UsageEventModel, AsyncSession, Exception, Failure bookkeeping for one pending row: count the attempt and keep         the, SQLAlchemyUsageRepository, _event() (+17 more)
 
 ### Community 42 - "TeamMembership"
-Cohesion: 0.17
-Nodes (26): A user's membership in a team, with a role., TeamMembership, _now(), _user(), TeamService: the last-admin guard on remove/demote, across membership pages., _team_with_two_admins(), test_cannot_demote_last_admin(), test_cannot_remove_last_admin() (+18 more)
+Cohesion: 0.11
+Nodes (31): A user's membership in a team, with a role., TeamMembership, AsyncSession, UUID, SQLAlchemy adapter implementing the `TeamMembershipRepository` port., SQLAlchemyTeamMembershipRepository, TeamMembershipModel, _now() (+23 more)
 
 ### Community 43 - "test_login_lockout.py"
-Cohesion: 0.14
-Nodes (21): _billable_response(), _chat_tool_call(), _extract_text(), _function_call_items(), _input_to_messages(), _invalid_response(), Emulate the Responses API on top of chat.completions.  For providers without a n, Responses-shaped request -> chat.completions-shaped request. (+13 more)
+Cohesion: 0.08
+Nodes (29): A bounded, time-ordered series of `UsageBucket`s for one team over     `[start,, UsageTimeseries, InvalidKeyExpiry, The requested API-key TTL is not a positive number of days., AddMemberRequest, BudgetAlertResponse, CreatedKeyResponse, CreateKeyRequest (+21 more)
 
 ### Community 44 - "test_weighted_strategy.py"
 Cohesion: 0.14
 Nodes (20): Any, Weighted multi-model routing: percentage-split traffic across candidates.  Each, WeightedStrategy, _bearer(), _candidate(), client(), _draws(), EchoClient (+12 more)
 
 ### Community 45 - "SQLAlchemyTeamMembershipRepository"
-Cohesion: 0.26
-Nodes (5): AsyncSession, UUID, SQLAlchemy adapter implementing the `TeamMembershipRepository` port., SQLAlchemyTeamMembershipRepository, TeamMembershipModel
+Cohesion: 0.16
+Nodes (17): APIKeyService, _as_utc(), _now(), AuditEvent, datetime, IssuedKey, KeyScope, timedelta (+9 more)
 
 ### Community 46 - "Any"
-Cohesion: 0.19
-Nodes (20): chat.completions response -> Responses-shaped response., to_responses(), _chat_tool_response(), Pure Responses ↔ Chat translation contracts for chat-only providers., _ScriptedStream, test_content_filter_becomes_an_explicit_incomplete_response_and_discards_partial_text(), test_duplicate_upstream_tool_call_ids_fail_closed(), test_incomplete_upstream_tool_response_fails_closed_and_carries_usage() (+12 more)
+Cohesion: 0.08
+Nodes (46): _billable_response(), _chat_tool_call(), ChatToResponsesAdapter, _extract_text(), _function_call_items(), _input_to_messages(), _invalid_response(), Any (+38 more)
 
 ### Community 47 - "SQLAlchemyUserRepository"
 Cohesion: 0.15
 Nodes (10): EmailAlreadyRegistered, A user with this email already exists., User, UserModel, AsyncSession, datetime, User, UUID (+2 more)
 
 ### Community 48 - "test_key_principal.py"
-Cohesion: 0.32
-Nodes (25): _admin(), _bearer(), client(), _issue_key(), _model_body(), AsyncTestClient, Path, API keys as team service principals (Databricks-style), with scopes.  A key belo (+17 more)
+Cohesion: 0.15
+Nodes (40): _config(), _downgrade(), _insert_model(), _insert_router(), AlembicCommandConfig, Connection, Path, UUID (+32 more)
 
 ### Community 49 - "Any"
 Cohesion: 0.10
 Nodes (41): _billable_response(), _build_client(), from_gemini_embeddings(), from_gemini_response(), from_imagen_response(), gemini_chunk_to_delta(), _gemini_contents(), _gemini_tool_calls() (+33 more)
 
 ### Community 50 - "KeyPurpose"
-Cohesion: 0.19
-Nodes (9): A rotating keyring key. `material` is the master-wrapped key bytes; only     the, SecretKey, SecretKeyModel, AsyncSession, datetime, UUID, SQLAlchemy adapter implementing the `SecretKeyRepository` port., The newest usable (non-retired) key for the purpose. (+1 more)
+Cohesion: 0.10
+Nodes (18): IssuedKey, API key, secret key, and service principal entities., A rotating keyring key. `material` is the master-wrapped key bytes; only     the, Result of issuing a key: the entity plus the one-time plaintext., SecretKey, KeyPurpose, KeyScope, What a keyring key is used for. (+10 more)
 
 ### Community 51 - "Principal"
 Cohesion: 0.09
 Nodes (35): CallableModel, CallableModel, A model a team can call, with the alias it calls it by and where it came     fro, Principal, The acting identity behind a request: a human user (JWT) or a team     service p, Attribution for the audit trail: user email, the service-principal         name,, ModelController, FromPath (+27 more)
 
 ### Community 52 - "chat_completions"
-Cohesion: 0.27
-Nodes (14): chat_completions(), embeddings(), images(), Any, NamedDependency, Request, Response, ServerSentEventMessage (+6 more)
+Cohesion: 0.15
+Nodes (20): chat_completions(), embeddings(), images(), Any, NamedDependency, Request, Response, ServerSentEventMessage (+12 more)
 
 ### Community 53 - "CandidateModel"
-Cohesion: 0.05
-Nodes (53): CompleteFn, ComplexityStrategy, _Dimension, _keyword_matches(), Any, QualityTier, S1 — rule-based complexity strategy.  Algorithm ported from LiteLLM's complexity, Word-boundary matching for single words (so "error" never matches     "terrorism (+45 more)
+Cohesion: 0.13
+Nodes (22): ComplexityStrategy, Any, Classify by weighted signals, then pick the candidate serving the tier., Any, filter_candidates(), The hard capability filters (§3) — run before any strategy., _candidate(), _ctx() (+14 more)
 
 ### Community 54 - "Protocol"
-Cohesion: 0.10
-Nodes (16): Team, UUID, Port — team and membership persistence., Narrow port for operations serialized against team deletion., Serialize invite creation and team deletion for this team.          Return the c, Persistence port for teams., Fetch many teams in one query (batch lookup, avoids N+1). Missing ids         ar, Every team across all organizations, stable order (platform-admin use). (+8 more)
+Cohesion: 0.15
+Nodes (9): UUID, Port — team and membership persistence., Narrow port for operations serialized against team deletion., Serialize invite creation and team deletion for this team.          Return the c, Persistence port for team memberships., The user's memberships across all teams — used to guard user deletion., Number of admin memberships on the team. Unpaginated on purpose: the         las, TeamLifecycleRepository (+1 more)
 
 ### Community 55 - "test_shadow_session_isolation.py"
 Cohesion: 0.10
@@ -698,47 +724,47 @@ Nodes (21): Call, FakeDecisionLog, JudgeGateway, _model(), Any, Event, Model, Mo
 
 ### Community 57 - "usage.py"
 Cohesion: 0.08
-Nodes (24): InMemoryCircuitBreaker, Circuit-breaker adapters — closed/open/half-open state machine per key.  In-memo, Shared breaker across replicas. Failure count lives on a plain INCR'd     key (r, Process-local breaker. Correct for a single replica; for multi-replica     deplo, RedisCircuitBreaker, _State, FakeRedis, CircuitBreaker adapters — closed -> open -> half-open state machine (Plan 05 Pha (+16 more)
+Nodes (26): build_circuit_breaker(), InMemoryCircuitBreaker, Circuit-breaker adapters — closed/open/half-open state machine per key.  In-memo, Shared breaker across replicas. Failure count lives on a plain INCR'd     key (r, Redis-backed when REDIS_URL is set (shared across replicas), else in-memory., Process-local breaker. Correct for a single replica; for multi-replica     deplo, RedisCircuitBreaker, _State (+18 more)
 
 ### Community 58 - "test_rate_limit.py"
-Cohesion: 0.15
-Nodes (20): _inference_identifier(), Any, Request, Key inference calls by client IP.      The limiter runs *before* authentication,, client(), _FakeClient, Any, AsyncTestClient (+12 more)
+Cohesion: 0.16
+Nodes (22): _admin(), _bearer(), _chat(), client(), FakeClient, AsyncTestClient, MonkeyPatch, Integration tests for team budgets: admin CRUD + end-to-end enforcement.  Budget (+14 more)
 
 ### Community 59 - "Keyring"
-Cohesion: 0.08
-Nodes (21): SecretKeyRepository, build_master_cipher(), DataCipher, _derive_fernet_key(), MasterCipher, new_key_material(), Envelope encryption for secrets at rest.  A fixed **master key** (derived from `, Fresh random key material (a Fernet key; also usable as an HMAC secret). (+13 more)
+Cohesion: 0.06
+Nodes (30): SecretKeyRepository, SALT_KEY is not configured; credential encryption is unavailable., SaltKeyMissing, build_master_cipher(), DataCipher, _derive_fernet_key(), MasterCipher, new_key_material() (+22 more)
 
 ### Community 60 - "ScimService"
-Cohesion: 0.17
-Nodes (14): _normalize_email(), _now(), datetime, User, UUID, Application service for SCIM provisioning — depends only on ports.  Two responsi, Provision an account for the IdP. SCIM accounts get an unknowable         random, Users matching an equality filter (email/externalId — at most one is         set (+6 more)
+Cohesion: 0.14
+Nodes (17): _normalize_email(), _now(), datetime, User, UUID, Application service for SCIM provisioning — depends only on ports.  Two responsi, Resolve a presented bearer token; rejects unknown and revoked ones., Provision an account for the IdP. SCIM accounts get an unknowable         random (+9 more)
 
 ### Community 61 - "UsageEvent"
 Cohesion: 0.19
 Nodes (13): FailingGateway, FakeCredentials, FakeModels, FakeUsage, _model(), OkGateway, Any, UUID (+5 more)
 
 ### Community 62 - "test_budgets.py"
-Cohesion: 0.07
-Nodes (38): ModelType, Provider, Whether this provider's chat path forwards the OpenAI `n` (multiple         comp, AzureOpenAIAdapter, OpenAIAdapter, Plain OpenAI, and OpenAI-compatible endpoints (e.g. Databricks via base_url)., Any, AsyncClient (+30 more)
+Cohesion: 0.08
+Nodes (34): AzureOpenAIAdapter, OpenAIAdapter, Plain OpenAI, and OpenAI-compatible endpoints (e.g. Databricks via base_url)., Any, AsyncClient, Resilience config applied to provider SDK clients.  A gateway sits in the critic, Kwargs accepted by the OpenAI and Anthropic client constructors., A fresh, generously bounded `httpx.AsyncClient` for an async         provider cl (+26 more)
 
 ### Community 63 - "_patch"
-Cohesion: 0.12
-Nodes (25): CandidateModel, A router candidate: a team model name plus its routing profile.      The profile, _budget(), FakeBudgets, FakeUsage, FixedDecisionRouter, _model(), MultiModelCallableResolver (+17 more)
+Cohesion: 0.13
+Nodes (22): _budget(), FakeUsage, FixedDecisionRouter, _model(), MultiModelCallableResolver, _ok_chunks(), Any, datetime (+14 more)
 
 ### Community 64 - "_setup"
 Cohesion: 0.12
-Nodes (38): Configure a credential + team + model 'm' + key. Returns the team API key., _setup(), AsyncTestClient, MonkeyPatch, `/v1/embeddings` and `/v1/images/generations`, per provider + type checks., test_embeddings_openai(), test_embeddings_unsupported_provider_501(), test_embeddings_vertex() (+30 more)
+Nodes (39): Configure a credential + team + model 'm' + key. Returns the team API key., _setup(), AsyncTestClient, MonkeyPatch, `/v1/embeddings` and `/v1/images/generations`, per provider + type checks., test_embeddings_openai(), test_embeddings_unsupported_provider_501(), test_embeddings_vertex() (+31 more)
 
 ### Community 65 - "test_integration.py"
 Cohesion: 0.19
 Nodes (22): _bearer(), _chat(), client(), EchoClient, AsyncTestClient, MonkeyPatch, Path, Smart routing through the chat endpoint: routing, filters, §4 fallback. (+14 more)
 
 ### Community 66 - "FakeUserRepository"
-Cohesion: 0.13
-Nodes (5): FakeUserRepository, datetime, Team, User, UUID
+Cohesion: 0.26
+Nodes (27): _budget(), FakeBudgetAlertState, FakeBudgets, FakeUsage, _freeze(), _meter(), _model(), datetime (+19 more)
 
 ### Community 67 - "ResilienceConfig"
-Cohesion: 0.27
-Nodes (6): AsyncAzureOpenAI, AzureOpenAI, _client_kwargs(), Any, Model, Azure OpenAI adapter — same OpenAI surface, different client construction.  Cred
+Cohesion: 0.12
+Nodes (19): _drain(), FakeCredentials, FakeModels, FakeRedis, FakeUsage, Gateway, _model(), Any (+11 more)
 
 ### Community 68 - "LLMGateway"
 Cohesion: 0.16
@@ -749,40 +775,40 @@ Cohesion: 0.22
 Nodes (9): Return a copy of `request` with only the allowlisted fields for     `operation`,, sanitize_request(), test_clamps_cost_drivers(), test_does_not_mutate_input(), test_drops_transport_and_unknown_keys(), test_non_int_cost_values_pass_through(), test_per_operation_allowlists(), test_responses_allowlist_matches_native_sdk_body_fields() (+1 more)
 
 ### Community 70 - "schemas.py"
-Cohesion: 0.17
-Nodes (19): apply_patch_ops(), _as_bool(), parse_filter(), parse_user_payload(), Any, SCIM 2.0 wire formats: resource/error builders + pure request parsing.  Only the, Booleans as sent in the wild: real JSON booleans, or Entra's "True"/"False"., The gateway-managed subset of a SCIM User resource. (+11 more)
+Cohesion: 0.16
+Nodes (20): apply_patch_ops(), _as_bool(), parse_filter(), parse_user_payload(), Any, SCIM 2.0 wire formats: resource/error builders + pure request parsing.  Only the, Booleans as sent in the wild: real JSON booleans, or Entra's "True"/"False"., The gateway-managed subset of a SCIM User resource. (+12 more)
 
 ### Community 71 - "test_judge_hybrid_export.py"
-Cohesion: 0.11
-Nodes (25): HybridStrategy, S5 — hybrid gray-zone: composition, not a new algorithm.  Runs S1 (rule-based co, Built by the RouterService, which supplies the escalation strategy     instance, JudgeStrategy, S4 — LLM as a judge.  A small, fast team model (the *judge*, picked by the admin, _bearer(), client(), _ctx() (+17 more)
+Cohesion: 0.18
+Nodes (17): HybridStrategy, S5 — hybrid gray-zone: composition, not a new algorithm.  Runs S1 (rule-based co, Built by the RouterService, which supplies the escalation strategy     instance, _bearer(), _ctx(), _judge(), AsyncTestClient, Phase 5 smart routing: S4 LLM judge, S5 hybrid gray-zone, S6 export. (+9 more)
 
 ### Community 72 - "MetricsAggregator"
-Cohesion: 0.08
-Nodes (19): MetricsAggregator, In-process metrics aggregation from TraceRecords (a `TraceSink`).  Counts what a, Cumulative totals plus interval latency stats (reset on read)., CompositeTraceSink, One sink failing (e.g. MLflow down) must not starve the others., default_run_name(), make_metrics_publisher(), MlflowMetricsPublisher (+11 more)
+Cohesion: 0.11
+Nodes (11): default_run_name(), make_metrics_publisher(), MlflowMetricsPublisher, Publish aggregated gateway metrics to MLflow as time-series run metrics.  MLflow, Resolve the experiment and open this instance's metrics run., Litestar lifespan: publish the aggregator to MLflow every interval., FakeMlflowClient, Ops metrics on MLflow: aggregate TraceRecords, publish to a metrics run.  MLflow (+3 more)
 
 ### Community 73 - "_account"
-Cohesion: 0.09
-Nodes (35): FakeAPIKeyRepository, FakeTransaction, FakeUserRepository, The user still has team memberships or API keys they created, and cannot     be, UserHasReferences, _account(), FakeAPIKeyRepository, FakeInviteRepository (+27 more)
+Cohesion: 0.06
+Nodes (40): FakeAPIKeyRepository, FakeTransaction, FakeUserRepository, The user still has team memberships or API keys they created, and cannot     be, UserHasReferences, _account(), FakeAPIKeyRepository, FakeInviteRepository (+32 more)
 
 ### Community 74 - "ModelService"
-Cohesion: 0.11
-Nodes (21): ModelService, _now(), Any, CredentialRepository, datetime, Model, ModelType, Provider (+13 more)
+Cohesion: 0.10
+Nodes (22): ModelService, _now(), Any, CredentialRepository, datetime, Model, ModelType, Provider (+14 more)
 
 ### Community 75 - "test_rotation.py"
 Cohesion: 0.05
 Nodes (46): SQLAlchemyCredentialRepository, DistributedLock, AbstractAsyncContextManager, timedelta, Port — distributed lock., Cross-process mutual exclusion, e.g. so only one replica runs key rotation., Async context manager that yields True if the lock was acquired (held         fo, build_distributed_lock() (+38 more)
 
 ### Community 76 - "test_session.py"
-Cohesion: 0.11
-Nodes (41): An effective alias bound to a stable, explicitly typed identity., ResolvedCallable, CallableKind, CallableOrigin, Stable identities in the shared model/router callable namespace., The provider refused the request itself (other 4xx, e.g. an     out-of-range par, The provider returned a 5xx or could not be reached., UpstreamRequestRejected (+33 more)
+Cohesion: 0.07
+Nodes (64): ClientError, An effective alias bound to a stable, explicitly typed identity., ResolvedCallable, CallableAliasBinding, CallableKind, CallableOrigin, Stable identities in the shared model/router callable namespace., Any (+56 more)
 
 ### Community 77 - "TraceRecord"
-Cohesion: 0.18
+Cohesion: 0.16
 Nodes (9): Budget, A hard spend cap (USD) for a team over a recurring calendar window.      Enforce, Create the team's budget, or replace it if one exists (upsert)., AsyncSession, UUID, SQLAlchemy adapter implementing the `BudgetRepository` port., SQLAlchemyBudgetRepository, A team's hard spend cap (at most one row per team). (+1 more)
 
 ### Community 78 - "LLMGatewayImpl"
-Cohesion: 0.11
-Nodes (26): arun_translated(), _aws_error_code(), Any, Exception, T, _raise_translated(), Translate provider SDK exceptions into domain errors at the gateway boundary.  P, Relay chunks unchanged, translating errors raised mid-stream too (the     provid (+18 more)
+Cohesion: 0.06
+Nodes (58): EventStreamError, _make_llm_gateway_lifespan(), Close every retained provider client on shutdown. Entered first (of this     lis, The provider rejected the gateway's credential (401/403): expired or     rotated, UpstreamAuthFailed, arun_translated(), _aws_error_code(), Any (+50 more)
 
 ### Community 79 - "test_stream_start_errors.py"
 Cohesion: 0.15
@@ -793,52 +819,52 @@ Cohesion: 0.15
 Nodes (17): _close_genai_client(), _default_response_factory(), _default_stream_factory(), _FakeGenaiClient, _FakeModels, _FakeResponse, _FakeStream, _model() (+9 more)
 
 ### Community 81 - "ServicePrincipalService"
-Cohesion: 0.13
-Nodes (21): _now(), datetime, IssuedKey, KeyScope, ServicePrincipal, UUID, Application service for team service principals + their keys.  Administration is, Fetch an SP scoped to the team, or None (used by the principal loader,         w (+13 more)
+Cohesion: 0.19
+Nodes (13): _now(), datetime, IssuedKey, KeyScope, ServicePrincipal, UUID, Application service for team service principals + their keys.  Administration is, Fetch an SP scoped to the team, or None (used by the principal loader,         w (+5 more)
 
 ### Community 82 - "test_generate_content.py"
 Cohesion: 0.07
 Nodes (48): InFlightSpend, Estimated cost of admitted-but-unsettled requests, per team.      The budget gat, BudgetWindow, Spend window a budget applies to. Calendar-based, UTC., test_in_flight_spend_add_then_remove_all_returns_to_zero(), test_in_flight_spend_never_goes_negative(), test_in_flight_spend_total_is_order_independent(), _BlockingGeminiGateway (+40 more)
 
 ### Community 83 - "DataTable.tsx"
-Cohesion: 0.07
-Nodes (51): Column, DataTable(), DataTableProps, EmptyState(), EmptyStateProps, StatusDot(), StatusDotProps, Tone (+43 more)
+Cohesion: 0.08
+Nodes (45): Column, DataTable(), DataTableProps, EmptyState(), EmptyStateProps, StatusDot(), StatusDotProps, Tone (+37 more)
 
 ### Community 84 - "test_teams_api.py"
 Cohesion: 0.28
 Nodes (32): _bearer(), client(), _login(), _org(), AsyncTestClient, Path, Integration tests for organizations, teams and memberships., _register() (+24 more)
 
 ### Community 85 - "APIKeyRepository"
-Cohesion: 0.08
-Nodes (18): ScimTokenRepository, APIKey, An issued API key. Only the hash is persisted.      A key is either **personal**, Usable right now: not expired, and either never revoked or revocation         sc, APIKeyRepository, datetime, UUID, Port — API key persistence. (+10 more)
+Cohesion: 0.11
+Nodes (14): ScimTokenRepository, APIKeyRepository, datetime, UUID, Port — API key persistence., Persistence port for API keys., Stage a key insert; the application service owns the commit., Load and lock a key for a transactional state change. (+6 more)
 
 ### Community 86 - "ModelsPage.tsx"
 Cohesion: 0.06
-Nodes (69): NAV_GROUPS, NavGroup, NavItem, Sidebar(), PageHeader(), PageHeaderProps, RequireAuth(), useAuth() (+61 more)
+Nodes (67): AppShell(), NAV_GROUPS, NavGroup, NavItem, Sidebar(), Topbar(), RequireAuth(), useAuth() (+59 more)
 
 ### Community 87 - "SQLAlchemyTeamRepository"
-Cohesion: 0.22
-Nodes (9): The team still has models or API keys and cannot be deleted — doing so     would, TeamNotEmpty, Team, TeamModel, AsyncSession, Team, UUID, SQLAlchemy adapter implementing the `TeamRepository` port. (+1 more)
+Cohesion: 0.25
+Nodes (7): Team, TeamModel, AsyncSession, Team, UUID, SQLAlchemy adapter implementing the `TeamRepository` port., SQLAlchemyTeamRepository
 
 ### Community 88 - "TraceDispatcher"
-Cohesion: 0.09
-Nodes (18): Port — observability trace sink., Observability sink. `write` is synchronous — the dispatcher's worker calls     i, TraceSink, Litestar, Off-hot-path trace dispatch: a bounded queue drained by a background worker.  Re, TraceDispatcher, build_trace_sink(), Build the trace sink from settings: MLflow if a tracking URI is set, else no-op. (+10 more)
+Cohesion: 0.18
+Nodes (12): build_trace_sink(), Build the trace sink from settings: MLflow if a tracking URI is set, else no-op., NullTraceSink, No-op trace sink, used when no MLflow tracking URI is configured., _FakeSink, Tests for the observability pipeline (dispatcher + sink factory)., _record(), _settings() (+4 more)
 
 ### Community 89 - "SQLAlchemyAPIKeyRepository"
 Cohesion: 0.22
 Nodes (8): APIKeyModel, `UUIDAuditBase` provides `id`, `created_at`, `updated_at`., AsyncSession, datetime, UUID, SQLAlchemy adapter implementing the `APIKeyRepository` port., Maps between `APIKey` domain entities and `APIKeyModel` rows., SQLAlchemyAPIKeyRepository
 
 ### Community 90 - "test_api_keys.py"
-Cohesion: 0.24
-Nodes (26): _bearer(), client(), _create_key(), _login(), AsyncTestClient, MonkeyPatch, Path, Integration tests for team-scoped API keys + API-key authentication. (+18 more)
+Cohesion: 0.22
+Nodes (27): _bearer(), client(), _create_key(), _login(), AsyncTestClient, MonkeyPatch, Path, Integration tests for team-scoped API keys + API-key authentication. (+19 more)
 
 ### Community 91 - "Implementation prompt: Agent framework compatibility"
-Cohesion: 0.18
-Nodes (16): AnthropicAdapter, _default_response_factory(), _FakeAnthropicClient, _FakeMessage, _FakeMessages, _FakeStream, _model(), _patch_async_client() (+8 more)
+Cohesion: 0.12
+Nodes (22): ModelType, Provider, Whether this provider's chat path forwards the OpenAI `n` (multiple         comp, Credential, Model and credential entities., Metadata for a provider credential. Secret values are stored encrypted     by th, Model, _default_response_factory() (+14 more)
 
 ### Community 92 - "APIKey"
-Cohesion: 0.13
-Nodes (19): InvalidAPIKey, The supplied key is missing, unknown, or revoked., FakeAPIKeyRepository, FakeTransaction, FakeUserRepository, datetime, User, UUID (+11 more)
+Cohesion: 0.10
+Nodes (22): APIKey, An issued API key. Only the hash is persisted.      A key is either **personal**, Usable right now: not expired, and either never revoked or revocation         sc, InvalidAPIKey, The supplied key is missing, unknown, or revoked., FakeAPIKeyRepository, FakeTransaction, FakeUserRepository (+14 more)
 
 ### Community 93 - "SQLAlchemyServicePrincipalRepository"
 Cohesion: 0.16
@@ -849,16 +875,16 @@ Cohesion: 0.13
 Nodes (22): AsyncSession, datetime, Invite, UUID, SQLAlchemy adapter implementing the `InviteRepository` port., Atomically consume the invite. Returns False if it was already used         (con, SQLAlchemyInviteRepository, InviteModel (+14 more)
 
 ### Community 95 - "ScimToken"
-Cohesion: 0.17
-Nodes (9): Resolve a presented bearer token; rejects unknown and revoked ones., An admin-issued SCIM provisioning token — the IdP's credential for the     /scim, ScimToken, ScimTokenModel, AsyncSession, datetime, UUID, SQLAlchemy adapter implementing the `ScimTokenRepository` port. (+1 more)
+Cohesion: 0.20
+Nodes (8): An admin-issued SCIM provisioning token — the IdP's credential for the     /scim, ScimToken, ScimTokenModel, AsyncSession, datetime, UUID, SQLAlchemy adapter implementing the `ScimTokenRepository` port., SQLAlchemyScimTokenRepository
 
 ### Community 96 - "SQLAlchemyAuditLog"
 Cohesion: 0.11
 Nodes (14): AsyncSession, AuditEvent, SQLAlchemy adapter implementing the `AuditLog` port.  Privileged actions are low, SQLAlchemyAuditLog, AuditEventModel, AuditEvent, provide_audit_log(), AsyncSession (+6 more)
 
 ### Community 97 - "test_chat.py"
-Cohesion: 0.20
-Nodes (24): _patch(), MonkeyPatch, AsyncTestClient, MonkeyPatch, Path, Basic chat completions: param sanitizing/enforcement, usage, key spending., test_default_params_remain_overridable_by_client(), test_enforced_params_cannot_be_overridden_by_client() (+16 more)
+Cohesion: 0.22
+Nodes (18): _admin(), client(), AsyncTestClient, Path, AsyncTestClient, MonkeyPatch, Path, Basic chat completions: param sanitizing/enforcement, usage, key spending. (+10 more)
 
 ### Community 98 - "RecordingDecisionLog"
 Cohesion: 0.13
@@ -869,8 +895,8 @@ Cohesion: 0.22
 Nodes (13): _bearer(), client(), JudgeAwareClient, AsyncTestClient, MonkeyPatch, Path, R7-H22: judge/embeddings routing strategies make real, billable provider calls., Fake AsyncOpenAI: a judge request (json_schema response_format) gets a     valid (+5 more)
 
 ### Community 100 - "Settings"
-Cohesion: 0.19
-Nodes (16): OrganizationController, FromPath, FromQuery, NamedDependency, Request, User, UUID, Organization & team creation — platform-admin only. (+8 more)
+Cohesion: 0.35
+Nodes (27): _admin(), _bearer(), _catalog(), client(), _credential(), _global_model(), _org(), AsyncTestClient (+19 more)
 
 ### Community 101 - "ModelRepository"
 Cohesion: 0.08
@@ -885,72 +911,72 @@ Cohesion: 0.09
 Nodes (23): An honest finding the 30 s protocol missed — resolved: proxy artifact, An unplanned but necessary fix: connection-pool sizing, Decision: stop here, not attack a diffuse tail, Environment caveat: ptrace over Docker Desktop's VM is slow, Measured result (3 runs, medians; 3 workers / 3 CPU, same conditions as, Measurement protocol (used by every step), Outcome, Plan 14a — Hot-path implementation: step-by-step execution (+15 more)
 
 ### Community 104 - "provide_user_service"
-Cohesion: 0.15
-Nodes (11): PasswordResetModel, AsyncSession, datetime, UUID, SQLAlchemy adapter implementing the `PasswordResetRepository` port., Atomically consume the reset. Returns False if it was already used         (cond, SQLAlchemyPasswordResetRepository, provide_user_service() (+3 more)
+Cohesion: 0.17
+Nodes (9): PasswordReset, A single-use, expiring admin-issued password reset for a specific user.      Onl, PasswordResetModel, AsyncSession, datetime, UUID, SQLAlchemy adapter implementing the `PasswordResetRepository` port., Atomically consume the reset. Returns False if it was already used         (cond (+1 more)
 
 ### Community 105 - "provide_authenticated_user"
-Cohesion: 0.10
-Nodes (30): provide_principal(), NamedDependency, Request, Resolve the acting Principal: a human JWT or a team service-principal key.  Used, _load_user(), provide_audit_reader(), provide_authenticated_user(), provide_browser_session() (+22 more)
+Cohesion: 0.11
+Nodes (28): provide_principal(), NamedDependency, Request, Resolve the acting Principal: a human JWT or a team service-principal key.  Used, _load_user(), provide_audit_reader(), provide_authenticated_user(), provide_browser_session() (+20 more)
 
 ### Community 106 - "browser_login"
 Cohesion: 0.07
 Nodes (36): Cookie, browser_login(), browser_logout(), get_browser_session(), NamedDependency, Request, Browser-only admin session endpoints using an HttpOnly cookie and CSRF token., _response() (+28 more)
 
 ### Community 107 - "toError"
-Cohesion: 0.12
-Nodes (35): PaginationControls(), PaginationControlsProps, AuditEvent, fail(), listAuditPage(), AuditPage(), COLUMNS, createServicePrincipal() (+27 more)
+Cohesion: 0.08
+Nodes (56): PageHeader(), PageHeaderProps, PaginationControls(), PaginationControlsProps, listTeamKeysPage(), ApiKeysPage(), RevokeKeyDialog(), RotateKeyDialog() (+48 more)
 
 ### Community 108 - "PlaygroundService"
-Cohesion: 0.08
-Nodes (40): _content(), _cost(), PlaygroundResult, PlaygroundService, Any, Model, UUID, Playground: run one prompt against several models and compare the results.  Real (+32 more)
+Cohesion: 0.12
+Nodes (25): _content(), _cost(), PlaygroundResult, PlaygroundService, Any, Model, UUID, Playground: run one prompt against several models and compare the results.  Real (+17 more)
 
 ### Community 109 - "Any"
 Cohesion: 0.08
-Nodes (45): anthropic_event_to_delta(), _anthropic_messages(), _anthropic_tool_choice(), _anthropic_tools(), _base_url(), _billable_response(), from_anthropic_response(), _invalid_response() (+37 more)
+Nodes (47): anthropic_event_to_delta(), _anthropic_messages(), _anthropic_tool_choice(), _anthropic_tools(), AnthropicAdapter, _base_url(), _billable_response(), from_anthropic_response() (+39 more)
 
 ### Community 110 - "test_models.py"
-Cohesion: 0.25
-Nodes (5): ChatToResponsesAdapter, Any, Model, Wraps a chat-only adapter to also serve the Responses API via emulation., Emulate Responses streaming over the chat stream: created → text         deltas,
+Cohesion: 0.15
+Nodes (19): _chat_chunks(), FakeCredentials, FakeUsage, _model(), MultiModelCallableResolver, Any, UUID, RaisingRouter (+11 more)
 
 ### Community 112 - "test_shadow_drain.py"
-Cohesion: 0.22
-Nodes (11): drain_shadow_tasks(), Await in-flight fire-and-forget shadow tasks on shutdown (R7-M51).      Each sha, Task, MonkeyPatch, R7-M51: fire-and-forget shadow tasks must be drained on shutdown.  The shadow-ro, Mirror how RouterService.route registers a shadow task., _register(), test_drain_awaits_pending_task_to_completion() (+3 more)
+Cohesion: 0.06
+Nodes (58): OpenAPIConfig, Provide, ResponseHeader, _build_dependencies(), _build_openapi_config(), _build_rate_limit_stores(), _build_sso_dependencies(), create_app() (+50 more)
 
 ### Community 113 - "api.ts"
-Cohesion: 0.16
-Nodes (18): listAllModels(), CandidateRequest, CandidateRow, CreateRouterDialog(), CreateRouterDialogProps, EMPTY_CANDIDATE, EMPTY_ROUTE, parsePositive() (+10 more)
+Cohesion: 0.18
+Nodes (15): CandidateRequest, CandidateRow, CreateRouterDialogProps, EMPTY_CANDIDATE, EMPTY_ROUTE, parseThreshold(), RouteRow, thresholdValid() (+7 more)
 
 ### Community 115 - "ServicePrincipalRepository"
-Cohesion: 0.24
-Nodes (7): ServicePrincipal, UUID, Port — service principal persistence., Persistence port for team service principals., Load and lock a service principal for a credential lifecycle change., Stage deletion; the application service owns the commit., ServicePrincipalRepository
+Cohesion: 0.17
+Nodes (15): AuditLog, AuditEvent, Append-only audit trail of privileged actions., Stage an event in the caller-owned transaction., Most recent audit events first (for the admin read API)., FromPath, FromQuery, NamedDependency (+7 more)
 
 ### Community 116 - "dependencies"
 Cohesion: 0.04
 Nodes (47): dependencies, class-variance-authority, clsx, @fontsource/inter, @fontsource/jetbrains-mono, @fontsource/space-grotesk, lucide-react, openapi-fetch (+39 more)
 
 ### Community 117 - "_bearer"
-Cohesion: 0.23
-Nodes (30): _bearer(), AsyncTestClient, MonkeyPatch, Non-streaming Responses API (`/v1/responses`), per provider., test_anthropic_chat_rejects_tool_stream_selector_bypasses_before_billing(), test_anthropic_chat_translation(), test_anthropic_pre_output_refusal_is_empty_success_and_not_billed(), test_anthropic_responses_emulated() (+22 more)
+Cohesion: 0.16
+Nodes (53): _bearer(), _patch(), MonkeyPatch, _team_usage(), AsyncTestClient, MonkeyPatch, Non-streaming Responses API (`/v1/responses`), per provider., test_anthropic_chat_rejects_tool_stream_selector_bypasses_before_billing() (+45 more)
 
 ### Community 118 - "test_audit.py"
-Cohesion: 0.42
-Nodes (10): _admin_token(), _bearer(), client(), AsyncTestClient, Integration tests for the audit trail., Model create/update/delete and org/team creation must hit the audit log., test_audit_read_requires_platform_admin(), test_invite_and_password_reset_issuance_are_audited() (+2 more)
+Cohesion: 0.20
+Nodes (17): _bearer(), issue_invite(), AsyncTestClient, Shared HTTP helpers for integration tests that create users via invites.  Invite, Issue an invite for `team_id` and return its one-time token., One-shot: seed an isolated team and return an invite token for it.      For the, seed_team_and_invite(), _admin_token() (+9 more)
 
 ### Community 119 - "APIKeyAuthMiddleware"
-Cohesion: 0.10
-Nodes (7): ApiKeySpend, Billing and usage tracking entities., One recorded model call: token counts and estimated cost, tagged with the     AP, Usage summed for one model (over an optional api-key/model filter)., Accumulated usage/cost for one API key across all of its calls., UsageAggregate, UsageEvent
+Cohesion: 0.09
+Nodes (3): One recorded model call: token counts and estimated cost, tagged with the     AP, UsageEvent, Durable dead-letter for a usage event whose ledger write failed, so a         ba
 
 ### Community 120 - "config.py"
-Cohesion: 0.06
-Nodes (39): BaseLoggingConfig, _build_ui(), main(), ``litegateway`` — run the gateway with the API, Swagger, docs, and admin UI on o, Build the admin UI (``ui/dist``) when the source tree and pnpm are present., _env_bool(), _env_choice(), _env_float() (+31 more)
+Cohesion: 0.10
+Nodes (20): 1. Goal, 2. Plan, 3. Open decisions, 4. Testing, 5. Rollout, Design doc — Structured logging & error hygiene, _build_ui(), main() (+12 more)
 
 ### Community 122 - "test_messages.py"
 Cohesion: 0.08
 Nodes (36): FakeAnthropic, Captures Messages-API kwargs; echoes an Anthropic message., _anthropic_model(), _FakeCredentials, _FakeModels, _FakeUsage, _native_service(), _NativeStreamGateway (+28 more)
 
 ### Community 124 - "provide_router_service"
-Cohesion: 0.13
-Nodes (16): AbstractAsyncContextManager, CredentialRepository, Opens a decision log with its OWN unit of work — for shadow-mode tasks     that, Opens model/credential repositories with their OWN unit of work — for     shadow, RoutingDecisionLogFactory, RoutingRepositoryFactory, provide_completion_service(), make_shadow_log_factory() (+8 more)
+Cohesion: 0.30
+Nodes (23): _admin(), _bearer(), client(), _create_org(), _login(), _member(), AsyncTestClient, Integration tests for organization CRUD (platform-admin only).  Covers create/li (+15 more)
 
 ### Community 125 - "test_credential_validation.py"
 Cohesion: 0.44
@@ -974,19 +1000,19 @@ Nodes (16): AsyncEngine, EngineConfig, SQLAlchemyAsyncConfig, create_database(),
 
 ### Community 130 - "test_error_paths.py"
 Cohesion: 0.13
-Nodes (7): Protocol, CircuitBreaker, Port — per-key circuit breaker (closed / open / half-open)., Tracks consecutive failures per key and short-circuits a key that has     failed, Port — unit-of-work transaction boundary., Unit-of-work boundary for a single use-case.      Repositories participating in, Transaction
+Nodes (15): ApiKeySpend, Billing and usage tracking entities., Usage summed for one model (over an optional api-key/model filter)., Accumulated usage/cost for one API key across all of its calls., One time-bucketed usage aggregate (Plan 10 Phase 1).      ``bucket_start`` is th, UsageAggregate, UsageBucket, _bucket_key_expr() (+7 more)
 
 ### Community 131 - "test_model_params.py"
 Cohesion: 0.36
 Nodes (8): _model(), Any, Unit tests for Model.merge_params — the three-way param precedence (H15).  `para, test_client_overrides_default_params(), test_default_used_when_client_omits(), test_enforced_beats_both_default_and_client(), test_enforced_params_win_over_client(), test_merge_does_not_mutate_request_or_model()
 
 ### Community 132 - "test_docs.py"
-Cohesion: 0.36
-Nodes (8): client(), AsyncTestClient, Path, The OpenAPI docs are served at the root path (the landing page)., test_docs_can_be_disabled(), test_docs_do_not_shadow_protected_routes(), test_docs_served_at_root(), test_openapi_schema_at_root()
+Cohesion: 0.21
+Nodes (14): AsyncSession, Path, Persistence for the budget-alert dedup ledger + outbox (Plan 07 Phases 0-1).  Ex, The unique constraint on (team_id, window, period_start, threshold)     makes a, A new period_start (window rollover) must not inherit the prior     period's fir, session(), test_daily_and_monthly_windows_are_independent(), test_different_periods_have_independent_fired_sets() (+6 more)
 
 ### Community 133 - "router.tsx"
 Cohesion: 0.04
-Nodes (51): AppShell(), Topbar(), ApiKeysPage, apiKeysRoute, appRoute, AuditPage, auditRoute, BudgetsPage (+43 more)
+Nodes (57): ApiKeysPage, apiKeysRoute, appRoute, AuditPage, auditRoute, BudgetsPage, budgetsRoute, CredentialsPage (+49 more)
 
 ### Community 136 - "test_native_anthropic.py"
 Cohesion: 0.12
@@ -1001,56 +1027,56 @@ Cohesion: 0.29
 Nodes (7): provide_scim_actor(), provide_scim_service(), AsyncSession, NamedDependency, Request, Dependency wiring for the SCIM surface: service + provisioning-token auth., Authenticate the IdP via `Authorization: Bearer <scim token>`.      Only admin-m
 
 ### Community 139 - "api.ts"
-Cohesion: 0.10
-Nodes (34): createGlobalModel(), createModel(), deleteGlobalModel(), deleteModel(), EditModel, extendModel(), fail(), Grant (+26 more)
+Cohesion: 0.08
+Nodes (46): CacheSavings, createGlobalModel(), createModel(), deleteGlobalModel(), deleteModel(), EditModel, extendModel(), fail() (+38 more)
 
 ### Community 140 - "CallableAliasBinding"
-Cohesion: 0.18
-Nodes (15): The provider completed a billable call but returned an unusable payload.      ``, UpstreamResponseInvalid, _billable_response(), from_converse_response(), _invalid_response(), _tool_calls(), test_converse_event_to_delta_mapping(), test_converse_event_to_delta_rejects_invalid_message_start() (+7 more)
+Cohesion: 0.30
+Nodes (20): AsyncSession, datetime, UUID, Plan 10 Phase 1: `SQLAlchemyUsageRepository.timeseries` + the `/teams/{id}/usage, A real `api_key` row: `usage_event.api_key_id` is a Postgres foreign     key (SQ, 2026-03-08 is a US spring-forward DST date (a local clock skips     01:59:59 ->, _seed_api_key(), _seed_credential() (+12 more)
 
 ### Community 141 - "client.ts"
 Cohesion: 0.10
-Nodes (28): BrowserSession, CurrentUser, fetchBrowserSession(), login(), logout(), messageFrom(), signup(), AuthContext (+20 more)
+Nodes (29): BrowserSession, CurrentUser, fetchBrowserSession(), login(), logout(), messageFrom(), signup(), AuthContext (+21 more)
 
 ### Community 142 - "test_sso_upsert.py"
 Cohesion: 0.43
 Nodes (7): _identity(), UserService.upsert_sso_user: JIT provisioning and the upgrade-only admin rule., test_sso_new_user_defaults_to_member(), test_sso_new_user_gets_admin_from_default_role(), test_sso_new_user_gets_admin_from_group(), test_sso_relogin_never_downgrades_admin(), test_sso_relogin_upgrades_member_in_admin_group()
 
 ### Community 143 - "DashboardPage.tsx"
-Cohesion: 0.10
-Nodes (33): fail(), listMyTeams(), MyTeam, platformSavings(), SavingsSummary, teamSavings(), AdminDashboard(), DashboardPage() (+25 more)
+Cohesion: 0.11
+Nodes (31): fail(), listMyTeams(), MyTeam, platformSavings(), SavingsSummary, teamSavings(), AdminDashboard(), formatUsd() (+23 more)
 
-### Community 144 - "ensure_translatable_chat_request"
+### Community 144 - "UUID"
 Cohesion: 0.38
 Nodes (6): ensure_translatable_chat_request(), _has_non_text_content(), Any, Guard the text-in/text-out chat translators against request features they cannot, True if any message carries a non-text content part (image_url, audio, …).     A, Reject chat-request features these text-only translators would drop.      `reque
 
 ### Community 145 - "parse_response_format"
-Cohesion: 0.40
-Nodes (14): _build_dist(), MonkeyPatch, Path, The built admin UI is served at /ui when present, and absent otherwise.  Running, A minimal Vite-style build: index.html + a hashed asset under assets/., _settings(), test_bare_ui_redirects_to_trailing_slash(), test_boots_without_built_ui() (+6 more)
+Cohesion: 0.14
+Nodes (11): BudgetAlertState, Dedup ledger row: one per `(team_id, window, period_start, threshold)`     that, BudgetWindow, datetime, UUID, SQLAlchemy adapter implementing the `BudgetAlertStateRepository` port., Most-recently fired alerts for a team, newest-first — the         read-model beh, BudgetAlertStateModel (+3 more)
 
 ### Community 146 - "provide_completion_service"
 Cohesion: 0.18
 Nodes (9): _Chat, _Completions, _max_tokens_400(), Any, BadRequestError, Reasoning models reject `max_tokens` and want `max_completion_tokens`. The OpenA, test_retries_with_max_completion_tokens(), test_swap_and_detect() (+1 more)
 
 ### Community 147 - "unlock_user"
-Cohesion: 0.29
-Nodes (7): delete_user(), FromPath, NamedDependency, Request, User, UUID, Admin endpoint to hard-delete a user (admin JWT).  Self-deletion is refused with
+Cohesion: 0.16
+Nodes (19): CountingGateway, FakeCredentials, FakeModels, FakeUsage, _model(), Any, UUID, Response caching (Plan 04 Phase 0): exact-match, in-memory, off by default.  Uni (+11 more)
 
 ### Community 148 - "test_orm_indexes.py"
 Cohesion: 0.39
 Nodes (7): _index_column_names(), R7-M54/M55: index coverage for hot filter columns on api_key and routing_decisio, The composite index replaces the two single-column indexes (R7-M55)., test_api_key_created_by_is_indexed(), test_routing_decision_has_composite_team_router_created_at_index(), test_routing_decision_has_composite_team_router_id_created_at_index(), test_routing_decision_has_no_independent_single_column_indexes()
 
 ### Community 150 - "lockout_duration"
-Cohesion: 0.50
-Nodes (4): lockout_duration(), timedelta, Lock duration after `cycles` prior consecutive lock cycles: the base     doubled, test_lockout_duration_escalates_and_is_capped()
+Cohesion: 0.24
+Nodes (13): Shared exact-match cache across replicas, keyed by the literal     `CacheKey.red, RedisResponseCache, FakeRedis, _key(), RedisResponseCache — TTL via EXPIRE, tenant-namespaced keys (Plan 04 Phase 1)., Hand-rolled fake covering the small surface `RedisResponseCache` needs:     GET/, Tenant isolation (design §3): the same digest under a different     `team_id` mu, The "shared across replicas" property (Plan 04 Phase 1 Done-when):     two separ (+5 more)
 
 ### Community 151 - "MLflowTraceSink"
 Cohesion: 0.15
 Nodes (12): MLflowTraceSink, Any, MLflow trace sink — works with classic MLflow and Databricks-managed MLflow.  On, _Experiment, FakeMlflowClient, Unit tests for the real MLflow trace sink, with a fake MlflowClient.  `mlflow` i, Records the MLflow client calls the trace sink makes., _record() (+4 more)
 
 ### Community 152 - "jwt.py"
-Cohesion: 0.14
-Nodes (12): RateLimitDecision, RateLimiter, Port — request-rate limiting (fixed-window counters)., Outcome of counting one request against a fixed window., Counts requests per key in a fixed window and reports whether the caller     is, _FakeRateLimiter, _FakeTeams, _FakeUsage (+4 more)
+Cohesion: 0.25
+Nodes (25): _admin_token(), client(), _db(), _lock_account(), _login(), AsyncTestClient, Connection, datetime (+17 more)
 
 ### Community 153 - "UpstreamResponseInvalid"
 Cohesion: 0.28
@@ -1065,24 +1091,24 @@ Cohesion: 0.08
 Nodes (35): ChatMode, ProfilePolicy, build_locust_command(), build_stage_environment(), estimate_provider_budget(), execute_stages(), main(), _nonnegative_number() (+27 more)
 
 ### Community 156 - "openai_error_handler"
-Cohesion: 0.06
-Nodes (46): Exception, BudgetNotFound, CredentialInUse, CredentialMisconfigured, DomainError, InvalidBudget, InvalidKeyScope, InvalidPasswordReset (+38 more)
+Cohesion: 0.28
+Nodes (7): is_failover_eligible(), Cross-provider failover eligibility (Plan 05, Phase 0).  Decides whether a faile, Whether a failed attempt may retry against the next candidate.      Eligible: tr, Cross-provider failover eligibility (Plan 05, Phase 0)., test_non_upstream_domain_errors_are_never_eligible(), test_transient_upstream_errors_are_eligible(), test_upstream_request_rejected_is_never_eligible()
 
 ### Community 157 - "record_audit"
 Cohesion: 0.40
 Nodes (12): claim_direct(), promote_direct(), AsyncSession, UUID, Transactional mutations for callable alias slots., rename_direct(), _scope(), tombstone_grant() (+4 more)
 
 ### Community 158 - "chat_tool_policy.py"
-Cohesion: 0.18
-Nodes (30): bedrock_supports_named_tool_choice(), bedrock_supports_tools(), decode_vertex_thought_signature(), _has_tool_contract(), json_object(), Any, Model, Provider (+22 more)
+Cohesion: 0.17
+Nodes (31): bedrock_supports_named_tool_choice(), bedrock_supports_tools(), decode_vertex_thought_signature(), _has_tool_contract(), json_object(), Any, Model, Provider (+23 more)
 
 ### Community 159 - "test_registry.py"
 Cohesion: 0.26
 Nodes (34): _bearer(), client(), _model_payload(), AsyncTestClient, MonkeyPatch, UUID, Unified callable-alias namespace regressions (R11 ISSUE-012)., The lifecycle mutex closes scan→delete on both SQLite and Postgres. (+26 more)
 
 ### Community 163 - "api.ts"
-Cohesion: 0.08
-Nodes (36): BUDGET_WINDOWS, BudgetWindow, deleteTeamBudget(), fail(), setTeamBudget(), TeamBudget, BudgetsPage(), formatUsd() (+28 more)
+Cohesion: 0.12
+Nodes (21): createTeam(), deleteTeam(), fail(), getTeam(), listAllTeamUsage(), listTeamMembersPage(), MyTeamMembership, requestTeamMembers() (+13 more)
 
 ### Community 164 - "Design doc — Observability via MLflow"
 Cohesion: 0.06
@@ -1093,8 +1119,8 @@ Cohesion: 0.15
 Nodes (26): _FakeGeminiApiClient, FakeUpstream, _final_text_response(), _function_call_response(), _gemini_key(), _genai_sdk(), _has_function_response(), _patch_upstream() (+18 more)
 
 ### Community 200 - "ApiKeysPage.tsx"
-Cohesion: 0.14
-Nodes (26): ApiKey, fail(), issueServicePrincipalKey(), issueTeamKey(), KeyScope, listAllServicePrincipals(), listTeamKeysPage(), requestServicePrincipals() (+18 more)
+Cohesion: 0.21
+Nodes (13): InMemorySemanticResponseCache, UUID, In-memory semantic response-cache adapter (Plan 04 Phase 2).  Bounded, TTL-aware, Process-local, single-replica semantic tier. No Redis-backed variant     exists, InMemorySemanticResponseCache — threshold matching, TTL, tenant isolation, and b, test_a_different_api_key_never_matches_within_the_same_team(), test_a_different_team_never_matches_even_with_an_identical_vector(), test_a_vector_at_the_threshold_hits() (+5 more)
 
 ### Community 201 - "Core design (non-negotiable)"
 Cohesion: 0.07
@@ -1105,12 +1131,12 @@ Cohesion: 0.07
 Nodes (26): 1a. Non-streaming, 1b. Streaming (`stream: true`), 1c. Validate with the real SDK, Execution, File touchpoints, Guardrails (from the design doc — non-negotiable), Phase 0 — Shared plumbing (1 slice), Phase 1 — Anthropic `POST /v1/messages` (+18 more)
 
 ### Community 203 - "OrganizationService"
-Cohesion: 0.17
-Nodes (20): _now(), OrganizationService, OrganizationSpend, datetime, Organization, Team, User, UUID (+12 more)
+Cohesion: 0.07
+Nodes (43): _now(), OrganizationService, OrganizationSpend, datetime, Organization, Team, User, UUID (+35 more)
 
 ### Community 204 - "test_platform_models.py"
-Cohesion: 0.35
-Nodes (27): _admin(), _bearer(), _catalog(), client(), _credential(), _global_model(), _org(), AsyncTestClient (+19 more)
+Cohesion: 0.10
+Nodes (30): PendingBudgetAlert, Durable outbox row for one newly-fired threshold (Plan 07 Phase 1,     design do, Durable outbox row for a newly-fired threshold, so delivery survives         res, Queued alerts oldest-first, for tests and `dispatch_pending` to         build on, NotificationChannel, Port — pluggable delivery channel for budget-threshold alerts (Plan 07 Phase 2,, Deliver one alert. Raise on any failure — the outbox worker         (`infrastruc, AsyncSession (+22 more)
 
 ### Community 205 - "test_global_resource_downgrade.py"
 Cohesion: 0.21
@@ -1125,20 +1151,20 @@ Cohesion: 0.20
 Nodes (25): CredentialNameExists, A credential with this name already exists., _model(), AsyncSession, Path, R7-M52: check-then-insert paths must translate the unique-constraint race (two c, session(), test_duplicate_credential_name_raises_domain_error() (+17 more)
 
 ### Community 208 - "CallableAliasResolver"
-Cohesion: 0.08
-Nodes (20): CallableResource, CallableAliasResolver, Model, UUID, One deterministic resolver for every callable model and router alias., Load an exact model identity only when it is callable in this scope.          Ro, Allocate effective aliases without loading target resources., Build the complete namespace from one registry snapshot.          Local bindings (+12 more)
+Cohesion: 0.06
+Nodes (30): CallableResource, CallableAliasResolver, Model, UUID, One deterministic resolver for every callable model and router alias., Load an exact model identity only when it is callable in this scope.          Ro, Allocate effective aliases without loading target resources., Build the complete namespace from one registry snapshot.          Local bindings (+22 more)
 
 ### Community 209 - "MEDIUM"
 Cohesion: 0.08
 Nodes (25): C1 — Streaming inference is completely unbilled and untraced, CRITICAL, H1 — No "last admin" protection: a team admin can orphan a team, H2 — Invite tokens never expire, H3 — Master key derived from a single unsalted SHA-256 pass, H4 — Default JWT secret is only rejected for exactly `production`/`prod`, H5 — Provider SDK clients are created per request and never closed, HIGH (+17 more)
 
 ### Community 210 - "request_policy.py"
-Cohesion: 0.19
-Nodes (27): _clamp_int(), clamp_native_output_tokens(), _hosted_tool_paths(), _input_resource_paths(), _malformed_native_discriminator_paths(), _native_effective_ceiling(), Any, Model (+19 more)
+Cohesion: 0.17
+Nodes (29): vertex_supports_tools(), _clamp_int(), clamp_native_output_tokens(), _hosted_tool_paths(), _input_resource_paths(), _malformed_native_discriminator_paths(), _native_effective_ceiling(), native_reservation_view() (+21 more)
 
 ### Community 211 - "_patch_upstream"
 Cohesion: 0.06
-Nodes (66): OpenAI, _FakeStream, FakeUpstream, _has_tool_result(), _patch_upstream(), Any, AsyncOpenAI, AsyncTestClient (+58 more)
+Nodes (65): _FakeStream, FakeUpstream, _has_tool_result(), _patch_upstream(), Any, AsyncOpenAI, AsyncTestClient, MonkeyPatch (+57 more)
 
 ### Community 212 - "Design doc — Proactive budget alerts"
 Cohesion: 0.17
@@ -1148,7 +1174,7 @@ Nodes (12): 10. Explicit non-goals (v1), 1. Goal, 2. The alert model, 3. Where t
 Cohesion: 0.11
 Nodes (18): build_safe_run_metadata(), _bytes(), DockerStatsSampler, git_metadata(), inspect_containers(), parse_docker_stats(), Any, Path (+10 more)
 
-### Community 214 - "CredentialMisconfigured"
+### Community 214 - "test_sso_settings.py"
 Cohesion: 0.18
 Nodes (11): RateLimitConfig, build_auth_rate_limit(), build_inference_rate_limit(), build_scim_rate_limit(), Rate limiting: per-IP guardrails for inference and auth endpoints.  These are co, Per-IP limiter for the public, unauthenticated auth endpoints., Per-IP limiter for the IdP-facing SCIM surface (provisioning-token auth     runs, create_scim_tokens_router() (+3 more)
 
@@ -1160,21 +1186,21 @@ Nodes (8): AbstractAuthenticationMiddleware, ASGIApp, ASGIConnection, Authentica
 Cohesion: 0.09
 Nodes (18): API reference (interactive), Narrative docs, Viewers and schema, Errors, Native Anthropic Messages endpoint, Notes and limits, Point the SDK at the gateway, Tool calling (full round-trip) (+10 more)
 
-### Community 217 - "PlatformRouterController"
-Cohesion: 0.20
-Nodes (17): RouterRequest, make_audit_event(), AuditEvent, Request, User, UUID, Helper to emit one privileged-action audit event from a web handler.  Called aft, record_audit() (+9 more)
+### Community 217 - "test_session.py"
+Cohesion: 0.30
+Nodes (10): RouterRequest, RouterGrantResponse, RouterResponse, PlatformRouterController, FromPath, NamedDependency, Request, User (+2 more)
 
 ### Community 218 - "LoadConfigurationError"
 Cohesion: 0.14
 Nodes (24): evaluate_load_gate(), LoadConfigurationError, parse_progressive_targets(), Parse a positive, strictly increasing comma-separated RPS profile., Raised before a load run when its environment is unsafe or incomplete., Evaluate measured metrics without inheriting Locust's any-failure exit policy., parse_profile_modes(), Require HTTPS except for an explicit loopback benchmark target, or —     when `a (+16 more)
 
-### Community 219 - "CallableKind"
+### Community 219 - "SQLAlchemyBudgetAlertStateRepository"
 Cohesion: 0.19
 Nodes (8): AsyncSession, UUID, SQLAlchemy adapter for the shared callable-alias registry., SQLAlchemyCallableAliasRepository, provide_callable_resolver(), AsyncSession, NamedDependency, Request-scoped wiring for the shared callable resolver.
 
 ### Community 220 - "conftest.py"
-Cohesion: 0.18
-Nodes (11): Compatibility levels, Conformance suite, Documentation deliverables, Framework matrix, Goal, Implementation prompt: Agent framework compatibility, Level B — remaining Responses fidelity, Non-goals (+3 more)
+Cohesion: 0.14
+Nodes (29): _bearer(), _chat(), client(), EchoClient, _model_record(), AsyncSession, AsyncTestClient, MonkeyPatch (+21 more)
 
 ### Community 221 - "test_browser_session.py"
 Cohesion: 0.23
@@ -1185,8 +1211,8 @@ Cohesion: 0.09
 Nodes (22): compilerOptions, allowImportingTsExtensions, baseUrl, isolatedModules, jsx, lib, module, moduleDetection (+14 more)
 
 ### Community 223 - "Implementation prompt: Cross-provider failover"
-Cohesion: 0.09
-Nodes (20): 1. Relationship to smart routing (non-negotiable reconciliation), 2. Error taxonomy — failover-eligible vs terminal (the core rule), 3. The failover loop (where it lives), 4. Budget / metering correctness across attempts (must not double-charge), 5. Streaming failover — the hard boundary, 6. Idempotency & observability, 7. Circuit breaker (later phase / partial non-goal), 8. Config surface & console exposure (+12 more)
+Cohesion: 0.20
+Nodes (10): 1. Relationship to smart routing (non-negotiable reconciliation), 2. Error taxonomy — failover-eligible vs terminal (the core rule), 3. The failover loop (where it lives), 4. Budget / metering correctness across attempts (must not double-charge), 5. Streaming failover — the hard boundary, 6. Idempotency & observability, 7. Circuit breaker (later phase / partial non-goal), 8. Config surface & console exposure (+2 more)
 
 ### Community 224 - "LoadTestSettings"
 Cohesion: 0.24
@@ -1202,15 +1228,15 @@ Nodes (17): Select, _CapturingSession, _EmptyRows, _order_by_sql(), Any, R7-L36:
 
 ### Community 227 - "README.md"
 Cohesion: 0.08
-Nodes (16): After Plan 01 — extend conformance to the native contracts, Execution, File touchpoints, Phase 1 — OpenAI Chat Completions contract conformance (existing surface), Phase 2 — Close OpenAI-shape contract gaps, Phase 3 — Documentation (protocol-based), Plan 02 — Framework-agnostic wire-contract conformance, Principle: agnostic by contract, not by framework (+8 more)
+Nodes (17): Compatibility levels, Conformance suite, Documentation deliverables, Framework matrix, Goal, Implementation prompt: Agent framework compatibility, Level B — remaining Responses fidelity, Non-goals (+9 more)
 
 ### Community 228 - "Strategies (implement in this order)"
 Cohesion: 0.10
 Nodes (21): 10. Router cost/policy simulator (future), 1. One contract, many strategies, 2. Model profiles, 3. Hard capability filters — always, before any strategy, 4. Failure policy, 6. Shadow mode, 7. Decision observability, 8. Semantic cache (optional — build last, only if trivial after S3) (+13 more)
 
 ### Community 229 - "HIGH (Round 2)"
-Cohesion: 0.10
-Nodes (20): Code Review — Round 2 (2026-07-02), Enterprise-readiness gaps (product roadmap, not defects), H10 — Audit log missing on model and organization/team creation, H11 — Key-rotation loop runs on every replica (no leader election), H12 — Bootstrap admin runs on every replica at startup (TOCTOU), H6 — Provider errors (429/5xx/timeout) are never mapped to client status codes, H7 — Argon2 password hashing/verification blocks the event loop, H8 — `VertexAdapter` never closes its `genai.Client` (per-request connection leak) (+12 more)
+Cohesion: 0.11
+Nodes (19): Enterprise-readiness gaps (product roadmap, not defects), H10 — Audit log missing on model and organization/team creation, H11 — Key-rotation loop runs on every replica (no leader election), H12 — Bootstrap admin runs on every replica at startup (TOCTOU), H6 — Provider errors (429/5xx/timeout) are never mapped to client status codes, H7 — Argon2 password hashing/verification blocks the event loop, H8 — `VertexAdapter` never closes its `genai.Client` (per-request connection leak), H9 — Insecure-by-default `--forwarded-allow-ips "*"` → rate-limit bypass + audit spoofing (+11 more)
 
 ### Community 230 - "test_vertex_tools.py"
 Cohesion: 0.15
@@ -1225,8 +1251,8 @@ Cohesion: 0.19
 Nodes (17): _completion(), _content_parts(), _headers(), _integer(), main(), MockConfigurationError, MockSettings, _number() (+9 more)
 
 ### Community 233 - "validate_chat_request"
-Cohesion: 0.16
-Nodes (22): Fail before routing/admission when a translated provider would lose Chat data., validate_chat_request(), vertex_supports_tools(), _model(), test_anthropic_chat_accepts_complete_parallel_tool_replay(), test_anthropic_chat_now_accepts_streaming_tools(), test_anthropic_chat_rejects_developer_messages_instead_of_dropping_them(), test_anthropic_chat_rejects_non_boolean_stream() (+14 more)
+Cohesion: 0.18
+Nodes (21): Fail before routing/admission when a translated provider would lose Chat data., validate_chat_request(), _model(), test_anthropic_chat_accepts_complete_parallel_tool_replay(), test_anthropic_chat_now_accepts_streaming_tools(), test_anthropic_chat_rejects_developer_messages_instead_of_dropping_them(), test_anthropic_chat_rejects_non_boolean_stream(), test_anthropic_chat_rejects_non_faithful_tool_shapes() (+13 more)
 
 ### Community 234 - "Design doc — Enterprise: SSO, SCIM, RBAC, audit"
 Cohesion: 0.11
@@ -1237,16 +1263,16 @@ Cohesion: 0.11
 Nodes (17): Cross-cutting, Endpoint 1 — Audio: `POST /v1/audio/transcriptions` + `/v1/audio/translations`, Endpoint 2 — `POST /v1/moderations`, Endpoint 3 — `POST /v1/rerank`, Endpoint 4 — Batch API: `POST /v1/batches` + `POST /v1/files` (heaviest — stage last), Explicit non-goals, Implementation prompt: Extended OpenAI-compatible endpoints, The pattern you are extending (non-negotiable) (+9 more)
 
 ### Community 236 - "test_responses_emulation.py"
-Cohesion: 0.08
-Nodes (23): Controller, _build_route_handlers(), health(), AsyncSession, NamedDependency, Response, Liveness: the process is up. Cheap, no dependencies., Readiness: the app can actually serve — verifies DB connectivity. Returns     50 (+15 more)
+Cohesion: 0.22
+Nodes (8): Controller, AuditController, AuditEventResponse, AuditEvent, FromQuery, NamedDependency, User, Read API for the audit trail — platform admins and auditors.
 
-### Community 237 - ".get_price"
-Cohesion: 0.27
-Nodes (8): _load(), ModelPrice, ModelPriceCatalog, Provider, Load the bundled price snapshot and look up default costs by model id.  The snap, Default per-token costs, keyed by provider + upstream model id., The bundled default costs for this model, or None if unknown., test_catalog_hit_and_miss()
+### Community 237 - "test_playground_service.py"
+Cohesion: 0.13
+Nodes (15): _load(), ModelPrice, ModelPriceCatalog, Provider, Load the bundled price snapshot and look up default costs by model id.  The snap, Default per-token costs, keyed by provider + upstream model id., The bundled default costs for this model, or None if unknown., ModelPriceResponse (+7 more)
 
 ### Community 238 - "test_migration.py"
-Cohesion: 0.26
-Nodes (15): _config(), _downgrade(), _insert_model(), _insert_router(), AlembicCommandConfig, Connection, Path, UUID (+7 more)
+Cohesion: 0.17
+Nodes (15): build_routing_context(), _content_has_image(), estimate_tokens(), _flatten_content(), Any, UUID, Smart routing — domain contracts, candidate profiles, capability filters.  A *ro, A team-owned router extended to another team, under `alias`. (+7 more)
 
 ### Community 239 - "test_docker_compose_dev.py"
 Cohesion: 0.19
@@ -1265,8 +1291,8 @@ Cohesion: 0.11
 Nodes (17): aliases, components, hooks, lib, ui, utils, iconLibrary, rsc (+9 more)
 
 ### Community 243 - "api.ts"
-Cohesion: 0.19
-Nodes (20): deleteUser(), fail(), Invite, inviteUser(), listUsersPage(), setUserActive(), setUserAdmin(), setUserAuditor() (+12 more)
+Cohesion: 0.21
+Nodes (17): deleteUser(), fail(), Invite, inviteUser(), setUserActive(), setUserAdmin(), setUserAuditor(), TeamRole (+9 more)
 
 ### Community 244 - "Findings"
 Cohesion: 0.12
@@ -1301,8 +1327,8 @@ Cohesion: 0.13
 Nodes (13): 1. Capability discovery, 2. Shadow comparison and promotion, 3. Cost/policy simulator, 4. Same-protocol native routing, 5. Boundaries, Design doc — Routing evolution, Phase 1 — Capability discovery, Phase 2 — Shadow comparison (+5 more)
 
 ### Community 252 - "INDEX.md"
-Cohesion: 0.13
-Nodes (10): Code Review — Findings Index, Overall, Rounds, Code Review — Round 1 (initial review), Category scores (this round), Code Review — Round 9 (2026-07-14), Executive summary, Issue summary (+2 more)
+Cohesion: 0.20
+Nodes (5): Code Review — Findings Index, Overall, Rounds, Code Review — Round 1 (initial review), Code Review — Round 2 (2026-07-02)
 
 ### Community 253 - "MEDIUM (Round 4)"
 Cohesion: 0.13
@@ -1313,16 +1339,16 @@ Cohesion: 0.28
 Nodes (11): _Counters, create_mock_app(), Create a dependency-free ASGI app with process-local deterministic counters., Any, _request(), _settings(), test_mock_applies_nonzero_stream_and_total_latency(), test_mock_failure_injection_is_deterministic_and_observable() (+3 more)
 
 ### Community 255 - "OrganizationRepository"
-Cohesion: 0.19
-Nodes (7): OrganizationRepository, Organization, UUID, Port — organization persistence., Persistence port for organizations., Replace the organization's editable metadata (name, description, tags);, Delete the organization; return True if a row was removed, False if no         o
+Cohesion: 0.16
+Nodes (9): CompleteFn, JudgeStrategy, Any, S4 — LLM as a judge.  A small, fast team model (the *judge*, picked by the admin, What a strategy may look at, extracted once from the request., Port: pick one candidate for the request. Implementations must never     mutate, RoutingContext, RoutingStrategy (+1 more)
 
 ### Community 256 - "test_api_key_lifecycle.py"
 Cohesion: 0.35
 Nodes (14): _api_key_service(), _bearer(), client(), AsyncSession, AsyncTestClient, MonkeyPatch, Postgres row-lock tests for personal API-key lifecycle invariants., _setup_personal_key() (+6 more)
 
 ### Community 257 - "Findings"
-Cohesion: 0.14
-Nodes (14): Findings, ISSUE-001 — `key-issuer` can rotate a service-principal key and obtain management scope (critical), ISSUE-002 — Rotation transfers a personal key's ownership to the operator (high), ISSUE-003 — User deactivation doesn't immediately revoke the old key in its grace window (high), ISSUE-004 — The per-key rate limit is bypassable on embeddings and images (high), ISSUE-005 — An admin can delete themselves and leave the platform with no admin (high), ISSUE-006 — Any persisted invite makes the team undeletable (medium), ISSUE-007 — Creating an invite for a non-existent team returns 500 (medium) (+6 more)
+Cohesion: 0.10
+Nodes (20): Category scores (this round), Code Review — Round 9 (2026-07-14), Executive summary, Findings, ISSUE-001 — `key-issuer` can rotate a service-principal key and obtain management scope (critical), ISSUE-002 — Rotation transfers a personal key's ownership to the operator (high), ISSUE-003 — User deactivation doesn't immediately revoke the old key in its grace window (high), ISSUE-004 — The per-key rate limit is bypassable on embeddings and images (high) (+12 more)
 
 ### Community 258 - "test_streaming.py"
 Cohesion: 0.20
@@ -1357,8 +1383,8 @@ Cohesion: 0.17
 Nodes (11): Code Review — Round 5 (2026-07-06), H15 — `model.params` precedence is a single dumb dict-merge, conflating three distinct governance semantics, HIGH (Round 5), LOW (Round 5), M33 — Inference rate limiter is bypassable with garbage tokens → pre-auth DB-load DoS, M34 — Last-admin protection is truncated to the first 100 memberships (regression from the M5/#57 pagination fix), M35 — Admin-issued invites and password-reset tokens are not audit-logged, M36 — OIDC `groups` claim is assumed to be a JSON array; a string claim is iterated character-by-character (+3 more)
 
 ### Community 266 - "window_start"
-Cohesion: 0.23
-Nodes (10): BudgetWindow, datetime, Pure budget-window math., Start of the current spend window (calendar month/day, in `now`'s tz)., window_start(), Pure budget-window math: when does the current spend window start?, test_daily_window_at_exact_start_is_idempotent(), test_daily_window_starts_at_midnight_utc() (+2 more)
+Cohesion: 0.09
+Nodes (18): crossed_thresholds(), BudgetWindow, datetime, Pure budget-window math and threshold-alert evaluation (Plan 07 Phase 0)., Start of the current spend window (calendar month/day, in `now`'s tz)., Thresholds newly crossed by `spend` against `limit_cost`, excluding any     alre, window_start(), Pure logic for Plan 07 Phase 0 — proactive budget alerts.  Covers the threshold- (+10 more)
 
 ### Community 267 - "Design doc — Account recovery & password change"
 Cohesion: 0.18
@@ -1381,8 +1407,8 @@ Cohesion: 0.18
 Nodes (10): Category scores (this round), Code Review — Round 7 (2026-07-08), HIGH, LOW, MEDIUM, R7-H22 — Judge/embeddings routing strategies make real, billable provider calls that bypass `UsageMeter` entirely, R7-H23 — `tools`/`tool_choice` and vision content are accepted by the request allowlist but silently dropped for Anthropic, Vertex and Bedrock, R7-H24 — Start-of-stream provider errors never reach the client as an HTTP status — for any provider — despite the code's stated intent; Vertex additionally emits a synthetic chunk before the provider is even called (+2 more)
 
 ### Community 272 - "Plan 03 — Admin UI"
-Cohesion: 0.07
-Nodes (24): 1. Goal, 2. Plan, 3. Open decisions, 4. Testing, 5. Rollout, Design doc — Structured logging & error hygiene, Conventions, Execution (historical) (+16 more)
+Cohesion: 0.10
+Nodes (18): Conventions, Execution (historical), Phase 0 — Scaffold, Phase 1 — Read-only console, Phase 2 — Mutations, Phase 3 — Packaging, Phases, Plan 03 — Admin UI (+10 more)
 
 ### Community 273 - "errors.py"
 Cohesion: 0.20
@@ -1397,16 +1423,16 @@ Cohesion: 0.22
 Nodes (10): create_ui_router(), Path, Redirect, Request, Serve the built admin UI (Vite/React SPA) as static files at /ui (when present)., Resolve `relative` under `root`, or None if it escapes the tree.      Guards aga, Redirect the bare `/ui` (no trailing slash) to `/ui/`.      The SPA references i, Return a router serving the built admin UI at /ui, or None when no build     exi (+2 more)
 
 ### Community 276 - "FakeBedrockRuntime"
-Cohesion: 0.22
-Nodes (8): 1. Goal, 2. Concept, 3. Where it hooks, 4. Selection, 5. Open decisions, 6. Testing, 7. Rollout, Design doc — Weighted multi-model routing
+Cohesion: 0.33
+Nodes (4): ChannelResolver, Exception, Drain up to `limit` pending alerts oldest-first (Plan 07 Phase 2,         per-te, Failure bookkeeping for one pending alert: count the attempt and         keep th
 
 ### Community 277 - "Admin UI — Design Language ("terminal-tech")"
 Cohesion: 0.18
 Nodes (10): Accessibility, Admin UI — Design Language ("terminal-tech"), Color tokens (shadcn CSS variables — single source of truth), Components, Dark (default), Layout / routing note, Light, Motion (+2 more)
 
 ### Community 278 - "inviteToken.ts"
-Cohesion: 0.22
-Nodes (6): datetime, UUID, Port — usage event persistence and aggregation., Usage grouped by requested alias and resolved model identity.          ``model_n, Token/cost totals grouped by API key for the team (includes keys that         ar, Total cost recorded for the team from `since` onwards. Read on the         hot p
+Cohesion: 0.16
+Nodes (8): datetime, UUID, Port — usage event persistence and aggregation., Usage grouped by requested alias and resolved model identity.          ``model_n, Token/cost totals grouped by API key for the team (includes keys that         ar, Total cost recorded for the team from `since` onwards. Read on the         hot p, Response-cache observability for one team (Plan 04 Phase 3):         ``(avoided_, Bucketed usage totals for the team over ``[start, end)`` (Plan 10         Phase
 
 ### Community 279 - "Design doc — AWS Bedrock provider"
 Cohesion: 0.20
@@ -1422,11 +1448,11 @@ Nodes (9): 1. Goal, 2. Two parts, 2a. Accounting (record every call's usage/cost
 
 ### Community 282 - "Plan 02 — Framework-agnostic wire-contract conformance"
 Cohesion: 0.10
-Nodes (18): 1. Problem, 2. Goal, 3. Fail-loud capability gate, 4. Tool translation, 5. Streaming event contract, 6. Conformance and observability, 7. Provider blockers after Phase 1b-B, 8. Non-goals (+10 more)
+Nodes (19): After Plan 01 — extend conformance to the native contracts, Execution, File touchpoints, Phase 1 — OpenAI Chat Completions contract conformance (existing surface), Phase 2 — Close OpenAI-shape contract gaps, Phase 3 — Documentation (protocol-based), Plan 02 — Framework-agnostic wire-contract conformance, Principle: agnostic by contract, not by framework (+11 more)
 
-### Community 283 - "SsoSettingsRepository"
-Cohesion: 0.25
-Nodes (3): PasswordReset, datetime, A single-use, expiring admin-issued password reset for a specific user.      Onl
+### Community 283 - "_RaisingClient"
+Cohesion: 0.11
+Nodes (11): _build_observability(), One observability trace for a model call (metadata; no payload in v1)., TraceRecord, Port — observability trace sink., Observability sink. `write` is synchronous — the dispatcher's worker calls     i, TraceSink, CompositeTraceSink, One sink failing (e.g. MLflow down) must not starve the others. (+3 more)
 
 ### Community 284 - "native_messages"
 Cohesion: 0.22
@@ -1436,17 +1462,17 @@ Nodes (9): A1. Containerize the load generator (PR, ~half day), A2. Probe the tr
 Cohesion: 0.33
 Nodes (9): _model(), Provider, Fail-loud feature boundaries for translated provider Chat adapters.  Anthropic a, test_bedrock_json_schema_fails_loud_without_validated_model_capability(), test_image_content_is_rejected(), test_plain_text_still_translates(), test_structured_output_still_translates(), test_tool_choice_is_rejected() (+1 more)
 
-### Community 286 - "_invite_helpers.py"
-Cohesion: 0.50
-Nodes (4): _bearer(), issue_invite(), Shared HTTP helpers for integration tests that create users via invites.  Invite, Issue an invite for `team_id` and return its one-time token.
+### Community 286 - "test_models.py"
+Cohesion: 0.18
+Nodes (13): drain_shadow_tasks(), Await in-flight fire-and-forget shadow tasks on shutdown (R7-M51).      Each sha, Task, MonkeyPatch, Path, R7-M51: fire-and-forget shadow tasks must be drained on shutdown.  The shadow-ro, Mirror how RouterService.route registers a shadow task., _register() (+5 more)
 
 ### Community 287 - "test_sso_settings_migration.py"
 Cohesion: 0.47
 Nodes (9): _config(), _downgrade(), AlembicCommandConfig, Path, Migration contract for the `sso_settings` singleton table., _table_columns(), test_downgrade_drops_the_table_and_reupgrade_is_clean(), test_upgrade_creates_the_expected_columns() (+1 more)
 
 ### Community 288 - "Design doc — Responses API Level B"
-Cohesion: 0.25
-Nodes (6): create_api_router(), SQLAlchemyAsyncConfig, The protected "api-endpoint" group.  Every handler registered on this router req, Request, Example protected endpoint. `request.user` is the key's team id., whoami()
+Cohesion: 0.20
+Nodes (7): Team, Persistence port for teams., Fetch many teams in one query (batch lookup, avoids N+1). Missing ids         ar, Every team across all organizations, stable order (platform-admin use)., Replace the team's editable metadata (name, description, tags,         rate_limi, Delete the team and its intrinsic children (memberships, budget,         routers, TeamRepository
 
 ### Community 289 - "Design doc — Request parameter allowlist"
 Cohesion: 0.22
@@ -1457,24 +1483,28 @@ Cohesion: 0.29
 Nodes (7): FromPath, NamedDependency, Request, User, UUID, Admin endpoint to lift a login lockout (requires an admin JWT).  The lockout esc, unlock_user()
 
 ### Community 291 - "Plan 09 — Responses API Level B"
-Cohesion: 0.67
-Nodes (3): generate_key(), NewKeyMaterial, Pure domain logic for generating and hashing keys.  Keys are high-entropy random
+Cohesion: 0.24
+Nodes (18): make_channel_resolver(), ChannelResolver, Per-alert channel resolution for the budget-alert outbox (Plan 07 Phase 3).  The, Build the per-alert channel resolver bound to a budget-lookup port and     the p, _alert(), _budget(), _FakeBudgets, UUID (+10 more)
 
 ### Community 292 - "create_docs_router"
 Cohesion: 0.25
 Nodes (8): create_docs_router(), Path, Redirect, Request, Serve the built MkDocs site as static files at /docs (when present).  The narrat, Redirect the bare `/docs` (no trailing slash) to `/docs/`.      MkDocs pages ref, Return a static-files router serving the built docs at /docs, or None     when n, _redirect_docs_root()
 
-### Community 293 - "test_playground_governance_api.py"
-Cohesion: 0.17
-Nodes (34): _admin(), AsyncTestClient, Configure a credential + team + model 'm' + key.      Returns (team API key, tea, _setup_team(), _team_usage(), test_embeddings_vertex_bills_nonzero_usage(), AsyncTestClient, MonkeyPatch (+26 more)
+### Community 293 - "PendingBudgetAlert"
+Cohesion: 0.47
+Nodes (8): AsyncTestClient, MonkeyPatch, HTTP proof that Playground calls share inference governance and accounting., _request(), test_playground_obeys_team_budget(), test_playground_obeys_team_rate_limit(), test_playground_records_usage_and_audit(), test_playground_validates_expensive_input_at_the_boundary()
 
-### Community 294 - "test_rate_limit.py"
+### Community 294 - "test_max_tokens_retry.py"
 Cohesion: 0.44
 Nodes (8): AsyncTestClient, MonkeyPatch, Per-team request-rate limiting (RPM) on the inference path.  A team with `rate_l, _set_team_rpm(), test_key_rpm_limit_blocks_after_limit(), test_key_rpm_limit_covers_embeddings_and_images(), test_no_limit_is_unlimited(), test_team_rpm_limit_blocks_after_limit()
 
-### Community 295 - "test_provider_error_surfaces_as_client_status"
-Cohesion: 0.31
-Nodes (8): client(), AsyncTestClient, MonkeyPatch, Path, Liveness and readiness probes., test_liveness_is_ok(), test_readiness_503_when_db_unavailable(), test_readiness_ok_when_db_reachable()
+### Community 295 - "EmbeddingsStrategy"
+Cohesion: 0.25
+Nodes (19): _admin_token(), client(), AsyncTestClient, Integration tests for login / JWT sessions., _signup(), test_admin_can_login_with_master_key(), test_admin_can_promote_and_demote_platform_admin(), test_admin_cannot_change_own_admin_role() (+11 more)
+
+### Community 296 - "SsoSettingsRepository"
+Cohesion: 0.21
+Nodes (15): formatThresholds(), normalizeOptional(), parseThresholds(), BUDGET_WINDOWS, BudgetAlert, BudgetAlertConfig, BudgetWindow, deleteTeamBudget() (+7 more)
 
 ### Community 297 - "test_docs_site.py"
 Cohesion: 0.47
@@ -1492,11 +1522,15 @@ Nodes (7): 1. Goal, 2. Design, 3. Streaming caveat, 4. Open decisions, 5. Testin
 Cohesion: 0.18
 Nodes (6): FastHttpUser, ResponseContextManager, LoadTestSettings, Runtime inputs for one readiness or authenticated chat load test., GatewayUser, One bounded-rate caller; the shape supplies enough concurrent users.
 
+### Community 301 - "RoutingContext"
+Cohesion: 0.27
+Nodes (17): Webhook `NotificationChannel` adapter (Plan 07 Phase 2, design doc §4).  Reuses, Delivers a fired budget-threshold alert as a single POST to one     operator-con, WebhookNotificationChannel, _alert(), _mock_transport(), _public_resolver(), MonkeyPatch, Plan 07 Phase 2 — webhook `NotificationChannel` adapter.  Reuses the exact SSRF- (+9 more)
+
 ### Community 302 - "dev-compose.sh"
 Cohesion: 0.39
 Nodes (5): create_env_file(), require_safe_value(), require_strong_secret(), require_value(), dev-compose.sh script
 
-### Community 303 - "clamp_output_tokens"
+### Community 303 - "test_playground_governance_api.py"
 Cohesion: 0.25
 Nodes (8): clamp_output_tokens(), Enforce a per-model output-token `ceiling` with `min` (clamp) semantics.      An, test_clamp_output_tokens_does_not_mutate_input(), test_clamp_output_tokens_injects_when_client_omits(), test_clamp_output_tokens_leaves_smaller_client_value(), test_clamp_output_tokens_lowers_client_value(), test_clamp_output_tokens_noop_without_ceiling(), test_clamp_output_tokens_skips_operations_without_output_tokens()
 
@@ -1504,9 +1538,17 @@ Nodes (8): clamp_output_tokens(), Enforce a per-model output-token `ceiling` wit
 Cohesion: 0.39
 Nodes (7): _entry(), list_models(), Any, NamedDependency, Request, UUID, OpenAI-compatible `GET /v1/models`.  Lists the models a team can call by their a
 
-### Community 307 - "test_model_prices.py"
-Cohesion: 0.46
-Nodes (7): _admin_token(), client(), AsyncTestClient, Default per-token pricing lookup (console prefill).  The catalog is a bundled sn, test_price_endpoint_404_for_unknown_model(), test_price_endpoint_requires_auth(), test_price_endpoint_returns_costs_for_known_model()
+### Community 305 - "PasswordReset"
+Cohesion: 0.47
+Nodes (9): _alert(), _channel(), _patch_smtp(), MonkeyPatch, Plan 07 Phase 3 — email `NotificationChannel` adapter.  Uses a fake SMTP transpo, test_no_tls_skips_starttls_and_no_username_skips_login(), test_rejects_empty_required_fields(), test_send_builds_and_delivers_message() (+1 more)
+
+### Community 306 - "FakeBedrockRuntime"
+Cohesion: 0.26
+Nodes (11): InMemoryResponseCache, In-memory LRU response-cache adapter (Plan 04 Phase 0).  Process-local `OrderedD, Bounded, TTL-aware, process-local exact-match cache., _key(), InMemoryResponseCache — TTL expiry + bounded LRU eviction (Plan 04 Phase 0)., test_a_read_hit_refreshes_recency_so_it_survives_the_next_eviction(), test_entry_expires_after_its_ttl(), test_entry_is_still_live_just_before_its_ttl() (+3 more)
+
+### Community 307 - "Plan 05 — Cross-provider failover"
+Cohesion: 0.24
+Nodes (12): _Completion, _model(), _Models, Any, ModelType, UUID, PlaygroundService: real-call comparison, per-model error isolation, cost calc., _service() (+4 more)
 
 ### Community 308 - "preflight_global_resource_downgrade.py"
 Cohesion: 0.48
@@ -1533,8 +1575,8 @@ Cohesion: 0.52
 Nodes (6): _config(), AlembicCommandConfig, Path, Migration contract for callable usage attribution., test_backfill_marks_only_reconstructible_usage_identity(), _upgrade()
 
 ### Community 314 - "App.tsx"
-Cohesion: 0.38
-Nodes (4): BudgetRepository, UUID, Port — per-team budget persistence., Persistence port for per-team spend caps (at most one budget per team).
+Cohesion: 0.05
+Nodes (29): Protocol, BudgetAlertStateRepository, BudgetWindow, ChannelResolver, datetime, UUID, Port — dedup ledger + delivery outbox for budget-threshold alerts.  Phase 0 ship, Persistence port for the `(team_id, window, period_start, threshold)`     dedup (+21 more)
 
 ### Community 315 - "Design doc — Continuous Integration (GitHub Actions)"
 Cohesion: 0.33
@@ -1548,13 +1590,25 @@ Nodes (12): App(), Providers(), router, applyTheme(), readInitialTheme(), Theme,
 Cohesion: 0.70
 Nodes (4): compose(), create_overlay(), require_existing_dev_state(), load-compose.sh script
 
+### Community 318 - "native_messages"
+Cohesion: 0.15
+Nodes (16): Boundary-validate a per-team alert threshold list (percentages of     `Budget.li, validate_thresholds(), InvalidBudget, The budget definition is invalid (non-positive limit or unknown window)., _cache_savings_response(), _parse_budget(), platform_cache_savings(), Any (+8 more)
+
 ### Community 319 - "provide_principal"
 Cohesion: 0.40
 Nodes (5): do_run_migrations(), Run migrations in 'offline' mode.      This configures the context with just a U, Run migrations in 'online' mode.      In this scenario we need to create an Engi, run_migrations_offline(), run_migrations_online()
 
+### Community 320 - "provide_router_service"
+Cohesion: 0.19
+Nodes (6): MetricsAggregator, In-process metrics aggregation from TraceRecords (a `TraceSink`).  Counts what a, Cumulative totals plus interval latency stats (reset on read)., Any, _record(), TestAggregator
+
 ### Community 321 - "test_benchmark_compose.py"
 Cohesion: 0.38
 Nodes (4): _config(), Any, test_benchmark_stack_is_isolated_bounded_and_has_no_mock_host_port(), test_loadgen_service_is_profile_gated_with_no_ports_and_mounts_out()
+
+### Community 322 - "build_response_cache"
+Cohesion: 0.23
+Nodes (7): _FakeRateLimiter, _FakeTeams, _FakeUsage, _model(), UsageMeter.admit()'s skip_team_rate_limit param (Plan 05 Phase 1).  A cross-prov, test_admit_hits_team_rate_limit_by_default(), test_admit_skips_team_rate_limit_on_retry()
 
 ### Community 323 - "conftest.py"
 Cohesion: 0.50
@@ -1564,25 +1618,105 @@ Nodes (3): database_url(), Path, Root `database_url` fixture, shared by every cl
 Cohesion: 0.67
 Nodes (3): _assert_callable_with_expected_params(), Contract guard for ISSUE-005: the native Gemini passthrough (`VertexAdapter.agen, test_private_raw_request_contract_holds_on_installed_sdk()
 
+### Community 474 - "Design doc — Responses API Level B"
+Cohesion: 0.53
+Nodes (13): _bearer(), client(), _credential(), _login(), AsyncTestClient, Integration tests for team-scoped model deployments., _team(), test_create_model() (+5 more)
+
+### Community 475 - "list_models"
+Cohesion: 0.19
+Nodes (8): SMTP, EmailNotificationChannel, EmailMessage, Email `NotificationChannel` adapter (Plan 07 Phase 3, design doc §4).  A second, Open an SMTP connection (module-level for test injection, mirroring     `applica, Delivers a fired budget-threshold alert as a plaintext email to one     recipien, Blocking SMTP send, run in a worker thread by `send`., _smtp_factory()
+
+### Community 476 - ".record_fired"
+Cohesion: 0.27
+Nodes (7): CredentialMisconfigured, The credential is missing a value required to call the provider (e.g. api_key)., The single OIDC identity provider configured for this deployment — at     most o, SsoSettingsModel, SsoSettings, SQLAlchemy adapter for the SSO settings singleton — encrypts the client secret a, SQLAlchemySsoSettingsRepository
+
+### Community 477 - "create_invite"
+Cohesion: 0.24
+Nodes (8): _Dimension, _keyword_matches(), QualityTier, S1 — rule-based complexity strategy.  Algorithm ported from LiteLLM's complexity, Word-boundary matching for single words (so "error" never matches     "terrorism, _score_keywords(), nearest_tier_candidate(), The candidate serving `tier`, or the nearest tier below it, or above.     Determ
+
+### Community 478 - "test_error_paths.py"
+Cohesion: 0.24
+Nodes (4): CallableAliasRepository, Model, UUID, Port for the unified callable-alias registry.
+
+### Community 479 - "test_concurrent_admin_changes_preserve_one_active_admin"
+Cohesion: 0.20
+Nodes (10): Execution, Phase 0 — Error taxonomy + eligibility classifier — ✅ complete, Phase 1 — Sequential failover for non-streamed calls, Phase 2 — Streaming failover (pre-first-byte only) — ✅ complete, Phase 3 — Circuit breaker + observability (optional / can split), Phases, Plan 05 — Cross-provider failover, Risks & mitigations (+2 more)
+
+### Community 480 - "test_role_permissions.py"
+Cohesion: 0.27
+Nodes (6): AsyncAzureOpenAI, AzureOpenAI, _client_kwargs(), Any, Model, Azure OpenAI adapter — same OpenAI surface, different client construction.  Cred
+
+### Community 481 - "_close_genai_client"
+Cohesion: 0.22
+Nodes (9): 1. Problem, 2. Goal, 3. Fail-loud capability gate, 4. Tool translation, 5. Streaming event contract, 6. Conformance and observability, 7. Provider blockers after Phase 1b-B, 8. Non-goals (+1 more)
+
+### Community 482 - "create_api_router"
+Cohesion: 0.22
+Nodes (3): _FakeSMTP, EmailMessage, Records the calls an `EmailNotificationChannel._deliver` makes.
+
+### Community 483 - "record_audit"
+Cohesion: 0.44
+Nodes (8): AsyncTestClient, MonkeyPatch, Clean error responses for misconfiguration (never a leaking 500)., test_disabled_model_409(), test_missing_api_key_in_credential_400(), test_unknown_model_alias_404(), test_unsupported_operation_501(), test_vertex_invalid_service_account_json_400()
+
+### Community 484 - "delete_user"
+Cohesion: 0.36
+Nodes (8): client(), AsyncTestClient, Path, The OpenAPI docs are served at the root path (the landing page)., test_docs_can_be_disabled(), test_docs_do_not_shadow_protected_routes(), test_docs_served_at_root(), test_openapi_schema_at_root()
+
+### Community 486 - "BudgetRepository"
+Cohesion: 0.25
+Nodes (6): _EchoClient, MonkeyPatch, SimpleNamespace, End-to-end: a real `/v1/chat/completions` call lands in the same-day     bucket, Always returns the same usage — enough to prove a real ledger write     reaches, test_usage_timeseries_reflects_a_real_call()
+
+### Community 487 - "_setup"
+Cohesion: 0.33
+Nodes (5): Contributing, Developer Certificate of Origin (DCO), Development setup, Quality gate, Security issues
+
+### Community 488 - "clamp_output_tokens"
+Cohesion: 0.29
+Nodes (7): delete_user(), FromPath, NamedDependency, Request, User, UUID, Admin endpoint to hard-delete a user (admin JWT).  Self-deletion is refused with
+
+### Community 489 - "FakeOpenAI"
+Cohesion: 0.36
+Nodes (7): AsyncSession, MonkeyPatch, User, Database-level concurrency tests for platform-admin deletion invariants., _service(), test_concurrent_admin_changes_preserve_one_active_admin(), _two_party_barrier()
+
+### Community 490 - "BudgetRepository"
+Cohesion: 0.25
+Nodes (5): client(), FakeOpenAI, MonkeyPatch, Path, Judge calls (response_format present) pick cheap-model; chat echoes.
+
+### Community 491 - ".__init__"
+Cohesion: 0.33
+Nodes (5): build_response_cache(), build_semantic_response_cache(), Response-cache adapter selection (Plan 04 Phase 1: Redis or in-memory).  `build_, Redis-backed when REDIS_URL is set (shared across replicas), else in-memory., In-memory only (Plan 04 Phase 2) — no external vector DB, a design     non-goal,
+
+### Community 492 - "budgetRequest.ts"
+Cohesion: 0.40
+Nodes (3): datetime, Port — user persistence., Temporarily lock password logins and reset the failure counter. The         cons
+
+### Community 494 - "provide_user_service"
+Cohesion: 0.40
+Nodes (4): provide_user_service(), AsyncSession, NamedDependency, Dependency wiring: build the UserService from a DB session.
+
+### Community 495 - "generate_key"
+Cohesion: 0.67
+Nodes (3): generate_key(), NewKeyMaterial, Pure domain logic for generating and hashing keys.  Keys are high-entropy random
+
 ## Knowledge Gaps
-- **935 isolated node(s):** `docker-entrypoint.sh script`, `litestar-gateway`, `PasswordResetCreateRequest`, `ResetPasswordRequest`, `$schema` (+930 more)
+- **938 isolated node(s):** `docker-entrypoint.sh script`, `litestar-gateway`, `PasswordResetCreateRequest`, `ResetPasswordRequest`, `$schema` (+933 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **154 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **153 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Router` connect `DataTable.tsx` to `Design doc — Responses API Level B`, `TeamGrant`, `create_docs_router`, `browser_login`, `create_users_router`, `create_ui_router`, `CredentialMisconfigured`, `ModelsPage.tsx`, `button.tsx`, `patch_scim_user`?**
-  _High betweenness centrality (0.104) - this node is a cross-community bridge._
-- **Why does `Settings` connect `create_app` to `translate_upstream_error`, `PasswordReset`, `test_api_key_lifecycle.py`, `test_webhook_shadow.py`, `test_docs.py`, `DomainError`, `test_login_flow.py`, `_scim_headers`, `test_config.py`, `OIDCIdentityProvider`, `test_embeddings_strategy.py`, `_bearer`, `parse_response_format`, `conftest.py`, `test_decisions_stats_savings.py`, `InMemoryRateLimiter`, `test_registry.py`, `conftest.py`, `test_signup_integration.py`, `test_provider_error_surfaces_as_client_status`, `test_router_alias.py`, `test_docs_site.py`, `SQLAlchemyUsageRepository`, `test_weighted_strategy.py`, `test_key_principal.py`, `test_model_prices.py`, `usage.py`, `test_rate_limit.py`, `test_integration.py`, `test_judge_hybrid_export.py`, `MetricsAggregator`, `test_rotation.py`, `test_platform_models.py`, `test_platform_routers.py`, `test_teams_api.py`, `TraceDispatcher`, `test_api_keys.py`, `test_browser_session.py`, `SQLAlchemyInviteRepository`, `test_strategy_call_metering.py`, `test_responses_emulation.py`, `test_audit.py`, `config.py`, `test_messages.py`, `test_credential_validation.py`, `test_auth_realm.py`?**
-  _High betweenness centrality (0.103) - this node is a cross-community bridge._
-- **Why does `CompletionService` connect `CompletionService` to `UsageMeter`, `test_max_tokens_retry.py`, `DomainError`, `test_budget_enforcement.py`, `RouterService`, `UnsupportedOperation`, `CallableAliasBinding`, `test_stream_usage_fallback.py`, `TeamService`, `generate_content`, `openai_error_handler`, `chat_completions`, `UsageEvent`, `_patch`, `ModelService`, `test_session.py`, `CallableAliasResolver`, `test_generate_content.py`, `PlaygroundService`, `test_messages.py`, `provide_router_service`?**
-  _High betweenness centrality (0.083) - this node is a cross-community bridge._
+- **Why does `CompletionService` connect `CompletionService` to `UsageMeter`, `test_max_tokens_retry.py`, `DomainError`, `test_budget_enforcement.py`, `RouterService`, `UnsupportedOperation`, `test_stream_usage_fallback.py`, `TeamService`, `generate_content`, `unlock_user`, `UserService`, `APIKeyService`, `chat_completions`, `UsageEvent`, `_patch`, `ResilienceConfig`, `ModelService`, `test_session.py`, `CallableAliasResolver`, `test_generate_content.py`, `PlaygroundService`, `test_models.py`, `test_messages.py`?**
+  _High betweenness centrality (0.125) - this node is a cross-community bridge._
+- **Why does `Settings` connect `create_app` to `translate_upstream_error`, `PasswordReset`, `test_api_key_lifecycle.py`, `test_webhook_shadow.py`, `test_login_flow.py`, `_scim_headers`, `test_config.py`, `OIDCIdentityProvider`, `test_embeddings_strategy.py`, `_bearer`, `conftest.py`, `test_decisions_stats_savings.py`, `jwt.py`, `InMemoryRateLimiter`, `_RaisingClient`, `test_models.py`, `test_registry.py`, `RouterController`, `conftest.py`, `test_signup_integration.py`, `Plan 09 — Responses API Level B`, `TeamGrant`, `EmbeddingsStrategy`, `test_docs_site.py`, `SQLAlchemyUsageRepository`, `test_weighted_strategy.py`, `test_key_principal.py`, `usage.py`, `test_rate_limit.py`, `provide_router_service`, `test_integration.py`, `test_judge_hybrid_export.py`, `MetricsAggregator`, `test_rotation.py`, `test_session.py`, `LLMGatewayImpl`, `test_platform_routers.py`, `test_teams_api.py`, `TraceDispatcher`, `Design doc — Responses API Level B`, `test_api_keys.py`, `conftest.py`, `test_browser_session.py`, `SQLAlchemyInviteRepository`, `test_chat.py`, `test_strategy_call_metering.py`, `delete_user`, `Settings`, `FakeOpenAI`, `BudgetRepository`, `.__init__`, `test_shadow_drain.py`, `test_audit.py`, `config.py`, `test_messages.py`, `provide_router_service`, `test_credential_validation.py`, `test_auth_realm.py`?**
+  _High betweenness centrality (0.116) - this node is a cross-community bridge._
+- **Why does `Router` connect `DataTable.tsx` to `TeamGrant`, `create_docs_router`, `browser_login`, `create_users_router`, `create_ui_router`, `chat_completions`, `test_sso_settings.py`, `ModelsPage.tsx`, `button.tsx`, `patch_scim_user`?**
+  _High betweenness centrality (0.114) - this node is a cross-community bridge._
+- **Are the 88 inferred relationships involving `CompletionService` (e.g. with `CallableAliasResolver` and `ResolvedCallable`) actually correct?**
+  _`CompletionService` has 88 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 24 inferred relationships involving `_patch()` (e.g. with `FakeAnthropic` and `FakeClient`) actually correct?**
   _`_patch()` has 24 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 101 inferred relationships involving `Settings` (e.g. with `InMemoryCircuitBreaker` and `RedisCircuitBreaker`) actually correct?**
-  _`Settings` has 101 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 72 inferred relationships involving `CompletionService` (e.g. with `CallableAliasResolver` and `ResolvedCallable`) actually correct?**
-  _`CompletionService` has 72 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 121 inferred relationships involving `UnsupportedOperation` (e.g. with `CompletionService` and `_reject_unsupported_n()`) actually correct?**
-  _`UnsupportedOperation` has 121 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 107 inferred relationships involving `Settings` (e.g. with `InMemoryCircuitBreaker` and `RedisCircuitBreaker`) actually correct?**
+  _`Settings` has 107 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 102 inferred relationships involving `UsageMeter` (e.g. with `CompletionService` and `CallableRouter`) actually correct?**
+  _`UsageMeter` has 102 INFERRED edges - model-reasoned connections that need verification._

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from litestar_gateway.domain.entities.enums import BudgetWindow
@@ -140,6 +141,41 @@ class ApiKeySpend:
     completion_tokens: int
     cost: float
     calls: int
+
+
+@dataclass(frozen=True)
+class UsageBucket:
+    """One time-bucketed usage aggregate (Plan 10 Phase 1).
+
+    ``bucket_start`` is the UTC-aligned start of the bucket (e.g. the top of
+    the hour or midnight UTC for a day bucket) — always tz-aware UTC,
+    regardless of server timezone, so bucket boundaries never shift around a
+    DST transition. Every count/sum is the total over events whose
+    ``created_at`` falls in ``[bucket_start, bucket_start + granularity)``.
+    A bucket is only ever emitted when it has at least one matching event —
+    callers wanting a dense, gap-filled series do that themselves from
+    ``UsageTimeseries.start``/``end``/``granularity``."""
+
+    bucket_start: datetime
+    request_count: int
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+
+
+@dataclass(frozen=True)
+class UsageTimeseries:
+    """A bounded, time-ordered series of `UsageBucket`s for one team over
+    `[start, end)` (Plan 10 Phase 1), plus the request metadata needed to
+    render or gap-fill it. Not paginated: a bucketed aggregate over a bounded
+    date range returns a bounded number of rows by construction, so totals
+    never depend on pagination."""
+
+    team_id: UUID
+    granularity: Literal["hour", "day"]
+    start: datetime
+    end: datetime
+    buckets: list[UsageBucket] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

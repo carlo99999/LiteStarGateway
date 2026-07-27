@@ -21,8 +21,20 @@ from litestar_gateway.application.service import APIKeyService
 from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.domain.authorization import Permission
 from litestar_gateway.domain.budget import validate_thresholds, window_start
-from litestar_gateway.domain.entities import Budget, BudgetWindow, KeyScope, Principal, User
-from litestar_gateway.domain.exceptions import BudgetNotFound, InvalidBudget, InvalidKeyScope
+from litestar_gateway.domain.entities import (
+    Budget,
+    BudgetWindow,
+    KeyScope,
+    Principal,
+    UsageTimeseries,
+    User,
+)
+from litestar_gateway.domain.exceptions import (
+    BudgetNotFound,
+    InvalidBudget,
+    InvalidKeyScope,
+    InvalidUsageQuery,
+)
 from litestar_gateway.domain.pagination import resolve_page
 from litestar_gateway.domain.ports import (
     AuditLog,
@@ -50,8 +62,11 @@ from litestar_gateway.infrastructure.web.teams.schemas import (
     TeamResponse,
     UpdateTeamRequest,
     UsageResponse,
+    UsageTimeseriesResponse,
     resolve_key_expiry,
 )
+
+_TIMESERIES_GRANULARITIES = frozenset({"hour", "day"})
 
 
 def _cache_savings_response(
@@ -565,6 +580,55 @@ class TeamController(Controller):
             offset=page_offset,
         )
         return [UsageResponse.from_aggregate(a) for a in aggregates]
+
+    @get(
+        "/{team_id:uuid}/usage/timeseries",
+        dependencies={"principal": Provide(provide_principal)},
+    )
+    async def usage_timeseries(
+        self,
+        team_id: FromPath[UUID],
+        principal: NamedDependency[Principal],
+        team_service: NamedDependency[TeamService],
+        usage_repository: NamedDependency[UsageRepository],
+        start: FromQuery[datetime],
+        end: FromQuery[datetime],
+        granularity: FromQuery[str] = "day",
+        model: FromQuery[str | None] = None,
+        alias: FromQuery[str | None] = None,
+        api_key_id: FromQuery[UUID | None] = None,
+    ) -> UsageTimeseriesResponse:
+        """Bucketed usage over ``[start, end)`` (Plan 10 Phase 1) — the data
+        layer the console's per-model-over-time chart will consume. Same
+        filter semantics as `usage` (``model`` = alias-or-canonical match,
+        ``alias``/``api_key_id`` exact); ``granularity`` is ``hour`` or
+        ``day``. Accepts a JWT or a management-scoped API key (own team only),
+        same as `usage`."""
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.USAGE_READ
+        )
+        if granularity not in _TIMESERIES_GRANULARITIES:
+            valid = sorted(_TIMESERIES_GRANULARITIES)
+            raise InvalidUsageQuery(f"granularity must be one of {valid}, got {granularity!r}")
+        if end <= start:
+            raise InvalidUsageQuery("end must be after start")
+        buckets = await usage_repository.timeseries(
+            team_id,
+            start=start,
+            end=end,
+            granularity=granularity,  # type: ignore[arg-type]  # validated above
+            model_name=model,
+            requested_alias=alias,
+            api_key_id=api_key_id,
+        )
+        series = UsageTimeseries(
+            team_id=team_id,
+            granularity=granularity,  # type: ignore[arg-type]  # validated above
+            start=start,
+            end=end,
+            buckets=buckets,
+        )
+        return UsageTimeseriesResponse.from_timeseries(series)
 
     @get(
         "/{team_id:uuid}/cache/savings",

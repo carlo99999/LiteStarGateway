@@ -17,6 +17,8 @@ from litestar_gateway.domain.entities import (
     TeamMembership,
     TeamRole,
     UsageAggregate,
+    UsageBucket,
+    UsageTimeseries,
 )
 from litestar_gateway.domain.exceptions import InvalidKeyExpiry
 
@@ -118,6 +120,52 @@ class UsageResponse:
             canonical_model_name=a.canonical_model_name or a.model_name,
             callable_origin=a.callable_origin or "unknown",
             source_team_id=a.source_team_id,
+        )
+
+
+@dataclass(frozen=True)
+class UsageBucketResponse:
+    """One bucket of `GET /teams/{id}/usage/timeseries` (Plan 10 Phase 1)."""
+
+    bucket_start: datetime
+    request_count: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    cost: float
+
+    @classmethod
+    def from_bucket(cls, b: UsageBucket) -> UsageBucketResponse:
+        return cls(
+            bucket_start=b.bucket_start,
+            request_count=b.request_count,
+            prompt_tokens=b.prompt_tokens,
+            completion_tokens=b.completion_tokens,
+            total_tokens=b.prompt_tokens + b.completion_tokens,
+            cost=b.cost,
+        )
+
+
+@dataclass(frozen=True)
+class UsageTimeseriesResponse:
+    """Bucketed usage over a bounded date range (Plan 10 Phase 1). Not
+    paginated — the requested `[start, end)` range and granularity already
+    bound the row count, so totals never depend on pagination."""
+
+    team_id: UUID
+    granularity: str
+    start: datetime
+    end: datetime
+    buckets: list[UsageBucketResponse]
+
+    @classmethod
+    def from_timeseries(cls, series: UsageTimeseries) -> UsageTimeseriesResponse:
+        return cls(
+            team_id=series.team_id,
+            granularity=series.granularity,
+            start=series.start,
+            end=series.end,
+            buckets=[UsageBucketResponse.from_bucket(b) for b in series.buckets],
         )
 
 
