@@ -45,7 +45,11 @@ class ResponseCache(Protocol):
 port, tried in order: **exact-match** (deterministic key equality) then, only if
 the team+model opted into it, **semantic** (embedding similarity ≥ threshold).
 The semantic tier reuses the S3 `EmbedFn` and cosine helper verbatim
-(`application/routing/embeddings.py:30`, `:42`); no second embedding path.
+(`application/routing/embeddings.py:30`, `:42`); no second embedding path. It
+searches inside a `SemanticScope` — tenant, model id, operation, plus a digest
+of every behaviour-affecting field except the embedded text — so similarity is
+only ever allowed to blur the wording of a prompt, never the model, the API or
+the request's contract (ISSUE-023).
 
 ### 2. Cache key derivation — what makes two requests "equivalent"
 

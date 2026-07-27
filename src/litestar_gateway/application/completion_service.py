@@ -55,6 +55,7 @@ from litestar_gateway.domain.request_policy import (
 )
 from litestar_gateway.domain.response_cache_key import derive_cache_key, is_cacheable
 from litestar_gateway.domain.response_cache_semantic import (
+    derive_semantic_scope,
     extract_semantic_text,
     is_semantic_cacheable,
 )
@@ -338,7 +339,9 @@ class CompletionService:
         if cache_key is not None:
             cached = await self._cache_get(cache_key)
             if cached is None and semantic_text is not None:
-                cached = await self._semantic_get(team_id, api_key_id, model, semantic_text)
+                cached = await self._semantic_get(
+                    team_id, api_key_id, model, operation, request, semantic_text
+                )
             if cached is not None:
                 latency_ms = (perf_counter() - start) * 1000
                 await self._meter.settle_cache_hit(
@@ -392,7 +395,14 @@ class CompletionService:
                 await self._cache_put(cache_key, response, view)
                 if semantic_text is not None:
                     await self._semantic_put(
-                        team_id, api_key_id, model, semantic_text, response, view
+                        team_id,
+                        api_key_id,
+                        model,
+                        operation,
+                        request,
+                        semantic_text,
+                        response,
+                        view,
                     )
             await self._attach_routing_usage(response)
             return response
@@ -462,11 +472,19 @@ class CompletionService:
         return embedding if isinstance(embedding, list) else None
 
     async def _semantic_get(
-        self, team_id: UUID, api_key_id: UUID | None, model: Model, text: str
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        operation: str,
+        request: dict[str, Any],
+        text: str,
     ) -> CachedResponse | None:
         """Semantic-tier lookup (Plan 04 Phase 2, design §1/§8): embed `text`
-        and search *only* the caller's own tenant scope
-        (`SemanticResponseCache.find`'s hard invariant). Any exception —
+        and search *only* this request's own scope — tenant, model, operation
+        and the digest of every other behaviour-affecting field
+        (`SemanticResponseCache.find`'s hard invariant, ISSUE-023), so
+        similarity can only ever blur the text itself. Any exception —
         embedding failure or backend error — is logged and treated as a miss,
         exactly like `_cache_get`; the semantic tier is exactly as optional as
         the exact-match tier it sits behind."""
@@ -475,9 +493,10 @@ class CompletionService:
             vector = await self._embed_for_semantic_cache(team_id, text)
             if vector is None:
                 return None
-            return await self._semantic_cache.find(
-                team_id, api_key_id, vector, self._semantic_threshold
+            scope = derive_semantic_scope(
+                team_id, api_key_id, model, operation, model.merge_params(request)
             )
+            return await self._semantic_cache.find(scope, vector, self._semantic_threshold)
         except Exception:
             logger.warning("semantic cache lookup failed; treating as a miss", exc_info=True)
             return None
@@ -487,6 +506,8 @@ class CompletionService:
         team_id: UUID,
         api_key_id: UUID | None,
         model: Model,
+        operation: str,
+        request: dict[str, Any],
         text: str,
         response: dict[str, Any],
         usage_view: dict[str, Any],
@@ -505,9 +526,11 @@ class CompletionService:
             vector = await self._embed_for_semantic_cache(team_id, text)
             if vector is None:
                 return
+            scope = derive_semantic_scope(
+                team_id, api_key_id, model, operation, model.merge_params(request)
+            )
             await self._semantic_cache.add(
-                team_id,
-                api_key_id,
+                scope,
                 vector,
                 CachedResponse(body=response, prompt_tokens=prompt, completion_tokens=completion),
                 self._response_cache_ttl_s,

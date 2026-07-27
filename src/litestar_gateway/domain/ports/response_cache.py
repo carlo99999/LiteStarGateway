@@ -37,6 +37,28 @@ class CacheKey:
 
 
 @dataclass(frozen=True)
+class SemanticScope:
+    """The namespace a semantic entry lives in — everything similarity must NOT
+    be allowed to bridge.
+
+    The tenant pair is the same hard invariant as `CacheKey`. `model_id` and
+    `operation` are here because similarity compares *text*: without them a
+    nearest-neighbour hit could hand a Responses request the chat body another
+    model produced for the same words (ISSUE-023). `request_digest` covers every
+    other behaviour-affecting part of the effective request — instructions,
+    tools, tool choice, output format, enforced policy — so two entries can only
+    ever be compared when they agree on all of it and differ solely in the text
+    that was embedded.
+    """
+
+    team_id: UUID
+    api_key_id: UUID | None
+    model_id: UUID
+    operation: str
+    request_digest: str
+
+
+@dataclass(frozen=True)
 class CachedResponse:
     """A stored provider response body plus its authoritative token usage, so
     a later hit can be metered at the real counts (design §6) rather than
@@ -65,26 +87,23 @@ class SemanticResponseCache(Protocol):
     """The semantic tier (Plan 04 Phase 2): tried only when the exact-match
     tier (above) has already missed and the model separately opted in. `find`
     receives an already-computed query embedding and returns the closest
-    stored entry at/above `threshold` *within the caller's own tenant scope*
-    — `team_id`/`api_key_id` are the same hard-invariant namespace as
-    `CacheKey` (design §3); implementations must never search or match across
-    them. `add` stores a fresh entry's embedding alongside its
-    `CachedResponse` for future lookups. Same failure policy as
-    `ResponseCache` (design §8): callers must treat any exception from
-    `find`/`add` as a miss/no-op."""
+    stored entry at/above `threshold` *within `scope`* — implementations must
+    never search or match across scopes, whatever the similarity. `add` stores
+    a fresh entry's embedding alongside its `CachedResponse` for future
+    lookups in the same scope. Same failure policy as `ResponseCache`
+    (design §8): callers must treat any exception from `find`/`add` as a
+    miss/no-op."""
 
     async def find(
         self,
-        team_id: UUID,
-        api_key_id: UUID | None,
+        scope: SemanticScope,
         vector: list[float],
         threshold: float,
     ) -> CachedResponse | None: ...
 
     async def add(
         self,
-        team_id: UUID,
-        api_key_id: UUID | None,
+        scope: SemanticScope,
         vector: list[float],
         value: CachedResponse,
         ttl_s: int,

@@ -11,9 +11,16 @@ from __future__ import annotations
 
 import math
 from typing import Any
+from uuid import UUID
 
 from litestar_gateway.domain.entities import Model
-from litestar_gateway.domain.response_cache_key import is_cacheable
+from litestar_gateway.domain.ports.response_cache import SemanticScope
+from litestar_gateway.domain.response_cache_key import canonical_view, digest_of, is_cacheable
+
+# The fields the embedding itself represents: they are the *content* similarity
+# is allowed to blur. Everything else in the canonical view stays in the scope
+# digest, so it must match exactly before a nearest neighbour is even compared.
+_EMBEDDED_FIELDS = ("messages", "input")
 
 
 def is_semantic_cacheable(operation: str, request: dict[str, Any], model: Model) -> bool:
@@ -24,6 +31,36 @@ def is_semantic_cacheable(operation: str, request: dict[str, Any], model: Model)
     opt-in (`cache_semantic_enabled`) — exact-match may be on while semantic
     stays off."""
     return is_cacheable(operation, request, model) and model.cache_semantic_enabled
+
+
+def derive_semantic_scope(
+    team_id: UUID,
+    api_key_id: UUID | None,
+    model: Model,
+    operation: str,
+    effective_request: dict[str, Any],
+) -> SemanticScope:
+    """The namespace this request's semantic entry belongs to (ISSUE-023).
+
+    Built from the exact-match tier's canonical view with the embedded text
+    fields removed: whatever similarity is allowed to blur is exactly what the
+    scope leaves out, and everything else — model identity, operation,
+    instructions, tools, tool choice, output format, enforced policy — has to
+    match exactly before two entries are ever compared. A nearest-neighbour hit
+    inside one scope therefore cannot change the model, the API or the contract
+    of the answer.
+    """
+    view = canonical_view(model, operation, effective_request)
+    view["request"] = {
+        field: value for field, value in view["request"].items() if field not in _EMBEDDED_FIELDS
+    }
+    return SemanticScope(
+        team_id=team_id,
+        api_key_id=api_key_id,
+        model_id=model.id,
+        operation=operation,
+        request_digest=digest_of(view),
+    )
 
 
 def _text_from_content(content: Any) -> str:

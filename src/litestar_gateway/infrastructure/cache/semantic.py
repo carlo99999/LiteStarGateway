@@ -1,13 +1,13 @@
 """In-memory semantic response-cache adapter (Plan 04 Phase 2).
 
-Bounded, TTL-aware, per-tenant list of (vector, `CachedResponse`) pairs — no
+Bounded, TTL-aware, per-scope list of (vector, `CachedResponse`) pairs — no
 external vector DB (an explicit non-goal, design doc); a linear cosine scan is
-fine at the small bounded size this store keeps per tenant, mirroring the S3
+fine at the small bounded size this store keeps per scope, mirroring the S3
 route cache's in-process, no-vector-DB approach
-(`application/routing/embeddings.py`). Tenant isolation is structural: entries
-live in a bucket keyed by the exact `(team_id, api_key_id)` pair, so a lookup
-for one tenant can never see another tenant's vectors, regardless of
-similarity (design §3 — the same hard invariant as the exact-match tier).
+(`application/routing/embeddings.py`). Isolation is structural: entries live in
+a bucket keyed by the exact `SemanticScope`, so a lookup can never see vectors
+from another tenant, another model, another operation or another request
+contract, regardless of similarity (design §3 and ISSUE-023).
 """
 
 from __future__ import annotations
@@ -15,16 +15,14 @@ from __future__ import annotations
 import time
 from collections import OrderedDict
 from collections.abc import Callable
-from uuid import UUID
 
-from litestar_gateway.domain.ports.response_cache import CachedResponse
+from litestar_gateway.domain.ports.response_cache import CachedResponse, SemanticScope
 from litestar_gateway.domain.response_cache_semantic import cosine_similarity
 
 # Small and process-local by design (no vector DB); bounds memory and keeps the
-# linear cosine scan cheap per tenant, mirroring embeddings.py's MAX_CACHE_ENTRIES.
+# linear cosine scan cheap per scope, mirroring embeddings.py's MAX_CACHE_ENTRIES.
 DEFAULT_MAX_ENTRIES_PER_TENANT = 50
 
-_TenantKey = tuple[UUID, UUID | None]
 _Entry = tuple[float, list[float], CachedResponse]  # (expires_at, vector, value)
 
 
@@ -41,16 +39,15 @@ class InMemorySemanticResponseCache:
     ) -> None:
         self._max_entries_per_tenant = max_entries_per_tenant
         self._clock = clock
-        self._buckets: OrderedDict[_TenantKey, list[_Entry]] = OrderedDict()
+        self._buckets: OrderedDict[SemanticScope, list[_Entry]] = OrderedDict()
 
     async def find(
         self,
-        team_id: UUID,
-        api_key_id: UUID | None,
+        scope: SemanticScope,
         vector: list[float],
         threshold: float,
     ) -> CachedResponse | None:
-        key: _TenantKey = (team_id, api_key_id)
+        key = scope
         bucket = self._buckets.get(key)
         if not bucket:
             return None
@@ -73,13 +70,12 @@ class InMemorySemanticResponseCache:
 
     async def add(
         self,
-        team_id: UUID,
-        api_key_id: UUID | None,
+        scope: SemanticScope,
         vector: list[float],
         value: CachedResponse,
         ttl_s: int,
     ) -> None:
-        key: _TenantKey = (team_id, api_key_id)
+        key = scope
         bucket = self._buckets.setdefault(key, [])
         bucket.append((self._clock() + ttl_s, vector, value))
         overflow = len(bucket) - self._max_entries_per_tenant

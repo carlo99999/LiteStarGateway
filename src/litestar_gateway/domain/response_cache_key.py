@@ -42,6 +42,40 @@ _NON_DETERMINING_FIELDS = frozenset(
 _KEY_SCHEMA_VERSION = "v2"
 
 
+def canonical_view(
+    model: Model, operation: str, effective_request: dict[str, Any]
+) -> dict[str, Any]:
+    """The pure, order-insensitive description of "which request is this" —
+    resolved model identity, operation, and every determining request field.
+    Shared by the exact-match key and the semantic scope (which hashes this
+    same view minus the text it embeds), so the two tiers can never disagree
+    about what counts as the same request."""
+    return {
+        "v": _KEY_SCHEMA_VERSION,
+        "operation": operation,
+        "model_id": str(model.id),
+        "model_name": model.name,
+        "provider": model.provider.value,
+        "provider_model_id": model.provider_model_id,
+        "api_version": model.api_version,
+        "max_output_tokens": model.max_output_tokens,
+        "request": {
+            field: value
+            for field, value in effective_request.items()
+            if field not in _NON_DETERMINING_FIELDS
+        },
+    }
+
+
+def digest_of(view: dict[str, Any]) -> str:
+    """`json.dumps(sort_keys=True)` canonicalizes object-key order at every
+    nesting level without touching string content, so semantically-significant
+    whitespace inside message text is preserved verbatim."""
+    return hashlib.sha256(
+        json.dumps(view, sort_keys=True, default=str, ensure_ascii=False).encode()
+    ).hexdigest()
+
+
 def derive_cache_key(
     team_id: UUID,
     api_key_id: UUID | None,
@@ -60,29 +94,10 @@ def derive_cache_key(
     deployment. `operation` separates chat from Responses, whose bodies differ
     in shape for the same text.
 
-    `json.dumps(sort_keys=True)` canonicalizes object-key order at every nesting
-    level without touching string content, so semantically-significant
-    whitespace inside message text is preserved verbatim.
+    Object-key order never affects the result; string content is untouched.
     """
-    canonical: dict[str, Any] = {
-        "v": _KEY_SCHEMA_VERSION,
-        "operation": operation,
-        "model_id": str(model.id),
-        "model_name": model.name,
-        "provider": model.provider.value,
-        "provider_model_id": model.provider_model_id,
-        "api_version": model.api_version,
-        "max_output_tokens": model.max_output_tokens,
-        "request": {
-            field: value
-            for field, value in effective_request.items()
-            if field not in _NON_DETERMINING_FIELDS
-        },
-    }
-    digest = hashlib.sha256(
-        json.dumps(canonical, sort_keys=True, default=str, ensure_ascii=False).encode()
-    ).hexdigest()
-    return CacheKey(team_id=team_id, api_key_id=api_key_id, digest=digest)
+    view = canonical_view(model, operation, effective_request)
+    return CacheKey(team_id=team_id, api_key_id=api_key_id, digest=digest_of(view))
 
 
 def is_cacheable(operation: str, request: dict[str, Any], model: Model) -> bool:
