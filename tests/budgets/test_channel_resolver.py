@@ -23,11 +23,20 @@ TEAM = uuid4()
 
 
 class _FakeBudgets:
+    """A read-only `BudgetRepository` stub (only `get` is exercised; `set`/
+    `remove` exist to satisfy the protocol for type checking)."""
+
     def __init__(self, budget: Budget | None) -> None:
         self._budget = budget
 
     async def get(self, team_id: UUID) -> Budget | None:
         return self._budget
+
+    async def set(self, budget: Budget) -> Budget:  # pragma: no cover - unused
+        raise NotImplementedError
+
+    async def remove(self, team_id: UUID) -> None:  # pragma: no cover - unused
+        raise NotImplementedError
 
 
 def _budget(**overrides) -> Budget:
@@ -122,6 +131,7 @@ async def test_falls_back_to_platform_webhook_without_team_override() -> None:
 
     channels = await resolve(_alert())
     assert len(channels) == 1
+    assert isinstance(channels[0], WebhookNotificationChannel)
     assert str(channels[0]._url) == "https://platform.example.com/hook"
 
 
@@ -133,6 +143,7 @@ async def test_no_budget_falls_back_to_platform_webhook() -> None:
 
     channels = await resolve(_alert())
     assert len(channels) == 1
+    assert isinstance(channels[0], WebhookNotificationChannel)
     assert str(channels[0]._url) == "https://platform.example.com/hook"
 
 
