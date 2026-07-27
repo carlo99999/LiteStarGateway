@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +26,12 @@ logger = logging.getLogger("litestar_gateway.budget_alerts")
 # inspection but is no longer selected), so a permanently-failing target
 # can't occupy the oldest-first batch forever and starve newer alerts.
 MAX_DISPATCH_ATTEMPTS = 10
+
+# How long a dispatcher owns a claimed row. Long enough that a normal
+# webhook/email round-trip finishes inside it, short enough that a worker
+# killed mid-delivery frees the row without operator action. Recovery is the
+# whole point of a lease rather than a boolean flag.
+DISPATCH_LEASE_SECONDS = 300
 
 
 class SQLAlchemyBudgetAlertStateRepository:
@@ -72,18 +79,55 @@ class SQLAlchemyBudgetAlertStateRepository:
         return row.to_entity()
 
     async def enqueue_alert(self, alert: PendingBudgetAlert) -> None:
-        self._session.add(
-            PendingBudgetAlertModel(
-                id=alert.id,
-                team_id=alert.team_id,
-                window=alert.window.value,
-                period_start=alert.period_start,
-                threshold=alert.threshold,
-                spend=alert.spend,
-                limit_cost=alert.limit_cost,
-            )
-        )
+        """Outbox row on its own. Production settlement never calls this — it
+        goes through `record_fired_and_enqueue` so the dedup row and this row
+        share one transaction (ISSUE-026); kept for seeding and for the
+        dispatch tests."""
+        self._session.add(self._outbox_row(alert))
         await self._session.commit()
+
+    @staticmethod
+    def _outbox_row(alert: PendingBudgetAlert) -> PendingBudgetAlertModel:
+        return PendingBudgetAlertModel(
+            id=alert.id,
+            team_id=alert.team_id,
+            window=alert.window.value,
+            period_start=alert.period_start,
+            threshold=alert.threshold,
+            spend=alert.spend,
+            limit_cost=alert.limit_cost,
+        )
+
+    async def record_fired_and_enqueue(self, alert: PendingBudgetAlert) -> BudgetAlertState | None:
+        """Record the dedup key and queue its delivery in ONE transaction.
+
+        Two commits used to be two failure windows (ISSUE-026): a crash or
+        error between them left a threshold marked fired with no outbox row,
+        and every later evaluation skipped it as already-fired — the alert was
+        lost permanently. Inserting both rows under a single commit makes
+        "fired" and "queued" the same durable fact.
+
+        Returns `None` when a concurrent settlement already recorded this exact
+        dedup key: the unique constraint makes the loser's insert a conflict,
+        and the rollback discards its outbox row too, so the alert is queued
+        exactly once."""
+        state = BudgetAlertStateModel(
+            id=uuid4(),
+            team_id=alert.team_id,
+            window=alert.window.value,
+            period_start=alert.period_start,
+            threshold=alert.threshold,
+            fired_at=datetime.now(UTC),
+        )
+        self._session.add(state)
+        self._session.add(self._outbox_row(alert))
+        try:
+            await self._session.commit()
+        except IntegrityError:
+            await self._session.rollback()
+            return None
+        await self._session.refresh(state)
+        return state.to_entity()
 
     async def pending_alerts(self, *, limit: int = DEFAULT_PAGE_SIZE) -> list[PendingBudgetAlert]:
         rows = await self._session.scalars(
@@ -132,10 +176,17 @@ class SQLAlchemyBudgetAlertStateRepository:
         delivery (e.g. webhook succeeds, email fails) therefore re-delivers to
         the already-succeeded channel on the next attempt; accepted for v1 as
         the outbox's existing at-least-once posture, not a new gap."""
+        now = datetime.now(UTC)
         pending = (
             await self._session.scalars(
                 select(PendingBudgetAlertModel)
-                .where(PendingBudgetAlertModel.attempts < MAX_DISPATCH_ATTEMPTS)
+                .where(
+                    PendingBudgetAlertModel.attempts < MAX_DISPATCH_ATTEMPTS,
+                    or_(
+                        PendingBudgetAlertModel.claimed_until.is_(None),
+                        PendingBudgetAlertModel.claimed_until < now,
+                    ),
+                )
                 .order_by(PendingBudgetAlertModel.created_at)
                 .limit(limit)
             )
@@ -149,6 +200,8 @@ class SQLAlchemyBudgetAlertStateRepository:
         batch = [(row.id, row.attempts, row.to_entity()) for row in pending]
         delivered = 0
         for row_id, attempts, alert in batch:
+            if not await self._claim(row_id, now):
+                continue  # another dispatcher owns this row
             try:
                 # Resolve inside the per-row try so a bad resolve (e.g. a
                 # stored URL that fails channel construction) marks just that
@@ -168,6 +221,42 @@ class SQLAlchemyBudgetAlertStateRepository:
                 await self._mark_failed_attempt(row_id, attempts + 1, exc)
         return delivered
 
+    async def _claim(self, row_id: UUID, now: datetime) -> bool:
+        """Take ownership of one pending row, atomically.
+
+        A conditional UPDATE is a compare-and-swap the database serializes for
+        us: concurrent dispatchers both try it, the second re-evaluates the
+        predicate after the first commits and matches nothing. Portable across
+        PostgreSQL and SQLite, unlike `FOR UPDATE SKIP LOCKED`, and unlike the
+        previous select-send-delete it closes the window in which two replicas
+        both delivered the same alert before either deleted the row
+        (ISSUE-026). An expired lease is claimable again, so a dispatcher that
+        dies mid-delivery does not strand the alert.
+
+        Note the deliberate trade: a claim whose holder dies mid-send can be
+        retried once the lease expires, so delivery stays at-least-once
+        (unchanged) while ceasing to be at-least-once *per replica*."""
+        # Any: the async execute() is typed Result, but at runtime it is a
+        # CursorResult exposing rowcount.
+        try:
+            result: Any = await self._session.execute(
+                update(PendingBudgetAlertModel)
+                .where(
+                    PendingBudgetAlertModel.id == row_id,
+                    or_(
+                        PendingBudgetAlertModel.claimed_until.is_(None),
+                        PendingBudgetAlertModel.claimed_until < now,
+                    ),
+                )
+                .values(claimed_until=now + timedelta(seconds=DISPATCH_LEASE_SECONDS))
+            )
+            await self._session.commit()
+        except Exception:
+            await self._session.rollback()
+            logger.warning("failed to claim pending budget alert", exc_info=True)
+            return False
+        return bool(result.rowcount)
+
     async def _mark_failed_attempt(self, row_id: UUID, attempts: int, exc: Exception) -> None:
         """Failure bookkeeping for one pending alert: count the attempt and
         keep the last error. At MAX_DISPATCH_ATTEMPTS the row stops being
@@ -177,7 +266,9 @@ class SQLAlchemyBudgetAlertStateRepository:
             await self._session.execute(
                 update(PendingBudgetAlertModel)
                 .where(PendingBudgetAlertModel.id == row_id)
-                .values(attempts=attempts, last_error=repr(exc)[:500])
+                # Release the claim too: this dispatcher is done with the row,
+                # so the next drain may retry it without waiting out the lease.
+                .values(attempts=attempts, last_error=repr(exc)[:500], claimed_until=None)
             )
             await self._session.commit()
         except Exception:  # bookkeeping is best-effort; the row stays selectable

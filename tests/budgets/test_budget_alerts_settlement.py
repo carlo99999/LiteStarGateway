@@ -93,13 +93,15 @@ class FakeBudgets:
 
 class FakeBudgetAlertState:
     """In-memory dedup ledger + outbox, mirroring the real repository's
-    contract: `record_fired` returns `None` on a duplicate dedup key."""
+    contract: `record_fired_and_enqueue` returns `None` on a duplicate dedup
+    key, and writes both artifacts or neither."""
 
     def __init__(self) -> None:
         self._fired: set[tuple[UUID, BudgetWindow, datetime, int]] = set()
         self.enqueued: list[PendingBudgetAlert] = []
         self.record_fired_calls = 0
         self.raise_on_fired_thresholds: Exception | None = None
+        self.raise_on_write: Exception | None = None
 
     async def fired_thresholds(
         self, team_id: UUID, window: BudgetWindow, period_start: datetime
@@ -112,25 +114,25 @@ class FakeBudgetAlertState:
             if tid == team_id and w == window and ps == period_start
         }
 
-    async def record_fired(
-        self, team_id: UUID, window: BudgetWindow, period_start: datetime, threshold: int
-    ) -> BudgetAlertState | None:
+    async def record_fired_and_enqueue(self, alert: PendingBudgetAlert) -> BudgetAlertState | None:
         self.record_fired_calls += 1
-        key = (team_id, window, period_start, threshold)
+        key = (alert.team_id, alert.window, alert.period_start, alert.threshold)
         if key in self._fired:
             return None
+        if self.raise_on_write is not None:
+            # A real transaction rolls back both inserts, so the fake must not
+            # leave the dedup key behind either.
+            raise self.raise_on_write
         self._fired.add(key)
+        self.enqueued.append(alert)
         return BudgetAlertState(
             id=uuid4(),
-            team_id=team_id,
-            window=window,
-            period_start=period_start,
-            threshold=threshold,
+            team_id=alert.team_id,
+            window=alert.window,
+            period_start=alert.period_start,
+            threshold=alert.threshold,
             fired_at=datetime.now(UTC),
         )
-
-    async def enqueue_alert(self, alert: PendingBudgetAlert) -> None:
-        self.enqueued.append(alert)
 
     async def pending_alerts(self, *, limit: int = 50) -> list[PendingBudgetAlert]:
         return list(self.enqueued[:limit])
@@ -333,3 +335,32 @@ async def test_alert_evaluation_failure_does_not_break_settlement(
 
     assert usage.events  # billing still landed despite the alert failure
     assert alert_state.enqueued == []
+
+
+async def test_a_failed_outbox_write_leaves_the_threshold_unfired_and_retryable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ISSUE-026, first window: the dedup row and the outbox row commit
+    together, so a failure leaves NEITHER. Previously the dedup row committed
+    first, and a failure right after it marked the threshold fired with nothing
+    to deliver — every later evaluation then skipped it, losing the alert."""
+    _freeze(monkeypatch, datetime(2026, 7, 15, tzinfo=UTC))
+    model = _model()
+    budget = _budget(100.0, [80])
+    alert_state = FakeBudgetAlertState()
+    alert_state.raise_on_write = RuntimeError("outbox insert failed")
+    usage = FakeUsage()
+    meter = _meter(usage, FakeBudgets(budget), alert_state)
+
+    await _settle(meter, model, prompt_tokens=85)
+
+    period_start = datetime(2026, 7, 1, tzinfo=UTC)
+    assert await alert_state.fired_thresholds(TEAM_ID, budget.window, period_start) == set()
+    assert alert_state.enqueued == []
+
+    # The next settlement still sees the threshold as un-fired and retries it.
+    alert_state.raise_on_write = None
+    await _settle(meter, model, prompt_tokens=1)
+
+    assert await alert_state.fired_thresholds(TEAM_ID, budget.window, period_start) == {80}
+    assert len(alert_state.enqueued) == 1
