@@ -9,10 +9,12 @@ budget admission, usage metering, billing, traces — is delegated to `UsageMete
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import weakref
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from time import perf_counter
 from typing import Any
@@ -33,6 +35,7 @@ from litestar_gateway.domain.exceptions import (
     ProviderMismatch,
     UnsupportedOperation,
     UpstreamResponseInvalid,
+    UpstreamTimeout,
 )
 from litestar_gateway.domain.failover import is_failover_eligible
 from litestar_gateway.domain.ports import (
@@ -1091,6 +1094,35 @@ class CompletionService:
                 allowed.append(candidate)
         return allowed
 
+    @asynccontextmanager
+    async def _within_deadline(self, router: RouterConfig, start: float) -> AsyncIterator[None]:
+        """Bound one failover attempt by whatever is left of the router's
+        `overall_deadline_ms` wall-clock budget (ISSUE-027).
+
+        The deadline used to be checked only *between* attempts, which made it
+        a gate on starting a retry rather than a budget for the chain: a single
+        slow attempt could run to the SDK timeout and blow past it entirely.
+        The point of the property is precisely to stop
+        `slow-timeout x candidates` from outlasting the caller's patience, so
+        the budget has to cut off the attempt in flight.
+
+        Expiry surfaces as `UpstreamTimeout`, which is failover-eligible: the
+        loop's next iteration re-checks the budget, finds nothing left, and
+        raises it. Release, settlement and breaker bookkeeping are unchanged —
+        the timeout arrives as an exception through the same paths a provider
+        timeout already takes."""
+        if router.overall_deadline_ms is None:
+            yield
+            return
+        remaining = router.overall_deadline_ms / 1000 - (perf_counter() - start)
+        if remaining <= 0:
+            raise UpstreamTimeout("failover deadline exceeded before the attempt started")
+        try:
+            async with asyncio.timeout(remaining):
+                yield
+        except TimeoutError as exc:
+            raise UpstreamTimeout("failover deadline exceeded during the attempt") from exc
+
     async def _chat_completion_with_failover(
         self,
         team_id: UUID,
@@ -1147,18 +1179,19 @@ class CompletionService:
                         skip_team_rate_limit=True,
                     )
                 try:
-                    response = await self._dispatch(
-                        team_id,
-                        api_key_id,
-                        attempt_model,
-                        "chat.completions",
-                        attempt_clean,
-                        lambda m=attempt_model, v=attempt_values, c=attempt_clean: (
-                            self._gateway.achat_completion(c, m, v)
-                        ),
-                        attempt_reservation,
-                        attribution=attribution,
-                    )
+                    async with self._within_deadline(router, start):
+                        response = await self._dispatch(
+                            team_id,
+                            api_key_id,
+                            attempt_model,
+                            "chat.completions",
+                            attempt_clean,
+                            lambda m=attempt_model, v=attempt_values, c=attempt_clean: (
+                                self._gateway.achat_completion(c, m, v)
+                            ),
+                            attempt_reservation,
+                            attribution=attribution,
+                        )
                 except DomainError as exc:
                     # UpstreamResponseInvalid already billed a partial charge
                     # inside _dispatch (settle_error) before re-raising; retrying
@@ -1386,9 +1419,10 @@ class CompletionService:
                         skip_team_rate_limit=True,
                     )
                 try:
-                    stream = await self._gateway.astream_chat_completion(
-                        attempt_clean, attempt_model, attempt_values
-                    )
+                    async with self._within_deadline(router, start):
+                        stream = await self._gateway.astream_chat_completion(
+                            attempt_clean, attempt_model, attempt_values
+                        )
                 except DomainError as exc:
                     # Never entered _metered, so nothing else releases this
                     # attempt's reservation -- we must release it ourselves.
@@ -1414,7 +1448,8 @@ class CompletionService:
                     attribution,
                 )
                 try:
-                    primed = await _prime(gen)
+                    async with self._within_deadline(router, start):
+                        primed = await _prime(gen)
                 except DomainError as exc:
                     # metered_stream's own shielded finally already released this
                     # reservation (via the release() closure _metered wired in)
