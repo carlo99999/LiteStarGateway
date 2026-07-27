@@ -1,8 +1,10 @@
-"""Persistence for the budget-alert dedup ledger (Plan 07 Phase 0).
+"""Persistence for the budget-alert dedup ledger + outbox (Plan 07 Phases 0-1).
 
 Exercises `SQLAlchemyBudgetAlertStateRepository` directly against a SQLite
 session, mirroring `tests/misc/test_usage_outbox.py`'s style for repository-
-level tests. Not wired into any request path yet (Phase 1)."""
+level tests. `record_fired`/`fired_thresholds` are wired into
+`UsageMeter.settle_ok` as of Phase 1; `enqueue_alert`/`pending_alerts` are the
+Phase 1 outbox side (delivery itself is Phase 2)."""
 
 from __future__ import annotations
 
@@ -15,7 +17,7 @@ import pytest
 from advanced_alchemy.extensions.litestar import base
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from litestar_gateway.domain.entities import BudgetWindow
+from litestar_gateway.domain.entities import BudgetWindow, PendingBudgetAlert
 from litestar_gateway.infrastructure.persistence.budget_alert_state_repository import (
     SQLAlchemyBudgetAlertStateRepository,
 )
@@ -96,3 +98,61 @@ async def test_daily_and_monthly_windows_are_independent(session: AsyncSession) 
 
     assert await repo.fired_thresholds(team_id, BudgetWindow.MONTHLY, period_start) == {50}
     assert await repo.fired_thresholds(team_id, BudgetWindow.DAILY, period_start) == set()
+
+
+async def test_enqueue_alert_is_readable_via_pending_alerts(session: AsyncSession) -> None:
+    repo = SQLAlchemyBudgetAlertStateRepository(session)
+    team_id = uuid4()
+    period_start = datetime(2026, 7, 1, tzinfo=UTC)
+    alert = PendingBudgetAlert(
+        id=uuid4(),
+        team_id=team_id,
+        window=BudgetWindow.MONTHLY,
+        period_start=period_start,
+        threshold=80,
+        spend=85.0,
+        limit_cost=100.0,
+        created_at=datetime.now(UTC),
+    )
+
+    await repo.enqueue_alert(alert)
+
+    pending = await repo.pending_alerts()
+    assert len(pending) == 1
+    row = pending[0]
+    assert row.id == alert.id
+    assert row.team_id == team_id
+    assert row.window == BudgetWindow.MONTHLY
+    assert row.period_start == period_start
+    assert row.threshold == 80
+    assert row.spend == 85.0
+    assert row.limit_cost == 100.0
+
+
+async def test_pending_alerts_starts_empty(session: AsyncSession) -> None:
+    repo = SQLAlchemyBudgetAlertStateRepository(session)
+
+    assert await repo.pending_alerts() == []
+
+
+async def test_pending_alerts_respects_limit_oldest_first(session: AsyncSession) -> None:
+    repo = SQLAlchemyBudgetAlertStateRepository(session)
+    team_id = uuid4()
+    period_start = datetime(2026, 7, 1, tzinfo=UTC)
+    for threshold in (50, 80, 100):
+        await repo.enqueue_alert(
+            PendingBudgetAlert(
+                id=uuid4(),
+                team_id=team_id,
+                window=BudgetWindow.MONTHLY,
+                period_start=period_start,
+                threshold=threshold,
+                spend=float(threshold),
+                limit_cost=100.0,
+                created_at=datetime.now(UTC),
+            )
+        )
+
+    pending = await repo.pending_alerts(limit=2)
+
+    assert [row.threshold for row in pending] == [50, 80]

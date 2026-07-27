@@ -25,6 +25,7 @@ from litestar_gateway.domain.entities import (
     ModelType,
     Organization,
     PasswordReset,
+    PendingBudgetAlert,
     Provider,
     ScimToken,
     SecretKey,
@@ -601,6 +602,39 @@ class BudgetAlertStateModel(base.UUIDAuditBase):
             period_start=self.period_start,
             threshold=self.threshold,
             fired_at=self.fired_at,
+        )
+
+
+class PendingBudgetAlertModel(base.UUIDAuditBase):
+    """Durable outbox for newly-fired budget-threshold alerts (Plan 07 Phase 1).
+    Mirrors `PendingUsageEventModel`'s shape (including the poison-quarantine
+    `attempts`/`last_error` columns) so Phase 2's delivery worker can reuse the
+    same drain/retry/quarantine pattern once `NotificationChannel` exists —
+    nothing reads or drains this table yet."""
+
+    __tablename__ = "pending_budget_alert"
+
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    window: Mapped[str] = mapped_column()
+    period_start: Mapped[datetime] = mapped_column()
+    threshold: Mapped[int] = mapped_column()
+    spend: Mapped[float] = mapped_column()
+    limit_cost: Mapped[float] = mapped_column()
+    # Poison-message bookkeeping, unused until Phase 2's delivery worker exists —
+    # reserved now so that phase doesn't need another migration.
+    attempts: Mapped[int] = mapped_column(default=0)
+    last_error: Mapped[str | None] = mapped_column(default=None)
+
+    def to_entity(self) -> PendingBudgetAlert:
+        return PendingBudgetAlert(
+            id=self.id,
+            team_id=self.team_id,
+            window=BudgetWindow(self.window),
+            period_start=self.period_start,
+            threshold=self.threshold,
+            spend=self.spend,
+            limit_cost=self.limit_cost,
+            created_at=self.created_at,
         )
 
 

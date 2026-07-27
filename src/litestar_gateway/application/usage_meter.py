@@ -20,11 +20,18 @@ from uuid import UUID, uuid4
 
 import anyio
 
-from litestar_gateway.domain.budget import window_start
-from litestar_gateway.domain.entities import Model, TraceRecord, UsageAttribution, UsageEvent
+from litestar_gateway.domain.budget import crossed_thresholds, window_start
+from litestar_gateway.domain.entities import (
+    Model,
+    PendingBudgetAlert,
+    TraceRecord,
+    UsageAttribution,
+    UsageEvent,
+)
 from litestar_gateway.domain.exceptions import BudgetExceeded, RateLimited
 from litestar_gateway.domain.ports import (
     APIKeyRepository,
+    BudgetAlertStateRepository,
     BudgetRepository,
     RateLimiter,
     TeamRepository,
@@ -283,10 +290,15 @@ class UsageMeter:
         rate_limiter: RateLimiter | None = None,
         teams: TeamRepository | None = None,
         api_keys: APIKeyRepository | None = None,
+        budget_alert_state: BudgetAlertStateRepository | None = None,
     ) -> None:
         self._usage = usage
         self._emit_trace = emit_trace
         self._budgets = budgets
+        # Proactive threshold alerts (Plan 07 Phase 1): optional, like `budgets`
+        # itself — without both a budget repo and this dedup/outbox port,
+        # settle_ok's alert evaluation is a no-op.
+        self._budget_alert_state = budget_alert_state
         # Rate limiting is opt-in: without a limiter admit skips the RPM gates.
         # The team gate needs the team repo; the key gate needs the api-key repo.
         self._rate_limiter = rate_limiter
@@ -408,6 +420,11 @@ class UsageMeter:
             request,
             attribution,
         )
+        # Proactive threshold alerts (Plan 07 Phase 1, design doc §3): evaluated
+        # right after the ledger write, on committed spend. Not hooked into
+        # settle_error/settle_cache_hit — only a genuine successful settlement
+        # advances alerts, matching the plan's scope.
+        await self._evaluate_budget_alerts(team_id, now)
         # Trace = observability (latency/analytics), fire-and-forget off the path.
         self._emit_trace(
             TraceRecord(
@@ -652,6 +669,59 @@ class UsageMeter:
                 cache_hit=cache_hit,
             )
         )
+
+    async def _evaluate_budget_alerts(self, team_id: UUID, now: datetime) -> None:
+        """Proactive threshold alerts (Plan 07 Phase 1, design doc §3). Reads
+        the same `spend_since` aggregate the pre-call gate uses, scoped to the
+        budget's own window, so a threshold newly crossed by this settlement's
+        committed cost is caught. For each newly-crossed threshold: record the
+        dedup key first, and only enqueue an outbox row if that insert actually
+        won the race (a `None` return means a concurrent settlement already
+        fired it) — this ordering is what makes "fired but never enqueued"
+        impossible while still tolerating "enqueued but not yet delivered".
+
+        Optional like the budget gate itself: without both a `BudgetRepository`
+        and a `BudgetAlertStateRepository` wired, or without any configured
+        thresholds, this is a no-op. Fail-safe: any error here is logged and
+        swallowed, never widening `settle_ok`'s own failure surface (design
+        doc §7) — a broken alert evaluation must never fail a billed request."""
+        if self._budgets is None or self._budget_alert_state is None:
+            return
+        try:
+            budget = await self._budgets.get(team_id)
+            if budget is None or not budget.thresholds:
+                return
+            period_start = window_start(budget.window, now)
+            spend = await self._usage.spend_since(team_id, period_start)
+            fired = await self._budget_alert_state.fired_thresholds(
+                team_id, budget.window, period_start
+            )
+            newly_crossed = crossed_thresholds(
+                spend=spend,
+                limit_cost=budget.limit_cost,
+                thresholds=budget.thresholds,
+                fired=fired,
+            )
+            for threshold in newly_crossed:
+                state = await self._budget_alert_state.record_fired(
+                    team_id, budget.window, period_start, threshold
+                )
+                if state is None:
+                    continue
+                await self._budget_alert_state.enqueue_alert(
+                    PendingBudgetAlert(
+                        id=uuid4(),
+                        team_id=team_id,
+                        window=budget.window,
+                        period_start=period_start,
+                        threshold=threshold,
+                        spend=spend,
+                        limit_cost=budget.limit_cost,
+                        created_at=now,
+                    )
+                )
+        except Exception:  # alert evaluation must never fail the request
+            logger.warning("budget alert evaluation failed", exc_info=True)
 
     async def metered_stream(
         self,

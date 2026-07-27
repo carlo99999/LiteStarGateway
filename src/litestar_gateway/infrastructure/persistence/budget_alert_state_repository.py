@@ -9,8 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_gateway.domain.entities import BudgetAlertState, BudgetWindow
-from litestar_gateway.infrastructure.persistence.orm import BudgetAlertStateModel
+from litestar_gateway.domain.entities import BudgetAlertState, BudgetWindow, PendingBudgetAlert
+from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
+from litestar_gateway.infrastructure.persistence.orm import (
+    BudgetAlertStateModel,
+    PendingBudgetAlertModel,
+)
 
 
 class SQLAlchemyBudgetAlertStateRepository:
@@ -56,3 +60,25 @@ class SQLAlchemyBudgetAlertStateRepository:
             return None
         await self._session.refresh(row)
         return row.to_entity()
+
+    async def enqueue_alert(self, alert: PendingBudgetAlert) -> None:
+        self._session.add(
+            PendingBudgetAlertModel(
+                id=alert.id,
+                team_id=alert.team_id,
+                window=alert.window.value,
+                period_start=alert.period_start,
+                threshold=alert.threshold,
+                spend=alert.spend,
+                limit_cost=alert.limit_cost,
+            )
+        )
+        await self._session.commit()
+
+    async def pending_alerts(self, *, limit: int = DEFAULT_PAGE_SIZE) -> list[PendingBudgetAlert]:
+        rows = await self._session.scalars(
+            select(PendingBudgetAlertModel)
+            .order_by(PendingBudgetAlertModel.created_at)
+            .limit(limit)
+        )
+        return [row.to_entity() for row in rows.all()]
