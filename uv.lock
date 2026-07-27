@@ -1171,7 +1171,7 @@ requires-dist = [
     { name = "google-genai", specifier = ">=2.10.0,<3" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "litestar", extras = ["standard"], specifier = ">=2.24.0" },
-    { name = "mlflow-skinny", specifier = ">=3.14.0" },
+    { name = "mlflow-skinny", specifier = ">=3.14.0,<4" },
     { name = "openai", specifier = ">=2.44.0" },
     { name = "pwdlib", extras = ["argon2"], specifier = ">=0.3.0" },
     { name = "pyjwt", specifier = ">=2.13.0" },
