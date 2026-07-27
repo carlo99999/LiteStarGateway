@@ -197,15 +197,20 @@ export function SsoSettingsPage() {
 
         <div className="grid gap-2">
           <Label htmlFor="sso-redirect-uri">
-            redirect uri <span className="text-muted-foreground">(optional)</span>
+            redirect uri{" "}
+            <span className="text-muted-foreground">(required outside local development)</span>
           </Label>
           <Input
             id="sso-redirect-uri"
             value={redirectUri}
             onChange={(e) => setRedirectUri(e.target.value)}
-            placeholder="derived from the request when unset"
+            placeholder="https://gateway.example.com/sso/callback"
             autoComplete="off"
           />
+          <p className="text-xs text-muted-foreground">
+            left unset, the callback URL is derived from the request host — accepted only in
+            local development, refused by the API in any deployed environment.
+          </p>
         </div>
 
         <div className="grid gap-2">

@@ -24,8 +24,16 @@ def _require_platform_admin(actor: User) -> None:
 
 
 class SsoSettingsService:
-    def __init__(self, repository: SsoSettingsRepository) -> None:
+    def __init__(
+        self, repository: SsoSettingsRepository, *, require_fixed_redirect_uri: bool = False
+    ) -> None:
         self._repo = repository
+        # Outside local development the callback URL must be explicit: with none
+        # configured, `session/sso.py` derives it from the request's `Host`, so a
+        # forged host steers the redirect URI declared in the authorization
+        # request. `config.py` already refuses this for the env-var path; the
+        # DB-backed path reopened it (ISSUE-028).
+        self._require_fixed_redirect_uri = require_fixed_redirect_uri
 
     async def get(self, actor: User) -> SsoSettings:
         _require_platform_admin(actor)
@@ -62,6 +70,11 @@ class SsoSettingsService:
             already_has_secret = existing is not None and existing.has_client_secret
             if client_secret is None and not already_has_secret:
                 raise InvalidSsoSettings("client_secret is required to enable SSO")
+            if self._require_fixed_redirect_uri and not (redirect_uri or "").strip():
+                raise InvalidSsoSettings(
+                    "redirect_uri is required to enable SSO outside local environments "
+                    "(otherwise the callback URL is derived from the untrusted Host header)"
+                )
         return await self._repo.upsert(
             enabled=enabled,
             discovery_url=discovery_url,

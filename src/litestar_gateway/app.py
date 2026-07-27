@@ -294,6 +294,10 @@ def _build_dependencies(
         "callable_resolver": Provide(provide_callable_resolver, sync_to_thread=False),
         "credential_service": Provide(provide_credential_service, sync_to_thread=False),
         "sso_settings_service": Provide(provide_sso_settings_service, sync_to_thread=False),
+        # Deployment policy for the DB-backed SSO config: outside local, an
+        # explicit callback URL is mandatory (ISSUE-028), matching the env-var
+        # check in `config.py`.
+        "require_fixed_sso_redirect": Provide(lambda: not settings.is_local, sync_to_thread=False),
         "completion_service": Provide(provide_completion_service, sync_to_thread=False),
         "service_principal_service": Provide(
             provide_service_principal_service, sync_to_thread=False

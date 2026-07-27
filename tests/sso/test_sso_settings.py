@@ -164,3 +164,65 @@ async def test_disabling_falls_back_to_not_configured(tmp_path: Path) -> None:
 
         resp = await client.get("/sso/login", follow_redirects=False)
         assert resp.status_code == HTTP_404_NOT_FOUND
+
+
+# ---------------------------------------------------------------------------
+# ISSUE-028: outside local, the callback URL must be explicit here too.
+# ---------------------------------------------------------------------------
+
+
+def _prod_client(tmp_path: Path) -> AsyncTestClient:
+    """Same app, deployed (staging) environment. The env-var path already
+    refuses to enable SSO without `OIDC_REDIRECT_URI` outside local
+    (`config.py`), because otherwise the callback is derived from the request's
+    `Host`. Staging rather than production only because production
+    additionally demands PostgreSQL; the SSO rule is the same for both."""
+    return AsyncTestClient(app=create_app(_settings(tmp_path, environment="staging")))
+
+
+async def test_enabling_without_a_redirect_uri_is_rejected_outside_local(
+    tmp_path: Path,
+) -> None:
+    async with _prod_client(tmp_path) as client:
+        resp = await client.put(
+            "/platform/sso-settings",
+            json={**VALID_PAYLOAD, "redirect_uri": None},
+            headers=await _admin_headers(client),
+        )
+        assert resp.status_code == HTTP_400_BAD_REQUEST, resp.text
+        assert "redirect_uri" in resp.text
+
+
+async def test_a_configured_redirect_uri_is_accepted_outside_local(tmp_path: Path) -> None:
+    async with _prod_client(tmp_path) as client:
+        resp = await client.put(
+            "/platform/sso-settings",
+            json={**VALID_PAYLOAD, "redirect_uri": "https://gw.example.com/sso/callback"},
+            headers=await _admin_headers(client),
+        )
+        assert resp.status_code == HTTP_200_OK, resp.text
+        assert resp.json()["redirect_uri"] == "https://gw.example.com/sso/callback"
+
+
+async def test_disabling_sso_outside_local_needs_no_redirect_uri(tmp_path: Path) -> None:
+    # The requirement belongs to an *enabled* configuration; turning SSO off
+    # must never be blocked by it.
+    async with _prod_client(tmp_path) as client:
+        resp = await client.put(
+            "/platform/sso-settings",
+            json={**VALID_PAYLOAD, "enabled": False, "redirect_uri": None},
+            headers=await _admin_headers(client),
+        )
+        assert resp.status_code == HTTP_200_OK, resp.text
+
+
+async def test_local_development_still_derives_the_callback(tmp_path: Path) -> None:
+    # Deriving from the request host is a genuine convenience on localhost;
+    # only deployed environments lose it.
+    async with _plain_client(tmp_path) as client:
+        resp = await client.put(
+            "/platform/sso-settings",
+            json={**VALID_PAYLOAD, "redirect_uri": None},
+            headers=await _admin_headers(client),
+        )
+        assert resp.status_code == HTTP_200_OK, resp.text

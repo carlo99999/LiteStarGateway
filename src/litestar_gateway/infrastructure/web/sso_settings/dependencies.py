@@ -15,5 +15,9 @@ from litestar_gateway.infrastructure.persistence.sso_settings_repository import 
 def provide_sso_settings_service(
     db_session: NamedDependency[AsyncSession],
     keyring: NamedDependency[Keyring],
+    require_fixed_sso_redirect: NamedDependency[bool],
 ) -> SsoSettingsService:
-    return SsoSettingsService(SQLAlchemySsoSettingsRepository(db_session, keyring))
+    return SsoSettingsService(
+        SQLAlchemySsoSettingsRepository(db_session, keyring),
+        require_fixed_redirect_uri=require_fixed_sso_redirect,
+    )

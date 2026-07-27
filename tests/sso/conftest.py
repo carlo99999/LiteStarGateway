@@ -11,11 +11,11 @@ from litestar.status_codes import HTTP_200_OK
 from litestar.testing import AsyncTestClient
 
 from litestar_gateway.app import create_app
-from litestar_gateway.config import Settings
+from litestar_gateway.config import DEFAULT_ENVIRONMENT, Settings
 from litestar_gateway.domain.entities import ExternalIdentity
 
 ADMIN_GROUP = "gw-admins"
-_MASTER_KEY = "master-secret"  # pragma: allowlist secret
+_MASTER_KEY = "master-secret-0123456789-abcdefghij"  # pragma: allowlist secret
 
 
 def _identity(
@@ -45,14 +45,20 @@ class FakeIdP:
         return self._identity
 
 
-def _settings(tmp_path: Path) -> Settings:
+def _settings(tmp_path: Path, *, environment: str | None = None) -> Settings:
+    """`environment` defaults to the local dev value; pass a deployed one (e.g.
+    "staging") to exercise the rules that only apply outside local (ISSUE-028).
+    A deployed environment also demands secure cookies and long secrets, all
+    checked at startup."""
     return Settings(
         database_url=f"sqlite+aiosqlite:///{tmp_path / 'sso.db'}",
         admin_email="admin@example.com",
         master_key=_MASTER_KEY,
         jwt_secret="test-secret-key-0123456789-abcdefghij",
-        salt_key="test-salt-key",
+        salt_key="test-salt-key-0123456789-abcdefghij",  # pragma: allowlist secret
         oidc_admin_groups=(ADMIN_GROUP,),
+        environment=environment or DEFAULT_ENVIRONMENT,
+        session_cookie_secure=environment is not None,
     )
 
 
