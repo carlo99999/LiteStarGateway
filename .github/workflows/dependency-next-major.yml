@@ -1,0 +1,67 @@
+name: Dependency next-major compatibility (mlflow-skinny)
+
+# Informational only. This workflow NEVER runs on pull_request/push, so it can
+# never show up as a red X on an unrelated PR and is not a candidate for
+# branch-protection required checks. It exists to give early warning before
+# the next mlflow-skinny major (currently pinned >=3.14,<4 in pyproject.toml)
+# is deliberately adopted.
+on:
+  schedule:
+    - cron: "0 5 * * 1" # Monday 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mlflow-next-major:
+    runs-on: ubuntu-latest
+    # Belt-and-braces: even if a step below misbehaves, the job itself must
+    # never fail the run.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      # Baseline install from the committed lockfile (mlflow-skinny pinned
+      # >=3.14,<4 here, same as normal CI).
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # Override the ceiling for this job only, via uv's pip-compatible
+      # interface — does not touch pyproject.toml/uv.lock.
+      - name: Force-upgrade mlflow-skinny to the next major
+        id: upgrade
+        continue-on-error: true
+        run: uv pip install --upgrade "mlflow-skinny>=4,<5"
+
+      # Smoke-run the full suite against the overridden version. Informational:
+      # failures are captured and summarized, never surfaced as a run failure.
+      - name: Run test suite against next-major mlflow-skinny
+        id: test
+        if: steps.upgrade.outcome == 'success'
+        continue-on-error: true
+        run: uv run --no-sync pytest -q 2>&1 | tee pytest-next-major.log
+
+      - name: Summarize result
+        if: always()
+        run: |
+          {
+            echo "### mlflow-skinny next-major (>=4,<5) compatibility"
+            echo
+            if [ "${{ steps.upgrade.outcome }}" != "success" ]; then
+              echo "Could not install mlflow-skinny>=4,<5 — see the upgrade step log."
+            elif [ "${{ steps.test.outcome }}" = "success" ]; then
+              echo "All tests passed against the next major version."
+            else
+              echo "Test suite reported failures against the next major version:"
+              echo
+              echo '```'
+              tail -n 60 pytest-next-major.log 2>/dev/null || echo "(no log captured)"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
