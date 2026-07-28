@@ -18,6 +18,8 @@ def _settings(environment: str) -> Settings:
         salt_key="s" * 32,
         environment=environment,
         session_cookie_secure=True,
+        # Production refuses to start without Redis; never connected here.
+        redis_url="redis://localhost:6379",
     )
 
 

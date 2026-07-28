@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import uuid
 from collections.abc import Iterable, Iterator
 
 import pytest
 from support.doubles import FakeRedis, MutableClock
+from support.redis import REDIS_TEST_URL, requires_redis
 
 from litestar_gateway.infrastructure.circuit_breaker import (
     InMemoryCircuitBreaker,
@@ -253,3 +256,56 @@ async def test_an_ordinary_success_still_resets_the_failure_count(kind: str) -> 
     await breaker.record_success("m")
 
     assert (await breaker.allow("m")).allowed is True
+
+
+# ---------------------------------------------------------------------------
+# Against a real Redis: the semantics a Python double cannot vouch for.
+# ---------------------------------------------------------------------------
+
+
+@requires_redis
+async def test_the_open_marker_really_outlives_the_cooldown_in_redis() -> None:
+    """ISSUE-029 in its original form: server-side TTL expiry, not a fake's.
+    With the marker gone at exactly the cooldown, `allow()` read "closed" and
+    admitted everyone at once."""
+    from redis.asyncio import Redis
+
+    client = Redis.from_url(str(REDIS_TEST_URL))
+    key = f"conformance-{uuid.uuid4().hex[:8]}"
+    try:
+        breaker = RedisCircuitBreaker(client, failure_threshold=1, cooldown_seconds=1)
+        await breaker.record_failure(key)
+        assert (await breaker.allow(key)).allowed is False  # cooling down
+
+        await asyncio.sleep(1.2)  # real time: the server expires its own keys
+        verdicts = [await breaker.allow(key) for _ in range(5)]
+
+        granted = [v for v in verdicts if v.allowed]
+        assert len(granted) == 1  # exactly one half-open trial, fleet-wide
+        assert granted[0].trial_token is not None
+    finally:
+        await client.delete(f"cb:failures:{key}", f"cb:opened:{key}", f"cb:trial:{key}")
+        await client.aclose()
+
+
+@requires_redis
+async def test_a_stale_outcome_cannot_resolve_the_trial_in_redis() -> None:
+    from redis.asyncio import Redis
+
+    client = Redis.from_url(str(REDIS_TEST_URL))
+    key = f"conformance-{uuid.uuid4().hex[:8]}"
+    try:
+        breaker = RedisCircuitBreaker(client, failure_threshold=1, cooldown_seconds=1)
+        await breaker.record_failure(key)
+        await asyncio.sleep(1.2)
+        lease = await breaker.allow(key)
+        assert lease.trial_token is not None
+
+        await breaker.record_success(key)  # a request admitted before the open
+
+        assert (await breaker.allow(key)).allowed is False  # gate still shut
+        await breaker.record_success(key, lease.trial_token)
+        assert (await breaker.allow(key)).allowed is True
+    finally:
+        await client.delete(f"cb:failures:{key}", f"cb:opened:{key}", f"cb:trial:{key}")
+        await client.aclose()

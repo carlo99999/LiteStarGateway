@@ -123,6 +123,8 @@ def _prod_settings() -> Settings:
         salt_key="s" * 32,
         environment="production",
         session_cookie_secure=True,
+        # Production refuses to start without Redis; never connected here.
+        redis_url="redis://localhost:6379",
     )
 
 

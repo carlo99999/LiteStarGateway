@@ -340,6 +340,20 @@ class Settings:
                 "Production requires PostgreSQL: set DATABASE_URL to a "
                 "postgresql+asyncpg:// URL (SQLite is for local development only)"
             )
+        # Production runs on Redis for the same reason. Without it, every shared
+        # component falls back to per-process state: rate limits become N x the
+        # configured value with N replicas, the circuit breaker keeps a private
+        # state machine per replica (the divergence behind ISSUE-029), and the
+        # response cache stops being shared. An infrastructural dependency, not
+        # a preference — so it fails here rather than degrading silently.
+        # Deployed non-production environments keep the warning in `app.py`:
+        # single-replica staging is legitimate and should stay easy to stand up.
+        if self.is_production and not self.redis_url:
+            raise InsecureConfigurationError(
+                "Production requires Redis: set REDIS_URL (without it rate limits, "
+                "the circuit breaker and the response cache are per-process, so "
+                "every replica enforces its own private limits)"
+            )
         if not self.jwt_secret or self.jwt_secret == DEFAULT_JWT_SECRET:
             raise InsecureConfigurationError(
                 "JWT_SECRET must be set to a strong, non-default value outside local environments"

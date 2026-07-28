@@ -71,6 +71,19 @@ test-postgres:
     uv run litestar --app {{app}} database upgrade --no-prompt
     uv run pytest -q
 
+# Run the suite with a real Redis available (the adapter tests skip without one).
+# Mirrors the `checks` CI job; ephemeral container, removed on exit.
+test-redis:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    name=lsg-ci-redis
+    docker rm -f "$name" >/dev/null 2>&1 || true
+    docker run -d --name "$name" -p 6380:6379 redis:7-alpine >/dev/null
+    trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+    echo "waiting for redis to accept connections…"
+    until docker exec "$name" redis-cli ping >/dev/null 2>&1; do sleep 1; done
+    REDIS_TEST_URL="redis://localhost:6380" uv run pytest -q
+
 # Run the GitHub Actions `ui` job locally.
 ui-ci:
     #!/usr/bin/env bash

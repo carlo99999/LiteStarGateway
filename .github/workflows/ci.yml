@@ -72,6 +72,26 @@ jobs:
 
   checks:
     runs-on: ubuntu-latest
+    # A real Redis, not a fake: the shared components' semantics (TTL expiry,
+    # SET NX, atomic scripts) are the part a Python double cannot vouch for —
+    # ISSUE-029 was a TTL the fake recorded and never applied. Tests that need
+    # it read REDIS_TEST_URL and skip when it is unset, so a local run without
+    # Docker still works.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      # Deliberately NOT `REDIS_URL`: that name is what `Settings.from_env()`
+      # reads, and setting it would silently change what the whole suite is
+      # testing. This one is opt-in, for the adapter tests only.
+      REDIS_TEST_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v7
 

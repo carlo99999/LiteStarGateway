@@ -13,6 +13,13 @@ Imported as `from support.doubles import ...`: pytest puts `tests/` on
 """
 
 from support.doubles import FakeRedis, MutableClock
+from support.redis import REDIS_TEST_URL, requires_redis
 from support.sessions import two_sessions_over_one_database
 
-__all__ = ["FakeRedis", "MutableClock", "two_sessions_over_one_database"]
+__all__ = [
+    "REDIS_TEST_URL",
+    "FakeRedis",
+    "MutableClock",
+    "requires_redis",
+    "two_sessions_over_one_database",
+]
