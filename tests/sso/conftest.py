@@ -59,6 +59,11 @@ def _settings(tmp_path: Path, *, environment: str | None = None) -> Settings:
         oidc_admin_groups=(ADMIN_GROUP,),
         environment=environment or DEFAULT_ENVIRONMENT,
         session_cookie_secure=environment is not None,
+        # The test client sends `Host: testserver.local`; a deployed Settings demands
+        # the list. `attacker.example` is here so the forged-Host test reaches
+        # the SSO layer instead of being stopped by host filtering — the two
+        # protections are separate and each needs its own test.
+        allowed_hosts=("testserver.local", "attacker.example") if environment else (),
     )
 
 

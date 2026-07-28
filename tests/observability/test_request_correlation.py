@@ -125,6 +125,7 @@ def _prod_settings() -> Settings:
         session_cookie_secure=True,
         # Production refuses to start without Redis; never connected here.
         redis_url="redis://localhost:6379",
+        allowed_hosts=("testserver.local",),
     )
 
 

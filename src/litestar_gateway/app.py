@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from litestar import Litestar, Request, Response, get
+from litestar.config.allowed_hosts import AllowedHostsConfig
 from litestar.datastructures import ResponseHeader
 from litestar.di import NamedDependency, Provide
 from litestar.openapi.config import OpenAPIConfig
@@ -155,6 +156,16 @@ def create_app(
         request_max_body_size=settings.max_body_size,
         exception_handlers={DomainError: domain_exception_handler},
         middleware=[RequestIDMiddleware(settings)],
+        # Refuse a request whose Host this deployment does not answer to, so
+        # anything derived from it (an SSO callback with no fixed URL, any future
+        # request-derived URL) cannot be steered. Empty outside local is refused
+        # at startup; empty in local means "accept anything", which is the only
+        # place that is defensible.
+        allowed_hosts=(
+            AllowedHostsConfig(allowed_hosts=list(settings.allowed_hosts))
+            if settings.allowed_hosts
+            else None
+        ),
     )
     _register_shadow_drain(app)
     return app

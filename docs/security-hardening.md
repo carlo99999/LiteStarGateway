@@ -50,6 +50,11 @@ already shipped (moved here from the README as the list grew).
 
 ## Hardening shipped
 
+- **Allowed hosts** — `ALLOWED_HOSTS` is mandatory outside local development and
+  a request whose `Host` is not on it is refused. Several places derive a URL
+  from the request host (the SSO callback when no fixed one is configured is the
+  one that produced two findings), so this closes the class rather than each
+  instance. `*.example.com` matches subdomains.
 - **Durable billing** — a failed usage-ledger write no longer just
   logs-and-drops: the event is dead-lettered to a `pending_usage_event` outbox
   and a background reconciler (every 60s) retries it into `usage_event`

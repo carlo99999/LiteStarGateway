@@ -32,6 +32,9 @@ def _settings(tmp_path: Path, **overrides) -> Settings:
         "environment": "production",
         "session_cookie_secure": True,
         "redis_url": "redis://localhost:6379",
+        # The test client sends `Host: testserver.local`; a deployed Settings now
+        # demands the list (ISSUE-028/032 class).
+        "allowed_hosts": ("testserver.local",),
     }
     values.update(overrides)
     return Settings(**values)

@@ -222,6 +222,11 @@ class Settings:
     # budget before the store reclaims it. Covers a slow streamed completion;
     # bounds how long a replica killed mid-request can strand headroom.
     budget_reservation_ttl_s: int = 300
+    # Hostnames this deployment answers to. Several places derive a URL from the
+    # request's `Host` (the SSO callback when no fixed one is set is the one that
+    # produced ISSUE-028/032), so accepting any host is only defensible on
+    # localhost. `*.example.com` matches subdomains.
+    allowed_hosts: tuple[str, ...] = ()
     # Trusted reverse-proxy allowlist (IPs/CIDRs, comma-separated) for the
     # request-correlation middleware (Plan 11 Slice A, docs/logging.md §2): an
     # inbound `X-Request-ID` is trusted verbatim only when the direct connecting
@@ -352,6 +357,16 @@ class Settings:
         # a preference — so it fails here rather than degrading silently.
         # Deployed non-production environments keep the warning in `app.py`:
         # single-replica staging is legitimate and should stay easy to stand up.
+        # A deployed gateway knows its own hostnames. Without the list, any
+        # `Host` is accepted and anything derived from it is attacker-influenced
+        # — the class behind ISSUE-028 and ISSUE-032, rather than either
+        # instance.
+        if not self.allowed_hosts:
+            raise InsecureConfigurationError(
+                "ALLOWED_HOSTS must list the hostnames this deployment answers to "
+                "outside local environments (otherwise any Host header is accepted, "
+                "and URLs derived from it are attacker-controlled)"
+            )
         if self.is_production and not self.redis_url:
             raise InsecureConfigurationError(
                 "Production requires Redis: set REDIS_URL (without it rate limits, "
@@ -458,6 +473,9 @@ class Settings:
             session_cookie_secure=_env_bool("SESSION_COOKIE_SECURE", not is_local),
             redis_url=os.environ.get("REDIS_URL"),
             budget_reservation_ttl_s=_env_int("BUDGET_RESERVATION_TTL_SECONDS", 300, minimum=1),
+            allowed_hosts=tuple(
+                h.strip() for h in os.environ.get("ALLOWED_HOSTS", "").split(",") if h.strip()
+            ),
             trusted_proxy_ips=tuple(
                 v.strip() for v in os.environ.get("TRUSTED_PROXY_IPS", "").split(",") if v.strip()
             ),
