@@ -112,6 +112,9 @@ async def test_failing_channel_leaves_row_queued_and_records_error(
 
 
 async def test_no_channels_resolved_is_a_no_op(session: AsyncSession) -> None:
+    """ "Untouched" has to include the claim (ISSUE-031): a row nobody can
+    deliver yet must stay immediately selectable, otherwise configuring a
+    channel is followed by a delivery blackout for the whole lease."""
     repo = SQLAlchemyBudgetAlertStateRepository(session)
     await repo.enqueue_alert(_alert())
 
@@ -119,6 +122,20 @@ async def test_no_channels_resolved_is_a_no_op(session: AsyncSession) -> None:
 
     assert delivered == 0
     assert len(await repo.pending_alerts()) == 1  # untouched, not marked failed
+    row = (await session.scalars(select(PendingBudgetAlertModel))).one()
+    assert (row.attempts, row.claimed_until) == (0, None)
+
+
+async def test_a_channel_configured_after_a_no_channel_drain_delivers_at_once(
+    session: AsyncSession,
+) -> None:
+    repo = SQLAlchemyBudgetAlertStateRepository(session)
+    await repo.enqueue_alert(_alert())
+    assert await repo.dispatch_pending(_const()) == 0  # no channel yet
+
+    channel = _RecordingChannel()
+    assert await repo.dispatch_pending(_const(channel)) == 1  # no lease to wait out
+    assert len(channel.sent) == 1
 
 
 async def test_both_channels_fire_for_one_alert(session: AsyncSession) -> None:

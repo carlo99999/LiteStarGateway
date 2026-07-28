@@ -208,7 +208,13 @@ class SQLAlchemyBudgetAlertStateRepository:
                 # row failed rather than killing the whole batch.
                 channels = await resolve_channels(alert)
                 if not channels:
-                    continue  # nowhere to deliver yet — leave queued, untouched
+                    # Nowhere to deliver yet: leave the row queued AND
+                    # unclaimed. Holding the lease would mean that configuring
+                    # a channel is followed by a delivery blackout until it
+                    # expires — and with no attempt recorded, nothing would
+                    # tell an operator why (ISSUE-031).
+                    await self._release_claim(row_id)
+                    continue
                 for channel in channels:
                     await channel.send(alert)
                 await self._session.execute(
@@ -220,6 +226,21 @@ class SQLAlchemyBudgetAlertStateRepository:
                 await self._session.rollback()
                 await self._mark_failed_attempt(row_id, attempts + 1, exc)
         return delivered
+
+    async def _release_claim(self, row_id: UUID) -> None:
+        """Give the lease back without touching `attempts`: this dispatcher had
+        nothing to do with the row, so the next drain must be able to pick it up
+        immediately."""
+        try:
+            await self._session.execute(
+                update(PendingBudgetAlertModel)
+                .where(PendingBudgetAlertModel.id == row_id)
+                .values(claimed_until=None)
+            )
+            await self._session.commit()
+        except Exception:  # the lease expires on its own; never break the batch
+            await self._session.rollback()
+            logger.warning("failed to release pending budget alert claim", exc_info=True)
 
     async def _claim(self, row_id: UUID, now: datetime) -> bool:
         """Take ownership of one pending row, atomically.
