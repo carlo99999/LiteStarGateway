@@ -42,9 +42,13 @@ server), which is not a production setup.
 
 ## 3. Multi-process implications (call out)
 
-Rate limiting uses Redis when `REDIS_URL` is configured and otherwise falls back
-to an in-memory store per process. Multi-worker or multi-replica deployments
-therefore need Redis for globally consistent limits. Future shared caches should
+**Production refuses to start without `REDIS_URL`** — the same fail-fast
+treatment as the PostgreSQL requirement, and for the same reason: without it
+every shared component (rate limits, circuit breaker, response cache) keeps
+per-process state, so each worker or replica silently enforces its own private
+limits. Other non-local environments log a warning instead, since a
+single-replica staging box is legitimate. Local development falls back to the
+in-memory adapters. Future shared caches should
 reuse the same explicit adapter boundary rather than assuming process-local
 state is global.
 
@@ -58,8 +62,8 @@ state is global.
    `litestar … database upgrade --no-prompt` in `docker-entrypoint.sh` (gated by
    `MIGRATE_ON_START`, default on).
 4. **Redis**: shipped as a `docker-compose.yml` service and enabled via
-   `REDIS_URL` (needed for multi-worker rate limiting; falls back to in-memory
-   when unset).
+   `REDIS_URL`. **Required in production** (startup fails without it); local
+   development falls back to in-memory adapters.
 5. **Production Compose**: app + Postgres + Redis, without reload or MLflow.
    The same app container serves the pre-built UI and has a 3 CPU / 4 GiB
    reservation and limit. `UVICORN_WORKERS` controls process-level parallelism.

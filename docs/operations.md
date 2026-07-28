@@ -247,9 +247,11 @@ provider clients, memory and Postgres pool; size `DB_POOL_SIZE` and
 `DB_MAX_OVERFLOW` against the total worker count. The local load profile defaults
 to 3 workers so its three CPU cores can execute Python work concurrently.
 
-Set `REDIS_URL` to back the rate-limit store with a shared Redis so limits hold
-across workers/replicas (the compose stack includes a `redis` service and sets
-it; drop the var to fall back to the in-memory per-process store). `REDIS_URL`
+`REDIS_URL` is **required in production** (startup fails without it) and backs
+the rate-limit store, circuit breaker and response cache with shared state so
+limits and breaker transitions hold across workers/replicas. The compose stack
+includes a `redis` service and sets it; dropping the var outside production
+falls back to the in-memory per-process adapters, with a startup warning. `REDIS_URL`
 also enables a distributed lock so only one replica runs the daily key rotation
 (without it, rotation assumes a single instance). The trace queue is still
 per-process (each drains its own).

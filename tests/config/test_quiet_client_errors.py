@@ -59,6 +59,7 @@ def test_both_environments_suppress_404_and_405(tmp_path: Path) -> None:
             salt_key="a-strong-random-salt-key-0123456789",  # pragma: allowlist secret
             environment=environment,
             session_cookie_secure=True,
+            redis_url="redis://localhost:6379",
         )
         config = build_logging_config(settings)
         assert config.disable_stack_trace == _QUIET_STATUSES, environment

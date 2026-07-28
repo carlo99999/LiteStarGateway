@@ -20,6 +20,9 @@ from litestar_gateway.domain.entities import TeamRole
 
 STRONG_SECRET = "a-strong-random-production-secret-0123456789"
 POSTGRES_URL = "postgresql+asyncpg://gateway:pw@db:5432/gateway"  # pragma: allowlist secret
+# Production also refuses to start without Redis; every production variant
+# below therefore carries one. Never connected — Settings only reads the URL.
+REDIS_URL = "redis://localhost:6379"
 
 # A valid development baseline; tests derive variants via dataclasses.replace,
 # which re-runs the same __post_init__ validation.
@@ -31,6 +34,7 @@ _BASE = Settings(
     salt_key="a-strong-random-salt-key-0123456789",
     environment="development",
     session_cookie_secure=True,
+    redis_url=REDIS_URL,
 )
 
 
@@ -384,5 +388,6 @@ def test_production_disables_auto_create(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("JWT_SECRET", "x" * 40)
     monkeypatch.setenv("SALT_KEY", "y" * 40)
     monkeypatch.setenv("MASTER_KEY", "z" * 40)
+    monkeypatch.setenv("REDIS_URL", REDIS_URL)
     monkeypatch.delenv("AUTO_CREATE_SCHEMA", raising=False)
     assert Settings.from_env().should_create_schema is False

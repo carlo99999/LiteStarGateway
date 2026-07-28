@@ -51,5 +51,6 @@ def test_create_all_disabled_in_production() -> None:
         salt_key="s" * 32,
         environment="production",
         session_cookie_secure=True,
+        redis_url="redis://localhost:6379",
     )
     assert create_database(production).config.create_all is False

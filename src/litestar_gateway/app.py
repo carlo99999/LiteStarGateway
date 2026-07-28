@@ -417,10 +417,11 @@ def _build_rate_limit_stores(settings: Settings) -> dict[str, Store]:
     # per name (per-process). With REDIS_URL, back them with a shared Redis store so
     # limits hold across replicas. Namespaced per limiter, one client.
     stores: dict[str, Store] = {}
-    if settings.is_production and not settings.redis_url:
-        # A single instance is legitimate, so this is a warning, not an error -
-        # but it must be impossible to miss: with N workers/replicas every
-        # configured limit silently becomes N x the intended one.
+    if not settings.is_local and not settings.redis_url:
+        # Production refuses to start without Redis (config.py). Everything else
+        # outside local gets this warning instead: a single-replica staging box
+        # is legitimate, but with N workers/replicas every configured limit
+        # silently becomes N x the intended one.
         logger.warning(
             "REDIS_URL is not set: rate limits are enforced in-memory PER "
             "PROCESS. With multiple workers or replicas every limit is "
