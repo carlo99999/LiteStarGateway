@@ -266,6 +266,15 @@ class InvalidBudget(DomainError):
     """The budget definition is invalid (non-positive limit or unknown window)."""
 
 
+class GuardrailBlocked(DomainError):
+    """A configured guardrail refused the request or the response (→ 422).
+
+    The message names the provider and the categories it matched, never the
+    content that matched them: a guardrail exists because some text is
+    sensitive, and echoing it into an error body would move the problem rather
+    than solve it."""
+
+
 class InvalidModelPricing(DomainError):
     """A model rate is negative or not a finite number. A negative rate would
     make settlement credit the ledger the budget gate reads, so it is refused
