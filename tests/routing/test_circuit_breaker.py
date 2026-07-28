@@ -6,6 +6,8 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Iterable, Iterator
 
+import pytest
+
 from litestar_gateway.infrastructure.circuit_breaker import (
     InMemoryCircuitBreaker,
     RedisCircuitBreaker,
@@ -90,16 +92,16 @@ class FakeRedis:
 
 async def test_allows_by_default() -> None:
     breaker = InMemoryCircuitBreaker(failure_threshold=3, cooldown_seconds=30)
-    assert await breaker.allow("model:x") is True
+    assert (await breaker.allow("model:x")).allowed is True
 
 
 async def test_trips_after_consecutive_failures_reach_threshold() -> None:
     breaker = InMemoryCircuitBreaker(failure_threshold=3, cooldown_seconds=30, clock=lambda: 0.0)
     await breaker.record_failure("model:x")
     await breaker.record_failure("model:x")
-    assert await breaker.allow("model:x") is True  # 2 failures, still under threshold
+    assert (await breaker.allow("model:x")).allowed is True  # 2 failures, still under threshold
     await breaker.record_failure("model:x")
-    assert await breaker.allow("model:x") is False  # 3rd failure trips it
+    assert (await breaker.allow("model:x")).allowed is False  # 3rd failure trips it
 
 
 async def test_a_success_before_threshold_resets_the_counter() -> None:
@@ -109,54 +111,35 @@ async def test_a_success_before_threshold_resets_the_counter() -> None:
     await breaker.record_success("model:x")
     await breaker.record_failure("model:x")
     await breaker.record_failure("model:x")
-    assert await breaker.allow("model:x") is True  # only 2 consecutive since the success
+    assert (await breaker.allow("model:x")).allowed is True  # only 2 consecutive since the success
 
 
 async def test_allow_returns_true_again_after_cooldown_elapses() -> None:
     clock = SequenceClock([0.0, 0.0, 30.0])
     breaker = InMemoryCircuitBreaker(failure_threshold=1, cooldown_seconds=30, clock=clock)
     await breaker.record_failure("model:x")  # trips open at t=0
-    assert await breaker.allow("model:x") is False  # t=0, still cooling down
-    assert await breaker.allow("model:x") is True  # t=30, half-open trial granted
+    assert (await breaker.allow("model:x")).allowed is False  # t=0, still cooling down
+    assert (await breaker.allow("model:x")).allowed is True  # t=30, half-open trial granted
 
 
 async def test_only_one_half_open_trial_is_granted_at_a_time() -> None:
     clock = SequenceClock([0.0, 30.0, 30.0])
     breaker = InMemoryCircuitBreaker(failure_threshold=1, cooldown_seconds=30, clock=clock)
     await breaker.record_failure("model:x")  # trips open at t=0
-    assert await breaker.allow("model:x") is True  # t=30, half-open trial granted
-    assert await breaker.allow("model:x") is False  # concurrent caller, no second trial
-
-
-async def test_a_failure_during_the_half_open_trial_reopens_with_a_fresh_cooldown() -> None:
-    clock = SequenceClock([0.0, 30.0, 30.0, 40.0, 60.0])
-    breaker = InMemoryCircuitBreaker(failure_threshold=1, cooldown_seconds=30, clock=clock)
-    await breaker.record_failure("model:x")  # trips open at t=0
-    assert await breaker.allow("model:x") is True  # t=30, half-open trial
-    await breaker.record_failure("model:x")  # trial fails at t=30, re-opens
-    assert await breaker.allow("model:x") is False  # t=40, still cooling down (until t=60)
-    assert await breaker.allow("model:x") is True  # t=60, fresh cooldown elapsed
-
-
-async def test_a_success_during_the_half_open_trial_closes_and_resets() -> None:
-    clock = SequenceClock([0.0, 30.0, 30.0, 30.0])
-    breaker = InMemoryCircuitBreaker(failure_threshold=1, cooldown_seconds=30, clock=clock)
-    await breaker.record_failure("model:x")  # trips open at t=0
-    assert await breaker.allow("model:x") is True  # t=30, half-open trial
-    await breaker.record_success("model:x")  # trial succeeds -> closed
-    assert await breaker.allow("model:x") is True  # t=30, closed
+    assert (await breaker.allow("model:x")).allowed is True  # t=30, half-open trial granted
+    assert (await breaker.allow("model:x")).allowed is False  # concurrent caller, no second trial
 
 
 async def test_keys_are_independent() -> None:
     breaker = InMemoryCircuitBreaker(failure_threshold=1, cooldown_seconds=30, clock=lambda: 0.0)
     await breaker.record_failure("model:a")
-    assert await breaker.allow("model:a") is False
-    assert await breaker.allow("model:b") is True
+    assert (await breaker.allow("model:a")).allowed is False
+    assert (await breaker.allow("model:b")).allowed is True
 
 
 async def test_redis_allows_by_default() -> None:
     breaker = RedisCircuitBreaker(FakeRedis(), failure_threshold=3, cooldown_seconds=30)
-    assert await breaker.allow("model:x") is True
+    assert (await breaker.allow("model:x")).allowed is True
 
 
 async def test_redis_trips_after_consecutive_failures_reach_threshold() -> None:
@@ -166,9 +149,9 @@ async def test_redis_trips_after_consecutive_failures_reach_threshold() -> None:
     )
     await breaker.record_failure("model:x")
     await breaker.record_failure("model:x")
-    assert await breaker.allow("model:x") is True
+    assert (await breaker.allow("model:x")).allowed is True
     await breaker.record_failure("model:x")
-    assert await breaker.allow("model:x") is False
+    assert (await breaker.allow("model:x")).allowed is False
 
 
 async def test_redis_success_resets_the_failure_counter() -> None:
@@ -179,7 +162,7 @@ async def test_redis_success_resets_the_failure_counter() -> None:
     await breaker.record_failure("model:x")
     await breaker.record_success("model:x")
     await breaker.record_failure("model:x")
-    assert await breaker.allow("model:x") is True  # only 1 consecutive since the success
+    assert (await breaker.allow("model:x")).allowed is True  # only 1 consecutive since the success
 
 
 async def test_redis_allows_after_cooldown_and_grants_only_one_trial() -> None:
@@ -187,30 +170,9 @@ async def test_redis_allows_after_cooldown_and_grants_only_one_trial() -> None:
     clock = SequenceClock([0.0, 0.0, 30.0, 30.0])
     breaker = RedisCircuitBreaker(client, failure_threshold=1, cooldown_seconds=30, clock=clock)
     await breaker.record_failure("model:x")  # trips open at t=0
-    assert await breaker.allow("model:x") is False  # t=0, cooling down
-    assert await breaker.allow("model:x") is True  # t=30, trial claimed
-    assert await breaker.allow("model:x") is False  # t=30, second caller loses the race
-
-
-async def test_redis_failure_during_half_open_trial_reopens() -> None:
-    client = FakeRedis()
-    clock = SequenceClock([0.0, 30.0, 30.0, 40.0, 60.0])
-    breaker = RedisCircuitBreaker(client, failure_threshold=1, cooldown_seconds=30, clock=clock)
-    await breaker.record_failure("model:x")  # trips open at t=0
-    assert await breaker.allow("model:x") is True  # t=30, trial granted
-    await breaker.record_failure("model:x")  # trial fails, re-opens
-    assert await breaker.allow("model:x") is False  # t=40, cooling down again
-    assert await breaker.allow("model:x") is True  # t=60, fresh cooldown elapsed
-
-
-async def test_redis_success_during_half_open_trial_closes() -> None:
-    client = FakeRedis()
-    clock = SequenceClock([0.0, 30.0, 30.0, 30.0])
-    breaker = RedisCircuitBreaker(client, failure_threshold=1, cooldown_seconds=30, clock=clock)
-    await breaker.record_failure("model:x")  # trips open at t=0
-    assert await breaker.allow("model:x") is True  # t=30, trial granted
-    await breaker.record_success("model:x")  # trial succeeds -> closed
-    assert await breaker.allow("model:x") is True
+    assert (await breaker.allow("model:x")).allowed is False  # t=0, cooling down
+    assert (await breaker.allow("model:x")).allowed is True  # t=30, trial claimed
+    assert (await breaker.allow("model:x")).allowed is False  # t=30, second caller loses the race
 
 
 # ---------------------------------------------------------------------------
@@ -233,41 +195,13 @@ async def test_only_one_caller_gets_the_half_open_trial_after_the_cooldown() -> 
     breaker, redis = _tripped(clock)
     await breaker.record_failure("m")
 
-    assert await breaker.allow("m") is False  # cooling down
+    assert (await breaker.allow("m")).allowed is False  # cooling down
 
     clock.now += 1.2  # cooldown elapsed
-    verdicts = [await breaker.allow("m") for _ in range(5)]
+    verdicts = [(await breaker.allow("m")).allowed for _ in range(5)]
 
     assert verdicts.count(True) == 1
     assert redis.store.get("cb:trial:m") is not None
-
-
-async def test_a_successful_trial_closes_the_breaker() -> None:
-    clock = MutableClock()
-    breaker, redis = _tripped(clock)
-    await breaker.record_failure("m")
-    clock.now += 1.2
-    assert await breaker.allow("m") is True
-
-    await breaker.record_success("m")
-
-    assert redis.store == {}
-    assert await breaker.allow("m") is True
-
-
-async def test_a_failed_trial_reopens_with_a_fresh_cooldown() -> None:
-    clock = MutableClock()
-    breaker, _ = _tripped(clock)
-    await breaker.record_failure("m")
-    clock.now += 1.2
-    assert await breaker.allow("m") is True
-
-    await breaker.record_failure("m")  # the trial failed
-
-    assert await breaker.allow("m") is False
-    clock.now += 1.2
-    assert await breaker.allow("m") is True  # one trial again, not a free-for-all
-    assert await breaker.allow("m") is False
 
 
 async def test_state_is_forgotten_after_a_long_idle_period() -> None:
@@ -280,5 +214,110 @@ async def test_state_is_forgotten_after_a_long_idle_period() -> None:
 
     clock.now += 3_600
 
-    assert await breaker.allow("m") is True
+    assert (await breaker.allow("m")).allowed is True
     assert redis.store.get("cb:opened:m") is None
+
+
+# ---------------------------------------------------------------------------
+# ISSUE-033: only the trial's own outcome decides the transition.
+#
+# One conformance suite over BOTH adapters. The two implementations had one
+# test file each, which is how the Redis one drifted from the in-memory one
+# unnoticed (ISSUE-029); a shared suite is the cheapest device against that.
+# ---------------------------------------------------------------------------
+
+_ADAPTERS = ("in_memory", "redis")
+
+
+def _breaker(kind: str, clock: MutableClock):
+    if kind == "in_memory":
+        return InMemoryCircuitBreaker(1, 1, clock=clock)
+    return RedisCircuitBreaker(FakeRedis(clock=clock), 1, 1, clock=clock)
+
+
+async def _open_and_claim_trial(breaker, clock: MutableClock) -> str:
+    """Trip the breaker, let the cooldown elapse, take the single trial."""
+    await breaker.record_failure("m")
+    assert (await breaker.allow("m")).allowed is False  # cooling down
+    clock.now += 1.2
+    lease = await breaker.allow("m")
+    assert lease.allowed is True
+    assert lease.trial_token is not None
+    return lease.trial_token
+
+
+@pytest.mark.parametrize("kind", _ADAPTERS)
+async def test_a_stale_success_does_not_close_a_breaker_mid_trial(kind: str) -> None:
+    # Request A was admitted before the breaker opened and finishes after T
+    # took the trial. Its success must not remove the gate: nothing about A
+    # says the provider recovered.
+    clock = MutableClock()
+    breaker = _breaker(kind, clock)
+    await _open_and_claim_trial(breaker, clock)
+
+    await breaker.record_success("m")  # A, no trial token
+
+    verdicts = [(await breaker.allow("m")).allowed for _ in range(5)]
+    assert verdicts == [False] * 5  # the gate is still shut, no second trial
+
+
+@pytest.mark.parametrize("kind", _ADAPTERS)
+async def test_a_stale_failure_does_not_reopen_over_a_live_trial(kind: str) -> None:
+    clock = MutableClock()
+    breaker = _breaker(kind, clock)
+    token = await _open_and_claim_trial(breaker, clock)
+
+    await breaker.record_failure("m")  # A, no trial token
+
+    # T's own success is still what decides, and it closes the breaker.
+    await breaker.record_success("m", token)
+    assert (await breaker.allow("m")).allowed is True
+    assert (await breaker.allow("m")).allowed is True  # closed, not half-open
+
+
+@pytest.mark.parametrize("kind", _ADAPTERS)
+async def test_the_trials_own_success_closes_the_breaker(kind: str) -> None:
+    clock = MutableClock()
+    breaker = _breaker(kind, clock)
+    token = await _open_and_claim_trial(breaker, clock)
+
+    await breaker.record_success("m", token)
+
+    assert (await breaker.allow("m")).allowed is True
+
+
+@pytest.mark.parametrize("kind", _ADAPTERS)
+async def test_the_trials_own_failure_reopens_with_a_fresh_cooldown(kind: str) -> None:
+    clock = MutableClock()
+    breaker = _breaker(kind, clock)
+    token = await _open_and_claim_trial(breaker, clock)
+
+    await breaker.record_failure("m", token)
+
+    assert (await breaker.allow("m")).allowed is False
+    clock.now += 1.2
+    assert (await breaker.allow("m")).allowed is True  # one trial again
+    assert (await breaker.allow("m")).allowed is False
+
+
+@pytest.mark.parametrize("kind", _ADAPTERS)
+async def test_a_wrong_token_is_treated_as_stale(kind: str) -> None:
+    clock = MutableClock()
+    breaker = _breaker(kind, clock)
+    await _open_and_claim_trial(breaker, clock)
+
+    await breaker.record_success("m", "not-the-trial-token")
+
+    assert (await breaker.allow("m")).allowed is False
+
+
+@pytest.mark.parametrize("kind", _ADAPTERS)
+async def test_an_ordinary_success_still_resets_the_failure_count(kind: str) -> None:
+    # No regression for the common path: a tokenless success on a CLOSED
+    # breaker is exactly what makes only *consecutive* failures count.
+    clock = MutableClock()
+    breaker = _breaker(kind, clock)
+
+    await breaker.record_success("m")
+
+    assert (await breaker.allow("m")).allowed is True

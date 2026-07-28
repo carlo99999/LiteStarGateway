@@ -515,7 +515,7 @@ async def test_a_failing_attempt_trips_the_breaker_for_a_later_request() -> None
     # Second logical request: the router still picks primary as attempt #1
     # (the breaker only filters the *retry* chain, not attempt #1), but a
     # forced second failure on primary would find secondary skipped this time.
-    assert await breaker.allow(str(primary.id)) is False
+    assert (await breaker.allow(str(primary.id))).allowed is False
 
 
 async def test_a_success_clears_prior_failures_before_the_threshold_trips() -> None:
@@ -540,7 +540,9 @@ async def test_a_success_clears_prior_failures_before_the_threshold_trips() -> N
         circuit_breaker=breaker,
     )
     await service_a.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
-    assert await breaker.allow(str(secondary.id)) is True  # only 1 consecutive failure so far
+    assert (
+        await breaker.allow(str(secondary.id))
+    ).allowed is True  # only 1 consecutive failure so far
 
     gateway_b = ScriptedGateway([])  # secondary succeeds outright this time
     service_b = _service(

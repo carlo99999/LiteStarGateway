@@ -206,7 +206,12 @@ shared cross-request state (in-process counter, or Redis for multi-replica, whic
 the project already wires optionally, `.env.sample:18`). Ship sequential failover
 first; add the breaker only if the failover rate metric shows it is worth it.
 Use a small state port so in-memory development and Redis-backed multi-replica
-production share the same state machine and test contract.
+production share the same state machine and test contract — enforced by one
+parametrized conformance suite over both adapters rather than a test file each.
+`allow()` returns a lease carrying the half-open trial's token, and an outcome
+resolves the trial only when it presents that token: a request admitted before
+the breaker opened can finish after another attempt took the trial, and nothing
+in its result says the provider recovered (ISSUE-033).
 
 ## 8. Config surface & console exposure
 
