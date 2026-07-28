@@ -10,6 +10,7 @@ can't silently introduce drift without failing a test first.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -17,12 +18,15 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from litestar_gateway.application.usage_meter import (
-    InFlightSpend,
     _parse_usage,
     _request_text,
     _reservation_cost,
 )
 from litestar_gateway.domain.entities import Model, ModelType, Provider
+from litestar_gateway.domain.ports import Reservation
+from litestar_gateway.infrastructure.budget_reservation import (
+    InMemoryBudgetReservationStore,
+)
 
 TEAM_ID = uuid4()
 
@@ -51,50 +55,67 @@ def _model(input_cost: float | None, output_cost: float | None) -> Model:
     )
 
 
-# ── InFlightSpend: reservation add/remove round-trips ────────────────────────
+# ── Reservations: the store's arithmetic under any arrival order ─────────────
+
+
+def _reserved_after(operations: list[float], *, release_all: bool = False) -> float:
+    """Drive the store synchronously so hypothesis can generate against it."""
+
+    async def run() -> float:
+        store = InMemoryBudgetReservationStore()
+        held = []
+        for amount in operations:
+            outcome = await store.try_reserve(
+                TEAM_ID, amount, spent=0.0, limit=float("inf"), ttl_s=300
+            )
+            assert outcome.reservation is not None
+            held.append(outcome.reservation)
+        if release_all:
+            for reservation in held:
+                await store.release(reservation)
+        probe = await store.try_reserve(TEAM_ID, 0.0, spent=0.0, limit=float("inf"), ttl_s=300)
+        return probe.reserved
+
+    return asyncio.run(run())
 
 
 @given(amounts=st.lists(_AMOUNT, min_size=1, max_size=50))
-def test_in_flight_spend_add_then_remove_all_returns_to_zero(amounts: list[float]) -> None:
-    spend = InFlightSpend()
-    for amount in amounts:
-        spend.add(TEAM_ID, amount)
-    for amount in amounts:
-        spend.remove(TEAM_ID, amount)
-    # Float summation isn't exactly associative, but removing exactly what was
-    # added (same values, any order) must land within float noise of zero —
-    # not accumulate a persistent drift.
-    assert abs(spend.total(TEAM_ID)) < 1e-6
-
-
-@given(amounts=st.lists(_AMOUNT, min_size=1, max_size=50))
-def test_in_flight_spend_never_goes_negative(amounts: list[float]) -> None:
-    spend = InFlightSpend()
-    total_added = 0.0
-    for amount in amounts:
-        spend.add(TEAM_ID, amount)
-        total_added += amount
-    # Remove more than was ever added — must clamp at zero, never go negative
-    # (a negative in-flight reservation would let a team's committed spend
-    # look smaller than it is, widening the budget gate).
-    spend.remove(TEAM_ID, total_added * 2 + 1.0)
-    assert spend.total(TEAM_ID) == 0.0
+def test_reserving_then_releasing_everything_returns_to_zero(amounts: list[float]) -> None:
+    # Release is by identity, so this is exact rather than within float noise:
+    # nothing is subtracted, the set simply empties.
+    assert _reserved_after(amounts, release_all=True) == 0.0
 
 
 @given(amounts=st.lists(_AMOUNT, min_size=2, max_size=20))
-def test_in_flight_spend_total_is_order_independent(amounts: list[float]) -> None:
-    forward = InFlightSpend()
-    for amount in amounts:
-        forward.add(TEAM_ID, amount)
+def test_the_reserved_total_is_order_independent(amounts: list[float]) -> None:
+    # Concurrent requests are admitted in any order; the running total must not
+    # depend on which one arrived first.
+    forward = _reserved_after(amounts)
+    backward = _reserved_after(list(reversed(amounts)))
+    assert abs(forward - backward) < 1e-9
 
-    backward = InFlightSpend()
-    for amount in reversed(amounts):
-        backward.add(TEAM_ID, amount)
 
-    # Same multiset of reservations, different arrival order (concurrent
-    # requests can be admitted in any order) — the running total must agree
-    # within float noise, not diverge based on ordering.
-    assert abs(forward.total(TEAM_ID) - backward.total(TEAM_ID)) < 1e-9
+@given(amounts=st.lists(_AMOUNT, min_size=1, max_size=20))
+def test_releasing_an_unknown_reservation_changes_nothing(amounts: list[float]) -> None:
+    """The property that replaced "never goes negative": you cannot release an
+    amount, only a claim. A stray release is a delete of an id that is not
+    there, so it cannot make a team's in-flight total look smaller than it is."""
+
+    async def run() -> tuple[float, float]:
+        store = InMemoryBudgetReservationStore()
+        for amount in amounts:
+            await store.try_reserve(TEAM_ID, amount, spent=0.0, limit=float("inf"), ttl_s=300)
+        before = (
+            await store.try_reserve(TEAM_ID, 0.0, spent=0.0, limit=float("inf"), ttl_s=300)
+        ).reserved
+        await store.release(Reservation(id=uuid4(), team_id=TEAM_ID, amount=sum(amounts) * 2))
+        after = (
+            await store.try_reserve(TEAM_ID, 0.0, spent=0.0, limit=float("inf"), ttl_s=300)
+        ).reserved
+        return before, after
+
+    before, after = asyncio.run(run())
+    assert after >= before  # the two probe reservations only add
 
 
 # ── Cost accumulation: non-negativity and monotonicity ───────────────────────

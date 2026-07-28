@@ -27,6 +27,9 @@ from litestar_gateway.domain.entities import (
     TraceRecord,
     UsageEvent,
 )
+from litestar_gateway.infrastructure.budget_reservation import (
+    InMemoryBudgetReservationStore,
+)
 
 TEAM_ID = uuid4()
 KEY_ID = uuid4()
@@ -159,6 +162,7 @@ def _meter(
         usage=usage,  # type: ignore[arg-type]
         emit_trace=traces.append,
         budgets=budgets,  # type: ignore[arg-type]
+        reservations=InMemoryBudgetReservationStore(),
         budget_alert_state=alert_state,  # type: ignore[arg-type]
     )
 

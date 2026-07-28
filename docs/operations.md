@@ -247,6 +247,13 @@ provider clients, memory and Postgres pool; size `DB_POOL_SIZE` and
 `DB_MAX_OVERFLOW` against the total worker count. The local load profile defaults
 to 3 workers so its three CPU cores can execute Python work concurrently.
 
+In-flight budget reservations live in the same Redis, so the hard cap bounds a
+concurrent burst **fleet-wide** rather than once per replica.
+`BUDGET_RESERVATION_TTL_SECONDS` (default 300) is how long an unsettled request
+holds its slice before the store reclaims it — long enough for a slow streamed
+completion, short enough that a replica killed mid-request does not strand
+headroom.
+
 `REDIS_URL` is **required in production** (startup fails without it) and backs
 the rate-limit store, circuit breaker and response cache with shared state so
 limits and breaker transitions hold across workers/replicas. The compose stack

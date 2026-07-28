@@ -21,6 +21,7 @@ from litestar_gateway.domain.exceptions import DomainError
 from litestar_gateway.domain.ports import IdentityProvider, LLMGateway
 from litestar_gateway.infrastructure.bootstrap import make_bootstrap_admin
 from litestar_gateway.infrastructure.budget_alert_reconciler import make_budget_alert_dispatcher
+from litestar_gateway.infrastructure.budget_reservation import build_budget_reservation_store
 from litestar_gateway.infrastructure.cache import (
     build_response_cache,
     build_semantic_response_cache,
@@ -275,6 +276,7 @@ def _build_dependencies(
     # One shared circuit breaker (Redis-backed with REDIS_URL, else in-memory) so
     # a tripped provider/model is skipped fleet-wide, not just per process.
     circuit_breaker = build_circuit_breaker(settings)
+    budget_reservations = build_budget_reservation_store(settings)
     # Response cache (Plan 04 Phase 0): the global kill-switch. `None` when off
     # so `CompletionService` never even looks up/writes it — off is byte-
     # identical to today. In-memory only in this phase (Phase 1 adds Redis).
@@ -325,6 +327,14 @@ def _build_dependencies(
         "response_cache": Provide(lambda: response_cache, sync_to_thread=False),
         "response_cache_ttl_s": Provide(
             lambda: settings.response_cache_ttl_s, sync_to_thread=False
+        ),
+        # One store for the whole process: request-scoped meters must share the
+        # in-flight reservations, or the budget gate's burst bound would reset
+        # per request. With Redis (mandatory in production) it is shared across
+        # replicas too, which is the point.
+        "budget_reservations": Provide(lambda: budget_reservations, sync_to_thread=False),
+        "reservation_ttl_s": Provide(
+            lambda: settings.budget_reservation_ttl_s, sync_to_thread=False
         ),
         "semantic_cache": Provide(lambda: semantic_cache, sync_to_thread=False),
         "semantic_threshold": Provide(

@@ -41,6 +41,9 @@ from litestar_gateway.domain.routing import (
     RouterConfig,
     RoutingDecision,
 )
+from litestar_gateway.infrastructure.budget_reservation import (
+    InMemoryBudgetReservationStore,
+)
 from litestar_gateway.infrastructure.circuit_breaker import InMemoryCircuitBreaker
 
 TEAM_ID = uuid4()
@@ -246,6 +249,7 @@ def _service(
             usage=usage,  # type: ignore[arg-type]
             emit_trace=lambda trace: None,
             budgets=FakeBudgets(_budget(1000.0)),  # type: ignore[arg-type]
+            reservations=InMemoryBudgetReservationStore(),
             rate_limiter=rate_limiter,  # type: ignore[arg-type]
             teams=FakeTeams() if rate_limiter is not None else None,  # type: ignore[arg-type]
         ),
@@ -403,6 +407,7 @@ async def test_budget_exceeded_on_retry_admission_surfaces_immediately() -> None
             usage=usage,  # type: ignore[arg-type]
             emit_trace=lambda trace: None,
             budgets=FakeBudgets(_budget(1.0)),  # type: ignore[arg-type]
+            reservations=InMemoryBudgetReservationStore(),
         ),
         router_service=FixedDecisionRouter(primary),  # type: ignore[arg-type]
         callable_resolver=MultiModelCallableResolver(router, models),  # type: ignore[arg-type]

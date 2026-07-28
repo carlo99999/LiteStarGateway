@@ -10,6 +10,7 @@ collaborator. Request-scoped like the service (it holds the request's
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -34,12 +35,19 @@ from litestar_gateway.domain.ports import (
     APIKeyRepository,
     BudgetAlertStateRepository,
     BudgetRepository,
+    BudgetReservationStore,
     RateLimiter,
+    Reservation,
     TeamRepository,
     UsageRepository,
 )
 from litestar_gateway.domain.pricing import BillableUsage, RateCard, compute_cost
 from litestar_gateway.request_context import current_request_id
+
+# How long an unsettled reservation holds a team's headroom before the store
+# reclaims it. Long enough for a slow streamed completion, short enough that a
+# replica killed mid-request does not strand budget until someone notices.
+DEFAULT_RESERVATION_TTL_SECONDS = 300
 
 logger = logging.getLogger("litestar_gateway.usage")
 
@@ -326,36 +334,6 @@ def _reservation_cost(model: Model, request: dict[str, Any]) -> float:
     return compute_cost(_worst_case_prompt_usage(prompt_estimate, output_estimate, rates), rates)
 
 
-class InFlightSpend:
-    """Estimated cost of admitted-but-unsettled requests, per team.
-
-    The budget gate adds this to committed spend, so a burst of concurrent
-    requests (streams especially — they settle minutes after admission) can't
-    all slip under a nearly-exhausted limit: each admission immediately
-    reserves its pessimistic cost until settlement releases it. In-memory and
-    per-process — replicas don't see each other's in-flight spend, so the
-    overshoot bound is per replica, not global."""
-
-    def __init__(self) -> None:
-        self._by_team: dict[UUID, float] = {}
-
-    def total(self, team_id: UUID) -> float:
-        return self._by_team.get(team_id, 0.0)
-
-    def add(self, team_id: UUID, amount: float) -> None:
-        if amount > 0:
-            self._by_team[team_id] = self._by_team.get(team_id, 0.0) + amount
-
-    def remove(self, team_id: UUID, amount: float) -> None:
-        if amount <= 0:
-            return
-        remaining = self._by_team.get(team_id, 0.0) - amount
-        if remaining <= 0:
-            self._by_team.pop(team_id, None)
-        else:
-            self._by_team[team_id] = remaining
-
-
 class UsageMeter:
     """Admission, settlement, and tracing for one request's spend."""
 
@@ -364,7 +342,8 @@ class UsageMeter:
         usage: UsageRepository,
         emit_trace: Callable[[TraceRecord], None],
         budgets: BudgetRepository | None = None,
-        in_flight: InFlightSpend | None = None,
+        reservations: BudgetReservationStore | None = None,
+        reservation_ttl_s: int = DEFAULT_RESERVATION_TTL_SECONDS,
         settlement_timeout: float = 30.0,
         rate_limiter: RateLimiter | None = None,
         teams: TeamRepository | None = None,
@@ -385,7 +364,9 @@ class UsageMeter:
         self._api_keys = api_keys
         # Library use may omit it; the web wiring passes one shared instance so
         # request-scoped meters see each other's reservations.
-        self._in_flight = in_flight if in_flight is not None else InFlightSpend()
+        self._reservations = reservations
+        self._reservation_ttl_s = reservation_ttl_s
+        self._pending_releases: set[asyncio.Task[None]] = set()
         # Upper bound on the shielded stream settlement, so a stalled DB can't
         # leave an unbounded pile of orphan cleanup coroutines (M29).
         self._settlement_timeout = settlement_timeout
@@ -398,15 +379,19 @@ class UsageMeter:
         *,
         api_key_id: UUID | None = None,
         skip_team_rate_limit: bool = False,
-    ) -> float:
+    ) -> Reservation | None:
         """Pre-call spend gate: reject once committed spend plus the estimated
         cost already reserved by in-flight requests reaches the budget limit.
         An admitted request immediately reserves its own pessimistic cost
-        (prompt estimate + requested output ceiling) and returns it — callers
-        release it at settlement. This bounds burst overshoot per replica:
-        without the reservation, any number of concurrent requests could pass
-        the gate before the first one settles (streams widen that blind spot
-        to minutes).
+        (prompt estimate + requested output ceiling) and returns the claim —
+        callers release it at settlement. Without the reservation, any number
+        of concurrent requests could pass the gate before the first one settles
+        (streams widen that blind spot to minutes).
+
+        The bound is fleet-wide, not per replica: the store decides and records
+        in one atomic step, so two replicas cannot both read the same in-flight
+        total and both slip under the cap. `None` means there was nothing to
+        gate — no budget configured, or no store wired.
 
         `skip_team_rate_limit` is for cross-provider failover retries only
         (Plan 05): one logical client request must consume exactly one
@@ -419,25 +404,40 @@ class UsageMeter:
             await self._enforce_team_rate_limit(team_id)
         await self.enforce_key_rate_limit(api_key_id)
         if self._budgets is None:
-            return 0.0
+            return None
         budget = await self._budgets.get(team_id)
         if budget is None:
-            return 0.0
+            return None
         since = window_start(budget.window, datetime.now(UTC))
         spent = await self._usage.spend_since(team_id, since)
-        # No await between reading the in-flight total and adding the new
-        # reservation: concurrent gates interleave only at checkpoints, so
-        # two requests can't both read the same total and slip through.
-        reserved = self._in_flight.total(team_id)
-        if spent + reserved >= budget.limit_cost:
+        if self._reservations is None:
+            # No store wired: the cap still holds on committed spend, but
+            # nothing bounds a concurrent burst. Unreachable in production —
+            # Redis is mandatory and the store is always wired — this is for
+            # library use and for tests that do not exercise admission.
+            if spent >= budget.limit_cost:
+                raise BudgetExceeded(
+                    f"Team budget exceeded: spent {spent:.4f} of {budget.limit_cost:.4f} USD "
+                    f"in the current {budget.window} window"
+                )
+            return None
+        # Read the in-flight total, decide and record as ONE step in the store:
+        # doing it here in two awaits is what would let two admissions see the
+        # same total and both slip through.
+        outcome = await self._reservations.try_reserve(
+            team_id,
+            _reservation_cost(model, request),
+            spent=spent,
+            limit=budget.limit_cost,
+            ttl_s=self._reservation_ttl_s,
+        )
+        if not outcome.admitted:
             raise BudgetExceeded(
-                f"Team budget exceeded: spent {spent:.4f} (+{reserved:.4f} USD reserved "
+                f"Team budget exceeded: spent {spent:.4f} (+{outcome.reserved:.4f} USD reserved "
                 f"by in-flight requests) of {budget.limit_cost:.4f} USD "
                 f"in the current {budget.window} window"
             )
-        reservation = _reservation_cost(model, request)
-        self._in_flight.add(team_id, reservation)
-        return reservation
+        return outcome.reservation
 
     async def _enforce_team_rate_limit(self, team_id: UUID) -> None:
         """Per-team requests/minute gate, checked before the budget reservation so
@@ -470,9 +470,40 @@ class UsageMeter:
                 retry_after=decision.retry_after,
             )
 
-    def release(self, team_id: UUID, reservation: float) -> None:
-        """Give back a reservation taken at admission (settlement or failure)."""
-        self._in_flight.remove(team_id, reservation)
+    async def release(self, reservation: Reservation | None) -> None:
+        """Give back a reservation taken at admission (settlement or failure).
+        Idempotent — releasing the same claim twice deletes nothing the second
+        time — so callers may release defensively."""
+        if reservation is None or self._reservations is None:
+            return
+        await self._reservations.release(reservation)
+
+    def release_soon(self, reservation: Reservation | None) -> None:
+        """Release from a context that cannot await — specifically the
+        `weakref.finalize` guarding a stream the client dropped before its first
+        byte, which runs as a garbage-collection callback.
+
+        Best effort by construction: with a running loop the release is
+        scheduled and lands within the tick; without one (interpreter shutdown,
+        a GC pass off the loop thread) nothing happens and the reservation's TTL
+        reclaims it. That bounded delay is the price of not blocking a GC
+        callback, and it is strictly better than the previous behaviour on a
+        crashed replica, which lost the in-process counter entirely."""
+        if reservation is None or self._reservations is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            logger.debug(
+                "no running loop to release reservation %s; its TTL will reclaim it",
+                reservation.id,
+            )
+            return
+        task = loop.create_task(self.release(reservation))
+        # Hold a reference: a task with no strong reference can be garbage
+        # collected mid-flight, which would silently skip the release.
+        self._pending_releases.add(task)
+        task.add_done_callback(self._pending_releases.discard)
 
     async def settle_ok(
         self,
@@ -832,7 +863,7 @@ class UsageMeter:
         operation: str,
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
-        release: Callable[[], None] | None = None,
+        release: Callable[[], Awaitable[None]] | None = None,
         attribution: UsageAttribution | None = None,
         on_settled: Callable[[int, int], Awaitable[None]] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
@@ -886,17 +917,16 @@ class UsageMeter:
             error = exc
             raise
         finally:
-            # Synchronous and first, so the budget reservation is released even
-            # when a client disconnect cancelled this scope (a cancelled frame
-            # runs sync code fine; it's the next checkpoint that re-raises).
-            # release() is idempotent — the caller also finalizes it for the
-            # never-iterated case (M27), so a double call here is safe.
-            if release is not None:
-                release()
             # Shielded: on a client disconnect this frame is already cancelled,
-            # and the settlement's first checkpoint (the DB commit) would
-            # re-raise CancelledError — no ledger row, no outbox, no trace.
+            # and the first checkpoint — now the release, then the DB commit —
+            # would re-raise CancelledError, leaving the reservation held and
+            # no ledger row, outbox or trace behind. Releasing first inside the
+            # shield keeps the old ordering now that the release awaits.
+            # release() is idempotent: the caller also finalizes it for the
+            # never-iterated case (M27), so a double call here is safe.
             with anyio.CancelScope(shield=True):
+                if release is not None:
+                    await release()
                 await self._finalize_stream_billing(
                     team_id,
                     api_key_id,
@@ -920,7 +950,7 @@ class UsageMeter:
         operation: str,
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
-        release: Callable[[], None] | None = None,
+        release: Callable[[], Awaitable[None]] | None = None,
         attribution: UsageAttribution | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Relay raw Anthropic Messages stream events unchanged while capturing the
@@ -961,11 +991,12 @@ class UsageMeter:
             error = exc
             raise
         finally:
-            # Synchronous release first (survives a cancelled scope), then the
-            # shielded settlement — same ordering and guarantees as metered_stream.
-            if release is not None:
-                release()
+            # Release first, inside the shield so a cancelled scope cannot
+            # re-raise at the release's checkpoint — same ordering and
+            # guarantees as metered_stream.
             with anyio.CancelScope(shield=True):
+                if release is not None:
+                    await release()
                 await self._finalize_stream_billing(
                     team_id,
                     api_key_id,
@@ -987,7 +1018,7 @@ class UsageMeter:
         operation: str,
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
-        release: Callable[[], None] | None = None,
+        release: Callable[[], Awaitable[None]] | None = None,
         attribution: UsageAttribution | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Relay raw Gemini `GenerateContentResponse` chunks unchanged while
@@ -1018,11 +1049,12 @@ class UsageMeter:
             error = exc
             raise
         finally:
-            # Synchronous release first (survives a cancelled scope), then the
-            # shielded settlement — same ordering and guarantees as metered_stream.
-            if release is not None:
-                release()
+            # Release first, inside the shield so a cancelled scope cannot
+            # re-raise at the release's checkpoint — same ordering and
+            # guarantees as metered_stream.
             with anyio.CancelScope(shield=True):
+                if release is not None:
+                    await release()
                 await self._finalize_stream_billing(
                     team_id,
                     api_key_id,

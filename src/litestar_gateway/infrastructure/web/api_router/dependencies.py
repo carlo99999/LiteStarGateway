@@ -8,11 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from litestar_gateway.application.callable_aliases import CallableAliasResolver
 from litestar_gateway.application.completion_service import CompletionService
 from litestar_gateway.application.routing.service import RouterService
-from litestar_gateway.application.usage_meter import InFlightSpend, UsageMeter
+from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.ports import (
     BudgetAlertStateRepository,
     BudgetRepository,
+    BudgetReservationStore,
     CircuitBreaker,
     LLMGateway,
     RateLimiter,
@@ -79,11 +80,6 @@ def provide_budget_alert_state_repository(
     return SQLAlchemyBudgetAlertStateRepository(db_session)
 
 
-# Process-wide: request-scoped meters must share the in-flight reservations
-# or the budget gate's burst bound would reset per request.
-_in_flight_spend = InFlightSpend()
-
-
 def provide_completion_service(
     db_session: NamedDependency[AsyncSession],
     keyring: NamedDependency[Keyring],
@@ -99,6 +95,8 @@ def provide_completion_service(
     semantic_cache: NamedDependency[SemanticResponseCache | None],
     semantic_threshold: NamedDependency[float],
     semantic_embedding_model: NamedDependency[str | None],
+    budget_reservations: NamedDependency[BudgetReservationStore],
+    reservation_ttl_s: NamedDependency[int],
 ) -> CompletionService:
     # One request-scoped meter, shared by the completion path and the router:
     # judge/embeddings strategies make real, billable provider calls that must be
@@ -107,7 +105,8 @@ def provide_completion_service(
         usage=SQLAlchemyUsageRepository(db_session),
         emit_trace=trace_dispatcher.enqueue,
         budgets=SQLAlchemyBudgetRepository(db_session),
-        in_flight=_in_flight_spend,
+        reservations=budget_reservations,
+        reservation_ttl_s=reservation_ttl_s,
         rate_limiter=rate_limiter,
         teams=SQLAlchemyTeamRepository(db_session),
         api_keys=SQLAlchemyAPIKeyRepository(db_session),
