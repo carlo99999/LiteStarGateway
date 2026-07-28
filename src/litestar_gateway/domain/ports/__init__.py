@@ -17,7 +17,7 @@ from litestar_gateway.domain.ports.callable_alias import (
     CallableAliasRepository,
     CallableModelResolver,
 )
-from litestar_gateway.domain.ports.circuit_breaker import CircuitBreaker
+from litestar_gateway.domain.ports.circuit_breaker import BreakerLease, CircuitBreaker
 from litestar_gateway.domain.ports.credential import CredentialRepository
 from litestar_gateway.domain.ports.identity import IdentityProvider
 from litestar_gateway.domain.ports.invite import InviteRepository, PasswordResetRepository
@@ -62,6 +62,7 @@ __all__ = [
     "CacheKey",
     "CallableAliasRepository",
     "CallableModelResolver",
+    "BreakerLease",
     "CircuitBreaker",
     "CredentialRepository",
     "DistributedLock",

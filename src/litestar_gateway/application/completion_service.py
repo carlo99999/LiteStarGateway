@@ -1082,17 +1082,32 @@ class CompletionService:
                 models.append(candidate_model)
         return models
 
-    async def _breaker_filtered(self, candidates: list[Model]) -> list[Model]:
+    async def _breaker_filtered(
+        self, candidates: list[Model]
+    ) -> tuple[list[Model], dict[str, str]]:
         """Drop candidates the circuit breaker has short-circuited (tripped
-        past its failure threshold, still cooling down) from the retry chain.
+        past its failure threshold, still cooling down) from the retry chain,
+        and return the half-open trial tokens this filtering was granted.
+
+        A candidate admitted *through* a half-open trial owes the breaker that
+        trial's outcome, so the token has to travel with it: only the holder may
+        close or re-open the breaker (ISSUE-033). A probed candidate the chain
+        never reaches leaves its trial unresolved until the marker expires —
+        the same as before tokens existed, now visible rather than implicit.
+
         A no-op when no breaker is configured."""
         if self._circuit_breaker is None:
-            return candidates
+            return candidates, {}
         allowed: list[Model] = []
+        trial_tokens: dict[str, str] = {}
         for candidate in candidates:
-            if await self._circuit_breaker.allow(str(candidate.id)):
-                allowed.append(candidate)
-        return allowed
+            lease = await self._circuit_breaker.allow(str(candidate.id))
+            if not lease.allowed:
+                continue
+            allowed.append(candidate)
+            if lease.trial_token is not None:
+                trial_tokens[str(candidate.id)] = lease.trial_token
+        return allowed, trial_tokens
 
     @asynccontextmanager
     async def _within_deadline(self, router: RouterConfig, start: float) -> AsyncIterator[None]:
@@ -1144,7 +1159,7 @@ class CompletionService:
         output ceiling and provider contract."""
         start = perf_counter()
         remaining = await self._remaining_failover_candidates(team_id, router, decision, sanitized)
-        remaining = await self._breaker_filtered(remaining)
+        remaining, trial_tokens = await self._breaker_filtered(remaining)
         max_attempts = min(router.max_attempts, 1 + len(remaining))
         attempt_model, attempt_values, attempt_reservation, attempt_clean = (
             model,
@@ -1205,13 +1220,17 @@ class CompletionService:
                         exc, UpstreamResponseInvalid
                     )
                     if eligible and self._circuit_breaker is not None:
-                        await self._circuit_breaker.record_failure(str(attempt_model.id))
+                        await self._circuit_breaker.record_failure(
+                            str(attempt_model.id), trial_tokens.get(str(attempt_model.id))
+                        )
                     if not eligible or attempt_index == max_attempts - 1:
                         raise
                     last_exc = exc
                     continue
                 if self._circuit_breaker is not None:
-                    await self._circuit_breaker.record_success(str(attempt_model.id))
+                    await self._circuit_breaker.record_success(
+                        str(attempt_model.id), trial_tokens.get(str(attempt_model.id))
+                    )
                 return response
             raise AssertionError("unreachable: the loop above always returns or raises")
         finally:
@@ -1384,7 +1403,7 @@ class CompletionService:
         this loop retries."""
         start = perf_counter()
         remaining = await self._remaining_failover_candidates(team_id, router, decision, sanitized)
-        remaining = await self._breaker_filtered(remaining)
+        remaining, trial_tokens = await self._breaker_filtered(remaining)
         max_attempts = min(router.max_attempts, 1 + len(remaining))
         attempt_model, attempt_values, attempt_reservation, attempt_clean = (
             model,
@@ -1429,7 +1448,9 @@ class CompletionService:
                     self._meter.release(team_id, attempt_reservation)
                     eligible = is_failover_eligible(exc)
                     if eligible and self._circuit_breaker is not None:
-                        await self._circuit_breaker.record_failure(str(attempt_model.id))
+                        await self._circuit_breaker.record_failure(
+                            str(attempt_model.id), trial_tokens.get(str(attempt_model.id))
+                        )
                     if not eligible or attempt_index == max_attempts - 1:
                         raise
                     last_exc = exc
@@ -1457,13 +1478,17 @@ class CompletionService:
                     # chunks were ever produced) -- do not release again here.
                     eligible = is_failover_eligible(exc)
                     if eligible and self._circuit_breaker is not None:
-                        await self._circuit_breaker.record_failure(str(attempt_model.id))
+                        await self._circuit_breaker.record_failure(
+                            str(attempt_model.id), trial_tokens.get(str(attempt_model.id))
+                        )
                     if not eligible or attempt_index == max_attempts - 1:
                         raise
                     last_exc = exc
                     continue
                 if self._circuit_breaker is not None:
-                    await self._circuit_breaker.record_success(str(attempt_model.id))
+                    await self._circuit_breaker.record_success(
+                        str(attempt_model.id), trial_tokens.get(str(attempt_model.id))
+                    )
                 return primed
             raise AssertionError("unreachable: the loop above always returns or raises")
         finally:
