@@ -18,6 +18,7 @@ import pytest
 from advanced_alchemy.extensions.litestar import base
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from support.sessions import two_sessions_over_one_database
 
 from litestar_gateway.domain.entities import BudgetWindow, PendingBudgetAlert
 from litestar_gateway.domain.ports.notification_channel import NotificationChannel
@@ -224,13 +225,8 @@ async def test_row_is_quarantined_after_max_attempts(session: AsyncSession) -> N
 async def two_sessions(tmp_path: Path) -> AsyncIterator[tuple[AsyncSession, AsyncSession]]:
     """Two independent sessions over ONE database file — the closest a test can
     get to two replicas draining the same outbox."""
-    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'replicas.db'}")
-    async with engine.begin() as conn:
-        await conn.run_sync(base.UUIDAuditBase.metadata.create_all)
-    maker = async_sessionmaker(engine, expire_on_commit=False)
-    async with maker() as first, maker() as second:
-        yield first, second
-    await engine.dispose()
+    async with two_sessions_over_one_database(tmp_path / "replicas.db") as pair:
+        yield pair
 
 
 async def test_two_dispatchers_deliver_one_alert_exactly_once(
