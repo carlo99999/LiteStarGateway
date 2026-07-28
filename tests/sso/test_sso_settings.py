@@ -4,6 +4,7 @@ process restart, and takes precedence over legacy env vars)."""
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 from litestar.status_codes import (
@@ -226,3 +227,82 @@ async def test_local_development_still_derives_the_callback(tmp_path: Path) -> N
             headers=await _admin_headers(client),
         )
         assert resp.status_code == HTTP_200_OK, resp.text
+
+
+# ---------------------------------------------------------------------------
+# ISSUE-032: a legacy row already in the database must not reopen the fallback.
+# ---------------------------------------------------------------------------
+
+
+async def _seed_legacy_enabled_row_without_redirect(tmp_path: Path) -> None:
+    """Write directly what an upsert accepted before #398: enabled, with a
+    client secret, and no callback URL. The write path refuses this now, so the
+    only way to have one is to have created it earlier."""
+    import sqlite3
+    from uuid import uuid4
+
+    connection = sqlite3.connect(tmp_path / "sso.db")
+    try:
+        now = datetime.now(UTC).isoformat()
+        key_id = uuid4().bytes
+        connection.execute(
+            "INSERT INTO secret_key (id, purpose, material, created_at, updated_at) "
+            "VALUES (?,?,?,?,?)",
+            (key_id, "sso", "x", now, now),
+        )
+        connection.execute(
+            "INSERT INTO sso_settings (id, enabled, discovery_url, client_id, "
+            "encrypted_client_secret, key_id, scopes, admin_groups, default_admin, "
+            "team_mapping, redirect_uri, created_at, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                uuid4().bytes,
+                1,
+                "https://legacy-idp.invalid/.well-known/openid-configuration",
+                "client-legacy",
+                "ciphertext",
+                key_id,
+                "openid email profile",
+                "[]",
+                0,
+                "{}",
+                None,
+                now,
+                now,
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+async def test_a_legacy_enabled_row_without_redirect_is_refused_outside_local(
+    tmp_path: Path,
+) -> None:
+    """#398 closed the write path; the resolver still loaded any enabled row,
+    so a configuration created before the fix kept deriving the callback from
+    the request `Host`. The runtime must refuse it, not use it."""
+    async with _prod_client(tmp_path) as client:
+        await _admin_headers(client)  # boots the schema and the admin user
+    await _seed_legacy_enabled_row_without_redirect(tmp_path)
+
+    async with _prod_client(tmp_path) as client:
+        resp = await client.get(
+            "/sso/login", follow_redirects=False, headers={"Host": "attacker.example"}
+        )
+        assert resp.status_code == HTTP_404_NOT_FOUND, resp.text
+        assert "attacker.example" not in resp.text
+
+
+async def test_a_legacy_row_without_redirect_still_works_in_local_development(
+    tmp_path: Path,
+) -> None:
+    async with _plain_client(tmp_path) as client:
+        await _admin_headers(client)
+    await _seed_legacy_enabled_row_without_redirect(tmp_path)
+
+    async with _plain_client(tmp_path) as client:
+        resp = await client.get("/sso/login", follow_redirects=False)
+        # Reaches the IdP (which does not resolve — RFC 2606 .invalid), i.e. the
+        # configuration was accepted rather than refused.
+        assert resp.status_code != HTTP_404_NOT_FOUND, resp.text
