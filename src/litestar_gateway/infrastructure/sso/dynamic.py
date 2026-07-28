@@ -7,6 +7,12 @@ boot). The DB wins whenever a row exists and is enabled; env vars remain a
 zero-migration fallback for existing deployments. Explicit override (tests
 injecting a fake `IdentityProvider` into `create_app()`) always wins over
 both and skips the DB lookup entirely.
+
+A DB row that is enabled but carries no `redirect_uri` is refused outside local
+development rather than used: the login flow would otherwise derive the callback
+from the request's `Host` (ISSUE-028/032). The write path refuses to create one,
+and a migration disables the rows that predate that check — this is the backstop
+for anything that reaches the resolver anyway.
 """
 
 from __future__ import annotations
@@ -91,6 +97,18 @@ def build_sso_config_provider(
             repo = SQLAlchemySsoSettingsRepository(db_session, keyring)
             db_settings = await repo.get()
             if db_settings is not None and db_settings.enabled:
+                if not settings.is_local and not (db_settings.redirect_uri or "").strip():
+                    # Runtime backstop for a configuration written before the
+                    # write path started refusing it (ISSUE-032). Without a
+                    # fixed callback, `session/sso.py` derives it from the
+                    # request's `Host`, which is exactly what ISSUE-028 closed.
+                    # Fail closed and say why: falling through to the env
+                    # config would silently log people into a different IdP.
+                    raise SSONotConfigured(
+                        "SSO is enabled in the database without a redirect_uri, which is "
+                        "refused outside local environments (the callback URL would be "
+                        "derived from the untrusted Host header). Set one in the console."
+                    )
                 secret = await repo.get_client_secret()
                 if secret and db_settings.discovery_url and db_settings.client_id:
                     idp = idp_cache.resolve(
