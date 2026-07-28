@@ -132,12 +132,18 @@ class FakeMlflowClient:
 
 
 async def test_app_startup_and_shutdown_never_wait_on_mlflow(tmp_path, monkeypatch) -> None:
-    # Observability is best-effort: the publisher connects inside its
-    # background task, so a slow/hanging MLflow (black-holed host, long HTTP
-    # retries) must delay neither startup nor shutdown. Simulated with a start
-    # that blocks far longer than the asserted wall-clock budget.
-    import time
-    from time import perf_counter
+    """Observability is best-effort: the publisher connects inside its background
+    task, so a slow or hanging MLflow (black-holed host, long HTTP retries) must
+    delay neither startup nor shutdown.
+
+    Proved by *reaching* the end of the lifespan while the publisher's `start` is
+    still blocked, rather than by timing how long that took. The wall-clock
+    version of this test (a 10 s sleep, asserted under 5 s) measured the
+    machine as much as the code: it passed locally every time and failed
+    deterministically on a 2-vCPU CI runner, where the blocked worker thread and
+    the loop's teardown interleave differently.
+    """
+    import threading
 
     from litestar.testing import AsyncTestClient
 
@@ -147,7 +153,16 @@ async def test_app_startup_and_shutdown_never_wait_on_mlflow(tmp_path, monkeypat
         MlflowMetricsPublisher,
     )
 
-    monkeypatch.setattr(MlflowMetricsPublisher, "start", lambda self: time.sleep(10))
+    start_entered = threading.Event()
+    let_start_finish = threading.Event()
+
+    def blocking_start(_self) -> None:
+        start_entered.set()
+        # Held until the test releases it. If startup or shutdown awaited this,
+        # the `async with` below could not complete.
+        let_start_finish.wait(timeout=30)
+
+    monkeypatch.setattr(MlflowMetricsPublisher, "start", blocking_start)
 
     settings = Settings(
         database_url=f"sqlite+aiosqlite:///{tmp_path / 'obs.db'}",
@@ -158,10 +173,15 @@ async def test_app_startup_and_shutdown_never_wait_on_mlflow(tmp_path, monkeypat
         mlflow_tracking_uri="http://127.0.0.1:1",  # nothing listens here
         mlflow_metrics_interval=60,
     )
-    began = perf_counter()
-    async with AsyncTestClient(app=create_app(settings)) as client:
-        assert (await client.get("/health")).status_code == 200
-    assert perf_counter() - began < 5.0  # startup + shutdown, not the 10s sleep
+    try:
+        async with AsyncTestClient(app=create_app(settings)) as client:
+            assert (await client.get("/health")).status_code == 200
+
+        # Reached with `start` still blocked: neither startup nor shutdown
+        # waited on it.
+        assert not let_start_finish.is_set()
+    finally:
+        let_start_finish.set()  # never leave the worker thread parked
 
 
 class TestPublisher:
