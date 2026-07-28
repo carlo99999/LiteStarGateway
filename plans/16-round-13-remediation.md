@@ -3,6 +3,16 @@
 Piano di esecuzione per chiudere tutti i finding di
 [issues/round-13.md](../issues/round-13.md): **2 HIGH + 7 MEDIUM** (ISSUE-022…030).
 
+> **Stato: completato.** Tutte le PR sono state mergiate — #392 (022), #393 e
+> #394 (023), #400 (024), #395 (025), #396 (026), #397 (027), #398 (028), #399
+> (029), #401 (030). Scostamenti dal piano, documentati nelle rispettive PR:
+> il claim dell'outbox usa un compare-and-swap portabile invece di
+> `FOR UPDATE SKIP LOCKED` (funziona identico su PostgreSQL e SQLite); la PR 4
+> non aggiunge il purge esplicito del namespace a revoca chiave, perché le
+> entry di una chiave revocata sono già irraggiungibili e ora limitate; la
+> PR 8 non introduce l'allowed-hosts middleware, che è una modifica di
+> deployment più ampia del finding.
+
 Regole del round:
 
 - una PR per issue (le due HIGH sono split in due PR dove il blast radius lo

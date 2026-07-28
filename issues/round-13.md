@@ -63,14 +63,14 @@ Counts: **0 CRITICAL · 2 HIGH · 7 MEDIUM · 0 LOW**.
 | ID | Title | Severity | Files | Status |
 |---|---|---|---|---|
 | ISSUE-022 | Prezzi negativi accreditano il ledger e aumentano il budget disponibile | HIGH | `web/models/schemas.py`; `model_service.py`; `pricing.py` | Fixed by #392 |
-| ISSUE-023 | Le cache possono riusare risposte tra modello, operazione e policy differenti | HIGH | `response_cache_key.py`; `response_cache_semantic.py`; `semantic.py`; `completion_service.py` | Open |
-| ISSUE-024 | La cache semantica ha retention globale illimitata dei bucket | MEDIUM | `infrastructure/cache/semantic.py`; `web/teams/controller.py` | Open |
-| ISSUE-025 | Il client registry perde il client sostitutivo durante close-on-release | MEDIUM | `infrastructure/llm/client_registry.py` | Open |
-| ISSUE-026 | L'outbox dei budget alert può perdere o duplicare una notifica | MEDIUM | `usage_meter.py`; `budget_alert_state_repository.py`; `budget_alert_reconciler.py` | Open |
-| ISSUE-027 | `overall_deadline_ms` non limita il tentativo di failover in corso | MEDIUM | `completion_service.py`; `cross-provider-failover.md` | Open |
-| ISSUE-028 | SSO DB-backed riapre la redirect URI derivata da un `Host` non fidato | MEDIUM | `sso_settings_service.py`; `session/sso.py`; `SsoSettingsPage.tsx` | Open |
-| ISSUE-029 | Il circuit breaker Redis salta il single-trial half-open | MEDIUM | `infrastructure/circuit_breaker.py`; `test_circuit_breaker.py` | Open |
-| ISSUE-030 | Il purge del team è incompleto: alcune FK lo bloccano e le decisioni restano | MEDIUM | `team_repository.py`; `orm.py`; `test_retention_lifecycle.py` | Open |
+| ISSUE-023 | Le cache possono riusare risposte tra modello, operazione e policy differenti | HIGH | `response_cache_key.py`; `response_cache_semantic.py`; `semantic.py`; `completion_service.py` | Fixed by #393 / #394 |
+| ISSUE-024 | La cache semantica ha retention globale illimitata dei bucket | MEDIUM | `infrastructure/cache/semantic.py`; `web/teams/controller.py` | Fixed by #400 |
+| ISSUE-025 | Il client registry perde il client sostitutivo durante close-on-release | MEDIUM | `infrastructure/llm/client_registry.py` | Fixed by #395 |
+| ISSUE-026 | L'outbox dei budget alert può perdere o duplicare una notifica | MEDIUM | `usage_meter.py`; `budget_alert_state_repository.py`; `budget_alert_reconciler.py` | Fixed by #396 |
+| ISSUE-027 | `overall_deadline_ms` non limita il tentativo di failover in corso | MEDIUM | `completion_service.py`; `cross-provider-failover.md` | Fixed by #397 |
+| ISSUE-028 | SSO DB-backed riapre la redirect URI derivata da un `Host` non fidato | MEDIUM | `sso_settings_service.py`; `session/sso.py`; `SsoSettingsPage.tsx` | Fixed by #398 |
+| ISSUE-029 | Il circuit breaker Redis salta il single-trial half-open | MEDIUM | `infrastructure/circuit_breaker.py`; `test_circuit_breaker.py` | Fixed by #399 |
+| ISSUE-030 | Il purge del team è incompleto: alcune FK lo bloccano e le decisioni restano | MEDIUM | `team_repository.py`; `orm.py`; `test_retention_lifecycle.py` | Fixed by #401 |
 
 ## Findings
 
@@ -414,12 +414,31 @@ del purge presente.
   sul tree corrente; non sono state rilevate regressioni nelle superfici
   precedentemente chiuse, salvo la **nuova superficie DB-backed** descritta in
   ISSUE-028 per la classe storica R4-M31.
-- ISSUE-022–ISSUE-030: finding nuovi di questo round. La review era
-  report-only; la remediation procede una PR per issue secondo
-  [plans/16-round-13-remediation.md](../plans/16-round-13-remediation.md).
-  **ISSUE-022 è chiuso da #392** (validazione dominio delle tariffe, CHECK sulle
-  colonne di prezzo e clamp dei valori negativi preesistenti); gli altri restano
-  **Open**.
+- ISSUE-022–ISSUE-030: **tutti chiusi**. La review era report-only; la
+  remediation è stata eseguita una PR per issue secondo
+  [plans/16-round-13-remediation.md](../plans/16-round-13-remediation.md), ogni
+  PR con una regressione che fallisce prima della fix:
+  - **ISSUE-022** (#392): validazione dominio delle tariffe richiamata da create
+    e update, CHECK sulle cinque colonne di prezzo, clamp dei valori negativi
+    preesistenti nella migrazione;
+  - **ISSUE-023** (#393 exact, #394 semantic): la chiave exact copre identità
+    del modello, operazione e request effettiva post-merge con selezione a
+    deny-list; il tier semantico vive dentro uno `SemanticScope` che la
+    similarità non può attraversare;
+  - **ISSUE-024** (#400): tetto LRU globale sugli scope e sweep opportunistico
+    di quelli abbandonati;
+  - **ISSUE-025** (#395): lo slot viene rimosso solo se contiene ancora
+    quell'entry, e le generazioni ritirate restano chiudibili;
+  - **ISSUE-026** (#396): dedup row e outbox row in una sola transazione, e
+    claim atomico con lease prima di ogni invio;
+  - **ISSUE-027** (#397): la deadline avvolge il dispatch e l'open+prime dello
+    stream, non solo la decisione di ritentare;
+  - **ISSUE-028** (#398): la configurazione SSO su database rifiuta
+    `enabled` senza redirect fuori da local, come già faceva il percorso env;
+  - **ISSUE-029** (#399): il marker open sopravvive al cooldown e il fake Redis
+    dei test applica davvero i TTL;
+  - **ISSUE-030** (#401): il purge elimina anche stato alert, grant ricevuti e
+    routing decision.
 
 ## Deferred / product decision
 
@@ -498,7 +517,14 @@ del purge presente.
 | API, integrations & frontend | 8.5/10 | Contratti ampi e UI verde; validazione economica/SSO non uniforme |
 | Tests, CI & production readiness | 8.0/10 | 92,89%, PostgreSQL e Docker verdi; fake/edge concorrenti troppo ottimistici |
 
-**Overall: 7.4/10.** Il repository è ben testato e distribuibile, ma i due
-HIGH toccano correttezza del risultato e hard budget; i MEDIUM mostrano che
-le nuove feature hanno bisogno di test fault-injection e multi-replica, non
-soltanto happy path e fake single-process.
+**Overall: 7.4/10** al momento della review. I nove finding sono stati
+successivamente remediati (#392–#401): la valutazione qui sopra resta la
+fotografia del tree `ccfc8e6` e non è stata riscritta a posteriori — la
+verifica delle remediation spetta al round successivo.
+
+Due osservazioni della review si sono confermate durante la remediation e
+valgono oltre i singoli finding: i fake troppo permissivi nascondevano difetti
+reali (il `FakeRedis` senza TTL teneva verde un breaker rotto; il test
+multi-replica del client registry costruiva un `Model` diverso per replica), e
+la copertura multi-replica richiede sessioni indipendenti sullo stesso database
+per riprodurre le corse davvero interessanti.

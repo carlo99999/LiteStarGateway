@@ -12,8 +12,10 @@ It is deliberately separate from `docs/next-steps/`:
 
 ## Status snapshot
 
-- Round 1–12 review findings: **fully remediated**. The two Round 12 MEDIUMs
-  were fixed by #332/#333; no reviewed finding remains open.
+- Round 1–13 review findings: **fully remediated**. The nine Round 13 findings
+  (2 HIGH, 7 MEDIUM) were fixed by #392–#401, one PR per issue, per
+  [16-round-13-remediation.md](16-round-13-remediation.md); no reviewed finding
+  remains open.
 - `main` is green: full suite passing, `ruff` clean, `pyrefly` 0 errors, all
   pre-commit hooks pass. CI runs the suite on SQLite **and** a real Postgres job
   (`alembic upgrade head` + full suite), plus a Docker build + `/health`

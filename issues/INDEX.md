@@ -10,6 +10,7 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 | Round | Focus | New findings (C·H·M·L) | Status |
 |---|---|---|---|
+| [Round 13](round-13.md) — 2026-07-27 | Post-R12 delta (response cache exact+semantic, failover/breaker, budget alerts, non-token pricing, client registry, DB-backed SSO, retention/purge) | 0·2·7·0 | Fully remediated (#392–#401) |
 | [Round 12](round-12.md) — 2026-07-22 | Post-R11 delta (verification of remediation PRs #313–#321: alias registry, router revisions, playground governance, downgrade contract) | 0·0·2·0 | Fully remediated |
 | [Round 11](round-11.md) — 2026-07-22 | Post-R10 delta (global/extended routers & models, Playground, credential lifecycle, reasoning params, admin console) | 0·4·6·0 | Fully remediated |
 | [Round 10](round-10.md) — 2026-07-21 | Post-R9 delta (console completa, savings/me-teams endpoints, R9-fix verification) | 0·2·4·3 | Fully remediated |
@@ -25,7 +26,20 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 ## Overall
 
-**As of Round 12: 9.1/10** — see [round-12.md](round-12.md#category-scores) for the category
+**As of Round 13: 7.4/10 at review time, all nine findings since remediated
+(#392–#401).** See [round-13.md](round-13.md#category-scores) for the category
+breakdown. The two HIGHs were economic/result correctness: a negative model rate
+credited the ledger the budget gate reads (#392), and both cache tiers could
+serve a response produced for a different model, operation or policy
+(#393/#394). The seven MEDIUMs were incomplete concurrent protocols (alert
+outbox atomicity and per-replica duplication, client-registry generation loss,
+Redis half-open) and declared-but-unenforced constraints (failover deadline,
+DB-backed SSO redirect, team purge completeness, semantic-cache global bound).
+Each fix landed with a regression that fails without it; two recurring test
+weaknesses surfaced along the way — fakes that ignore TTLs, and single-session
+stand-ins for multi-replica races. Re-verification belongs to Round 14.
+
+Previous: **as of Round 12: 9.1/10** — see [round-12.md](round-12.md#category-scores) for the category
 breakdown. Round 12 re-verified the entire Round 11 remediation (PRs #313–#321) against the
 current tree with six independent lenses plus an adversarial cross-feature pass: **zero new
 security findings**, all ten Round 11 issues hold, and all ten probed cross-feature combinations
