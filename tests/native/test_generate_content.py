@@ -39,7 +39,7 @@ from litestar.status_codes import (
 from litestar.testing import AsyncTestClient
 
 from litestar_gateway.application.completion_service import CompletionService
-from litestar_gateway.application.usage_meter import InFlightSpend, UsageMeter
+from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.entities import (
     Budget,
     Model,
@@ -50,6 +50,9 @@ from litestar_gateway.domain.entities import (
 )
 from litestar_gateway.domain.entities.enums import BudgetWindow
 from litestar_gateway.domain.exceptions import BudgetExceeded
+from litestar_gateway.infrastructure.budget_reservation import (
+    InMemoryBudgetReservationStore,
+)
 from litestar_gateway.infrastructure.llm import vertex_adapter
 
 _MODEL_ID = "gemini-1.5-pro-002"
@@ -553,12 +556,12 @@ async def test_gemini_reservation_nonzero_gates_concurrent_burst() -> None:
     # concurrent burst near the budget cannot slip through with a $0 reservation.
     traces: list[TraceRecord] = []
     usage = _SpendUsage()
-    in_flight = InFlightSpend()
+    reservations = InMemoryBudgetReservationStore()
     meter = UsageMeter(
         usage=usage,  # type: ignore[arg-type]
         emit_trace=traces.append,
         budgets=_FakeBudgets(limit=1.0),  # type: ignore[arg-type]
-        in_flight=in_flight,
+        reservations=reservations,
     )
     entered = anyio.Event()
     release = anyio.Event()
@@ -575,7 +578,8 @@ async def test_gemini_reservation_nonzero_gates_concurrent_burst() -> None:
         tg.start_soon(service.generate_content, _TEAM_ID, _KEY_ID, "m", dict(body))
         await entered.wait()
         # First request admitted and holding a non-zero reservation (was $0 pre-fix).
-        assert in_flight.total(_TEAM_ID) > 0
+        held = await reservations.try_reserve(_TEAM_ID, 0.0, spent=0.0, limit=float("inf"), ttl_s=1)
+        assert held.reserved > 0
         with pytest.raises(BudgetExceeded):
             await service.generate_content(_TEAM_ID, _KEY_ID, "m", dict(body))
         release.set()

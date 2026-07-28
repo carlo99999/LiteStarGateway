@@ -33,6 +33,9 @@ from litestar_gateway.domain.routing import (
     RouterConfig,
     RoutingDecision,
 )
+from litestar_gateway.infrastructure.budget_reservation import (
+    InMemoryBudgetReservationStore,
+)
 from litestar_gateway.infrastructure.circuit_breaker import InMemoryCircuitBreaker
 
 TEAM_ID = uuid4()
@@ -235,6 +238,7 @@ def _service(
             usage=usage,  # type: ignore[arg-type]
             emit_trace=lambda trace: None,
             budgets=FakeBudgets(_budget(1000.0)),  # type: ignore[arg-type]
+            reservations=InMemoryBudgetReservationStore(),
         ),
         router_service=router_service,  # type: ignore[arg-type]
         callable_resolver=MultiModelCallableResolver(router, models),  # type: ignore[arg-type]

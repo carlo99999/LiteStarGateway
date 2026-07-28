@@ -218,6 +218,10 @@ class Settings:
     # Optional Redis backing for the rate-limit store, shared across replicas. When
     # unset, an in-memory per-process store is used (fine for a single instance).
     redis_url: str | None = None
+    # How long an admitted-but-unsettled request holds its slice of a team's
+    # budget before the store reclaims it. Covers a slow streamed completion;
+    # bounds how long a replica killed mid-request can strand headroom.
+    budget_reservation_ttl_s: int = 300
     # Trusted reverse-proxy allowlist (IPs/CIDRs, comma-separated) for the
     # request-correlation middleware (Plan 11 Slice A, docs/logging.md §2): an
     # inbound `X-Request-ID` is trusted verbatim only when the direct connecting
@@ -453,6 +457,7 @@ class Settings:
             # requests also force Secure at response time.
             session_cookie_secure=_env_bool("SESSION_COOKIE_SECURE", not is_local),
             redis_url=os.environ.get("REDIS_URL"),
+            budget_reservation_ttl_s=_env_int("BUDGET_RESERVATION_TTL_SECONDS", 300, minimum=1),
             trusted_proxy_ips=tuple(
                 v.strip() for v in os.environ.get("TRUSTED_PROXY_IPS", "").split(",") if v.strip()
             ),

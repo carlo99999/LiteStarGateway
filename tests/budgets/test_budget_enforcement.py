@@ -7,6 +7,7 @@ Budget limit and raises BudgetExceeded (402) without calling the provider.
 
 from __future__ import annotations
 
+import asyncio
 import gc
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -30,8 +31,22 @@ from litestar_gateway.domain.entities import (
 )
 from litestar_gateway.domain.exceptions import BudgetExceeded, UnsupportedOperation
 from litestar_gateway.domain.routing import CandidateModel, QualityTier, RouterConfig
+from litestar_gateway.infrastructure.budget_reservation import (
+    InMemoryBudgetReservationStore,
+)
 
 TEAM_ID = uuid4()
+
+
+async def _reserved_total(service) -> float:
+    """The team's in-flight reservations, read through the store the meter uses."""
+    store = service._meter._reservations
+    outcome = await store.try_reserve(TEAM_ID, 0.0, spent=0.0, limit=float("inf"), ttl_s=1)
+    if outcome.reservation is not None:
+        await store.release(outcome.reservation)
+    return outcome.reserved
+
+
 KEY_ID = uuid4()
 
 
@@ -160,7 +175,10 @@ def _service(
     usage: FakeUsage,
     budgets: FakeBudgets | None,
     model: Model | None = None,
+    reservations: InMemoryBudgetReservationStore | None = None,
 ) -> CompletionService:
+    """`reservations` is explicit so a test can hand the SAME store to two
+    services — which is what two replicas of the gateway are."""
     traces: list[TraceRecord] = []
     return CompletionService(
         models=FakeModels(model or _model()),  # type: ignore[arg-type]
@@ -170,6 +188,7 @@ def _service(
             usage=usage,  # type: ignore[arg-type]
             emit_trace=traces.append,
             budgets=budgets,  # type: ignore[arg-type]
+            reservations=reservations or InMemoryBudgetReservationStore(),
         ),
     )
 
@@ -294,6 +313,7 @@ async def test_router_is_prefiltered_before_strategy_side_effects() -> None:
             usage=usage,  # type: ignore[arg-type]
             emit_trace=lambda trace: None,
             budgets=FakeBudgets(_budget(1.0)),  # type: ignore[arg-type]
+            reservations=InMemoryBudgetReservationStore(),
         ),
         router_service=router_service,  # type: ignore[arg-type]
         callable_resolver=FakeCallableResolver(router, model),  # type: ignore[arg-type]
@@ -348,6 +368,7 @@ async def test_vertex_malformed_signature_fails_before_router_and_budget_side_ef
             usage=usage,  # type: ignore[arg-type]
             emit_trace=lambda trace: None,
             budgets=FakeBudgets(_budget(1.0)),  # type: ignore[arg-type]
+            reservations=InMemoryBudgetReservationStore(),
         ),
         router_service=router_service,  # type: ignore[arg-type]
         callable_resolver=FakeCallableResolver(router, model),  # type: ignore[arg-type]
@@ -395,7 +416,7 @@ async def test_vertex_malformed_signature_fails_before_router_and_budget_side_ef
     assert usage.spend_since_calls == []
     assert usage.events == []
     assert gateway.calls == 0
-    assert service._meter._in_flight.total(TEAM_ID) == 0
+    assert await _reserved_total(service) == 0.0
 
 
 @pytest.mark.parametrize(
@@ -477,6 +498,7 @@ async def test_bedrock_responses_validation_precedes_router_and_admission(
             usage=usage,  # type: ignore[arg-type]
             emit_trace=lambda trace: None,
             budgets=FakeBudgets(_budget(1.0)),  # type: ignore[arg-type]
+            reservations=InMemoryBudgetReservationStore(),
         ),
         router_service=router_service,  # type: ignore[arg-type]
         callable_resolver=FakeCallableResolver(router, model),  # type: ignore[arg-type]
@@ -508,17 +530,24 @@ async def test_spend_exactly_at_limit_blocks() -> None:
 async def test_unstarted_stream_releases_reservation() -> None:
     # M27: a stream admitted (reservation taken at the gate) but never iterated
     # — e.g. the SSE layer returns before the first byte, or the client drops —
-    # must not leak its reservation into InFlightSpend. The metered generator's
-    # finally only runs once started, so a finalizer covers the never-started case.
+    # must not leak its reservation. The metered generator's finally only runs
+    # once started, so a finalizer covers the never-started case.
+    #
+    # The finalizer is a garbage-collection callback and cannot await, so it
+    # schedules the release rather than performing it: the checkpoint below is
+    # what lets that task run. With no loop at all (interpreter shutdown) the
+    # reservation's TTL is what reclaims it.
     gateway = CountingGateway()
     service = _service(gateway, FakeUsage(spent=0.0), FakeBudgets(_budget(100.0)))
 
     stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(REQUEST))
-    assert service._meter._in_flight.total(TEAM_ID) > 0  # reserved at admission
+    assert await _reserved_total(service) > 0.0  # reserved at admission
 
     del stream  # never iterated
-    gc.collect()  # collect the abandoned generator -> finalizer releases
-    assert service._meter._in_flight.total(TEAM_ID) == 0  # released, not leaked
+    gc.collect()  # collect the abandoned generator -> finalizer schedules a release
+    await asyncio.sleep(0)  # let it run
+
+    assert await _reserved_total(service) == 0.0  # released, not leaked
 
 
 async def test_no_budget_configured_allows_the_call() -> None:
@@ -699,7 +728,7 @@ async def test_n_gt_1_rejected_for_provider_that_ignores_n(provider: Provider) -
         await service.chat_completion(TEAM_ID, KEY_ID, {**MAX_TOKENS_REQUEST, "n": 4})
 
     assert gateway.calls == 0  # never dispatched
-    assert service._meter._in_flight.total(TEAM_ID) == 0  # no over-reservation held
+    assert await _reserved_total(service) == 0.0  # no over-reservation held
 
 
 async def test_n_1_allowed_for_provider_that_ignores_n() -> None:
@@ -724,3 +753,33 @@ async def test_n_gt_1_still_allowed_for_openai() -> None:
 
     await service.chat_completion(TEAM_ID, KEY_ID, {**MAX_TOKENS_REQUEST, "n": 4})
     assert gateway.calls == 1
+
+
+async def test_two_replicas_share_the_in_flight_bound() -> None:
+    """The property a per-process counter could not provide: with a cap that
+    fits one in-flight request, the second replica must refuse the second —
+    where before, each replica bounded the burst on its own and the team could
+    spend N times the cap with N replicas."""
+    shared = InMemoryBudgetReservationStore()
+    budgets = FakeBudgets(_budget(1.0))
+    # 100 requested output tokens at 0.01/token reserves ~1 USD, at the cap.
+    replica_one = _service(CountingGateway(), FakeUsage(spent=0.0), budgets, reservations=shared)
+    replica_two = _service(CountingGateway(), FakeUsage(spent=0.0), budgets, reservations=shared)
+
+    admitted = await replica_one._meter.admit(TEAM_ID, _model(), dict(MAX_TOKENS_REQUEST))
+    assert admitted is not None
+
+    with pytest.raises(BudgetExceeded):
+        await replica_two._meter.admit(TEAM_ID, _model(), dict(MAX_TOKENS_REQUEST))
+
+
+async def test_a_replica_releasing_frees_the_bound_for_the_other() -> None:
+    shared = InMemoryBudgetReservationStore()
+    budgets = FakeBudgets(_budget(1.0))
+    replica_one = _service(CountingGateway(), FakeUsage(spent=0.0), budgets, reservations=shared)
+    replica_two = _service(CountingGateway(), FakeUsage(spent=0.0), budgets, reservations=shared)
+    held = await replica_one._meter.admit(TEAM_ID, _model(), dict(MAX_TOKENS_REQUEST))
+
+    await replica_one._meter.release(held)
+
+    assert await replica_two._meter.admit(TEAM_ID, _model(), dict(MAX_TOKENS_REQUEST)) is not None

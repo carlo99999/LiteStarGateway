@@ -45,6 +45,7 @@ from litestar_gateway.domain.ports import (
     CredentialRepository,
     LLMGateway,
     ModelRepository,
+    Reservation,
     ResponseCache,
     SemanticResponseCache,
 )
@@ -309,7 +310,7 @@ class CompletionService:
         operation: str,
         request: dict[str, Any],
         call: Callable[[], Awaitable[dict[str, Any]]],
-        reservation: float = 0.0,
+        reservation: Reservation | None = None,
         settle_view: Callable[[dict[str, Any]], dict[str, Any]] = lambda response: response,
         attribution: UsageAttribution | None = None,
         cache_key: CacheKey | None = None,
@@ -357,7 +358,7 @@ class CompletionService:
                     latency_ms,
                     attribution,
                 )
-                self._meter.release(team_id, reservation)
+                await self._meter.release(reservation)
                 return cached.body
         try:
             try:
@@ -410,7 +411,7 @@ class CompletionService:
             await self._attach_routing_usage(response)
             return response
         finally:
-            self._meter.release(team_id, reservation)
+            await self._meter.release(reservation)
 
     async def _cache_get(self, key: CacheKey) -> CachedResponse | None:
         """A cache failure must never fail the request (design §8): any
@@ -715,7 +716,7 @@ class CompletionService:
         try:
             stream = await self._gateway.astream_native_messages(governed, model, values)
         except BaseException:
-            self._meter.release(team_id, reservation)
+            await self._meter.release(reservation)
             raise
         gen = self._metered_native(
             team_id, api_key_id, model, stream, view, reservation, attribution
@@ -729,7 +730,7 @@ class CompletionService:
         model: Model,
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
-        reservation: float,
+        reservation: Reservation | None,
         attribution: UsageAttribution,
     ) -> AsyncIterator[dict[str, Any]]:
         """Native mirror of `_metered`: wrap the raw Anthropic stream in the native
@@ -738,11 +739,20 @@ class CompletionService:
         `weakref.finalize` for the never-iterated (drop-before-first-byte) case."""
         released = False
 
-        def release() -> None:
+        async def release() -> None:
             nonlocal released
             if not released:
                 released = True
-                self._meter.release(team_id, reservation)
+                await self._meter.release(reservation)
+
+        def release_from_finalizer() -> None:
+            # A garbage-collection callback cannot await. `release_soon`
+            # schedules the release when a loop is running and otherwise leaves
+            # it to the reservation's TTL.
+            nonlocal released
+            if not released:
+                released = True
+                self._meter.release_soon(reservation)
 
         gen = self._meter.metered_native_stream(
             team_id,
@@ -754,7 +764,7 @@ class CompletionService:
             release,
             attribution,
         )
-        weakref.finalize(gen, release)
+        weakref.finalize(gen, release_from_finalizer)
         return gen
 
     async def generate_content(
@@ -826,7 +836,7 @@ class CompletionService:
         try:
             stream = await self._gateway.astream_generate_content(governed, model, values)
         except BaseException:
-            self._meter.release(team_id, reservation)
+            await self._meter.release(reservation)
             raise
         gen = self._metered_gemini(
             team_id, api_key_id, model, stream, view, reservation, attribution
@@ -840,7 +850,7 @@ class CompletionService:
         model: Model,
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
-        reservation: float,
+        reservation: Reservation | None,
         attribution: UsageAttribution,
     ) -> AsyncIterator[dict[str, Any]]:
         """Native mirror of `_metered_native` for the Gemini wire shape: wrap the raw
@@ -850,11 +860,20 @@ class CompletionService:
         never-iterated (drop-before-first-byte) case."""
         released = False
 
-        def release() -> None:
+        async def release() -> None:
             nonlocal released
             if not released:
                 released = True
-                self._meter.release(team_id, reservation)
+                await self._meter.release(reservation)
+
+        def release_from_finalizer() -> None:
+            # A garbage-collection callback cannot await. `release_soon`
+            # schedules the release when a loop is running and otherwise leaves
+            # it to the reservation's TTL.
+            nonlocal released
+            if not released:
+                released = True
+                self._meter.release_soon(reservation)
 
         gen = self._meter.metered_gemini_stream(
             team_id,
@@ -866,7 +885,7 @@ class CompletionService:
             release,
             attribution,
         )
-        weakref.finalize(gen, release)
+        weakref.finalize(gen, release_from_finalizer)
         return gen
 
     async def _prepare(
@@ -879,7 +898,7 @@ class CompletionService:
         request_validator: RequestValidator | None = None,
         *,
         router_context: dict[str, Any] | None = None,
-    ) -> tuple[Model, dict[str, str], float, dict[str, Any], UsageAttribution]:
+    ) -> tuple[Model, dict[str, str], Reservation | None, dict[str, Any], UsageAttribution]:
         # Gate the caller before router strategies: judge/embedding strategies
         # may make billable provider calls while resolving a virtual model.
         # The later admit handles team RPM + budget and omits the key so this
@@ -964,7 +983,7 @@ class CompletionService:
             if values is None:
                 raise CredentialNotFound(str(model.credential_id))
         except BaseException:
-            self._meter.release(team_id, reservation)
+            await self._meter.release(reservation)
             raise
         attribution = self._usage_attribution(team_id, alias, model, resolved)
         return model, values, reservation, clean, attribution
@@ -1145,7 +1164,7 @@ class CompletionService:
         sanitized: dict[str, Any],
         model: Model,
         values: dict[str, str],
-        reservation: float,
+        reservation: Reservation | None,
         clean: dict[str, Any],
         attribution: UsageAttribution,
         router: RouterConfig,
@@ -1316,7 +1335,7 @@ class CompletionService:
         try:
             stream = await self._gateway.astream_chat_completion(clean, model, values)
         except BaseException:
-            self._meter.release(team_id, reservation)
+            await self._meter.release(reservation)
             raise
         gen = self._metered(
             team_id,
@@ -1337,7 +1356,7 @@ class CompletionService:
         model: Model,
         operation: str,
         cached: CachedResponse,
-        reservation: float,
+        reservation: Reservation | None,
         attribution: UsageAttribution,
     ) -> AsyncIterator[dict[str, Any]]:
         """Synthetic-stream replay of a cache hit (Plan 04 Phase 1). Mirrors
@@ -1349,11 +1368,20 @@ class CompletionService:
         never a second one for the streaming replay (design §6)."""
         released = False
 
-        def release() -> None:
+        async def release() -> None:
             nonlocal released
             if not released:
                 released = True
-                self._meter.release(team_id, reservation)
+                await self._meter.release(reservation)
+
+        def release_from_finalizer() -> None:
+            # A garbage-collection callback cannot await. `release_soon`
+            # schedules the release when a loop is running and otherwise leaves
+            # it to the reservation's TTL.
+            nonlocal released
+            if not released:
+                released = True
+                self._meter.release_soon(reservation)
 
         async def gen() -> AsyncIterator[dict[str, Any]]:
             start = perf_counter()
@@ -1361,7 +1389,7 @@ class CompletionService:
                 for chunk in _synthetic_chat_chunks(cached.body, model):
                     yield chunk
             finally:
-                release()
+                await release()
                 latency_ms = (perf_counter() - start) * 1000
                 await self._meter.settle_cache_hit(
                     team_id,
@@ -1375,7 +1403,7 @@ class CompletionService:
                 )
 
         generator = gen()
-        weakref.finalize(generator, release)
+        weakref.finalize(generator, release_from_finalizer)
         return generator
 
     async def _open_chat_stream_with_failover(
@@ -1385,7 +1413,7 @@ class CompletionService:
         sanitized: dict[str, Any],
         model: Model,
         values: dict[str, str],
-        reservation: float,
+        reservation: Reservation | None,
         clean: dict[str, Any],
         attribution: UsageAttribution,
         router: RouterConfig,
@@ -1445,7 +1473,7 @@ class CompletionService:
                 except DomainError as exc:
                     # Never entered _metered, so nothing else releases this
                     # attempt's reservation -- we must release it ourselves.
-                    self._meter.release(team_id, attempt_reservation)
+                    await self._meter.release(attempt_reservation)
                     eligible = is_failover_eligible(exc)
                     if eligible and self._circuit_breaker is not None:
                         await self._circuit_breaker.record_failure(
@@ -1456,7 +1484,7 @@ class CompletionService:
                     last_exc = exc
                     continue
                 except BaseException:
-                    self._meter.release(team_id, attempt_reservation)
+                    await self._meter.release(attempt_reservation)
                     raise
                 gen = self._metered(
                     team_id,
@@ -1512,7 +1540,7 @@ class CompletionService:
         try:
             stream = await self._gateway.astream_responses(clean, model, values)
         except BaseException:
-            self._meter.release(team_id, reservation)
+            await self._meter.release(reservation)
             raise
         gen = self._metered(
             team_id, api_key_id, model, "responses", stream, clean, reservation, attribution
@@ -1527,7 +1555,7 @@ class CompletionService:
         operation: str,
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
-        reservation: float,
+        reservation: Reservation | None,
         attribution: UsageAttribution,
     ) -> AsyncIterator[dict[str, Any]]:
         """Wrap the provider stream with usage metering, releasing the budget
@@ -1546,11 +1574,20 @@ class CompletionService:
         the billing that already committed."""
         released = False
 
-        def release() -> None:
+        async def release() -> None:
             nonlocal released
             if not released:
                 released = True
-                self._meter.release(team_id, reservation)
+                await self._meter.release(reservation)
+
+        def release_from_finalizer() -> None:
+            # A garbage-collection callback cannot await. `release_soon`
+            # schedules the release when a loop is running and otherwise leaves
+            # it to the reservation's TTL.
+            nonlocal released
+            if not released:
+                released = True
+                self._meter.release_soon(reservation)
 
         gen = self._meter.metered_stream(
             team_id,
@@ -1563,7 +1600,7 @@ class CompletionService:
             attribution,
             on_settled=self._record_router_usage,
         )
-        weakref.finalize(gen, release)
+        weakref.finalize(gen, release_from_finalizer)
         return gen
 
     async def embeddings(

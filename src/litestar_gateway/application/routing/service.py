@@ -823,7 +823,7 @@ class RouterService:
             )
             return response
         finally:
-            meter.release(team_id, reservation)
+            await meter.release(reservation)
 
     async def _embed_texts(
         self,
