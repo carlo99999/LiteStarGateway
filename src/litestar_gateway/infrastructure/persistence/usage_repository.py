@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
@@ -11,6 +12,7 @@ from sqlalchemy import and_, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import ApiKeySpend, UsageAggregate, UsageBucket, UsageEvent
+from litestar_gateway.domain.money import ZERO, quantize_cost, to_cost
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.infrastructure.persistence.orm import (
     ModelRecord,
@@ -183,7 +185,7 @@ class SQLAlchemyUsageRepository:
                 source_team_id=row[6],
                 prompt_tokens=int(row[7]),
                 completion_tokens=int(row[8]),
-                cost=float(row[9]),
+                cost=to_cost(row[9]),
                 calls=int(row[10]),
             )
             for row in rows
@@ -210,13 +212,13 @@ class SQLAlchemyUsageRepository:
                 api_key_id=row[0],
                 prompt_tokens=int(row[1]),
                 completion_tokens=int(row[2]),
-                cost=float(row[3]),
+                cost=to_cost(row[3]),
                 calls=int(row[4]),
             )
             for row in rows
         ]
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
         # Hot-path read for the budget gate: an indexed team_id filter + SUM.
         # If this ever gets hot enough to matter, move to a running counter.
         total = await self._session.scalar(
@@ -242,7 +244,9 @@ class SQLAlchemyUsageRepository:
                 PendingUsageEventModel.attempts < MAX_RECONCILE_ATTEMPTS,
             )
         )
-        return (total or 0.0) + (pending or 0.0)
+        # Both sums come back as Decimal from a NUMERIC column; `or ZERO`
+        # covers a window with no rows on either side.
+        return quantize_cost((total or ZERO) + (pending or ZERO))
 
     async def enqueue_pending(self, event: UsageEvent) -> None:
         # The request session may be in a failed state after the ledger commit
@@ -430,7 +434,7 @@ class SQLAlchemyUsageRepository:
                 request_count=int(row[1]),
                 prompt_tokens=int(row[2]),
                 completion_tokens=int(row[3]),
-                cost=float(row[4]),
+                cost=to_cost(row[4]),
                 group_key=(row[5] or "unknown") if group_by == "model" else None,
             )
             for row in rows

@@ -10,6 +10,7 @@ that captures the recorded `UsageEvent`s — the money the ledger actually sees.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -23,7 +24,7 @@ from litestar_gateway.domain.entities import (
     UsageEvent,
 )
 from litestar_gateway.domain.entities.enums import ModelType
-from litestar_gateway.domain.money import to_cost
+from litestar_gateway.domain.money import ZERO, to_cost
 
 TEAM_ID = uuid4()
 
@@ -44,8 +45,8 @@ class _FakeUsageRepository:
     async def spend_by_api_key(self, team_id: UUID) -> list[ApiKeySpend]:
         return []
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
-        return 0.0
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
+        return ZERO
 
     async def enqueue_pending(self, event: UsageEvent) -> None:
         raise AssertionError("outbox must not be used in this test")
@@ -119,7 +120,7 @@ async def test_image_generation_bills_per_image_and_records_the_count() -> None:
     assert cost == to_cost("0.12")  # 3 images * 0.04
     event = repo.recorded[0]
     assert event.image_count == 3
-    assert event.cost == 0.12
+    assert event.cost == to_cost("0.12")
     assert (event.prompt_tokens, event.completion_tokens) == (0, 0)
 
 

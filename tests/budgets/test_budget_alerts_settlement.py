@@ -9,6 +9,7 @@ enqueue again; alert evaluation must never break the settlement itself.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -27,6 +28,7 @@ from litestar_gateway.domain.entities import (
     TraceRecord,
     UsageEvent,
 )
+from litestar_gateway.domain.money import ZERO, to_cost
 from litestar_gateway.infrastructure.budget_reservation import (
     InMemoryBudgetReservationStore,
 )
@@ -62,7 +64,7 @@ def _budget(
     return Budget(
         id=uuid4(),
         team_id=TEAM_ID,
-        limit_cost=limit,
+        limit_cost=to_cost(limit),
         window=window,
         created_at=datetime.now(UTC),
         thresholds=thresholds,
@@ -82,8 +84,11 @@ class FakeUsage:
     async def enqueue_pending(self, event: UsageEvent) -> None:  # pragma: no cover
         raise AssertionError("outbox must not be used in these tests")
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
-        return sum(e.cost for e in self.events if e.team_id == team_id and e.created_at >= since)
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
+        return sum(
+            (e.cost for e in self.events if e.team_id == team_id and e.created_at >= since),
+            ZERO,
+        )
 
 
 class FakeBudgets:

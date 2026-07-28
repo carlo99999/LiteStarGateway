@@ -36,6 +36,7 @@ from litestar_gateway.domain.exceptions import (
     InvalidKeyScope,
     InvalidUsageQuery,
 )
+from litestar_gateway.domain.money import to_cost
 from litestar_gateway.domain.pagination import resolve_page
 from litestar_gateway.domain.ports import (
     AuditLog,
@@ -134,7 +135,7 @@ def _parse_budget(data: SetBudgetRequest, team_id: UUID) -> Budget:
     return Budget(
         id=uuid4(),
         team_id=team_id,
-        limit_cost=data.limit_cost,
+        limit_cost=to_cost(data.limit_cost),
         window=window,
         created_at=datetime.now(UTC),
         thresholds=thresholds,

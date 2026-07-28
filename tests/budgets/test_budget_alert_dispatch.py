@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from support.sessions import two_sessions_over_one_database
 
 from litestar_gateway.domain.entities import BudgetWindow, PendingBudgetAlert
+from litestar_gateway.domain.money import to_cost
 from litestar_gateway.domain.ports.notification_channel import NotificationChannel
 from litestar_gateway.infrastructure.persistence.budget_alert_state_repository import (
     DISPATCH_LEASE_SECONDS,
@@ -57,8 +58,8 @@ def _alert(**overrides) -> PendingBudgetAlert:
         window=BudgetWindow.MONTHLY,
         period_start=datetime(2026, 7, 1, tzinfo=UTC),
         threshold=80,
-        spend=85.0,
-        limit_cost=100.0,
+        spend=to_cost("85.0"),
+        limit_cost=to_cost("100.0"),
         created_at=datetime.now(UTC),
     )
     defaults.update(overrides)

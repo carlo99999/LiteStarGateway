@@ -30,6 +30,7 @@ from litestar_gateway.domain.entities import (
     UsageEvent,
 )
 from litestar_gateway.domain.exceptions import BudgetExceeded, UnsupportedOperation
+from litestar_gateway.domain.money import to_cost
 from litestar_gateway.domain.routing import CandidateModel, QualityTier, RouterConfig
 from litestar_gateway.infrastructure.budget_reservation import (
     InMemoryBudgetReservationStore,
@@ -80,7 +81,7 @@ def _budget(limit: float, window: BudgetWindow = BudgetWindow.MONTHLY) -> Budget
     return Budget(
         id=uuid4(),
         team_id=TEAM_ID,
-        limit_cost=limit,
+        limit_cost=to_cost(limit),
         window=window,
         created_at=datetime.now(UTC),
     )

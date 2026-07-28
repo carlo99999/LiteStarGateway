@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 
 from litestar_gateway.domain.entities import BudgetWindow
 from litestar_gateway.domain.exceptions import InvalidBudget
@@ -30,7 +31,7 @@ def validate_thresholds(thresholds: list[int]) -> list[int]:
 
 
 def crossed_thresholds(
-    *, spend: float, limit_cost: float, thresholds: list[int], fired: set[int]
+    *, spend: Decimal, limit_cost: Decimal, thresholds: list[int], fired: set[int]
 ) -> list[int]:
     """Thresholds newly crossed by `spend` against `limit_cost`, excluding any
     already in `fired` (the persisted dedup set for the current

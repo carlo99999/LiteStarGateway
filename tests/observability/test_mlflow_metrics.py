@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from litestar_gateway.domain.entities import TraceRecord
+from litestar_gateway.domain.money import to_cost
 from litestar_gateway.infrastructure.observability.aggregator import MetricsAggregator
 from litestar_gateway.infrastructure.observability.composite import CompositeTraceSink
 from litestar_gateway.infrastructure.observability.mlflow_metrics import MlflowMetricsPublisher
@@ -36,7 +37,7 @@ def _record(
         operation="chat.completions",
         prompt_tokens=0 if failed else 5,
         completion_tokens=0 if failed else 7,
-        cost=0.0 if failed else 0.02,
+        cost=to_cost("0.0") if failed else to_cost("0.02"),
         latency_ms=latency_ms,
         status=status,
         created_at=datetime.now(UTC),

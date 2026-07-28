@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.entities import TraceRecord
+from litestar_gateway.domain.money import to_cost
 from litestar_gateway.infrastructure.observability.dispatcher import TraceDispatcher
 from litestar_gateway.infrastructure.observability.factory import build_trace_sink
 from litestar_gateway.infrastructure.observability.null_sink import NullTraceSink
@@ -22,7 +23,7 @@ def _record() -> TraceRecord:
         operation="chat.completions",
         prompt_tokens=1,
         completion_tokens=2,
-        cost=0.0,
+        cost=to_cost("0.0"),
         latency_ms=12.3,
         status="ok",
         created_at=datetime.now(UTC),
