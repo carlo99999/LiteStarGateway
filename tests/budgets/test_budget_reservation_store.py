@@ -8,21 +8,34 @@ an adapter that passes is substitutable for the other.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from typing import Any
 from uuid import uuid4
 
 import pytest
 from support.doubles import MutableClock
+from support.redis import REDIS_TEST_URL, requires_redis
 
 from litestar_gateway.infrastructure.budget_reservation import (
     InMemoryBudgetReservationStore,
+    RedisBudgetReservationStore,
 )
 
 TTL = 300
 
 
-@pytest.fixture(params=["in_memory"])
-def store_factory(request: pytest.FixtureRequest) -> Callable[[MutableClock], object]:
+@pytest.fixture(
+    params=[
+        "in_memory",
+        # The Lua script IS the atomicity, and a Python fake cannot vouch for
+        # it: verifying a script against a hand-rolled double proves only that
+        # the double agrees with itself (ISSUE-029). Skipped without a server.
+        pytest.param("redis", marks=requires_redis),
+    ]
+)
+async def store_factory(
+    request: pytest.FixtureRequest,
+) -> AsyncIterator[Callable[[MutableClock], object]]:
     """Builds a store bound to a test-controlled clock, over a backend SHARED by
     every store the test builds — so calling the factory twice models two
     replicas. For the in-memory adapter the shared backend is the object itself
@@ -31,13 +44,31 @@ def store_factory(request: pytest.FixtureRequest) -> Callable[[MutableClock], ob
     Parametrized so every adapter answers the same questions.
     """
     built: dict[int, object] = {}
+    clients: list[Any] = []
 
-    def build(clock: MutableClock):
-        if id(clock) not in built:
-            built[id(clock)] = InMemoryBudgetReservationStore(clock=clock)
-        return built[id(clock)]
+    if request.param == "in_memory":
 
-    return build
+        def build(clock: MutableClock):
+            if id(clock) not in built:
+                built[id(clock)] = InMemoryBudgetReservationStore(clock=clock)
+            return built[id(clock)]
+
+        yield build
+        return
+
+    from redis.asyncio import Redis
+
+    def build_redis(clock: MutableClock):
+        client = Redis.from_url(str(REDIS_TEST_URL))
+        clients.append(client)
+        # A fresh client per call: two of them over one server is what "two
+        # replicas" means here, unlike the in-memory adapter where it cannot.
+        return RedisBudgetReservationStore(client, clock=clock)
+
+    yield build_redis
+    for client in clients:
+        await client.flushdb()
+        await client.aclose()
 
 
 async def test_a_request_within_the_cap_is_admitted(store_factory) -> None:

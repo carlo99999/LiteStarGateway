@@ -78,8 +78,104 @@ class InMemoryBudgetReservationStore:
             self._by_team.pop(reservation.team_id, None)
 
 
+# One indivisible admission: sweep what expired, sum what is live, decide, and
+# record — server-side, so two replicas cannot both read the same total and both
+# slip under the cap. Splitting this into a read and a write in Python would
+# reintroduce exactly the race the single-process gate avoided by not awaiting
+# between them.
+#
+# Field format is "amount:expires_at". A hash rather than a key per reservation
+# because the sum has to be taken over a set the script can enumerate; the outer
+# EXPIRE is the safety net for a team that stops sending traffic entirely.
+_RESERVE_SCRIPT = """
+local now = tonumber(ARGV[1])
+local spent = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+local amount = tonumber(ARGV[4])
+local ttl = tonumber(ARGV[5])
+local reservation_id = ARGV[6]
+
+local reserved = 0
+local expired = {}
+local entries = redis.call('HGETALL', KEYS[1])
+for i = 1, #entries, 2 do
+  local field = entries[i]
+  local value = entries[i + 1]
+  local separator = string.find(value, ':')
+  local held = tonumber(string.sub(value, 1, separator - 1))
+  local expires_at = tonumber(string.sub(value, separator + 1))
+  if expires_at <= now then
+    table.insert(expired, field)
+  else
+    reserved = reserved + held
+  end
+end
+if #expired > 0 then
+  redis.call('HDEL', KEYS[1], unpack(expired))
+end
+if spent + reserved >= limit then
+  return {0, tostring(reserved)}
+end
+redis.call('HSET', KEYS[1], reservation_id, tostring(amount) .. ':' .. tostring(now + ttl))
+redis.call('EXPIRE', KEYS[1], ttl * 2)
+return {1, tostring(reserved)}
+"""
+
+
+class RedisBudgetReservationStore:
+    """In-flight spend shared across replicas.
+
+    The decision runs as a Lua script so the read-decide-write is one atomic
+    step on the server. `now` is passed in rather than read from Redis: the
+    caller's clock is the one the rest of the budget window already uses, and it
+    keeps the store testable against a controlled clock."""
+
+    def __init__(self, client: object, *, clock: Callable[[], float] = time.time) -> None:
+        # redis.asyncio.Redis; typed as object to avoid a hard import at module load.
+        self._redis = client
+        self._clock = clock
+        self._script = client.register_script(_RESERVE_SCRIPT)  # type: ignore[attr-defined]
+
+    @staticmethod
+    def _key(team_id: UUID) -> str:
+        return f"budget:res:{team_id}"
+
+    async def try_reserve(
+        self,
+        team_id: UUID,
+        amount: float,
+        *,
+        spent: float,
+        limit: float,
+        ttl_s: int,
+    ) -> ReservationOutcome:
+        reservation_id = uuid4()
+        admitted, reserved = await self._script(
+            keys=[self._key(team_id)],
+            args=[self._clock(), spent, limit, amount, ttl_s, str(reservation_id)],
+        )
+        reserved_total = float(reserved)
+        if not int(admitted):
+            return ReservationOutcome(reservation=None, reserved=reserved_total)
+        return ReservationOutcome(
+            reservation=Reservation(id=reservation_id, team_id=team_id, amount=amount),
+            reserved=reserved_total,
+        )
+
+    async def release(self, reservation: Reservation) -> None:
+        # HDEL by id: releasing twice, or releasing one the sweep already
+        # removed, deletes nothing and changes nothing.
+        await self._redis.hdel(  # type: ignore[attr-defined]
+            self._key(reservation.team_id), str(reservation.id)
+        )
+
+
 def build_budget_reservation_store(settings: Settings) -> BudgetReservationStore:
     """Redis-backed when REDIS_URL is set (shared across replicas), else
     in-memory. Production cannot reach the in-memory branch: `Settings` refuses
     to start without `REDIS_URL`."""
+    if settings.redis_url:
+        from redis.asyncio import Redis
+
+        return RedisBudgetReservationStore(Redis.from_url(settings.redis_url))
     return InMemoryBudgetReservationStore()
