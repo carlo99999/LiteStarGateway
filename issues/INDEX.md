@@ -10,6 +10,7 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 | Round | Focus | New findings (C·H·M·L) | Status |
 |---|---|---|---|
+| [Round 14](round-14.md) — 2026-07-28 | Regression review of the Round 13 remediation (#392–#401): pricing, cache equivalence, client lifecycle, outbox, deadline, SSO, breaker, purge | 0·0·3·0 | Fully remediated (#403–#405) |
 | [Round 13](round-13.md) — 2026-07-27 | Post-R12 delta (response cache exact+semantic, failover/breaker, budget alerts, non-token pricing, client registry, DB-backed SSO, retention/purge) | 0·2·7·0 | Fully remediated (#392–#401) |
 | [Round 12](round-12.md) — 2026-07-22 | Post-R11 delta (verification of remediation PRs #313–#321: alias registry, router revisions, playground governance, downgrade contract) | 0·0·2·0 | Fully remediated |
 | [Round 11](round-11.md) — 2026-07-22 | Post-R10 delta (global/extended routers & models, Playground, credential lifecycle, reasoning params, admin console) | 0·4·6·0 | Fully remediated |
@@ -26,7 +27,19 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 ## Overall
 
-**As of Round 13: 7.4/10 at review time, all nine findings since remediated
+**As of Round 14: 8.6/10 at review time, all three findings since remediated
+(#403–#405).** See [round-14.md](round-14.md#category-scores) for the breakdown.
+The round verified the nine Round 13 remediations hold and found three MEDIUMs
+in their transition edges — a no-channel alert holding its dispatch lease for
+the full 300 s (#403), a DB SSO configuration created before #398 still
+reopening the `Host` fallback (#404), and a breaker outcome able to resolve a
+half-open trial it never earned (#405). Two of the three were introduced or left
+incomplete by the Round 13 remediation itself, which is the argument for running
+a regression round after a large remediation rather than declaring it closed.
+Their shared lesson: a concurrent protocol needs an *identity*, not just a
+state — the fix in all three cases was making the owner explicit.
+
+Previous: **as of Round 13: 7.4/10 at review time, all nine findings since remediated
 (#392–#401).** See [round-13.md](round-13.md#category-scores) for the category
 breakdown. The two HIGHs were economic/result correctness: a negative model rate
 credited the ledger the budget gate reads (#392), and both cache tiers could

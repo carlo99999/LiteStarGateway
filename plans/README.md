@@ -12,10 +12,10 @@ It is deliberately separate from `docs/next-steps/`:
 
 ## Status snapshot
 
-- Round 1–13 review findings: **fully remediated**. The nine Round 13 findings
+- Round 1–14 review findings: **fully remediated**. The nine Round 13 findings
   (2 HIGH, 7 MEDIUM) were fixed by #392–#401, one PR per issue, per
-  [16-round-13-remediation.md](16-round-13-remediation.md); no reviewed finding
-  remains open.
+  [16-round-13-remediation.md](16-round-13-remediation.md); the three Round 14
+  transition-edge MEDIUMs by #403–#405. No reviewed finding remains open.
 - `main` is green: full suite passing, `ruff` clean, `pyrefly` 0 errors, all
   pre-commit hooks pass. CI runs the suite on SQLite **and** a real Postgres job
   (`alembic upgrade head` + full suite), plus a Docker build + `/health`
@@ -47,6 +47,8 @@ It is deliberately separate from `docs/next-steps/`:
 | 14 | [Gateway hot-path throughput](14-hot-path-throughput.md) | ✅ **complete** (outcome 2: +21–49% non-streaming, streaming gate PASS in-network; PRs #348–#353) | Profile-driven client reuse and hot-path work toward 300 RPS |
 | 14a | [Hot-path implementation steps](14a-hot-path-implementation.md) | ✅ execution log of 14 — all six steps recorded, incl. the proxy-artifact investigation | Registry, adapter adoption, measured hotspots, deployment tuning |
 | 15 | [Post-throughput next steps](15-next-steps.md) | 🚧 Phases A+B complete (in-network loadgen, true ceilings measured, B-i stop-optimizing decided); Phase C feature sequencing next | Bridge from Plan 14 to the feature roadmap (09 → 05 → 04 → 07 → 10) |
+| 16 | [Round 13 remediation](16-round-13-remediation.md) | ✅ complete (#392–#401) | One PR per finding, each with a regression that fails first |
+| 17 | [Post-Round-13 execution](17-post-round-13-execution.md) | 🚧 proposed — sequence for what comes after Plan 15 Phase C: multi-replica budget reservations, decimal money, guardrails | Correctness at scale-out, then the enterprise policy layer |
 
 ## Recommended order
 
