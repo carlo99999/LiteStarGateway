@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+from support.doubles import MutableClock
+
 from litestar_gateway.domain.ports.response_cache import CachedResponse, SemanticScope
 from litestar_gateway.infrastructure.cache.semantic import InMemorySemanticResponseCache
 
@@ -73,10 +75,10 @@ async def test_a_different_api_key_never_matches_within_the_same_team() -> None:
 
 
 async def test_an_expired_entry_is_a_miss() -> None:
-    clock_value = [0.0]
-    cache = InMemorySemanticResponseCache(clock=lambda: clock_value[0])
+    clock = MutableClock(now=0.0)
+    cache = InMemorySemanticResponseCache(clock=clock)
     await cache.add(SCOPE, [1.0, 0.0], _value("a"), ttl_s=60)
-    clock_value[0] = 61.0
+    clock.now = 61.0
 
     assert await cache.find(SCOPE, [1.0, 0.0], threshold=0.97) is None
 
@@ -171,13 +173,13 @@ async def test_expired_scopes_are_swept_without_being_revisited() -> None:
     # The reported leak: `find` only ever pruned the bucket it was asked about,
     # so a scope that is never looked up again kept its bodies and vectors
     # resident long past their TTL.
-    clock_value = [0.0]
-    cache = InMemorySemanticResponseCache(max_scopes=1000, clock=lambda: clock_value[0])
+    clock = MutableClock(now=0.0)
+    cache = InMemorySemanticResponseCache(max_scopes=1000, clock=clock)
     for index in range(20):
         await cache.add(_scope(api_key=uuid4()), [1.0, 0.0], _value(str(index)), ttl_s=60)
     assert len(cache._buckets) == 20
 
-    clock_value[0] = 61.0
+    clock.now = 61.0
     for index in range(20):
         await cache.add(_scope(api_key=uuid4()), [1.0, 0.0], _value(f"new-{index}"), ttl_s=60)
 
@@ -186,12 +188,12 @@ async def test_expired_scopes_are_swept_without_being_revisited() -> None:
 
 
 async def test_a_live_scope_is_never_swept() -> None:
-    clock_value = [0.0]
-    cache = InMemorySemanticResponseCache(clock=lambda: clock_value[0])
+    clock = MutableClock(now=0.0)
+    cache = InMemorySemanticResponseCache(clock=clock)
     keeper = _scope(api_key=uuid4())
     await cache.add(keeper, [1.0, 0.0], _value("keeper"), ttl_s=600)
 
-    clock_value[0] = 61.0
+    clock.now = 61.0
     for index in range(20):
         await cache.add(_scope(api_key=uuid4()), [1.0, 0.0], _value(str(index)), ttl_s=60)
 
