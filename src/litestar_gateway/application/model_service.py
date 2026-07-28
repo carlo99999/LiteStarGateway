@@ -39,14 +39,17 @@ def _ensure_valid_pricing(model: Model) -> None:
     """Refuse a model whose rates would make settlement credit the ledger.
     Applied to the *resulting* entity, so a partial update that leaves other
     rates untouched is validated as a whole (ISSUE-022)."""
+    # Validated on the raw configured values, before conversion: a rate that is
+    # NaN, negative or not a number at all must be refused with the operator's
+    # own value in the message, not a converted one.
     validate_rate_card(
         RateCard(
-            input_cost_per_token=model.input_cost_per_token,
-            output_cost_per_token=model.output_cost_per_token,
-            cache_write_cost_per_token=model.cache_write_cost_per_token,
-            cache_read_cost_per_token=model.cache_read_cost_per_token,
-            image_cost_per_image=model.image_cost_per_image,
-            image_prices=model.image_prices,
+            input_cost_per_token=model.input_cost_per_token,  # type: ignore[arg-type]
+            output_cost_per_token=model.output_cost_per_token,  # type: ignore[arg-type]
+            cache_write_cost_per_token=model.cache_write_cost_per_token,  # type: ignore[arg-type]
+            cache_read_cost_per_token=model.cache_read_cost_per_token,  # type: ignore[arg-type]
+            image_cost_per_image=model.image_cost_per_image,  # type: ignore[arg-type]
+            image_prices=model.image_prices,  # type: ignore[arg-type]
         )
     )
 

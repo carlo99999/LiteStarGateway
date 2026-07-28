@@ -6,18 +6,21 @@ normalized :class:`BillableUsage` and a model's :class:`RateCard`. Routing both
 paths through the same calculation is what guarantees the reservation and the
 final charge can never disagree about how a given usage shape maps to a cost.
 
-Phase 2 (Decimal migration) will change the numeric type of the rate/cost fields
-and the arithmetic here from ``float`` to fixed-precision ``Decimal`` WITHOUT
-changing this module's shape: ``RateCard`` / ``BillableUsage`` / ``compute_cost``
-stay the single seam where money is calculated.
+Money is `Decimal` here (Plan 13 Phase 2, retiring R3-L15): rates and costs are
+exact decimal quantities, with the scales and the single rounding step defined in
+`domain/money.py`. Token counts stay `int` — they are counts, not money. The
+module's shape is unchanged: ``RateCard`` / ``BillableUsage`` / ``compute_cost``
+remain the single seam where money is calculated.
 """
 
 from __future__ import annotations
 
-import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 
 from litestar_gateway.domain.exceptions import InvalidModelPricing
+from litestar_gateway.domain.money import ZERO, quantize_cost, to_rate
 
 
 def image_price_key(size: str | None, quality: str | None) -> str | None:
@@ -38,17 +41,17 @@ class RateCard:
     opt-in: a model with no cache/image rates bills exactly as it did before.
     """
 
-    input_cost_per_token: float | None = None
-    output_cost_per_token: float | None = None
+    input_cost_per_token: Decimal | None = None
+    output_cost_per_token: Decimal | None = None
     # Anthropic prompt caching: distinct economics from ordinary input tokens
     # (design §1 — "do not fold them into ordinary input tokens"). Unset ⇒ 0.0.
-    cache_write_cost_per_token: float | None = None
-    cache_read_cost_per_token: float | None = None
+    cache_write_cost_per_token: Decimal | None = None
+    cache_read_cost_per_token: Decimal | None = None
     # Flat per-image price — the "simple per-call fallback" (design §1) applied
     # when no size/quality-specific entry in `image_prices` matches.
-    image_cost_per_image: float | None = None
+    image_cost_per_image: Decimal | None = None
     # Optional size/quality-specific per-image prices, keyed by `image_price_key`.
-    image_prices: dict[str, float] = field(default_factory=dict)
+    image_prices: dict[str, Decimal] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -82,11 +85,18 @@ _RATE_FIELDS = (
 def _validate_rate(name: str, value: object, *, optional: bool = True) -> None:
     if value is None and optional:
         return  # unpriced dimension — bills at 0.0
-    if isinstance(value, bool) or not isinstance(value, int | float):
+    # A string is refused even though `Decimal("0.01")` would parse: rates reach
+    # this from JSON bodies, where a quoted number means the client sent the
+    # wrong type, and silently accepting it would hide that.
+    if isinstance(value, bool) or not isinstance(value, int | float | Decimal):
         raise InvalidModelPricing(f"{name} must be a number, got {value!r}")
-    if not math.isfinite(value):
+    try:
+        exact = value if isinstance(value, Decimal) else Decimal(str(value))
+    except InvalidOperation as exc:
+        raise InvalidModelPricing(f"{name} must be a number, got {value!r}") from exc
+    if not exact.is_finite():
         raise InvalidModelPricing(f"{name} must be a finite number, got {value!r}")
-    if value < 0:
+    if exact < 0:
         raise InvalidModelPricing(f"{name} must be zero or positive, got {value}")
 
 
@@ -110,16 +120,16 @@ def validate_rate_card(rates: RateCard) -> None:
         _validate_rate(f"image_prices[{key}]", value, optional=False)
 
 
-def image_unit_price(rates: RateCard, size: str | None, quality: str | None) -> float:
+def image_unit_price(rates: RateCard, size: str | None, quality: str | None) -> Decimal:
     """Per-image price for the given dimensions: a size/quality-specific entry
-    when configured, otherwise the flat per-image fallback, otherwise ``0.0``."""
+    when configured, otherwise the flat per-image fallback, otherwise zero."""
     key = image_price_key(size, quality)
     if key is not None and key in rates.image_prices:
         return rates.image_prices[key]
-    return rates.image_cost_per_image or 0.0
+    return rates.image_cost_per_image or ZERO
 
 
-def compute_cost(usage: BillableUsage, rates: RateCard) -> float:
+def compute_cost(usage: BillableUsage, rates: RateCard) -> Decimal:
     """The single normalized usage→cost calculation (design §1).
 
     Cost is additive across independent dimensions, each priced at its own rate:
@@ -128,10 +138,41 @@ def compute_cost(usage: BillableUsage, rates: RateCard) -> float:
     a token-only call on a model with no image/cache rates costs exactly what it
     did before Plan 13 (the strict billing-regression guarantee).
     """
-    return (
-        usage.prompt_tokens * (rates.input_cost_per_token or 0.0)
-        + usage.completion_tokens * (rates.output_cost_per_token or 0.0)
-        + usage.cache_write_tokens * (rates.cache_write_cost_per_token or 0.0)
-        + usage.cache_read_tokens * (rates.cache_read_cost_per_token or 0.0)
+    # Rounded ONCE, here, after every term is summed exactly: quantizing each
+    # product would bias the total in the direction of the rounding rule.
+    return quantize_cost(
+        usage.prompt_tokens * (rates.input_cost_per_token or ZERO)
+        + usage.completion_tokens * (rates.output_cost_per_token or ZERO)
+        + usage.cache_write_tokens * (rates.cache_write_cost_per_token or ZERO)
+        + usage.cache_read_tokens * (rates.cache_read_cost_per_token or ZERO)
         + usage.image_count * image_unit_price(rates, usage.image_size, usage.image_quality)
+    )
+
+
+def rate_card(
+    *,
+    input_cost_per_token: float | str | Decimal | None = None,
+    output_cost_per_token: float | str | Decimal | None = None,
+    cache_write_cost_per_token: float | str | Decimal | None = None,
+    cache_read_cost_per_token: float | str | Decimal | None = None,
+    image_cost_per_image: float | str | Decimal | None = None,
+    image_prices: Mapping[str, float | str | Decimal] | None = None,
+) -> RateCard:
+    """Build a `RateCard` from values that may still be floats.
+
+    The single conversion point for rates crossing in from JSON bodies or from
+    columns not yet migrated — so `Decimal(str(x))` happens once, here, rather
+    than being re-derived (and mis-derived) at each call site.
+    """
+    return RateCard(
+        input_cost_per_token=to_rate(input_cost_per_token),
+        output_cost_per_token=to_rate(output_cost_per_token),
+        cache_write_cost_per_token=to_rate(cache_write_cost_per_token),
+        cache_read_cost_per_token=to_rate(cache_read_cost_per_token),
+        image_cost_per_image=to_rate(image_cost_per_image),
+        image_prices={
+            key: converted
+            for key, value in (image_prices or {}).items()
+            if (converted := to_rate(value)) is not None
+        },
     )
