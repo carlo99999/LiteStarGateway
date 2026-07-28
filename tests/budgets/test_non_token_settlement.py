@@ -23,6 +23,7 @@ from litestar_gateway.domain.entities import (
     UsageEvent,
 )
 from litestar_gateway.domain.entities.enums import ModelType
+from litestar_gateway.domain.money import to_cost
 
 TEAM_ID = uuid4()
 
@@ -115,7 +116,7 @@ async def test_image_generation_bills_per_image_and_records_the_count() -> None:
         request={"n": 3, "size": "1024x1024", "quality": "standard"},
     )
 
-    assert cost == 0.12  # 3 images * 0.04
+    assert cost == to_cost("0.12")  # 3 images * 0.04
     event = repo.recorded[0]
     assert event.image_count == 3
     assert event.cost == 0.12
@@ -138,7 +139,7 @@ async def test_image_size_quality_specific_price_beats_flat_fallback() -> None:
         latency_ms=5.0,
         request={"n": 2, "size": "1024x1024", "quality": "hd"},
     )
-    assert cost == 0.16  # 2 * 0.08
+    assert cost == to_cost("0.16")  # 2 * 0.08
 
 
 async def test_image_reservation_is_an_upper_bound_on_settlement() -> None:
@@ -147,7 +148,7 @@ async def test_image_reservation_is_an_upper_bound_on_settlement() -> None:
     # its reservation.
     model = _model(model_type=ModelType.IMAGE, image_cost_per_image=0.04)
     reservation = _reservation_cost(model, {"n": 3, "size": "1024x1024", "quality": "standard"})
-    assert reservation == 0.12
+    assert reservation == to_cost("0.12")
 
     repo = _FakeUsageRepository()
     _, _, settled = await (_meter(repo)).settle_ok(
@@ -159,7 +160,7 @@ async def test_image_reservation_is_an_upper_bound_on_settlement() -> None:
         latency_ms=5.0,
         request={"n": 3, "size": "1024x1024", "quality": "standard"},
     )
-    assert settled == 0.04
+    assert settled == to_cost("0.04")
     assert settled <= reservation
 
 
@@ -190,8 +191,9 @@ async def test_cache_tokens_settle_at_their_own_rates_and_are_recorded() -> None
         },
         latency_ms=5.0,
     )
-    expected = 100 * 0.001 + 50 * 0.002 + 200 * 0.00125 + 400 * 0.0001
-    assert cost == expected
+    # Written out exactly: the float expression 100*0.001 + 50*0.002 +
+    # 200*0.00125 + 400*0.0001 evaluates to 0.49000000000000005.
+    assert cost == to_cost("0.49")
     event = repo.recorded[0]
     assert event.cache_write_tokens == 200
     assert event.cache_read_tokens == 400
@@ -238,4 +240,4 @@ async def test_plain_chat_call_bills_and_reserves_exactly_as_before() -> None:
     prompt_chars = len("hello")
     prompt_est = (prompt_chars + 3) // 4
     expected_reservation = prompt_est * 0.001 + 100 * 1 * 0.002
-    assert _reservation_cost(model, request) == expected_reservation
+    assert _reservation_cost(model, request) == to_cost(expected_reservation)

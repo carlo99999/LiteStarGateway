@@ -15,6 +15,7 @@ import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
+from decimal import Decimal
 from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
@@ -31,6 +32,7 @@ from litestar_gateway.domain.entities import (
     UsageEvent,
 )
 from litestar_gateway.domain.exceptions import BudgetExceeded, RateLimited
+from litestar_gateway.domain.money import ZERO
 from litestar_gateway.domain.ports import (
     APIKeyRepository,
     BudgetAlertStateRepository,
@@ -41,7 +43,12 @@ from litestar_gateway.domain.ports import (
     TeamRepository,
     UsageRepository,
 )
-from litestar_gateway.domain.pricing import BillableUsage, RateCard, compute_cost
+from litestar_gateway.domain.pricing import (
+    BillableUsage,
+    RateCard,
+    compute_cost,
+    rate_card,
+)
 from litestar_gateway.request_context import current_request_id
 
 # How long an unsettled reservation holds a team's headroom before the store
@@ -228,9 +235,10 @@ def _max_output_tokens(request: dict[str, Any]) -> int:
 def _rate_card(model: Model) -> RateCard:
     """The model's pricing inputs as the pure `RateCard` the normalized pricing
     function consumes. Isolating the `Model → RateCard` projection here keeps
-    `domain.pricing` free of the `Model` entity, so Phase 2 can decimalize the
-    pricing math without reaching into model config."""
-    return RateCard(
+    `domain.pricing` free of the `Model` entity — and is where the model's
+    still-`float` columns become exact `Decimal` rates, once, rather than at each
+    call site."""
+    return rate_card(
         input_cost_per_token=model.input_cost_per_token,
         output_cost_per_token=model.output_cost_per_token,
         cache_write_cost_per_token=model.cache_write_cost_per_token,
@@ -279,7 +287,7 @@ def _image_usage(request: dict[str, Any] | None, response: dict[str, Any]) -> Bi
     )
 
 
-def _parse_usage(model: Model, usage: dict[str, Any]) -> tuple[int, int, float]:
+def _parse_usage(model: Model, usage: dict[str, Any]) -> tuple[int, int, Decimal]:
     """Token counts + cost from a provider usage dict, via the one normalized
     pricing function (design §1). Returned as a `(prompt, completion, cost)` tuple
     for the token settlement/error paths; `_token_usage` exposes the full
@@ -309,7 +317,7 @@ def _worst_case_prompt_usage(
     return BillableUsage(prompt_tokens=prompt_estimate, completion_tokens=output_estimate)
 
 
-def _reservation_cost(model: Model, request: dict[str, Any]) -> float:
+def _reservation_cost(model: Model, request: dict[str, Any]) -> Decimal:
     """Pessimistic pre-dispatch cost of a request, via the same normalized pricing
     function settlement uses. For image models: the requested image count at the
     request's size/quality (an upper bound — settlement bills the images actually
@@ -426,7 +434,10 @@ class UsageMeter:
         # same total and both slip through.
         outcome = await self._reservations.try_reserve(
             team_id,
-            _reservation_cost(model, request),
+            # The store's arithmetic is a comparison against the budget, both
+            # still floats; PR 2/3 of this slice migrates the columns and this
+            # conversion goes away.
+            float(_reservation_cost(model, request)),
             spent=spent,
             limit=budget.limit_cost,
             ttl_s=self._reservation_ttl_s,
@@ -515,7 +526,7 @@ class UsageMeter:
         latency_ms: float,
         request: dict[str, Any] | None = None,
         attribution: UsageAttribution | None = None,
-    ) -> tuple[int, int, float]:
+    ) -> tuple[int, int, Decimal]:
         """Record usage (billing) + emit an observability trace. Fail-safe.
 
         If the provider reported no usable token counts (e.g. an adapter that
@@ -551,7 +562,9 @@ class UsageMeter:
                 operation=operation,
                 prompt_tokens=prompt,
                 completion_tokens=completion,
-                cost=cost,
+                # `as_float` at the edge: the trace is an observability record,
+                # and the columns are migrated in the next PR of this slice.
+                cost=float(cost),
                 latency_ms=latency_ms,
                 status="ok",
                 created_at=now,
@@ -586,7 +599,7 @@ class UsageMeter:
             model,
             operation,
             BillableUsage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens),
-            0.0,
+            ZERO,
             now,
             attribution,
             cache_hit=True,
@@ -620,7 +633,7 @@ class UsageMeter:
         exc: BaseException,
         request: dict[str, Any] | None = None,
         attribution: UsageAttribution | None = None,
-    ) -> tuple[int, int, float]:
+    ) -> tuple[int, int, Decimal]:
         """Bill a completed provider invocation whose response is unusable."""
         prompt, completion, cost, _ = await self._settle_usage(
             team_id,
@@ -653,7 +666,7 @@ class UsageMeter:
         response: dict[str, Any],
         request: dict[str, Any] | None,
         attribution: UsageAttribution | None,
-    ) -> tuple[int, int, float, datetime]:
+    ) -> tuple[int, int, Decimal, datetime]:
         if model.type is ModelType.IMAGE:
             # Image responses carry no token usage — bill on the image count/size/
             # quality dimensions instead of estimating a (meaningless) prompt.
@@ -690,7 +703,7 @@ class UsageMeter:
         *,
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
-        cost: float = 0.0,
+        cost: Decimal = ZERO,
     ) -> None:
         """Emit a status='error' trace for a failed gateway call. Without this,
         provider outages/timeouts/rate-limits are invisible in tracing — exactly
@@ -706,7 +719,7 @@ class UsageMeter:
                 operation=operation,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                cost=cost,
+                cost=float(cost),
                 latency_ms=latency_ms,
                 status="error",
                 created_at=datetime.now(UTC),
@@ -755,7 +768,7 @@ class UsageMeter:
         model: Model,
         operation: str,
         usage: BillableUsage,
-        cost: float,
+        cost: Decimal,
         now: datetime,
         attribution: UsageAttribution | None = None,
         *,
@@ -774,7 +787,7 @@ class UsageMeter:
                 operation=operation,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
-                cost=cost,
+                cost=float(cost),
                 created_at=now,
                 request_id=current_request_id(),
                 requested_alias=attribution.requested_alias if attribution else None,
