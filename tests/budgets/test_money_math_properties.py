@@ -1,19 +1,20 @@
-"""Property-based tests for the float-based cost math (L31).
+"""Property-based tests for the cost math (originally L31).
 
-Costs and budgets are plain `float` throughout (see `domain/entities.py`,
-`usage_meter.py`) rather than `Decimal`/integer micro-USD. That's an accepted
-tradeoff for now (see ISSUES round-6 L31) — these tests don't change the
-representation, they document and pin down the float-precision behavior the
-budget gate actually relies on, so a future change to the accumulation logic
-can't silently introduce drift without failing a test first.
+The costs these exercise are now `Decimal` (Plan 17 Slice 5), so the drift the
+module was written to pin down is gone from the pricing seam itself; what remains
+worth generating against is the accumulation logic — a change there must not
+reintroduce order dependence or a negative total without failing here first.
+
+The reservation-store properties below are NOT hypothesis-driven; the comment
+above them explains why.
 """
 
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -56,66 +57,76 @@ def _model(input_cost: float | None, output_cost: float | None) -> Model:
 
 
 # ── Reservations: the store's arithmetic under any arrival order ─────────────
+#
+# Not hypothesis-driven, deliberately. Generating against an async store means
+# `asyncio.run` inside a sync test body, which opens and closes an extra event
+# loop inside a pytest-asyncio session — and that is a hazard for whatever runs
+# afterwards in the same process, not a local matter (it took out an unrelated
+# startup-timing test on CI while passing locally every time). Explicit
+# multisets, including a reversed and a duplicate-heavy one, cover the same
+# properties without nesting loops.
+
+_MULTISETS = [
+    pytest.param([1.0], id="single"),
+    pytest.param([0.0, 0.0, 0.0], id="all-zero"),
+    pytest.param([0.1, 0.2, 0.3], id="tenths-that-float-cannot-represent"),
+    pytest.param([1e-6, 1e-6, 1e-6, 999.999999], id="tiny-and-large"),
+    pytest.param([2.5] * 20, id="many-duplicates"),
+    pytest.param([0.07, 12.5, 0.0, 3.33, 1e-6], id="mixed"),
+]
 
 
-def _reserved_after(operations: list[float], *, release_all: bool = False) -> float:
-    """Drive the store synchronously so hypothesis can generate against it."""
-
-    async def run() -> float:
-        store = InMemoryBudgetReservationStore()
-        held = []
-        for amount in operations:
-            outcome = await store.try_reserve(
-                TEAM_ID, amount, spent=0.0, limit=float("inf"), ttl_s=300
-            )
-            assert outcome.reservation is not None
-            held.append(outcome.reservation)
-        if release_all:
-            for reservation in held:
-                await store.release(reservation)
-        probe = await store.try_reserve(TEAM_ID, 0.0, spent=0.0, limit=float("inf"), ttl_s=300)
-        return probe.reserved
-
-    return asyncio.run(run())
+async def _reserve_all(store, amounts: list[float]) -> list[Reservation]:
+    held = []
+    for amount in amounts:
+        outcome = await store.try_reserve(TEAM_ID, amount, spent=0.0, limit=float("inf"), ttl_s=300)
+        assert outcome.reservation is not None
+        held.append(outcome.reservation)
+    return held
 
 
-@given(amounts=st.lists(_AMOUNT, min_size=1, max_size=50))
-def test_reserving_then_releasing_everything_returns_to_zero(amounts: list[float]) -> None:
+async def _reserved_total(store) -> float:
+    """Read the in-flight total by probing with a zero-amount reservation."""
+    probe = await store.try_reserve(TEAM_ID, 0.0, spent=0.0, limit=float("inf"), ttl_s=300)
+    if probe.reservation is not None:
+        await store.release(probe.reservation)
+    return probe.reserved
+
+
+@pytest.mark.parametrize("amounts", _MULTISETS)
+async def test_reserving_then_releasing_everything_returns_to_zero(amounts: list[float]) -> None:
     # Release is by identity, so this is exact rather than within float noise:
     # nothing is subtracted, the set simply empties.
-    assert _reserved_after(amounts, release_all=True) == 0.0
+    store = InMemoryBudgetReservationStore()
+    for reservation in await _reserve_all(store, amounts):
+        await store.release(reservation)
+
+    assert await _reserved_total(store) == 0.0
 
 
-@given(amounts=st.lists(_AMOUNT, min_size=2, max_size=20))
-def test_the_reserved_total_is_order_independent(amounts: list[float]) -> None:
+@pytest.mark.parametrize("amounts", _MULTISETS)
+async def test_the_reserved_total_is_order_independent(amounts: list[float]) -> None:
     # Concurrent requests are admitted in any order; the running total must not
     # depend on which one arrived first.
-    forward = _reserved_after(amounts)
-    backward = _reserved_after(list(reversed(amounts)))
-    assert abs(forward - backward) < 1e-9
+    forward, backward = InMemoryBudgetReservationStore(), InMemoryBudgetReservationStore()
+    await _reserve_all(forward, amounts)
+    await _reserve_all(backward, list(reversed(amounts)))
+
+    assert abs(await _reserved_total(forward) - await _reserved_total(backward)) < 1e-9
 
 
-@given(amounts=st.lists(_AMOUNT, min_size=1, max_size=20))
-def test_releasing_an_unknown_reservation_changes_nothing(amounts: list[float]) -> None:
+@pytest.mark.parametrize("amounts", _MULTISETS)
+async def test_releasing_an_unknown_reservation_changes_nothing(amounts: list[float]) -> None:
     """The property that replaced "never goes negative": you cannot release an
-    amount, only a claim. A stray release is a delete of an id that is not
-    there, so it cannot make a team's in-flight total look smaller than it is."""
+    amount, only a claim. A stray release deletes an id that is not there, so it
+    cannot make a team's in-flight total look smaller than it is."""
+    store = InMemoryBudgetReservationStore()
+    await _reserve_all(store, amounts)
+    before = await _reserved_total(store)
 
-    async def run() -> tuple[float, float]:
-        store = InMemoryBudgetReservationStore()
-        for amount in amounts:
-            await store.try_reserve(TEAM_ID, amount, spent=0.0, limit=float("inf"), ttl_s=300)
-        before = (
-            await store.try_reserve(TEAM_ID, 0.0, spent=0.0, limit=float("inf"), ttl_s=300)
-        ).reserved
-        await store.release(Reservation(id=uuid4(), team_id=TEAM_ID, amount=sum(amounts) * 2))
-        after = (
-            await store.try_reserve(TEAM_ID, 0.0, spent=0.0, limit=float("inf"), ttl_s=300)
-        ).reserved
-        return before, after
+    await store.release(Reservation(id=uuid4(), team_id=TEAM_ID, amount=sum(amounts) * 2 + 1))
 
-    before, after = asyncio.run(run())
-    assert after >= before  # the two probe reservations only add
+    assert await _reserved_total(store) == before
 
 
 # ── Cost accumulation: non-negativity and monotonicity ───────────────────────
