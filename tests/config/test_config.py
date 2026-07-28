@@ -35,6 +35,8 @@ _BASE = Settings(
     environment="development",
     session_cookie_secure=True,
     redis_url=REDIS_URL,
+    # Deployed variants also demand the host list.
+    allowed_hosts=("testserver.local",),
 )
 
 
@@ -389,5 +391,6 @@ def test_production_disables_auto_create(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("SALT_KEY", "y" * 40)
     monkeypatch.setenv("MASTER_KEY", "z" * 40)
     monkeypatch.setenv("REDIS_URL", REDIS_URL)
+    monkeypatch.setenv("ALLOWED_HOSTS", "gateway.example.com")
     monkeypatch.delenv("AUTO_CREATE_SCHEMA", raising=False)
     assert Settings.from_env().should_create_schema is False

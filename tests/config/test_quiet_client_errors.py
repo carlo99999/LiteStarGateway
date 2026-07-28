@@ -60,6 +60,7 @@ def test_both_environments_suppress_404_and_405(tmp_path: Path) -> None:
             environment=environment,
             session_cookie_secure=True,
             redis_url="redis://localhost:6379",
+            allowed_hosts=("testserver.local",),
         )
         config = build_logging_config(settings)
         assert config.disable_stack_trace == _QUIET_STATUSES, environment

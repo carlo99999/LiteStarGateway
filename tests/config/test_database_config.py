@@ -52,5 +52,6 @@ def test_create_all_disabled_in_production() -> None:
         environment="production",
         session_cookie_secure=True,
         redis_url="redis://localhost:6379",
+        allowed_hosts=("testserver.local",),
     )
     assert create_database(production).config.create_all is False
