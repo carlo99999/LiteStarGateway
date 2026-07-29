@@ -77,3 +77,33 @@ async def test_local_development_accepts_any_host(tmp_path: Path) -> None:
     async with AsyncTestClient(app=create_app(settings)) as client:
         resp = await client.get("/health", headers={"Host": "anything.local"})
         assert resp.status_code == HTTP_200_OK
+
+
+def test_a_bare_wildcard_is_refused(tmp_path: Path) -> None:
+    """`ALLOWED_HOSTS=*` is the obvious thing to write to get past a new
+    mandatory setting, and it silently restored the exact behaviour the setting
+    exists to remove: the middleware short-circuits on a `*` entry and accepts
+    every `Host`. Non-emptiness was the only check, so it passed."""
+    with pytest.raises(InsecureConfigurationError, match=r"\*"):
+        _settings(tmp_path, allowed_hosts=("*",))
+
+
+def test_a_wildcard_beside_real_hosts_is_refused_too(tmp_path: Path) -> None:
+    # One `*` anywhere in the list disables the check for the whole list, so a
+    # config that looks specific is not.
+    with pytest.raises(InsecureConfigurationError, match=r"\*"):
+        _settings(tmp_path, allowed_hosts=("gateway.example.com", "*"))
+
+
+def test_a_bare_wildcard_is_still_allowed_locally(tmp_path: Path) -> None:
+    # Local already accepts any Host with an empty list; refusing the explicit
+    # spelling of the same thing would be noise.
+    _settings(
+        tmp_path, environment="development", session_cookie_secure=False, allowed_hosts=("*",)
+    )
+
+
+def test_a_subdomain_wildcard_is_not_the_bare_one(tmp_path: Path) -> None:
+    # `*.example.com` is a real constraint and must keep working; only the
+    # matches-everything spelling is refused.
+    _settings(tmp_path, allowed_hosts=("*.example.com",))
