@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from litestar_gateway.domain.entities import BudgetWindow
 from litestar_gateway.infrastructure.persistence.orm import (
     BudgetAlertStateModel,
+    GuardrailRuleModel,
     ModelGrantRecord,
     ModelRecord,
     PendingBudgetAlertModel,
@@ -434,3 +435,73 @@ async def test_purge_removes_routing_decisions_and_their_prompts(
         )
     ).all()
     assert rows == []
+
+
+async def _seed_team_wide_guardrail_rule(session: AsyncSession, team_id: str) -> None:
+    """A rule scoped to the whole team: `model_id` and `router_id` both NULL.
+
+    Model- and router-scoped rules cascade away with their model or router, so
+    only the team-wide row — the common configuration — reaches the team delete.
+    """
+    session.add(
+        GuardrailRuleModel(
+            id=uuid4(),
+            team_id=UUID(team_id),
+            name="pii",
+            kind="judge",
+            direction="request",
+            fail_policy="closed",
+        )
+    )
+    await session.commit()
+
+
+async def test_a_team_with_a_team_wide_guardrail_rule_can_still_be_purged(
+    client: AsyncTestClient, raw_session: AsyncSession
+) -> None:
+    """`guardrail_rule.team_id` is an FK with no `ondelete`, and the table was
+    missing from the purge child list — so the delete raised and surfaced as
+    409 TeamNotEmpty. The team was tombstoned but never purgeable, and its
+    envelope-encrypted signing secret outlived an 'irreversible' purge."""
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    team_id = await _tombstoned_team(client, admin, raw_session)
+    await _seed_team_wide_guardrail_rule(raw_session, team_id)
+
+    resp = await client.post(f"/teams/{team_id}/purge", headers=_bearer(admin))
+
+    assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
+    assert await raw_session.get(TeamModel, UUID(team_id)) is None
+    rows = (
+        await raw_session.scalars(
+            select(GuardrailRuleModel).where(GuardrailRuleModel.team_id == UUID(team_id))
+        )
+    ).all()
+    assert rows == []
+
+
+async def test_a_team_with_a_guardrail_rule_and_no_usage_is_still_hard_deleted(
+    client: AsyncTestClient, raw_session: AsyncSession
+) -> None:
+    """The same FK also broke the ordinary delete, which is the wider blast
+    radius: a team with no billed history, no models and no keys still answered
+    409 'team not empty' — naming a condition the operator could not find,
+    because guardrail rules are not part of what the message describes."""
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    org_id = (
+        await client.post(
+            "/organizations", json={"name": f"O-{uuid4().hex[:6]}"}, headers=_bearer(admin)
+        )
+    ).json()["id"]
+    team_id = (
+        await client.post(
+            f"/organizations/{org_id}/teams",
+            json={"name": f"T-{uuid4().hex[:6]}", "admin_email": ADMIN_EMAIL},
+            headers=_bearer(admin),
+        )
+    ).json()["id"]
+    await _seed_team_wide_guardrail_rule(raw_session, team_id)
+
+    resp = await client.delete(f"/teams/{team_id}", headers=_bearer(admin))
+
+    assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
+    assert await raw_session.get(TeamModel, UUID(team_id)) is None

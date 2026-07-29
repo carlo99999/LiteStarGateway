@@ -134,13 +134,23 @@ Il finding più grave. L'allowlist va ri-verificata dove parte la connessione.
 - `team_repository.py:203-218`: aggiungere `GuardrailRuleModel` alla lista dei
   figli cancellati per `team_id` (prima del `DELETE FROM team`), aggiornando il
   commento "every table that carries this team's id".
-- **Migrazione dati** (unica del piano): cancellare/riassegnare le
-  `guardrail_rule` team-wide dei team già tombstoned rimasti incastrati, così un
-  deployment aggiornato può finalmente purgar-li.
+- ~~**Migrazione dati** (unica del piano): cancellare/riassegnare le
+  `guardrail_rule` team-wide dei team già tombstoned rimasti incastrati.~~
+  **Non serve, e non è stata scritta.** Il fix del codice sblocca da sé i team
+  già tombstoned: il purge ora cancella le regole e completa. Non esistono righe
+  orfane da riparare, proprio perché la FK era RESTRICT — nessun team è mai
+  stato cancellato mentre le sue regole esistevano. Quindi **il piano non ha
+  migrazioni**, e non c'è contesa di head Alembic da gestire.
+- **Scoperta durante la fix:** il difetto non colpiva solo il purge. Anche la
+  `delete_team` ordinaria passa dalla stessa `delete()`, quindi un team **senza
+  storico di fatturazione, senza modelli e senza chiavi** rispondeva 409 "team
+  not empty" — nominando una condizione che l'operatore non poteva trovare,
+  perché le regole guardrail non fanno parte di ciò che quel messaggio descrive.
+  Coperto da una seconda regressione.
 - **Done when:** creare una regola team-wide → `delete_team` (tombstone) →
-  `purge_team` **completa** senza 409, e nessuna `guardrail_rule` con
-  `team_id` orfano resta; regressione in `tests/teams/test_retention_lifecycle.py`
-  che fallisce prima del fix; `just test-postgres` + `just migration-check`.
+  `purge_team` **completa** senza 409, e nessuna `guardrail_rule` resta per quel
+  team; più il caso hard-delete; regressioni in
+  `tests/teams/test_retention_lifecycle.py` che falliscono prima del fix.
 
 ### S8 — REDACT compone in sequenza (ISSUE-039) · HIGH · ~0,75 d
 
@@ -255,7 +265,7 @@ quindi mai due branch vive insieme qui.
 | S1 | 050, 051 | L | B | no | 0,25 d |
 | S2 | 034, 048 | H/L | B | no | 1,5 d |
 | S3 | 043 | M | B | no | 0,5 d |
-| S4 | 040 | H | B | **sì** | 1,0 d |
+| S4 | 040 | H | B | no¹ | 1,0 d |
 | S8 | 039 | H | B | no | 0,75 d |
 | S9 | 041, 049 | M/L | B | no | 1,0 d |
 | S10 | 046 | M | B | no | 0,5 d |
@@ -264,6 +274,11 @@ quindi mai due branch vive insieme qui.
 | S5 | 035, 036 | H | A | no | 1,5 d |
 | S6 | 038, 042 | H/M | A | no | 1,5 d |
 | S7 | 037, 044, 045 | H/M | A | no | 1,5 d |
+
+¹ La migrazione prevista per S4 non è servita: il fix del codice sblocca da sé i
+team già tombstoned, e la FK RESTRICT garantisce che non esistano righe orfane
+da riparare. **Il piano non ha migrazioni**, quindi nessuna contesa di head
+Alembic.
 
 Critical path = Traccia A (S5→S6→S7, ~4,5 d serial); la Traccia B gira in
 parallelo. Con un owner sul hot path e uno sul resto, ~11 giorni-persona di

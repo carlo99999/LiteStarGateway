@@ -21,6 +21,7 @@ from litestar_gateway.infrastructure.persistence.callable_alias_slots import (
 )
 from litestar_gateway.infrastructure.persistence.orm import (
     BudgetAlertStateModel,
+    GuardrailRuleModel,
     InviteModel,
     ModelGrantRecord,
     PendingBudgetAlertModel,
@@ -177,6 +178,11 @@ class SQLAlchemyTeamRepository:
         #     blocked anything and were simply left behind. Routing decisions
         #     retain `user_text`/`system_prompt`, so leaving them turns an
         #     "irreversible purge" into a partial one.
+        #   - `guardrail_rule` (ISSUE-040): same FK, same false denial, and it
+        #     hit the ordinary delete too. Model- and router-scoped rules
+        #     cascade with their model or router, so only the team-wide row —
+        #     the common configuration — reached here, and it carries an
+        #     envelope-encrypted signing secret that has to go with the purge.
         # What deliberately survives: the audit trail (including this purge's
         # own entry) and platform-level rows that are not team data.
         try:
@@ -207,6 +213,7 @@ class SQLAlchemyTeamRepository:
                 RoutingDecisionModel,
                 PendingBudgetAlertModel,
                 BudgetAlertStateModel,
+                GuardrailRuleModel,
                 ModelGrantRecord,
                 RouterGrantModel,
                 RouterModel,
