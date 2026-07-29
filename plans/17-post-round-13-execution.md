@@ -457,6 +457,46 @@ same atomic step, which only exists after the store) and Slice 4 (a second
 limit comparison in float is a second drift source). Reuses Plan 07's threshold
 semantics rather than a parallel calculation.
 
+---
+
+## State at close
+
+Every slice landed. What differs from the plan as written, and why, is recorded
+here rather than in a commit message nobody will find again.
+
+| Slice | Outcome | PRs |
+|---|---|---|
+| 0 — shared test harness | as planned | #406 |
+| 1 — Redis required outside local | as planned; Postgres tests stay slow by decision (218 ms vs 14 ms per test, measured — not worth the complexity of avoiding) | #407–#408 |
+| 2 — console reliability view | as planned, plus a read-only `CircuitBreakerInspector` port the plan did not anticipate | #425 |
+| 3 — distributed budget reservations | as planned; the last per-process money component is gone | #409–#411 |
+| 4 — allowed hosts | folded into Slice 1's config work | #407 |
+| 5 — decimal money | **deliberately short**: PRs 1–2 of 3 (`domain/money.py`, the `Money` column type, rates and costs). The third — decimalizing the reservation store's float comparison — was dropped as not worth its cost; see the Slice 5 section | #413, #416 |
+| 6 — guardrails | as planned, in four PRs: chain runner, providers, hooks, policy + console | #412, #418, #420, #421, #424, #423 |
+| 7 — per-key budgets | as planned, and it generalized the reservation store from team-scoped to scope-keyed | #426 |
+
+Two follow-ups declared during Slice 6 were closed in the same run: replaying a
+quarantined budget alert (#427) and a per-team webhook signing secret (#428) —
+the last two boxes of the webhook production checklist #419 worked through.
+
+### Still open, deliberately
+
+- **a `guardrail.block` feed in the console.** Plan 06 asks for one. Traces are
+  dispatched to MLflow rather than persisted in a queryable table, so there is
+  nothing for the console to read; a feed needs either a trace store or an
+  MLflow query adapter. A refusal *does* now emit an `error` trace (#423), so
+  the data exists — only the read model does not. Config changes are already
+  visible in the audit trail.
+- **per-key `alert`-mode notifications.** Plan 07's dedup ledger keys on
+  `(team, window, period_start, threshold)`; pushing a per-key overrun through it
+  needs a key dimension to keep the at-most-once-per-period guarantee — a
+  migration on `budget_alert_state`. Today the overrun is a `WARNING` log line
+  plus `over_limit` on the budget read (#426).
+- **an end-to-end webhook-guardrail test over real HTTP.** Needs a live
+  receiver; the provider's HTTP behaviour, the chain behaviour and the wiring are
+  each covered separately (#418, #420, #424).
+- **decimalizing the reservation store** — see Slice 5.
+
 ## Non-goals for this plan
 
 - **Plan 08 (audio, moderations, rerank, Batch/Files)** — surface breadth,
