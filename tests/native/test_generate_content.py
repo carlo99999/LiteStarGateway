@@ -51,6 +51,7 @@ from litestar_gateway.domain.entities import (
 from litestar_gateway.domain.entities.enums import BudgetWindow
 from litestar_gateway.domain.exceptions import BudgetExceeded
 from litestar_gateway.domain.money import to_cost
+from litestar_gateway.domain.ports.budget_reservation import team_scope
 from litestar_gateway.infrastructure.budget_reservation import (
     InMemoryBudgetReservationStore,
 )
@@ -579,7 +580,9 @@ async def test_gemini_reservation_nonzero_gates_concurrent_burst() -> None:
         tg.start_soon(service.generate_content, _TEAM_ID, _KEY_ID, "m", dict(body))
         await entered.wait()
         # First request admitted and holding a non-zero reservation (was $0 pre-fix).
-        held = await reservations.try_reserve(_TEAM_ID, 0.0, spent=0.0, limit=float("inf"), ttl_s=1)
+        held = await reservations.try_reserve(
+            team_scope(_TEAM_ID), 0.0, spent=0.0, limit=float("inf"), ttl_s=1
+        )
         assert held.reserved > 0
         with pytest.raises(BudgetExceeded):
             await service.generate_content(_TEAM_ID, _KEY_ID, "m", dict(body))

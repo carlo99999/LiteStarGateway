@@ -47,6 +47,15 @@ class UsageRepository(Protocol):
         are now revoked, as long as they have recorded usage)."""
         ...
 
+    async def key_spend_since(self, api_key_id: UUID, since: datetime) -> Decimal:
+        """Committed spend for one API key since `since`.
+
+        Separate from `spend_since` rather than an optional filter on it: the
+        team gate and the key gate ask different questions of different indexes,
+        and an optional argument on the hot path is how one of them ends up
+        silently answering the other's question."""
+        ...
+
     async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
         """Total cost recorded for the team from `since` onwards. Read on the
         hot path by the budget gate — must stay a cheap indexed aggregate."""

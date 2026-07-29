@@ -48,6 +48,9 @@ class _FakeUsageRepository:
     async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
         return ZERO
 
+    async def key_spend_since(self, api_key_id: UUID, since: datetime) -> Decimal:
+        return ZERO
+
     async def enqueue_pending(self, event: UsageEvent) -> None:
         raise AssertionError("outbox must not be used in this test")
 

@@ -218,6 +218,28 @@ class SQLAlchemyUsageRepository:
             for row in rows
         ]
 
+    async def key_spend_since(self, api_key_id: UUID, since: datetime) -> Decimal:
+        """Committed spend for one key, counting the same two sources as
+        `spend_since`: the ledger plus undrained dead-letter rows.
+
+        Deliberately the same accounting, not a simplified version — a key gate
+        that ignored pending rows would let a ledger degradation become a
+        per-key cap bypass, which is exactly the hole M28 closed for teams."""
+        total = await self._session.scalar(
+            select(func.coalesce(func.sum(UsageEventModel.cost), 0.0)).where(
+                UsageEventModel.api_key_id == api_key_id,
+                UsageEventModel.created_at >= since,
+            )
+        )
+        pending = await self._session.scalar(
+            select(func.coalesce(func.sum(PendingUsageEventModel.cost), 0.0)).where(
+                PendingUsageEventModel.api_key_id == api_key_id,
+                PendingUsageEventModel.event_created_at >= since,
+                PendingUsageEventModel.attempts < MAX_RECONCILE_ATTEMPTS,
+            )
+        )
+        return quantize_cost((total or ZERO) + (pending or ZERO))
+
     async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
         # Hot-path read for the budget gate: an indexed team_id filter + SUM.
         # If this ever gets hot enough to matter, move to a running counter.

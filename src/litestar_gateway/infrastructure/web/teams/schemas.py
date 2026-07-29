@@ -10,6 +10,7 @@ from uuid import UUID
 
 from litestar_gateway.domain.entities import (
     APIKey,
+    ApiKeyBudget,
     ApiKeySpend,
     AuditEvent,
     Budget,
@@ -64,6 +65,46 @@ class BudgetResponse:
             thresholds=list(budget.thresholds),
             alert_webhook_url=budget.alert_webhook_url,
             alert_email=budget.alert_email,
+        )
+
+
+@dataclass(frozen=True)
+class SetKeyBudgetRequest:
+    """A spend cap for one API key, inside the team's cap."""
+
+    limit_cost: float  # USD, must be > 0
+    window: str  # "monthly" | "daily"
+    # `block` refuses the call once the cap is reached; `alert` lets it through
+    # and records the overrun. Defaulting to `alert` is deliberate: adding
+    # visibility to a key should not be able to break its owner's workload by
+    # accident — breaking it has to be asked for.
+    mode: str = "alert"
+
+
+@dataclass(frozen=True)
+class KeyBudgetResponse:
+    api_key_id: UUID
+    team_id: UUID
+    limit_cost: float
+    window: str
+    mode: str
+    spent: float  # this key's accumulated cost in the current window
+    remaining: float  # never negative
+    # True once spend has reached the cap. On an `alert`-mode budget this is the
+    # whole signal — the call still went through, and this is what says so.
+    over_limit: bool
+
+    @classmethod
+    def from_budget(cls, budget: ApiKeyBudget, spent: Decimal) -> KeyBudgetResponse:
+        return cls(
+            api_key_id=budget.api_key_id,
+            team_id=budget.team_id,
+            limit_cost=float(budget.limit_cost),
+            window=budget.window.value,
+            mode=budget.mode.value,
+            spent=float(spent),
+            remaining=float(max(ZERO, budget.limit_cost - spent)),
+            over_limit=spent >= budget.limit_cost,
         )
 
 

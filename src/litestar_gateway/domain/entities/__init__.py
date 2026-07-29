@@ -3,9 +3,11 @@
 from .access import APIKey, IssuedKey, SecretKey, ServicePrincipal
 from .audit import AuditEvent
 from .billing import (
+    ApiKeyBudget,
     ApiKeySpend,
     Budget,
     BudgetAlertState,
+    KeyBudgetMode,
     PendingBudgetAlert,
     TraceRecord,
     UsageAggregate,
@@ -55,9 +57,11 @@ __all__ = [
     "GuardrailRule",
     "resolve_chain",
     # Billing
+    "ApiKeyBudget",
     "ApiKeySpend",
     "Budget",
     "BudgetAlertState",
+    "KeyBudgetMode",
     "PendingBudgetAlert",
     "TraceRecord",
     "UsageAggregate",

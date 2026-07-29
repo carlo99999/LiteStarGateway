@@ -30,26 +30,26 @@ class InMemoryBudgetReservationStore:
     def __init__(self, *, clock: Callable[[], float] = time.monotonic) -> None:
         self._clock = clock
         # team -> reservation id -> (amount, expires_at)
-        self._by_team: dict[UUID, dict[UUID, tuple[float, float]]] = {}
+        self._by_scope: dict[str, dict[UUID, tuple[float, float]]] = {}
 
-    def _live_total(self, team_id: UUID) -> float:
+    def _live_total(self, scope: str) -> float:
         """Sum the team's unexpired reservations, dropping the rest on the way
         through — the same opportunistic sweep the Redis script performs, so a
         replica that died mid-request cannot hold headroom forever."""
-        held = self._by_team.get(team_id)
+        held = self._by_scope.get(scope)
         if not held:
             return 0.0
         now = self._clock()
         live = {res_id: v for res_id, v in held.items() if v[1] > now}
         if live:
-            self._by_team[team_id] = live
+            self._by_scope[scope] = live
         else:
-            self._by_team.pop(team_id, None)
+            self._by_scope.pop(scope, None)
         return sum(amount for amount, _ in live.values())
 
     async def try_reserve(
         self,
-        team_id: UUID,
+        scope: str,
         amount: float,
         *,
         spent: float,
@@ -59,23 +59,23 @@ class InMemoryBudgetReservationStore:
         # No await anywhere between the read and the write: concurrent gates in
         # one event loop interleave only at checkpoints, so two requests cannot
         # both see the same total and both slip through.
-        reserved = self._live_total(team_id)
+        reserved = self._live_total(scope)
         if spent + reserved >= limit:
             return ReservationOutcome(reservation=None, reserved=reserved)
-        reservation = Reservation(id=uuid4(), team_id=team_id, amount=amount)
-        self._by_team.setdefault(team_id, {})[reservation.id] = (
+        reservation = Reservation(id=uuid4(), scope=scope, amount=amount)
+        self._by_scope.setdefault(scope, {})[reservation.id] = (
             amount,
             self._clock() + ttl_s,
         )
         return ReservationOutcome(reservation=reservation, reserved=reserved)
 
     async def release(self, reservation: Reservation) -> None:
-        held = self._by_team.get(reservation.team_id)
+        held = self._by_scope.get(reservation.scope)
         if held is None:
             return
         held.pop(reservation.id, None)
         if not held:
-            self._by_team.pop(reservation.team_id, None)
+            self._by_scope.pop(reservation.scope, None)
 
 
 # One indivisible admission: sweep what expired, sum what is live, decide, and
@@ -137,12 +137,12 @@ class RedisBudgetReservationStore:
         self._script = client.register_script(_RESERVE_SCRIPT)  # type: ignore[attr-defined]
 
     @staticmethod
-    def _key(team_id: UUID) -> str:
-        return f"budget:res:{team_id}"
+    def _key(scope: str) -> str:
+        return f"budget:res:{scope}"
 
     async def try_reserve(
         self,
-        team_id: UUID,
+        scope: str,
         amount: float,
         *,
         spent: float,
@@ -151,14 +151,14 @@ class RedisBudgetReservationStore:
     ) -> ReservationOutcome:
         reservation_id = uuid4()
         admitted, reserved = await self._script(
-            keys=[self._key(team_id)],
+            keys=[self._key(scope)],
             args=[self._clock(), spent, limit, amount, ttl_s, str(reservation_id)],
         )
         reserved_total = float(reserved)
         if not int(admitted):
             return ReservationOutcome(reservation=None, reserved=reserved_total)
         return ReservationOutcome(
-            reservation=Reservation(id=reservation_id, team_id=team_id, amount=amount),
+            reservation=Reservation(id=reservation_id, scope=scope, amount=amount),
             reserved=reserved_total,
         )
 
@@ -166,7 +166,7 @@ class RedisBudgetReservationStore:
         # HDEL by id: releasing twice, or releasing one the sweep already
         # removed, deletes nothing and changes nothing.
         await self._redis.hdel(  # type: ignore[attr-defined]
-            self._key(reservation.team_id), str(reservation.id)
+            self._key(reservation.scope), str(reservation.id)
         )
 
 

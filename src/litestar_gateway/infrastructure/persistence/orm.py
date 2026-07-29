@@ -13,6 +13,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from litestar_gateway.domain.entities import (
     APIKey,
+    ApiKeyBudget,
     AuditEvent,
     Budget,
     BudgetAlertState,
@@ -21,6 +22,7 @@ from litestar_gateway.domain.entities import (
     GuardrailKind,
     GuardrailRule,
     Invite,
+    KeyBudgetMode,
     KeyPurpose,
     KeyScope,
     Model,
@@ -726,6 +728,38 @@ class CredentialModel(base.UUIDAuditBase):
             id=self.id,
             name=self.name,
             provider=Provider(self.provider),
+            created_at=self.created_at,
+        )
+
+
+class ApiKeyBudgetModel(base.UUIDAuditBase):
+    """A per-key spend cap inside the team's cap (Plan 13 Phase 4).
+
+    `api_key_id` is unique: one cap per key, replaced on write. ON DELETE
+    CASCADE because a cap for a deleted key would be a row nothing can ever
+    reach again, and the key's usage history is kept separately anyway.
+    """
+
+    __tablename__ = "api_key_budget"
+
+    api_key_id: Mapped[UUID] = mapped_column(
+        ForeignKey("api_key.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    # Denormalized so the window's spend can be scoped by team without a join,
+    # and so a cap can be listed per team for the console.
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    limit_cost: Mapped[Decimal] = mapped_column(Money)
+    window: Mapped[str] = mapped_column()
+    mode: Mapped[str] = mapped_column()
+
+    def to_entity(self) -> ApiKeyBudget:
+        return ApiKeyBudget(
+            id=self.id,
+            api_key_id=self.api_key_id,
+            team_id=self.team_id,
+            limit_cost=self.limit_cost,
+            window=BudgetWindow(self.window),
+            mode=KeyBudgetMode(self.mode),
             created_at=self.created_at,
         )
 

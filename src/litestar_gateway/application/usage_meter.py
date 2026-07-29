@@ -24,6 +24,7 @@ import anyio
 
 from litestar_gateway.domain.budget import crossed_thresholds, window_start
 from litestar_gateway.domain.entities import (
+    KeyBudgetMode,
     Model,
     ModelType,
     PendingBudgetAlert,
@@ -34,6 +35,8 @@ from litestar_gateway.domain.entities import (
 from litestar_gateway.domain.exceptions import BudgetExceeded, RateLimited
 from litestar_gateway.domain.money import ZERO
 from litestar_gateway.domain.ports import (
+    Admission,
+    ApiKeyBudgetRepository,
     APIKeyRepository,
     BudgetAlertStateRepository,
     BudgetRepository,
@@ -42,6 +45,8 @@ from litestar_gateway.domain.ports import (
     Reservation,
     TeamRepository,
     UsageRepository,
+    key_scope,
+    team_scope,
 )
 from litestar_gateway.domain.pricing import (
     BillableUsage,
@@ -357,6 +362,7 @@ class UsageMeter:
         teams: TeamRepository | None = None,
         api_keys: APIKeyRepository | None = None,
         budget_alert_state: BudgetAlertStateRepository | None = None,
+        api_key_budgets: ApiKeyBudgetRepository | None = None,
     ) -> None:
         self._usage = usage
         self._emit_trace = emit_trace
@@ -367,6 +373,9 @@ class UsageMeter:
         self._budget_alert_state = budget_alert_state
         # Rate limiting is opt-in: without a limiter admit skips the RPM gates.
         # The team gate needs the team repo; the key gate needs the api-key repo.
+        # Per-key caps (Plan 13 Phase 4): optional, like `budgets`. Unwired, or
+        # wired with no rows, and admission behaves exactly as it did before.
+        self._api_key_budgets = api_key_budgets
         self._rate_limiter = rate_limiter
         self._teams = teams
         self._api_keys = api_keys
@@ -387,7 +396,7 @@ class UsageMeter:
         *,
         api_key_id: UUID | None = None,
         skip_team_rate_limit: bool = False,
-    ) -> Reservation | None:
+    ) -> Admission | None:
         """Pre-call spend gate: reject once committed spend plus the estimated
         cost already reserved by in-flight requests reaches the budget limit.
         An admitted request immediately reserves its own pessimistic cost
@@ -411,6 +420,70 @@ class UsageMeter:
         if not skip_team_rate_limit:
             await self._enforce_team_rate_limit(team_id)
         await self.enforce_key_rate_limit(api_key_id)
+        # The key gate runs FIRST. A key over its own cap gets an error that
+        # names the key's cap, which is the actionable one; and evaluating it
+        # before the team reservation means a refusal never has to give a team
+        # reservation back.
+        key_claim = await self._admit_key(api_key_id, model, request)
+        team_claim = await self._admit_team(team_id, model, request)
+        claims = tuple(c for c in (key_claim, team_claim) if c is not None)
+        return Admission(reservations=claims) if claims else None
+
+    async def _admit_key(
+        self, api_key_id: UUID | None, model: Model, request: dict[str, Any]
+    ) -> Reservation | None:
+        """Per-key cap. `block` refuses; `alert` lets the call through and says
+        so in the log, which is the whole difference between the two modes."""
+        if self._api_key_budgets is None or api_key_id is None:
+            return None
+        budget = await self._api_key_budgets.get(api_key_id)
+        if budget is None:
+            return None
+        since = window_start(budget.window, datetime.now(UTC))
+        spent = await self._usage.key_spend_since(api_key_id, since)
+        cost = _reservation_cost(model, request)
+        if budget.mode is KeyBudgetMode.ALERT:
+            if spent >= budget.limit_cost:
+                # Visibility without the power to break someone's workload. No
+                # reservation either: there is nothing to bound when nothing is
+                # being refused.
+                logger.warning(
+                    "api key is over its budget (alert mode)",
+                    extra={
+                        "api_key_id": str(api_key_id),
+                        "window": budget.window.value,
+                        "limit_cost": float(budget.limit_cost),
+                        "spent": float(spent),
+                    },
+                )
+            return None
+        if self._reservations is None:
+            # Library use / tests without a store: the cap still holds on
+            # committed spend, but nothing bounds a concurrent burst.
+            if spent >= budget.limit_cost:
+                raise BudgetExceeded(
+                    f"API key budget exceeded: spent {spent:.4f} of "
+                    f"{budget.limit_cost:.4f} USD in the current {budget.window} window"
+                )
+            return None
+        outcome = await self._reservations.try_reserve(
+            key_scope(api_key_id),
+            float(cost),
+            spent=float(spent),
+            limit=float(budget.limit_cost),
+            ttl_s=self._reservation_ttl_s,
+        )
+        if not outcome.admitted:
+            raise BudgetExceeded(
+                f"API key budget exceeded: spent {spent:.4f} (+{outcome.reserved:.4f} USD "
+                f"reserved by in-flight requests) of {budget.limit_cost:.4f} USD "
+                f"in the current {budget.window} window"
+            )
+        return outcome.reservation
+
+    async def _admit_team(
+        self, team_id: UUID, model: Model, request: dict[str, Any]
+    ) -> Reservation | None:
         if self._budgets is None:
             return None
         budget = await self._budgets.get(team_id)
@@ -433,7 +506,7 @@ class UsageMeter:
         # doing it here in two awaits is what would let two admissions see the
         # same total and both slip through.
         outcome = await self._reservations.try_reserve(
-            team_id,
+            team_scope(team_id),
             # The store's arithmetic is a comparison against the budget, both
             # still floats; PR 2/3 of this slice migrates the columns and this
             # conversion goes away.
@@ -483,15 +556,16 @@ class UsageMeter:
                 retry_after=decision.retry_after,
             )
 
-    async def release(self, reservation: Reservation | None) -> None:
+    async def release(self, admission: Admission | None) -> None:
         """Give back a reservation taken at admission (settlement or failure).
         Idempotent — releasing the same claim twice deletes nothing the second
         time — so callers may release defensively."""
-        if reservation is None or self._reservations is None:
+        if admission is None or self._reservations is None:
             return
-        await self._reservations.release(reservation)
+        for reservation in admission.reservations:
+            await self._reservations.release(reservation)
 
-    def release_soon(self, reservation: Reservation | None) -> None:
+    def release_soon(self, admission: Admission | None) -> None:
         """Release from a context that cannot await — specifically the
         `weakref.finalize` guarding a stream the client dropped before its first
         byte, which runs as a garbage-collection callback.
@@ -502,17 +576,17 @@ class UsageMeter:
         reclaims it. That bounded delay is the price of not blocking a GC
         callback, and it is strictly better than the previous behaviour on a
         crashed replica, which lost the in-process counter entirely."""
-        if reservation is None or self._reservations is None:
+        if admission is None or self._reservations is None:
             return
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             logger.debug(
-                "no running loop to release reservation %s; its TTL will reclaim it",
-                reservation.id,
+                "no running loop to release %d reservation(s); their TTL will reclaim them",
+                len(admission.reservations),
             )
             return
-        task = loop.create_task(self.release(reservation))
+        task = loop.create_task(self.release(admission))
         # Hold a reference: a task with no strong reference can be garbage
         # collected mid-flight, which would silently skip the release.
         self._pending_releases.add(task)

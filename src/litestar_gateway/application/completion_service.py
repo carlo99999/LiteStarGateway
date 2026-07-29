@@ -50,13 +50,13 @@ from litestar_gateway.domain.exceptions import (
 from litestar_gateway.domain.failover import is_failover_eligible
 from litestar_gateway.domain.guardrails import Direction, GuardrailPayload
 from litestar_gateway.domain.ports import (
+    Admission,
     CachedResponse,
     CacheKey,
     CircuitBreaker,
     CredentialRepository,
     LLMGateway,
     ModelRepository,
-    Reservation,
     ResponseCache,
     SemanticResponseCache,
 )
@@ -336,7 +336,7 @@ class CompletionService:
         operation: str,
         request: dict[str, Any],
         call: Callable[[], Awaitable[dict[str, Any]]],
-        reservation: Reservation | None = None,
+        reservation: Admission | None = None,
         settle_view: Callable[[dict[str, Any]], dict[str, Any]] = lambda response: response,
         attribution: UsageAttribution | None = None,
         cache_key: CacheKey | None = None,
@@ -812,7 +812,7 @@ class CompletionService:
         model: Model,
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
-        reservation: Reservation | None,
+        reservation: Admission | None,
         attribution: UsageAttribution,
     ) -> AsyncIterator[dict[str, Any]]:
         """Native mirror of `_metered`: wrap the raw Anthropic stream in the native
@@ -932,7 +932,7 @@ class CompletionService:
         model: Model,
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
-        reservation: Reservation | None,
+        reservation: Admission | None,
         attribution: UsageAttribution,
     ) -> AsyncIterator[dict[str, Any]]:
         """Native mirror of `_metered_native` for the Gemini wire shape: wrap the raw
@@ -980,7 +980,7 @@ class CompletionService:
         request_validator: RequestValidator | None = None,
         *,
         router_context: dict[str, Any] | None = None,
-    ) -> tuple[Model, dict[str, str], Reservation | None, dict[str, Any], UsageAttribution]:
+    ) -> tuple[Model, dict[str, str], Admission | None, dict[str, Any], UsageAttribution]:
         # Gate the caller before router strategies: judge/embedding strategies
         # may make billable provider calls while resolving a virtual model.
         # The later admit handles team RPM + budget and omits the key so this
@@ -1248,7 +1248,7 @@ class CompletionService:
         sanitized: dict[str, Any],
         model: Model,
         values: dict[str, str],
-        reservation: Reservation | None,
+        reservation: Admission | None,
         clean: dict[str, Any],
         attribution: UsageAttribution,
         router: RouterConfig,
@@ -1440,7 +1440,7 @@ class CompletionService:
         model: Model,
         operation: str,
         cached: CachedResponse,
-        reservation: Reservation | None,
+        reservation: Admission | None,
         attribution: UsageAttribution,
     ) -> AsyncIterator[dict[str, Any]]:
         """Synthetic-stream replay of a cache hit (Plan 04 Phase 1). Mirrors
@@ -1497,7 +1497,7 @@ class CompletionService:
         sanitized: dict[str, Any],
         model: Model,
         values: dict[str, str],
-        reservation: Reservation | None,
+        reservation: Admission | None,
         clean: dict[str, Any],
         attribution: UsageAttribution,
         router: RouterConfig,
@@ -1639,7 +1639,7 @@ class CompletionService:
         operation: str,
         stream: AsyncIterator[dict[str, Any]],
         request: dict[str, Any],
-        reservation: Reservation | None,
+        reservation: Admission | None,
         attribution: UsageAttribution,
     ) -> AsyncIterator[dict[str, Any]]:
         """Wrap the provider stream with usage metering, releasing the budget

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from typing import Literal
 from uuid import UUID
 
@@ -41,6 +42,41 @@ class Budget:
     thresholds: list[int] = field(default_factory=list)
     alert_webhook_url: str | None = None
     alert_email: str | None = None
+
+
+class KeyBudgetMode(StrEnum):
+    """What crossing a key's cap does.
+
+    `BLOCK` refuses the call, like the team cap. `ALERT` lets it through and
+    records the overrun — for the case an operator wants visibility on a key
+    without the power to break its owner's workload, which is most keys most of
+    the time.
+    """
+
+    BLOCK = "block"
+    ALERT = "alert"
+
+
+@dataclass(frozen=True)
+class ApiKeyBudget:
+    """A spend cap for one API key, inside its team's cap.
+
+    Always a *sub*-limit: the team gate runs regardless, so a key limit above
+    the team's is harmless (the team cap still binds) and a key limit below it
+    is the point — dividing one team's budget between the things that spend it.
+
+    Windows are the same calendar windows as the team budget, anchored by
+    `domain.budget.window_start`, so "this month" means one thing across the
+    system.
+    """
+
+    id: UUID
+    api_key_id: UUID
+    team_id: UUID
+    limit_cost: Decimal
+    window: BudgetWindow  # noqa: F821
+    mode: KeyBudgetMode
+    created_at: datetime
 
 
 @dataclass(frozen=True)

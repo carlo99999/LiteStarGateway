@@ -47,6 +47,7 @@ from litestar_gateway.infrastructure.sso.oidc import OIDCIdentityProvider
 from litestar_gateway.infrastructure.usage_reconciler import make_usage_reconciler
 from litestar_gateway.infrastructure.web.api_router.dependencies import (
     build_llm_gateway,
+    provide_api_key_budget_repository,
     provide_budget_alert_state_repository,
     provide_budget_repository,
     provide_completion_service,
@@ -333,6 +334,9 @@ def _build_dependencies(
         ),
         "usage_repository": Provide(provide_usage_repository, sync_to_thread=False),
         "budget_repository": Provide(provide_budget_repository, sync_to_thread=False),
+        "api_key_budget_repository": Provide(
+            provide_api_key_budget_repository, sync_to_thread=False
+        ),
         "budget_alert_state_repository": Provide(
             provide_budget_alert_state_repository, sync_to_thread=False
         ),
