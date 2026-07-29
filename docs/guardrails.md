@@ -43,8 +43,16 @@ distinguishable from a malformed request in your metrics.
    depending on which finished first.
 3. **Allow is the identity.**
 
-Providers run concurrently (they are independent); the combination is sequential
-and ordered (so the result is reproducible).
+Rule 2 is why the chain runs **one provider at a time**, in order, each seeing
+what the previous one left behind. Providers used to run concurrently on the
+original text, which cannot compose: with two redactors the text that survived
+was whichever rewrite finished last, and the other's redaction was silently
+restored. A refusal also short-circuits the rest of the chain now, and a check
+can act on what an earlier redaction exposed.
+
+The cost is latency — a chain of N providers pays the sum of their times, not the
+slowest — which is why every provider is time-bounded and chains are meant to be
+short.
 
 ### Redaction is applied exactly, or not at all
 

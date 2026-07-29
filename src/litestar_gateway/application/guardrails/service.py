@@ -11,13 +11,24 @@ Combination rules, in order:
    first.
 3. **ALLOW is the identity.** A chain of allows returns the payload untouched.
 
-Providers run concurrently because they are independent, but the *combination*
-is sequential and ordered, which is what keeps the result reproducible.
+Rule 2 is why the chain runs **sequentially**, one provider at a time, each
+handed what the previous one left behind. Providers used to run concurrently on
+the original text and the rewrites were merged afterwards, which cannot compose:
+with two redactors the surviving text was whichever rewrite landed last, and the
+other's redaction was silently restored (ISSUE-039). "The next one sees the
+rewritten version" is only true if the next one runs after it.
+
+Sequencing also means a provider is asked exactly once, a refusal short-circuits
+the rest of the chain, and a check can act on what an earlier redaction exposed.
+The cost is latency: a chain of N providers pays the sum of their times rather
+than the slowest. Chains are short and every provider is time-bounded, so this
+is the right side of the trade — a redactor that gets undone is not a slow
+control, it is a broken one. Restoring concurrency for the checks that never
+redact needs the Protocol to declare that up front, which it does not today.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass, replace
 
@@ -69,24 +80,26 @@ async def run_chain(
     if not applicable:
         return ChainOutcome(text=payload.text)
 
-    results = await asyncio.gather(
-        *(_check(c, payload) for c in applicable), return_exceptions=False
-    )
-
-    blocking = [v for v in results if v.decision is Decision.BLOCK]
-    if blocking:
-        first = blocking[0]
-        raise GuardrailBlocked(
-            f"blocked by {first.provider}"
-            + (f": {first.reason}" if first.reason else "")
-            + (f" ({', '.join(first.categories)})" if first.categories else "")
-        )
-
     text = payload.text
-    for verdict in results:
+    verdicts: list[GuardrailVerdict] = []
+    for chained in applicable:
+        verdict = await _check(chained, replace(payload, text=text))
+        verdicts.append(verdict)
+        if verdict.decision is Decision.BLOCK:
+            raise GuardrailBlocked(_refusal(verdict))
         if verdict.decision is Decision.REDACT and verdict.redacted_text is not None:
             text = verdict.redacted_text
-    return ChainOutcome(text=text, verdicts=tuple(results))
+    return ChainOutcome(text=text, verdicts=tuple(verdicts))
+
+
+def _refusal(verdict: GuardrailVerdict) -> str:
+    """The refusal message: provider, reason and categories — never the matched
+    content, which is the thing the guardrail exists to keep out of sight."""
+    return (
+        f"blocked by {verdict.provider}"
+        + (f": {verdict.reason}" if verdict.reason else "")
+        + (f" ({', '.join(verdict.categories)})" if verdict.categories else "")
+    )
 
 
 async def _check(chained: ChainedProvider, payload: GuardrailPayload) -> GuardrailVerdict:

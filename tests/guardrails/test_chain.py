@@ -53,6 +53,48 @@ class _Provider:
         return self._verdict
 
 
+class _MaskingProvider:
+    """A provider whose verdict depends on the text it is handed.
+
+    A redactor returning a fixed string cannot distinguish a pipeline from a
+    race: last-writer-wins and proper composition produce the same answer. This
+    one rewrites `needle` into `replacement`, so it only acts when the text it
+    sees actually contains the needle — which is what makes the ordering
+    observable.
+    """
+
+    def __init__(self, name: str, needle: str, replacement: str, *, blocks: bool = False) -> None:
+        self.name = name
+        self._needle = needle
+        self._replacement = replacement
+        self._blocks = blocks
+        self.calls = 0
+        self.delay_s = 0.0
+
+    def supports(self, direction: Direction) -> bool:
+        return True
+
+    async def check(self, payload: GuardrailPayload) -> GuardrailVerdict:
+        self.calls += 1
+        if self.delay_s:
+            await asyncio.sleep(self.delay_s)
+        if self._needle not in payload.text:
+            return GuardrailVerdict(decision=Decision.ALLOW, provider=self.name)
+        if self._blocks:
+            return GuardrailVerdict(
+                decision=Decision.BLOCK,
+                provider=self.name,
+                categories=(f"pii.{self.name}",),
+            )
+        return GuardrailVerdict(
+            decision=Decision.REDACT,
+            provider=self.name,
+            categories=(f"pii.{self.name}",),
+            counts={f"pii.{self.name}": 1},
+            redacted_text=payload.text.replace(self._needle, self._replacement),
+        )
+
+
 def _payload(text: str = "hello") -> GuardrailPayload:
     return GuardrailPayload(direction=Direction.REQUEST, text=text)
 
@@ -132,16 +174,65 @@ async def test_the_block_message_never_carries_the_matched_content() -> None:
 
 
 async def test_redactions_compose_in_chain_order() -> None:
-    # Two redactors, deterministic result: the configured order decides, not
-    # whichever coroutine finished first.
-    slow = _redactor("slow", "first-pass")
-    fast = _redactor("fast", "second-pass")
-    slow._delay_s = 0.01  # noqa: SLF001 - the point is that it still applies first
+    # `x` -> `y` -> `z` only reaches `z` if the second redactor saw the first
+    # one's output. Fixed-string redactors cannot tell a pipeline from a race —
+    # whichever wrote last wins either way — so both here depend on their input.
+    first = _MaskingProvider("first", "x", "y")
+    second = _MaskingProvider("second", "y", "z")
+    first.delay_s = 0.01  # finishing last must not mean applying last
 
-    outcome = await run_chain((ChainedProvider(slow), ChainedProvider(fast)), _payload("raw"))
+    outcome = await run_chain((ChainedProvider(first), ChainedProvider(second)), _payload("x"))
 
-    assert outcome.text == "second-pass"
+    assert outcome.text == "z"
     assert outcome.redacted
+
+
+async def test_two_redactors_do_not_undo_each_other() -> None:
+    # The leak: both ran on the original, so the surviving text was whichever
+    # rewrite landed last — and the other provider's redaction was restored.
+    emails = _MaskingProvider("email", "user@example.test", "[EMAIL]")
+    cards = _MaskingProvider("card", "4111111111111111", "[CARD]")
+
+    outcome = await run_chain(
+        (ChainedProvider(emails), ChainedProvider(cards)),
+        _payload("mail user@example.test card 4111111111111111"),
+    )
+
+    assert outcome.text == "mail [EMAIL] card [CARD]"
+    assert "user@example.test" not in outcome.text
+    assert "4111111111111111" not in outcome.text
+    # Both verdicts still reach the audit row, not just the last one.
+    assert {v.provider for v in outcome.verdicts if v.decision is Decision.REDACT} == {
+        "email",
+        "card",
+    }
+
+
+async def test_one_redactor_is_asked_exactly_once() -> None:
+    # The common case must keep the concurrent single-pass cost: composing is
+    # only needed when a second redactor actually fires.
+    only = _MaskingProvider("only", "secret", "[X]")
+    quiet = _MaskingProvider("quiet", "absent", "[Y]")
+
+    outcome = await run_chain(
+        (ChainedProvider(only), ChainedProvider(quiet)), _payload("a secret here")
+    )
+
+    assert outcome.text == "a [X] here"
+    assert only.calls == 1
+    assert quiet.calls == 1
+
+
+async def test_a_block_found_while_composing_still_wins() -> None:
+    # Re-reading composed text can surface what the original hid; a refusal
+    # discovered there is still a refusal.
+    masker = _MaskingProvider("mask", "raw", "tripwire")
+    late_blocker = _MaskingProvider("late", "tripwire", "never", blocks=True)
+
+    with pytest.raises(GuardrailBlocked, match="late"):
+        await run_chain(
+            (ChainedProvider(masker), ChainedProvider(late_blocker)), _payload("raw and more")
+        )
 
 
 async def test_a_provider_is_not_asked_about_a_direction_it_does_not_support() -> None:
@@ -179,11 +270,34 @@ async def test_one_provider_failing_does_not_hide_another_s_verdict() -> None:
     assert outcome.text == "clean"
 
 
-async def test_providers_run_concurrently() -> None:
-    # Independent checks: three 50 ms providers must not cost 150 ms.
-    slow = [ChainedProvider(_Provider(f"p{i}", delay_s=0.05)) for i in range(3)]
+async def test_providers_run_one_at_a_time_in_chain_order() -> None:
+    # This replaces a test asserting the opposite — three 50 ms providers
+    # finishing in under 120 ms, i.e. concurrently. That concurrency is exactly
+    # what broke composition (ISSUE-039): a redactor cannot see the previous
+    # rewrite if both ran on the original at once. The property is gone on
+    # purpose, and the chain now pays the sum of its providers' times.
+    #
+    # Pinned by observation rather than by a stopwatch: each provider records
+    # entering and leaving, and yields to the loop in between, so an
+    # interleaving would show up as out-of-order events instead of as a flaky
+    # duration.
+    events: list[str] = []
 
-    started = asyncio.get_running_loop().time()
-    await run_chain(tuple(slow), _payload())
+    class _Recording:
+        def __init__(self, name: str) -> None:
+            self.name = name
 
-    assert asyncio.get_running_loop().time() - started < 0.12
+        def supports(self, direction: Direction) -> bool:
+            return True
+
+        async def check(self, payload: GuardrailPayload) -> GuardrailVerdict:
+            events.append(f"{self.name}:in")
+            await asyncio.sleep(0)  # a concurrent runner would interleave here
+            events.append(f"{self.name}:out")
+            return GuardrailVerdict(decision=Decision.ALLOW, provider=self.name)
+
+    await run_chain(
+        (ChainedProvider(_Recording("a")), ChainedProvider(_Recording("b"))), _payload()
+    )
+
+    assert events == ["a:in", "a:out", "b:in", "b:out"]

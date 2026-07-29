@@ -215,6 +215,16 @@ combine verdicts (any `BLOCK` wins; `REDACT`s compose left-to-right). A blocking
 provider short-circuits the rest of its chain once it has enough to block. Record
 per-provider `latency_ms` on the verdict for the observability endpoints.
 
+!!! warning "Corrected in implementation — these two asks contradict each other"
+    Running the checks in parallel and having `REDACT`s compose left-to-right
+    cannot both hold: providers that all see the *original* text produce rewrites
+    that cannot be merged afterwards, so the surviving text is whichever landed
+    last and the other redaction is silently undone. That is exactly what
+    shipped, and what ISSUE-039 found. The chain is now **sequential**, which is
+    what makes composition — and short-circuiting a refusal — real. Parallelism
+    for checks that never redact would need the Protocol to declare that up
+    front; it does not today. See `application/guardrails/service.py`.
+
 ---
 
 ## Console exposure
