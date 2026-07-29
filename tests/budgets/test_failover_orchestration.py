@@ -20,6 +20,7 @@ import pytest
 
 from litestar_gateway.application.callable_aliases import ResolvedCallable
 from litestar_gateway.application.completion_service import CompletionService
+from litestar_gateway.application.guardrails.service import ChainedProvider
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.callable_alias import (
     CallableAliasBinding,
@@ -33,6 +34,13 @@ from litestar_gateway.domain.exceptions import (
     UpstreamResponseInvalid,
     UpstreamTimeout,
     UpstreamUnavailable,
+)
+from litestar_gateway.domain.guardrails import (
+    Decision,
+    Direction,
+    FailPolicy,
+    GuardrailPayload,
+    GuardrailVerdict,
 )
 from litestar_gateway.domain.money import to_cost
 from litestar_gateway.domain.ports.rate_limiter import RateLimitDecision
@@ -224,9 +232,13 @@ class ScriptedGateway:
     def __init__(self, exceptions: list[Exception]) -> None:
         self._exceptions = list(exceptions)
         self.calls: list[Model] = []
+        # What each attempt actually sent upstream — the redaction question can
+        # only be asked of the body, not of the model.
+        self.requests: list[dict[str, Any]] = []
 
     async def achat_completion(self, request, model, credentials) -> dict[str, Any]:
         self.calls.append(model)
+        self.requests.append(request)
         if self._exceptions:
             raise self._exceptions.pop(0)
         return {"usage": {"prompt_tokens": 1, "completion_tokens": 1}}
@@ -241,6 +253,7 @@ def _service(
     *,
     rate_limiter: FakeRateLimiter | None = None,
     circuit_breaker: InMemoryCircuitBreaker | None = None,
+    guardrails: Any = None,
 ) -> CompletionService:
     return CompletionService(
         models=FakeModels({}),  # type: ignore[arg-type]
@@ -257,6 +270,7 @@ def _service(
         router_service=router_service,  # type: ignore[arg-type]
         callable_resolver=MultiModelCallableResolver(router, models),  # type: ignore[arg-type]
         circuit_breaker=circuit_breaker,
+        guardrails=guardrails,
     )
 
 
@@ -679,3 +693,96 @@ async def test_no_deadline_configured_never_interrupts_a_slow_attempt() -> None:
     await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
 
     assert gateway.completed == 1
+
+
+# ── Guardrails on the retry path (ISSUE-035) ──────────────────────────────────
+
+
+class _Redactor:
+    """Masks a fixed needle in whatever text it is handed."""
+
+    name = "redactor"
+
+    def supports(self, direction: Direction) -> bool:
+        return direction is Direction.REQUEST
+
+    async def check(self, payload: GuardrailPayload) -> GuardrailVerdict:
+        if "123-45-6789" not in payload.text:
+            return GuardrailVerdict(decision=Decision.ALLOW, provider=self.name)
+        return GuardrailVerdict(
+            decision=Decision.REDACT,
+            provider=self.name,
+            categories=("pii.ssn",),
+            counts={"pii.ssn": 1},
+            redacted_text=payload.text.replace("123-45-6789", "[REDACTED]"),
+        )
+
+
+def _redacting_resolver(asked: list[tuple[Direction, str, UUID | None]]) -> Any:
+    chain = (ChainedProvider(provider=_Redactor(), fail=FailPolicy.CLOSED),)  # type: ignore[arg-type]
+
+    async def resolver(
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        direction: Direction,
+        router_id: UUID | None = None,
+    ) -> Any:
+        asked.append((direction, model.name, router_id))
+        return chain if direction is Direction.REQUEST else ()
+
+    return resolver
+
+
+_SENSITIVE = {"model": "auto", "messages": [{"role": "user", "content": "ssn 123-45-6789"}]}
+
+
+async def test_a_failover_retry_sends_the_screened_prompt_not_the_original() -> None:
+    """The retry rebuilt its body from `sanitized` — the pre-guardrail request —
+    so attempt #1 went out redacted and attempt #2 restored the PII and shipped
+    it to a *different* provider."""
+    primary, secondary = _model("primary"), _model("secondary")
+    router = _router(primary, secondary)
+    models = {primary.id: primary, secondary.id: secondary}
+    gateway = ScriptedGateway([UpstreamUnavailable("503")])
+    asked: list[tuple[Direction, str, UUID | None]] = []
+    service = _service(
+        gateway,
+        FakeUsage(),
+        router,
+        models,
+        FixedDecisionRouter(primary),
+        guardrails=_redacting_resolver(asked),
+    )
+
+    await service.chat_completion(TEAM_ID, KEY_ID, dict(_SENSITIVE))
+
+    assert gateway.calls == [primary, secondary]
+    assert len(gateway.requests) == 2
+    for sent in gateway.requests:
+        assert sent["messages"][-1]["content"] == "ssn [REDACTED]"
+
+
+async def test_a_failover_retry_is_screened_for_the_candidate_that_serves_it() -> None:
+    """The retry never re-resolved the chain, so a rule scoped to the candidate
+    that actually served the request — or to the router the caller named — never
+    ran."""
+    primary, secondary = _model("primary"), _model("secondary")
+    router = _router(primary, secondary)
+    models = {primary.id: primary, secondary.id: secondary}
+    gateway = ScriptedGateway([UpstreamUnavailable("503")])
+    asked: list[tuple[Direction, str, UUID | None]] = []
+    service = _service(
+        gateway,
+        FakeUsage(),
+        router,
+        models,
+        FixedDecisionRouter(primary),
+        guardrails=_redacting_resolver(asked),
+    )
+
+    await service.chat_completion(TEAM_ID, KEY_ID, dict(_SENSITIVE))
+
+    requested = [entry for entry in asked if entry[0] is Direction.REQUEST]
+    assert (Direction.REQUEST, "primary", router.id) in requested
+    assert (Direction.REQUEST, "secondary", router.id) in requested

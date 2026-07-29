@@ -386,7 +386,13 @@ class CompletionService:
                     attribution,
                 )
                 await self._meter.release(reservation)
-                return cached.body
+                # Screened again on the way out. Only screened bodies are stored
+                # (see below), so this is normally a no-op — but a rule added
+                # after the entry was written has to apply to it too, or the
+                # cache would answer with content the current policy refuses.
+                return await self._guard_response(
+                    team_id, api_key_id, model, operation, cached.body, router_id
+                )
         try:
             try:
                 response = await call()
@@ -422,8 +428,22 @@ class CompletionService:
                 request,
                 attribution,
             )
+            await self._attach_routing_usage(response)
+            # Response-side guardrails run AFTER settlement, deliberately. The
+            # provider call already happened and its tokens were really
+            # consumed; refusing to bill a blocked answer would hand anyone who
+            # can trip the response guardrail a free channel. So: bill, then
+            # refuse to hand the content back.
+            guarded = await self._guard_response(
+                team_id, api_key_id, model, operation, response, router_id
+            )
+            # Cache what the chain produced, not what the provider said. Storing
+            # first meant the caller was refused while the raw answer stayed in
+            # the cache, and the next identical request was served that answer
+            # as a 200 without the chain running (ISSUE-036). A block raises
+            # above this line, so refused content is never written at all.
             if cache_key is not None:
-                await self._cache_put(cache_key, response, view)
+                await self._cache_put(cache_key, guarded, view)
                 if semantic_text is not None:
                     await self._semantic_put(
                         team_id,
@@ -432,18 +452,10 @@ class CompletionService:
                         operation,
                         request,
                         semantic_text,
-                        response,
+                        guarded,
                         view,
                     )
-            await self._attach_routing_usage(response)
-            # Response-side guardrails run AFTER settlement, deliberately. The
-            # provider call already happened and its tokens were really
-            # consumed; refusing to bill a blocked answer would hand anyone who
-            # can trip the response guardrail a free channel. So: bill, then
-            # refuse to hand the content back.
-            return await self._guard_response(
-                team_id, api_key_id, model, operation, response, router_id
-            )
+            return guarded
         finally:
             await self._meter.release(reservation)
 
@@ -1342,6 +1354,23 @@ class CompletionService:
                         "chat.completions", sanitized, attempt_model.max_output_tokens
                     )
                     attempt_clean = validate_chat_request(attempt_model, attempt_clean)
+                    # Rebuilding from `sanitized` is deliberate: each candidate
+                    # clamps the caller's original ceiling rather than inheriting
+                    # the previous candidate's. But `sanitized` is the body from
+                    # *before* the guardrails ran, so reusing it alone restored
+                    # whatever `_prepare` had redacted and shipped it to a
+                    # different provider (ISSUE-035). The chain therefore runs
+                    # again here — which it owed this attempt anyway: this is
+                    # another model, with possibly its own rules, and the router
+                    # the caller named is still the scope that applies.
+                    attempt_clean = await self._guard_request(
+                        team_id,
+                        api_key_id,
+                        attempt_model,
+                        "chat.completions",
+                        attempt_clean,
+                        router.id,
+                    )
                     attempt_values = await self._credentials.get_values(attempt_model.credential_id)
                     if attempt_values is None:
                         raise CredentialNotFound(str(attempt_model.credential_id))
@@ -1364,6 +1393,12 @@ class CompletionService:
                             ),
                             attempt_reservation,
                             attribution=attribution,
+                            # The caller named this router, on the first attempt
+                            # and on every retry: without it the response chain
+                            # resolves as if there were no router, so a
+                            # router-scoped rule silently stopped applying the
+                            # moment failover kicked in (ISSUE-035).
+                            router_id=router.id,
                         )
                 except DomainError as exc:
                     # UpstreamResponseInvalid already billed a partial charge
@@ -1595,6 +1630,23 @@ class CompletionService:
                         "chat.completions", sanitized, attempt_model.max_output_tokens
                     )
                     attempt_clean = validate_chat_request(attempt_model, attempt_clean)
+                    # Rebuilding from `sanitized` is deliberate: each candidate
+                    # clamps the caller's original ceiling rather than inheriting
+                    # the previous candidate's. But `sanitized` is the body from
+                    # *before* the guardrails ran, so reusing it alone restored
+                    # whatever `_prepare` had redacted and shipped it to a
+                    # different provider (ISSUE-035). The chain therefore runs
+                    # again here — which it owed this attempt anyway: this is
+                    # another model, with possibly its own rules, and the router
+                    # the caller named is still the scope that applies.
+                    attempt_clean = await self._guard_request(
+                        team_id,
+                        api_key_id,
+                        attempt_model,
+                        "chat.completions",
+                        attempt_clean,
+                        router.id,
+                    )
                     attempt_values = await self._credentials.get_values(attempt_model.credential_id)
                     if attempt_values is None:
                         raise CredentialNotFound(str(attempt_model.credential_id))
