@@ -21,6 +21,8 @@ load-results/
 ## Graphify: track only graph.json + GRAPH_REPORT.md; everything else is
 ## generated/local snapshot data (rebuilt by `graphify update .`).
 graphify-out/
+.agents/
+.codex
 # Claude Code session worktrees (machine-local, never committed)
 .claude/worktrees/
 
