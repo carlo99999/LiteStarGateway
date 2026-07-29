@@ -10,6 +10,7 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 | Round | Focus | New findings (C·H·M·L) | Status |
 |---|---|---|---|
+| [Round 15](round-15.md) — 2026-07-29 | Delta dopo `5469464`: provider openai_compatible + egress allowlist, guardrail (chain/webhook/judge/policy/router-scope), prenotazioni budget distribuite + Decimal/NUMERIC, budget per-chiave, segreto webhook per-team, capability dichiarate, reliability view | 0·7·6·6 | Open |
 | [Round 14](round-14.md) — 2026-07-28 | Regression review of the Round 13 remediation (#392–#401): pricing, cache equivalence, client lifecycle, outbox, deadline, SSO, breaker, purge | 0·0·3·0 | Fully remediated (#403–#405) |
 | [Round 13](round-13.md) — 2026-07-27 | Post-R12 delta (response cache exact+semantic, failover/breaker, budget alerts, non-token pricing, client registry, DB-backed SSO, retention/purge) | 0·2·7·0 | Fully remediated (#392–#401) |
 | [Round 12](round-12.md) — 2026-07-22 | Post-R11 delta (verification of remediation PRs #313–#321: alias registry, router revisions, playground governance, downgrade contract) | 0·0·2·0 | Fully remediated |
@@ -27,7 +28,23 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 ## Overall
 
-**As of Round 14: 8.6/10 at review time, all three findings since remediated
+**As of Round 15: 6.8/10 at review time — 0C·7H·6M·6L, all Open.** See
+[round-15.md](round-15.md#category-scores). Il delta aggiunge il provider
+openai_compatible con egress allowlist, i guardrail (con scope per-router), le
+prenotazioni di budget distribuite, il denaro Decimal/NUMERIC e i budget
+per-chiave; la base storica regge (primitive di egress byte-for-byte, firma HMAC
+corretta, atomicità Redis in un solo Lua, decimalizzazione a una regola). Il
+tema dei sette HIGH è però unico e ricorrente su tre feature: **un controllo
+dichiarato non viene richiamato sul percorso alternativo** — l'allowlist egress
+non è applicata al dispatch (034), la redazione è annullata sul failover (035),
+la response cache serve il body pre-guardrail (036), il budget per-chiave è
+no-op sulla superficie OpenAI (037), gli endpoint native saltano il guard di
+richiesta (038), due redattori non compongono (039) e il purge del team omette
+le regole guardrail team-wide, bloccandolo (040). Nessuna escalation
+cross-tenant. Un caso è REFUTED: il presunto `SyntaxError` bloccante è codice
+valido su Python 3.14 (PEP 758) e la suite passa (2184 test).
+
+Previous: **as of Round 14: 8.6/10 at review time, all three findings since remediated
 (#403–#405).** See [round-14.md](round-14.md#category-scores) for the breakdown.
 The round verified the nine Round 13 remediations hold and found three MEDIUMs
 in their transition edges — a no-channel alert holding its dispatch lease for
