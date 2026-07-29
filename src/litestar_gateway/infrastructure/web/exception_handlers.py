@@ -11,6 +11,7 @@ from litestar.status_codes import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
     HTTP_409_CONFLICT,
+    HTTP_422_UNPROCESSABLE_ENTITY,
     HTTP_429_TOO_MANY_REQUESTS,
     HTTP_501_NOT_IMPLEMENTED,
     HTTP_502_BAD_GATEWAY,
@@ -29,6 +30,7 @@ from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
     DomainError,
     EmailAlreadyRegistered,
+    GuardrailBlocked,
     InvalidAPIKey,
     InvalidCredentials,
     InvalidInvite,
@@ -126,6 +128,10 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     (ProviderMismatch, HTTP_400_BAD_REQUEST),
     (ModelTypeMismatch, HTTP_400_BAD_REQUEST),
     (InvalidModelPricing, HTTP_400_BAD_REQUEST),
+    # A guardrail refusal is not a malformed request: it is a well-formed one the
+    # operator's policy declined. 422 keeps the two distinguishable in a
+    # caller's metrics and in ours.
+    (GuardrailBlocked, HTTP_422_UNPROCESSABLE_ENTITY),
     (ManagementScopeRequiresServicePrincipal, HTTP_400_BAD_REQUEST),
     (InvalidServicePrincipal, HTTP_400_BAD_REQUEST),
     (InvalidRouterConfig, HTTP_400_BAD_REQUEST),

@@ -21,6 +21,15 @@ from typing import Any
 from uuid import UUID
 
 from litestar_gateway.application.callable_aliases import CallableAliasResolver, ResolvedCallable
+from litestar_gateway.application.guardrails.payloads import (
+    can_redact_request,
+    can_redact_response,
+    redact_request,
+    redact_response,
+    request_text,
+    response_text,
+)
+from litestar_gateway.application.guardrails.service import ChainedProvider, run_chain
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.callable_alias import CallableKind
@@ -29,6 +38,7 @@ from litestar_gateway.domain.entities import Model, ModelType, Provider, UsageAt
 from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
     DomainError,
+    GuardrailBlocked,
     ModelDisabled,
     ModelNotFound,
     ModelTypeMismatch,
@@ -38,6 +48,7 @@ from litestar_gateway.domain.exceptions import (
     UpstreamTimeout,
 )
 from litestar_gateway.domain.failover import is_failover_eligible
+from litestar_gateway.domain.guardrails import Direction, GuardrailPayload
 from litestar_gateway.domain.ports import (
     CachedResponse,
     CacheKey,
@@ -70,6 +81,10 @@ from litestar_gateway.domain.routing import (
     build_routing_context,
     filter_candidates,
 )
+
+# Resolves the chain for one (team, model, direction). A function rather than a
+# repository so the wiring can cache, and so tests can hand over a literal chain.
+GuardrailChainFn = Callable[[UUID, Model, Direction], Awaitable[tuple[ChainedProvider, ...]]]
 
 logger = logging.getLogger("litestar_gateway.response_cache")
 
@@ -226,6 +241,7 @@ class CompletionService:
         semantic_cache: SemanticResponseCache | None = None,
         semantic_threshold: float = 0.97,
         semantic_embedding_model: str | None = None,
+        guardrails: GuardrailChainFn | None = None,
     ) -> None:
         self._models = models
         self._credentials = credentials
@@ -249,6 +265,11 @@ class CompletionService:
         self._semantic_cache = semantic_cache
         self._semantic_threshold = semantic_threshold
         self._semantic_embedding_model = semantic_embedding_model
+        # Guardrail chains, resolved per (team, model, direction). `None` — and a
+        # resolver that returns an empty chain — mean the request path is
+        # byte-identical to having no guardrails at all, which is what keeps this
+        # off by default for every existing tenant.
+        self._guardrails = guardrails
 
     async def _candidate_model(self, team_id: UUID, candidate: CandidateModel) -> Model | None:
         if self._callable_resolver is not None:
@@ -409,9 +430,65 @@ class CompletionService:
                         view,
                     )
             await self._attach_routing_usage(response)
-            return response
+            # Response-side guardrails run AFTER settlement, deliberately. The
+            # provider call already happened and its tokens were really
+            # consumed; refusing to bill a blocked answer would hand anyone who
+            # can trip the response guardrail a free channel. So: bill, then
+            # refuse to hand the content back.
+            return await self._guard_response(team_id, model, response)
         finally:
             await self._meter.release(reservation)
+
+    async def _guard_request(
+        self, team_id: UUID, model: Model, request: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Run the request-side chain, returning the request to actually send.
+
+        Blocking raises out of here — before admission, so nothing is reserved
+        or billed for a call that never happens."""
+        if self._guardrails is None:
+            return request
+        chain = await self._guardrails(team_id, model, Direction.REQUEST)
+        if not chain:
+            return request
+        outcome = await run_chain(
+            chain,
+            GuardrailPayload(direction=Direction.REQUEST, text=request_text(request), raw=request),
+        )
+        if not outcome.redacted:
+            return request
+        if not can_redact_request(request):
+            # A redaction we cannot apply exactly is a redaction we do not
+            # apply: guessing which multimodal block each piece of the flattened
+            # text came from would be worse than refusing, and passing the
+            # original through would defeat the point of the verdict.
+            raise GuardrailBlocked(
+                "content had to be redacted but the request shape cannot be rewritten safely"
+            )
+        return redact_request(request, outcome.text)
+
+    async def _guard_response(
+        self, team_id: UUID, model: Model, response: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Run the response-side chain on an already-billed response."""
+        if self._guardrails is None:
+            return response
+        chain = await self._guardrails(team_id, model, Direction.RESPONSE)
+        if not chain:
+            return response
+        outcome = await run_chain(
+            chain,
+            GuardrailPayload(
+                direction=Direction.RESPONSE, text=response_text(response), raw=response
+            ),
+        )
+        if not outcome.redacted:
+            return response
+        if not can_redact_response(response):
+            raise GuardrailBlocked(
+                "content had to be redacted but the response shape cannot be rewritten safely"
+            )
+        return redact_response(response, outcome.text)
 
     async def _cache_get(self, key: CacheKey) -> CachedResponse | None:
         """A cache failure must never fail the request (design §8): any
@@ -973,10 +1050,12 @@ class CompletionService:
         clean = clamp_output_tokens(operation, request, model.max_output_tokens)
         if request_validator is not None:
             clean = request_validator(model, clean)
-        # Adapters merge trusted model defaults/enforced policy before dispatch.
-        # Reserve from that same effective prompt so configured tools/schemas are
-        # never invisible to admission, while still dispatching the governed
-        # client request for the adapter to merge exactly once.
+        # Guardrails run BEFORE admission: a blocked request must not consume
+        # the team's budget reservation or its rate-limit slot, because it never
+        # reaches a provider. A redaction rewrites `clean`, so everything after
+        # this line — admission, the trace, the provider call — sees the redacted
+        # prompt and never the original.
+        clean = await self._guard_request(team_id, model, clean)
         reservation = await self._meter.admit(team_id, model, model.merge_params(clean))
         try:
             values = await self._credentials.get_values(model.credential_id)
