@@ -21,9 +21,20 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+import pytest
+
 from litestar_gateway.application.completion_service import CompletionService
+from litestar_gateway.application.guardrails.service import ChainedProvider
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.entities import Model, ModelType, Provider, TraceRecord, UsageEvent
+from litestar_gateway.domain.exceptions import GuardrailBlocked
+from litestar_gateway.domain.guardrails import (
+    Decision,
+    Direction,
+    FailPolicy,
+    GuardrailPayload,
+    GuardrailVerdict,
+)
 from litestar_gateway.domain.ports.response_cache import CachedResponse, CacheKey
 from litestar_gateway.infrastructure.cache.in_memory import InMemoryResponseCache
 
@@ -108,6 +119,53 @@ class RaisingCache:
         raise RuntimeError("boom: cache backend unavailable")
 
 
+class _ResponseGuardrail:
+    """A RESPONSE-direction provider that rewrites — or refuses — the answer.
+
+    What the cache stores has to be what the chain produced: a stored raw body
+    is served to the next identical request without the chain running again.
+    """
+
+    def __init__(self, needle: str, replacement: str = "", *, blocks: bool = False) -> None:
+        self.name = "response-guard"
+        self._needle = needle
+        self._replacement = replacement
+        self._blocks = blocks
+
+    def supports(self, direction: Direction) -> bool:
+        return direction is Direction.RESPONSE
+
+    async def check(self, payload: GuardrailPayload) -> GuardrailVerdict:
+        if self._needle not in payload.text:
+            return GuardrailVerdict(decision=Decision.ALLOW, provider=self.name)
+        if self._blocks:
+            return GuardrailVerdict(
+                decision=Decision.BLOCK, provider=self.name, categories=("policy",)
+            )
+        return GuardrailVerdict(
+            decision=Decision.REDACT,
+            provider=self.name,
+            categories=("policy",),
+            counts={"policy": 1},
+            redacted_text=payload.text.replace(self._needle, self._replacement),
+        )
+
+
+def _response_chain(provider: _ResponseGuardrail) -> Any:
+    chain = (ChainedProvider(provider=provider, fail=FailPolicy.CLOSED),)  # type: ignore[arg-type]
+
+    async def resolver(
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        direction: Direction,
+        router_id: UUID | None = None,
+    ) -> Any:
+        return chain if direction is Direction.RESPONSE else ()
+
+    return resolver
+
+
 def _service(
     gateway: CountingGateway,
     usage: FakeUsage,
@@ -115,6 +173,7 @@ def _service(
     *,
     model: Model | None = None,
     response_cache: object | None = None,
+    guardrails: Any = None,
 ) -> CompletionService:
     return CompletionService(
         models=FakeModels(model or _model()),  # type: ignore[arg-type]
@@ -122,6 +181,7 @@ def _service(
         gateway=gateway,  # type: ignore[arg-type]
         meter=UsageMeter(usage=usage, emit_trace=traces.append),  # type: ignore[arg-type]
         response_cache=response_cache,  # type: ignore[arg-type]
+        guardrails=guardrails,
     )
 
 
@@ -323,4 +383,49 @@ async def test_tightening_enforced_policy_invalidates_earlier_entries() -> None:
     reconfigured._response_cache = service._response_cache  # same shared store
     await reconfigured.chat_completion(TEAM_ID, KEY_ID, {**_CHAT_REQUEST, "model": "model-a"})
 
+    assert gateway.calls == 2
+
+
+async def test_the_cache_stores_the_screened_response_not_the_raw_one() -> None:
+    """ISSUE-036: `_cache_put` ran before `_guard_response`, so the stored body
+    was the provider's raw answer. The caller of the first request got a
+    screened response and every later identical request got the unscreened one
+    straight out of the cache, with the chain never consulted."""
+    traces: list[TraceRecord] = []
+    gateway = CountingGateway()
+    service = _service(
+        gateway,
+        FakeUsage(),
+        traces,
+        response_cache=InMemoryResponseCache(max_entries=8),
+        guardrails=_response_chain(_ResponseGuardrail("hello", "[MASKED]")),
+    )
+
+    first = await service.chat_completion(TEAM_ID, KEY_ID, dict(_CHAT_REQUEST))
+    second = await service.chat_completion(TEAM_ID, KEY_ID, dict(_CHAT_REQUEST))
+
+    assert gateway.calls == 1  # the second request was served from the cache
+    assert first["choices"][0]["message"]["content"] == "[MASKED]"
+    assert second == first  # ...and what it served was screened, not the raw body
+
+
+async def test_a_blocked_response_never_reaches_the_cache() -> None:
+    """The sharper version of the same defect: a refused answer was stored
+    first, so the next identical request was handed the very content the
+    guardrail had just refused — and handed it as a 200."""
+    gateway = CountingGateway()
+    service = _service(
+        gateway,
+        FakeUsage(),
+        [],
+        response_cache=InMemoryResponseCache(max_entries=8),
+        guardrails=_response_chain(_ResponseGuardrail("hello", blocks=True)),
+    )
+
+    with pytest.raises(GuardrailBlocked):
+        await service.chat_completion(TEAM_ID, KEY_ID, dict(_CHAT_REQUEST))
+    with pytest.raises(GuardrailBlocked):
+        await service.chat_completion(TEAM_ID, KEY_ID, dict(_CHAT_REQUEST))
+
+    # Two provider calls: the second request found nothing cached to serve.
     assert gateway.calls == 2
