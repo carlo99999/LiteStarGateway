@@ -25,6 +25,12 @@ _FIELDS: dict[Provider, tuple[frozenset[str], frozenset[str]]] = {
         frozenset({"vertex_credentials"}),
     ),
     Provider.DATABRICKS: (frozenset({"api_key", "api_base"}), frozenset()),
+    # api_key is optional: local servers (Ollama, llama.cpp) accept none, and
+    # the adapter sends a documented placeholder in that case. api_base is the
+    # only endpoint source and is additionally checked against the egress
+    # allowlist by `CredentialService` — that check needs config, so it cannot
+    # live in this pure field contract.
+    Provider.OPENAI_COMPATIBLE: (frozenset({"api_base"}), frozenset({"api_key"})),
     Provider.BEDROCK: (
         frozenset({"region", "aws_access_key_id", "aws_secret_access_key"}),
         frozenset({"aws_session_token"}),

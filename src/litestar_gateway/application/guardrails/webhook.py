@@ -31,12 +31,12 @@ from uuid import uuid4
 
 import httpx
 
-from litestar_gateway.application.routing.webhook import (
+from litestar_gateway.application.egress import (
     _is_blocked,
     _literal_ip,
-    post_to_approved_address,
     resolve_approved_addresses,
 )
+from litestar_gateway.application.routing.webhook import post_to_approved_address
 from litestar_gateway.domain.guardrails import (
     Decision,
     Direction,

@@ -1943,6 +1943,7 @@ export interface components {
             cache_allow_nondeterministic: boolean;
             /** @default false */
             cache_semantic_enabled: boolean;
+            capabilities?: string[] | null;
             cache_write_cost_per_token?: number | null;
             cache_read_cost_per_token?: number | null;
             image_cost_per_image?: number | null;
@@ -2187,6 +2188,7 @@ export interface components {
             image_prices?: {
                 [key: string]: number;
             };
+            capabilities?: string[];
         };
         /**
          * ModelType
@@ -2261,7 +2263,7 @@ export interface components {
          * @description The LLM provider this credential connects to.
          * @enum {string}
          */
-        Provider: "openai" | "anthropic" | "vertex_ai" | "azure_openai" | "bedrock" | "databricks";
+        Provider: "openai" | "anthropic" | "vertex_ai" | "azure_openai" | "bedrock" | "databricks" | "openai_compatible";
         /** ResetPasswordRequest */
         ResetPasswordRequest: {
             reset_token: string;
@@ -2556,6 +2558,7 @@ export interface components {
             cache_enabled?: boolean | null;
             cache_allow_nondeterministic?: boolean | null;
             cache_semantic_enabled?: boolean | null;
+            capabilities?: string[] | null;
             cache_write_cost_per_token?: number | null;
             cache_read_cost_per_token?: number | null;
             image_cost_per_image?: number | null;

@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listAllCredentials } from "@/features/credentials/api";
 import { PROVIDER_LABELS, PROVIDERS } from "@/features/credentials/providerFields";
+import { CapabilitiesField, CHAT_CAPABILITY } from "@/features/models/CapabilitiesField";
 import {
   createGlobalModel,
   createModel,
@@ -81,6 +82,7 @@ export function CreateModelDialog({
   const [cacheEnabled, setCacheEnabled] = useState(false);
   const [cacheAllowNondeterministic, setCacheAllowNondeterministic] = useState(false);
   const [cacheSemanticEnabled, setCacheSemanticEnabled] = useState(false);
+  const [capabilities, setCapabilities] = useState<string[]>([CHAT_CAPABILITY]);
 
   useEffect(() => {
     if (open) {
@@ -150,6 +152,7 @@ export function CreateModelDialog({
         cacheEnabled,
         cacheAllowNondeterministic,
         cacheSemanticEnabled,
+        capabilities: provider === "openai_compatible" ? capabilities : null,
       };
       return global ? createGlobalModel(model) : createModel(effectiveTeamId, model);
     },
@@ -375,6 +378,11 @@ export function CreateModelDialog({
               semantic tier (near-duplicate prompts)
             </label>
           </div>
+          <CapabilitiesField
+            provider={provider}
+            value={capabilities}
+            onChange={setCapabilities}
+          />
           {mutation.isError ? (
             <p className="font-mono text-xs text-destructive">{mutation.error.message}</p>
           ) : null}

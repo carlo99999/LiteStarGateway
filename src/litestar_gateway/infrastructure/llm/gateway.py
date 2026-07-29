@@ -21,7 +21,10 @@ from litestar_gateway.infrastructure.llm.errors import (
     run_translated,
     translate_stream,
 )
-from litestar_gateway.infrastructure.llm.openai_adapter import OpenAIAdapter
+from litestar_gateway.infrastructure.llm.openai_adapter import (
+    OpenAIAdapter,
+    OpenAICompatibleProviderAdapter,
+)
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.llm.responses_emulation import ChatToResponsesAdapter
 from litestar_gateway.infrastructure.llm.vertex_adapter import VertexAdapter
@@ -79,6 +82,16 @@ class LLMGatewayImpl:
                 ChatToResponsesAdapter(openai_adapter),
                 frozenset({_CHAT, _RESPONSES, _EMBEDDINGS}),
             ),
+            # Any OpenAI-protocol endpoint (Plan 18). This is the *maximum* the
+            # adapter can serve; what a given model actually serves is the
+            # intersection with its declared `capabilities` (see `_resolve`),
+            # which defaults to chat only. No Responses: compatible backends
+            # implement Chat Completions, and Responses coverage is Plan 09's
+            # contract rather than this one's.
+            Provider.OPENAI_COMPATIBLE: (
+                OpenAICompatibleProviderAdapter(resilience, self._client_registry),
+                frozenset({_CHAT, _EMBEDDINGS, _IMAGES}),
+            ),
             # Anthropic: chat + emulated Responses + native Messages passthrough.
             # No embeddings API.
             Provider.ANTHROPIC: (
@@ -99,11 +112,18 @@ class LLMGatewayImpl:
             ),
         }
 
-    def _resolve(self, provider: Provider, operation: str) -> Any:
+    def _resolve(self, model: Model, operation: str) -> Any:
+        provider = model.provider
         entry = self._registry.get(provider)
         if entry is None:
             raise UnsupportedOperation(f"Provider '{provider}' is not supported yet")
         adapter, supported = entry
+        if provider is Provider.OPENAI_COMPATIBLE:
+            # The only provider whose operation set cannot be static: one
+            # credential may front a chat-only Ollama and another a vLLM that
+            # also serves embeddings. The declaration narrows the adapter's
+            # maximum set and can never widen it (Plan 18 design §3).
+            supported = supported & model.capabilities
         if operation not in supported:
             raise UnsupportedOperation(f"Provider '{provider}' does not support '{operation}'")
         return adapter
@@ -111,38 +131,38 @@ class LLMGatewayImpl:
     def chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        adapter = self._resolve(model.provider, "chat.completions")
+        adapter = self._resolve(model, "chat.completions")
         return run_translated(lambda: adapter.chat_completion(request, model, credentials))
 
     async def achat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        adapter = self._resolve(model.provider, "chat.completions")
+        adapter = self._resolve(model, "chat.completions")
         return await arun_translated(adapter.achat_completion(request, model, credentials))
 
     def responses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        adapter = self._resolve(model.provider, "responses")
+        adapter = self._resolve(model, "responses")
         return run_translated(lambda: adapter.responses(request, model, credentials))
 
     async def aresponses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        adapter = self._resolve(model.provider, "responses")
+        adapter = self._resolve(model, "responses")
         return await arun_translated(adapter.aresponses(request, model, credentials))
 
     async def astream_chat_completion(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
         # Resolve eagerly (await) so capability errors surface before streaming.
-        adapter = self._resolve(model.provider, "chat.completions")
+        adapter = self._resolve(model, "chat.completions")
         return translate_stream(adapter.astream_chat_completion(request, model, credentials))
 
     async def astream_responses(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> AsyncIterator[dict[str, Any]]:
-        adapter = self._resolve(model.provider, "responses")
+        adapter = self._resolve(model, "responses")
         return translate_stream(adapter.astream_responses(request, model, credentials))
 
     async def anative_messages(
@@ -154,7 +174,7 @@ class LLMGatewayImpl:
         # errors (429/5xx/timeout -> domain errors) — it does not touch the
         # request or response body, so the native Anthropic shape flows through
         # untranslated.
-        adapter = self._resolve(model.provider, _NATIVE_MESSAGES)
+        adapter = self._resolve(model, _NATIVE_MESSAGES)
         return await arun_translated(adapter.anative_messages(request, model, credentials))
 
     async def astream_native_messages(
@@ -167,7 +187,7 @@ class LLMGatewayImpl:
         # events, so the raw Anthropic event shape flows through untouched
         # (mirrors astream_chat_completion minus the anthropic_event_to_delta
         # re-encoding done inside the adapter there).
-        adapter = self._resolve(model.provider, _NATIVE_MESSAGES)
+        adapter = self._resolve(model, _NATIVE_MESSAGES)
         return translate_stream(adapter.astream_native_messages(request, model, credentials))
 
     async def agenerate_content(
@@ -179,7 +199,7 @@ class LLMGatewayImpl:
         # NORMALIZES upstream SDK errors (429/5xx/timeout -> domain errors) — it does
         # not touch the request or response body, so the native Gemini shape flows
         # through untranslated.
-        adapter = self._resolve(model.provider, _NATIVE_GENERATE_CONTENT)
+        adapter = self._resolve(model, _NATIVE_GENERATE_CONTENT)
         return await arun_translated(adapter.agenerate_content(request, model, credentials))
 
     async def astream_generate_content(
@@ -191,31 +211,31 @@ class LLMGatewayImpl:
         # errors (open-time + mid-stream) — it does NOT translate the chunks, so
         # the raw Gemini chunk shape flows through untouched (mirrors
         # astream_native_messages for the Gemini wire shape).
-        adapter = self._resolve(model.provider, _NATIVE_GENERATE_CONTENT)
+        adapter = self._resolve(model, _NATIVE_GENERATE_CONTENT)
         return translate_stream(adapter.astream_generate_content(request, model, credentials))
 
     def embeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        adapter = self._resolve(model.provider, "embeddings")
+        adapter = self._resolve(model, "embeddings")
         return run_translated(lambda: adapter.embeddings(request, model, credentials))
 
     async def aembeddings(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        adapter = self._resolve(model.provider, "embeddings")
+        adapter = self._resolve(model, "embeddings")
         return await arun_translated(adapter.aembeddings(request, model, credentials))
 
     def images(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        adapter = self._resolve(model.provider, "image_generation")
+        adapter = self._resolve(model, "image_generation")
         return run_translated(lambda: adapter.images(request, model, credentials))
 
     async def aimages(
         self, request: dict[str, Any], model: Model, credentials: dict[str, str]
     ) -> dict[str, Any]:
-        adapter = self._resolve(model.provider, "image_generation")
+        adapter = self._resolve(model, "image_generation")
         return await arun_translated(adapter.aimages(request, model, credentials))
 
     async def aclose(self) -> None:

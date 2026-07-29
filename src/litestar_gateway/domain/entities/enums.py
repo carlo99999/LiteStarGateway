@@ -53,6 +53,10 @@ class Provider(StrEnum):
     AZURE_OPENAI = "azure_openai"
     BEDROCK = "bedrock"
     DATABRICKS = "databricks"
+    # Any endpoint speaking the OpenAI wire protocol — a self-hosted vLLM /
+    # Ollama / TGI, or an OpenAI-compatible SaaS. One provider value over the
+    # shared adapter, never a per-vendor branch (Plan 18).
+    OPENAI_COMPATIBLE = "openai_compatible"
 
     @property
     def honors_n(self) -> bool:
@@ -66,6 +70,12 @@ class Provider(StrEnum):
 
 
 # OpenAI-compatible surfaces (OpenAI, Azure, Databricks share the OpenAI SDK).
+# `OPENAI_COMPATIBLE` is deliberately absent despite speaking the same protocol:
+# compatible backends disagree on `n` (vLLM honors it, Ollama ignores it), and
+# the gateway cannot know which one a credential points at. Claiming support
+# would over-reserve budget by up to MAX_N x wherever the backend silently
+# returns one completion, so `n>1` is refused there until it becomes a declared
+# capability (Plan 18 design §5).
 _PROVIDERS_HONORING_N = frozenset({Provider.OPENAI, Provider.AZURE_OPENAI, Provider.DATABRICKS})
 
 

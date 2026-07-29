@@ -45,6 +45,9 @@ class CreateModelRequest:
     # Semantic-tier opt-in (Plan 04 Phase 2), separate from `cache_enabled` —
     # only takes effect when `cache_enabled` is also true.
     cache_semantic_enabled: bool = False
+    # Declared gateway operations (Plan 18), `openai_compatible` only. Omitted
+    # or empty ⇒ the chat-only default.
+    capabilities: list[str] | None = None
     # Non-token pricing (Plan 13 Phase 1) — Anthropic prompt-cache rates and
     # image count/size/quality pricing. Optional and strictly opt-in.
     cache_write_cost_per_token: float | None = None
@@ -69,6 +72,7 @@ class UpdateModelRequest:
     cache_enabled: bool | None = None
     cache_allow_nondeterministic: bool | None = None
     cache_semantic_enabled: bool | None = None
+    capabilities: list[str] | None = None
     # Non-token pricing (Plan 13 Phase 1).
     cache_write_cost_per_token: float | None = None
     cache_read_cost_per_token: float | None = None
@@ -102,6 +106,7 @@ class ModelResponse:
     cache_read_cost_per_token: float | None = None
     image_cost_per_image: float | None = None
     image_prices: dict[str, float] = field(default_factory=dict)
+    capabilities: list[str] = field(default_factory=list)
 
     @classmethod
     def from_entity(cls, model: Model) -> ModelResponse:
@@ -129,6 +134,7 @@ class ModelResponse:
             cache_read_cost_per_token=model.cache_read_cost_per_token,
             image_cost_per_image=model.image_cost_per_image,
             image_prices=model.image_prices,
+            capabilities=sorted(model.capabilities),
         )
 
 

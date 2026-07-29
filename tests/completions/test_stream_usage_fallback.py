@@ -30,12 +30,12 @@ KEY_ID = uuid4()
 PROMPT_TEXT = "hiya"
 
 
-def _model() -> Model:
+def _model(provider: Provider = Provider.OPENAI) -> Model:
     return Model(
         id=uuid4(),
         team_id=TEAM_ID,
         name="m",
-        provider=Provider.OPENAI,
+        provider=provider,
         credential_id=uuid4(),
         type=ModelType.CHAT,
         provider_model_id="gpt-4o",
@@ -92,9 +92,14 @@ class StreamGateway:
             yield chunk
 
 
-def _service(gateway: Any, usage: FakeUsage, traces: list[TraceRecord]) -> CompletionService:
+def _service(
+    gateway: Any,
+    usage: FakeUsage,
+    traces: list[TraceRecord],
+    provider: Provider = Provider.OPENAI,
+) -> CompletionService:
     return CompletionService(
-        models=FakeModels(_model()),  # type: ignore[arg-type]
+        models=FakeModels(_model(provider)),  # type: ignore[arg-type]
         credentials=FakeCredentials(),  # type: ignore[arg-type]
         gateway=gateway,
         meter=UsageMeter(usage=usage, emit_trace=traces.append),  # type: ignore[arg-type]
@@ -157,12 +162,20 @@ async def test_disconnect_before_any_output_still_bills_prompt() -> None:
     assert [t.status for t in traces] == ["ok"]
 
 
-async def test_stream_without_usage_chunk_records_estimated_usage() -> None:
+@pytest.mark.parametrize("provider", [Provider.OPENAI, Provider.OPENAI_COMPATIBLE])
+async def test_stream_without_usage_chunk_records_estimated_usage(provider: Provider) -> None:
     # The provider stream ends cleanly but never reports usage: estimate from
     # the full streamed output (12 chars → 3 tokens) and the prompt.
+    #
+    # Parametrized over `openai_compatible` (Plan 18 Phase 3) because that is
+    # the provider where this stops being an edge case: the gateway forces
+    # `stream_options.include_usage`, but a self-hosted server is free to
+    # ignore it, so the estimate is the *normal* settlement path there. The
+    # fallback lives in UsageMeter, above the adapter, so it is one shared
+    # behaviour — this pins that the new provider inherits it.
     traces: list[TraceRecord] = []
     usage = FakeUsage()
-    service = _service(StreamGateway(_chat_chunks()), usage, traces)
+    service = _service(StreamGateway(_chat_chunks()), usage, traces, provider)
 
     stream = await service.open_chat_stream(TEAM_ID, KEY_ID, dict(CHAT_REQUEST))
     async for _ in stream:

@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from litestar_gateway.domain.exceptions import InvalidModelCapabilities
+
 from .enums import ModelType, Provider
+
+# Gateway operations a model may be declared to serve (Plan 18). Mirrors the
+# operation strings in infrastructure/llm/gateway.py.
+CHAT_CAPABILITY = "chat.completions"
+DECLARABLE_CAPABILITIES = frozenset({CHAT_CAPABILITY, "embeddings", "image_generation"})
+# Fail-closed: an `openai_compatible` model that declares nothing serves chat
+# and nothing else, so an under-declared model serves less, never more.
+DEFAULT_CAPABILITIES = frozenset({CHAT_CAPABILITY})
 
 
 @dataclass(frozen=True)
@@ -79,12 +90,48 @@ class Model:
     # specific overrides keyed by `pricing.image_price_key(size, quality)`.
     image_cost_per_image: float | None = None
     image_prices: dict[str, float] = field(default_factory=dict)
+    # Which gateway operations this model serves (Plan 18). Only consulted for
+    # `openai_compatible`, where the provider alone cannot say what a given
+    # backend does — every other provider's operation set is a property of the
+    # provider and stays declared in the gateway registry. Declared, never
+    # probed: the gateway does not call upstream to discover capabilities.
+    capabilities: frozenset[str] = DEFAULT_CAPABILITIES
 
     def merge_params(self, request: dict[str, Any]) -> dict[str, Any]:
         """Effective request for a provider call: admin `params` (defaults the
         client may override), then the sanitized client `request`, then
         `params_enforced` (admin policy the client cannot override)."""
         return {**self.params, **request, **self.params_enforced}
+
+
+def normalize_capabilities(provider: Provider, declared: Iterable[str] | None) -> frozenset[str]:
+    """Validate an operator's capability declaration and fold it to the set the
+    entity carries.
+
+    Omitted or empty ⇒ the chat-only default, so under-declaring serves less
+    rather than more. Raises `InvalidModelCapabilities` (→ 400) for an unknown
+    operation, or for any
+    declaration on a provider whose operation set is a fixed property of the
+    provider — silently ignoring one there would leave an operator believing
+    they had constrained a model they had not.
+    """
+    if declared is None:
+        return DEFAULT_CAPABILITIES
+    capabilities = frozenset(declared)
+    if not capabilities:
+        return DEFAULT_CAPABILITIES
+    unknown = sorted(capabilities - DECLARABLE_CAPABILITIES)
+    if unknown:
+        raise InvalidModelCapabilities(
+            f"unknown capabilities: {', '.join(unknown)}; "
+            f"declarable: {', '.join(sorted(DECLARABLE_CAPABILITIES))}"
+        )
+    if provider is not Provider.OPENAI_COMPATIBLE and capabilities != DEFAULT_CAPABILITIES:
+        raise InvalidModelCapabilities(
+            f"capabilities may only be declared for '{Provider.OPENAI_COMPATIBLE}' models; "
+            f"provider '{provider}' advertises a fixed operation set"
+        )
+    return capabilities
 
 
 @dataclass(frozen=True)

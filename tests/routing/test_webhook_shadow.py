@@ -17,6 +17,7 @@ import pytest
 from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from litestar.testing import AsyncTestClient
 
+import litestar_gateway.application.egress as egress_module
 import litestar_gateway.application.routing.webhook as webhook_module
 from litestar_gateway.app import create_app
 from litestar_gateway.application.routing.webhook import WebhookStrategy
@@ -55,7 +56,7 @@ def _mock_webhook(monkeypatch: pytest.MonkeyPatch, handler) -> None:
         return httpx.AsyncClient(timeout=timeout_seconds, transport=httpx.MockTransport(handler))
 
     monkeypatch.setattr(webhook_module, "_client_factory", factory)
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", _public_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", _public_resolver)
 
 
 # ── S2 webhook: unit ─────────────────────────────────────────────────────────
@@ -163,7 +164,7 @@ async def test_webhook_rejects_hostname_resolving_to_private(
     async def private_resolver(host: str) -> list[str]:
         return ["10.1.2.3"]
 
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", private_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", private_resolver)
     with pytest.raises(ValueError):
         await WebhookStrategy({"url": "https://picker.example/route"}).select(_ctx(), CANDIDATES)
     assert called == []  # blocked before any bytes leave the gateway
@@ -177,7 +178,7 @@ async def test_webhook_rejects_hostname_with_any_private_address(
     async def mixed_resolver(host: str) -> list[str]:
         return ["93.184.216.34", "192.168.1.10"]  # DNS-rebind style mix
 
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", mixed_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", mixed_resolver)
     with pytest.raises(ValueError):
         await WebhookStrategy({"url": "https://picker.example/route"}).select(_ctx(), CANDIDATES)
 
@@ -209,7 +210,7 @@ async def test_webhook_connects_to_validated_ip_without_second_dns_resolution(
     def factory(timeout_seconds: float) -> httpx.AsyncClient:
         return httpx.AsyncClient(timeout=timeout_seconds, transport=httpx.MockTransport(handler))
 
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", resolver)
     monkeypatch.setattr(webhook_module, "_client_factory", factory)
 
     decision = await WebhookStrategy({"url": "https://picker.example:8443/route"}).select(
@@ -242,7 +243,7 @@ async def test_webhook_failover_never_leaves_validated_address_set(
     def factory(timeout_seconds: float) -> httpx.AsyncClient:
         return httpx.AsyncClient(timeout=timeout_seconds, transport=httpx.MockTransport(handler))
 
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", resolver)
     monkeypatch.setattr(webhook_module, "_client_factory", factory)
 
     decision = await WebhookStrategy({"url": "https://picker.example/route"}).select(
@@ -409,7 +410,7 @@ async def test_blocked_webhook_target_falls_back_to_default(
     async def private_resolver(host: str) -> list[str]:
         return ["10.0.0.5"]
 
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", private_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", private_resolver)
     key, _, _ = await _setup(
         client,
         {

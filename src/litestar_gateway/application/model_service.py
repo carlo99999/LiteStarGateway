@@ -18,6 +18,7 @@ from uuid import UUID, uuid4
 from litestar_gateway.application.callable_aliases import CallableAliasResolver
 from litestar_gateway.domain.callable_alias import CallableKind
 from litestar_gateway.domain.entities import Credential, Model, ModelGrant, ModelType, Provider
+from litestar_gateway.domain.entities.model import normalize_capabilities
 from litestar_gateway.domain.exceptions import (
     CredentialNotFound,
     ModelNameExists,
@@ -113,6 +114,7 @@ class ModelService:
         cache_read_cost_per_token: float | None = None,
         image_cost_per_image: float | None = None,
         image_prices: dict[str, float] | None = None,
+        capabilities: list[str] | None = None,
     ) -> Model:
         """Create a team-owned model (`team_id` set) or a global one (`team_id`
         None). A team may reuse a name that only exists as a global (it shadows
@@ -159,6 +161,7 @@ class ModelService:
             cache_read_cost_per_token=cache_read_cost_per_token,
             image_cost_per_image=image_cost_per_image,
             image_prices=image_prices or {},
+            capabilities=normalize_capabilities(provider, capabilities),
         )
         _ensure_valid_pricing(model)
         return await self._models.add(model)
@@ -251,6 +254,13 @@ class ModelService:
             else await self._get_scoped(team_id, model_id)
         )
         applied = {k: v for k, v in changes.items() if v is not None}
+        if "capabilities" in applied:
+            # Arrives as a JSON list; validated against the model's own
+            # (immutable) provider, so an update cannot smuggle in a
+            # declaration the create path would have refused.
+            applied["capabilities"] = normalize_capabilities(
+                model.provider, applied["capabilities"]
+            )
         updated = dataclasses.replace(model, **applied)
         _ensure_valid_pricing(updated)
         if team_id is not None:
