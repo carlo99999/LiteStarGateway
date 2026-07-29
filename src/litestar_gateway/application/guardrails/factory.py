@@ -68,7 +68,7 @@ def _provider(
     if complete is None:
         raise ValueError("judge guardrail is not wired (no completion seam)")
     categories = config.get("block_categories")
-    knobs: dict[str, Any] = _optional(config, char_budget="char_budget")
+    knobs: dict[str, Any] = _optional(config, char_budget="char_budget", timeout_ms="timeout_ms")
     if categories:
         knobs["block_categories"] = tuple(categories)
     return JudgeGuardrail(

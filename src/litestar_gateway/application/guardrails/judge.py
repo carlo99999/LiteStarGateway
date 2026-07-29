@@ -19,6 +19,7 @@ Two properties this provider must hold that the routing judge does not:
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -35,6 +36,15 @@ CompleteFn = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
 # Long enough for a real prompt, short enough that the judge stays cheap and
 # quick — it is charged and waited for on every guarded request.
 DEFAULT_CHAR_BUDGET = 4000
+
+# The judge is a network call on the request path, so it needs a bound of its
+# own. Without one it inherited the provider client's budget (60 s) plus its
+# retries, and a hung judge model held the caller — and its budget reservation —
+# for that whole time. Worse, with `fail_policy=closed` the "a control that could
+# not be evaluated has not passed" answer never fired, because nothing failed.
+# Same default and bounds as the webhook provider: one number for "how long may a
+# guardrail delay a request", not one per provider kind.
+DEFAULT_TIMEOUT_MS = 2000
 
 JUDGE_PROMPT_V1 = (
     "You are a content-safety classifier. You will be shown a piece of text "
@@ -70,6 +80,7 @@ class JudgeGuardrail:
         block_categories: tuple[str, ...] = _ALL_CATEGORIES,
         directions: tuple[Direction, ...] = (Direction.REQUEST,),
         char_budget: int = DEFAULT_CHAR_BUDGET,
+        timeout_ms: int = DEFAULT_TIMEOUT_MS,
     ) -> None:
         if not judge_model:
             raise ValueError("judge guardrail requires a judge model name")
@@ -82,12 +93,18 @@ class JudgeGuardrail:
         self._block_categories = frozenset(block_categories)
         self._directions = directions
         self._char_budget = char_budget
+        self._timeout_ms = timeout_ms
 
     def supports(self, direction: Direction) -> bool:
         return direction in self._directions
 
     async def check(self, payload: GuardrailPayload) -> GuardrailVerdict:
-        response = await self._complete(self._judge_model, self._request(payload.text))
+        # A timeout leaves `check` by raising, which is exactly what the chain's
+        # fail policy is for: CLOSED turns it into a block, OPEN into an allow
+        # with a warning. Either way the caller is answered on this budget rather
+        # than the provider client's.
+        async with asyncio.timeout(self._timeout_ms / 1000):
+            response = await self._complete(self._judge_model, self._request(payload.text))
         content = response["choices"][0]["message"]["content"]
         categories = self._parse(content)
         blocking = tuple(c for c in categories if c in self._block_categories)

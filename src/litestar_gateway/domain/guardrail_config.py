@@ -24,7 +24,7 @@ MIN_CHAR_BUDGET = 100
 MAX_CHAR_BUDGET = 20_000
 
 _WEBHOOK_KEYS = {"url", "timeout_ms"}
-_JUDGE_KEYS = {"judge_model", "block_categories", "char_budget"}
+_JUDGE_KEYS = {"judge_model", "block_categories", "char_budget", "timeout_ms"}
 
 JUDGE_CATEGORIES = (
     "harassment",
@@ -102,6 +102,9 @@ def _validate_judge(config: dict[str, Any]) -> None:
                 f"known: {', '.join(JUDGE_CATEGORIES)}"
             )
     _validate_bounded_int(config, "char_budget", MIN_CHAR_BUDGET, MAX_CHAR_BUDGET)
+    # Same bounds as the webhook provider: a guardrail's delay is the caller's
+    # delay, whichever kind it is.
+    _validate_bounded_int(config, "timeout_ms", MIN_TIMEOUT_MS, MAX_TIMEOUT_MS)
 
 
 def _validate_bounded_int(config: dict[str, Any], key: str, low: int, high: int) -> None:

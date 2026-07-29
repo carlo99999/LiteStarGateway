@@ -8,6 +8,7 @@ property of the classifier.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -123,3 +124,20 @@ async def test_an_unparseable_verdict_is_a_provider_failure(content: str) -> Non
 def test_a_missing_judge_model_is_refused() -> None:
     with pytest.raises(ValueError, match="judge model"):
         JudgeGuardrail("", complete=_Judge([]))
+
+
+async def test_a_stalled_judge_gives_up_on_its_own_time_budget() -> None:
+    """The judge had no timeout of its own, so it inherited the gateway's 60 s
+    provider budget plus retries. A hung judge model therefore held the caller's
+    request — and its budget reservation — for a minute or more, and with
+    `fail_policy=closed` the intended "timeout means block" never fired because
+    nothing timed out at this layer."""
+
+    async def stalls(model: str, request: dict[str, Any]) -> dict[str, Any]:
+        await asyncio.sleep(5)
+        raise AssertionError("the judge should have been given up on long before this")
+
+    guardrail = JudgeGuardrail("safety-model", complete=stalls, timeout_ms=100)
+
+    with pytest.raises(TimeoutError):
+        await guardrail.check(GuardrailPayload(direction=Direction.REQUEST, text="hello"))
