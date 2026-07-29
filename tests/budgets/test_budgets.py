@@ -318,12 +318,12 @@ async def test_budget_alert_config_validation(client: AsyncTestClient) -> None:
         {"limit_cost": 1.0, "window": "monthly", "thresholds": [0]},  # < 1
         {"limit_cost": 1.0, "window": "monthly", "thresholds": [101]},  # > 100
         # SSRF: private / loopback / link-local webhook targets are rejected.
-        {"limit_cost": 1.0, "window": "monthly", "alert_webhook_url": "http://127.0.0.1/hook"},
-        {"limit_cost": 1.0, "window": "monthly", "alert_webhook_url": "http://10.0.0.5/hook"},
+        {"limit_cost": 1.0, "window": "monthly", "alert_webhook_url": "https://127.0.0.1/hook"},
+        {"limit_cost": 1.0, "window": "monthly", "alert_webhook_url": "https://10.0.0.5/hook"},
         {
             "limit_cost": 1.0,
             "window": "monthly",
-            "alert_webhook_url": "http://169.254.169.254/latest",
+            "alert_webhook_url": "https://169.254.169.254/latest",
         },
         {"limit_cost": 1.0, "window": "monthly", "alert_webhook_url": "ftp://x"},  # not http(s)
         {"limit_cost": 1.0, "window": "monthly", "alert_email": "not-an-email"},

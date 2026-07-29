@@ -48,7 +48,9 @@ def make_channel_resolver(budgets: BudgetRepository, settings: Settings) -> Chan
         if team_webhook:
             channels.append(
                 WebhookNotificationChannel(
-                    team_webhook, timeout_ms=settings.budget_alert_webhook_timeout_ms
+                    team_webhook,
+                    signing_secret=settings.webhook_signing_secret,
+                    timeout_ms=settings.budget_alert_webhook_timeout_ms,
                 )
             )
         elif settings.budget_alert_webhook_url:
@@ -56,6 +58,7 @@ def make_channel_resolver(budgets: BudgetRepository, settings: Settings) -> Chan
                 WebhookNotificationChannel(
                     settings.budget_alert_webhook_url,
                     bearer_token=settings.budget_alert_webhook_bearer_token,
+                    signing_secret=settings.webhook_signing_secret,
                     timeout_ms=settings.budget_alert_webhook_timeout_ms,
                 )
             )

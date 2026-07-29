@@ -95,7 +95,7 @@ def _router(default_model: str) -> RouterConfig:
         default_model=default_model,
         # Unreachable webhook → the strategy raises → §4 fallback path.
         strategy="webhook",
-        strategy_config={"url": "http://127.0.0.1:9/route", "timeout_ms": 100},
+        strategy_config={"url": "https://127.0.0.1:9/route", "timeout_ms": 100},
         enabled=True,
         created_at=datetime.now(UTC),
     )

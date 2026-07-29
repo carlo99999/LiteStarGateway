@@ -11,6 +11,8 @@ code path rather than a re-implementation of it."""
 from __future__ import annotations
 
 import json
+import logging
+import time
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -20,6 +22,11 @@ import pytest
 import litestar_gateway.application.routing.webhook as webhook_module
 from litestar_gateway.domain.entities import BudgetWindow, PendingBudgetAlert
 from litestar_gateway.domain.money import to_cost
+from litestar_gateway.domain.webhook_signature import (
+    EVENT_ID_HEADER,
+    SIGNATURE_HEADER,
+    verify,
+)
 from litestar_gateway.infrastructure.notifications.webhook_channel import (
     WebhookNotificationChannel,
 )
@@ -71,6 +78,10 @@ async def test_send_posts_alert_payload(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert seen["auth"] == "Bearer tok"
     assert seen["payload"] == {
+        # The outbox row's id: stable across retries, which is what makes it
+        # usable as the receiver's idempotency key.
+        "event_id": str(alert.id),
+        "event": "budget.threshold_crossed",
         "team_id": str(alert.team_id),
         "window": "monthly",
         "period_start": alert.period_start.isoformat(),
@@ -181,3 +192,85 @@ async def test_connects_to_pinned_ip_retaining_host_and_sni(
     assert requests[0].url.host == "93.184.216.34"
     assert requests[0].headers["Host"] == "alerts.example:8443"
     assert requests[0].extensions["sni_hostname"] == "alerts.example"
+
+
+# HMAC material for these tests.
+SIGNING_MATERIAL = "alerts-endpoint-fixture-value"
+
+
+# ---------------------------------------------------------------------------
+# Sender obligations: signed, identified, https-only.
+# ---------------------------------------------------------------------------
+
+
+async def test_the_alert_is_signed_and_verifies(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["content"] = request.content
+        seen["signature"] = request.headers.get(SIGNATURE_HEADER)
+        seen["event_id"] = request.headers.get(EVENT_ID_HEADER)
+        return httpx.Response(200)
+
+    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", _public_resolver)
+    _mock_transport(monkeypatch, handler)
+    channel = WebhookNotificationChannel(
+        "https://alerts.example/hook", signing_secret=SIGNING_MATERIAL
+    )
+
+    await channel.send(_alert())
+
+    assert verify(seen["content"], seen["signature"], secret=SIGNING_MATERIAL, now=int(time.time()))
+
+
+async def test_a_retry_reuses_the_same_event_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Delivery is at-least-once: the second attempt at the same alert must be
+    recognisable as a duplicate, which is only possible if the id is the outbox
+    row's and not freshly generated per send."""
+    ids: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        ids.append(request.headers[EVENT_ID_HEADER])
+        return httpx.Response(200)
+
+    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", _public_resolver)
+    _mock_transport(monkeypatch, handler)
+    channel = WebhookNotificationChannel(
+        "https://alerts.example/hook", signing_secret=SIGNING_MATERIAL
+    )
+    alert = _alert()
+
+    await channel.send(alert)
+    await channel.send(alert)  # the retry
+
+    assert ids[0] == ids[1] == str(alert.id)
+
+
+async def test_without_a_secret_it_still_sends_but_warns(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Unsigned is the pre-existing behaviour, so an upgrade must not break
+    # delivery — but it must not be quiet either.
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["signature"] = request.headers.get(SIGNATURE_HEADER)
+        return httpx.Response(200)
+
+    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", _public_resolver)
+    _mock_transport(monkeypatch, handler)
+    channel = WebhookNotificationChannel("https://alerts.example/hook")
+
+    with caplog.at_level(logging.WARNING):
+        await channel.send(_alert())
+
+    assert seen["signature"] is None
+    assert any("UNSIGNED" in record.message for record in caplog.records)
+
+
+def test_a_plaintext_alert_target_is_refused() -> None:
+    # The SSRF guard already bans loopback and private ranges, so a plaintext
+    # target is a public one: there is no configuration where sending a team's
+    # spend in cleartext is intended.
+    with pytest.raises(ValueError, match="https"):
+        WebhookNotificationChannel("http://alerts.example/hook")

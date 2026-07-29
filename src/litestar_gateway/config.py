@@ -264,6 +264,12 @@ class Settings:
     # budget endpoints (`GET/PUT/DELETE /teams/{id}/budget`), not this.
     budget_alert_webhook_url: str | None = None
     budget_alert_webhook_bearer_token: str | None = None
+    # HMAC key for signing OUTBOUND webhook payloads (budget alerts and, unless
+    # its strategy_config overrides it, the routing webhook). Without it we
+    # cannot sign, and a receiver cannot tell our traffic from anyone else's who
+    # learned the URL. Platform-wide for now: per-endpoint secrets for the
+    # per-team alert URL need a column, hence a migration, and are follow-up.
+    webhook_signing_secret: str | None = None
     budget_alert_webhook_timeout_ms: int = DEFAULT_BUDGET_ALERT_WEBHOOK_TIMEOUT_MS
     # Budget-alert email delivery (Plan 07 Phase 3, design doc §4/§8). A single
     # platform-wide SMTP server; a team opts in per-budget by setting
@@ -491,6 +497,7 @@ class Settings:
             oidc_team_mapping=_env_team_mapping("SSO_TEAM_MAPPING"),
             budget_alert_webhook_url=os.environ.get("BUDGET_ALERT_WEBHOOK_URL"),
             budget_alert_webhook_bearer_token=os.environ.get("BUDGET_ALERT_WEBHOOK_BEARER_TOKEN"),
+            webhook_signing_secret=os.environ.get("WEBHOOK_SIGNING_SECRET"),
             budget_alert_webhook_timeout_ms=_env_int(
                 "BUDGET_ALERT_WEBHOOK_TIMEOUT_MS",
                 DEFAULT_BUDGET_ALERT_WEBHOOK_TIMEOUT_MS,
