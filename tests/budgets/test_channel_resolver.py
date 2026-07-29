@@ -27,13 +27,19 @@ class _FakeBudgets:
     """A read-only `BudgetRepository` stub (only `get` is exercised; `set`/
     `remove` exist to satisfy the protocol for type checking)."""
 
-    def __init__(self, budget: Budget | None) -> None:
+    def __init__(self, budget: Budget | None, *, webhook_secret: str | None = None) -> None:
         self._budget = budget
+        self._webhook_secret = webhook_secret
 
     async def get(self, team_id: UUID) -> Budget | None:
         return self._budget
 
-    async def set(self, budget: Budget) -> Budget:  # pragma: no cover - unused
+    async def alert_webhook_secret(self, team_id: UUID) -> str | None:
+        return self._webhook_secret
+
+    async def set(
+        self, budget: Budget, *, alert_webhook_secret: str | None = None
+    ) -> Budget:  # pragma: no cover - unused
         raise NotImplementedError
 
     async def remove(self, team_id: UUID) -> None:  # pragma: no cover - unused

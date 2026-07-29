@@ -46,10 +46,19 @@ def make_channel_resolver(budgets: BudgetRepository, settings: Settings) -> Chan
 
         team_webhook = budget.alert_webhook_url if budget else None
         if team_webhook:
+            # A team's own secret wins over the platform one: a receiver hosting
+            # several tenants' endpoints needs to verify each with its own key,
+            # and one that only ever sees this gateway can keep using the shared
+            # secret by not setting one.
+            secret = (
+                await budgets.alert_webhook_secret(alert.team_id)
+                if budget and budget.has_alert_webhook_secret
+                else None
+            ) or settings.webhook_signing_secret
             channels.append(
                 WebhookNotificationChannel(
                     team_webhook,
-                    signing_secret=settings.webhook_signing_secret,
+                    signing_secret=secret,
                     timeout_ms=settings.budget_alert_webhook_timeout_ms,
                 )
             )

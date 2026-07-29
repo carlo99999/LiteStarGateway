@@ -41,6 +41,10 @@ class SetBudgetRequest:
     thresholds: list[int] | None = None
     alert_webhook_url: str | None = None
     alert_email: str | None = None
+    # Per-team HMAC secret for the team's alert webhook. Omit to keep the stored
+    # one (it is never returned); leave unset entirely to sign with the
+    # platform-wide secret.
+    alert_webhook_secret: str | None = None
 
 
 @dataclass(frozen=True)
@@ -53,6 +57,8 @@ class BudgetResponse:
     thresholds: list[int]
     alert_webhook_url: str | None
     alert_email: str | None
+    # Whether a per-team webhook secret is stored — never the value.
+    has_alert_webhook_secret: bool = False
 
     @classmethod
     def from_budget(cls, budget: Budget, spent: Decimal) -> BudgetResponse:
@@ -65,6 +71,7 @@ class BudgetResponse:
             thresholds=list(budget.thresholds),
             alert_webhook_url=budget.alert_webhook_url,
             alert_email=budget.alert_email,
+            has_alert_webhook_secret=budget.has_alert_webhook_secret,
         )
 
 

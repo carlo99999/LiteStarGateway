@@ -42,6 +42,10 @@ class Budget:
     thresholds: list[int] = field(default_factory=list)
     alert_webhook_url: str | None = None
     alert_email: str | None = None
+    # Whether this team has its own HMAC secret for its alert webhook. The value
+    # never appears on the entity — a per-team secret is only ever read by the
+    # dispatcher that signs with it.
+    has_alert_webhook_secret: bool = False
 
 
 class KeyBudgetMode(StrEnum):

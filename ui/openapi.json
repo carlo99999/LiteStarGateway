@@ -13079,6 +13079,10 @@
                                 "type": "null"
                             }
                         ]
+                    },
+                    "has_alert_webhook_secret": {
+                        "type": "boolean",
+                        "default": false
                     }
                 },
                 "type": "object",
@@ -15238,6 +15242,16 @@
                         ]
                     },
                     "alert_email": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "alert_webhook_secret": {
                         "oneOf": [
                             {
                                 "type": "string"

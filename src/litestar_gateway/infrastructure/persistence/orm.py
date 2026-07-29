@@ -617,6 +617,14 @@ class TeamBudgetModel(base.UUIDAuditBase):
     # is delivered via the platform-wide SMTP server.
     alert_webhook_url: Mapped[str | None] = mapped_column(default=None)
     alert_email: Mapped[str | None] = mapped_column(default=None)
+    # Per-team HMAC secret for `alert_webhook_url`, envelope-encrypted like every
+    # other stored secret. NULL means "sign with the platform-wide secret": a
+    # receiver that only ever sees this gateway needs no per-team key, and one
+    # that hosts several tenants' endpoints does.
+    encrypted_alert_webhook_secret: Mapped[str | None] = mapped_column(default=None)
+    alert_webhook_secret_key_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("secret_key.id"), default=None
+    )
 
     def to_entity(self) -> Budget:
         return Budget(
@@ -628,6 +636,7 @@ class TeamBudgetModel(base.UUIDAuditBase):
             thresholds=list(self.thresholds or []),
             alert_webhook_url=self.alert_webhook_url,
             alert_email=self.alert_email,
+            has_alert_webhook_secret=self.encrypted_alert_webhook_secret is not None,
         )
 
 
