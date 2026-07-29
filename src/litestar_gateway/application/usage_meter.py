@@ -396,6 +396,7 @@ class UsageMeter:
         *,
         api_key_id: UUID | None = None,
         skip_team_rate_limit: bool = False,
+        skip_key_rate_limit: bool = False,
     ) -> Admission | None:
         """Pre-call spend gate: reject once committed spend plus the estimated
         cost already reserved by in-flight requests reaches the budget limit.
@@ -410,6 +411,14 @@ class UsageMeter:
         total and both slip under the cap. `None` means there was nothing to
         gate — no budget configured, or no store wired.
 
+        `skip_key_rate_limit` is the same idea for the per-key RPM gate, and is
+        what lets a caller pass `api_key_id` purely for the *budget* check.
+        `CompletionService._prepare` takes the key-RPM hit itself, early, before
+        a router strategy can make billable calls while resolving a virtual
+        model; re-checking it here would make one external request cost two of
+        the key's slots. The native call sites, which have no such early hit,
+        leave it off and let this be the single enforcement point.
+
         `skip_team_rate_limit` is for cross-provider failover retries only
         (Plan 05): one logical client request must consume exactly one
         team-RPM hit, taken on the first attempt. A retry against the next
@@ -419,13 +428,24 @@ class UsageMeter:
         request into N rate-limit consumptions."""
         if not skip_team_rate_limit:
             await self._enforce_team_rate_limit(team_id)
-        await self.enforce_key_rate_limit(api_key_id)
+        if not skip_key_rate_limit:
+            await self.enforce_key_rate_limit(api_key_id)
         # The key gate runs FIRST. A key over its own cap gets an error that
         # names the key's cap, which is the actionable one; and evaluating it
         # before the team reservation means a refusal never has to give a team
         # reservation back.
         key_claim = await self._admit_key(api_key_id, model, request)
-        team_claim = await self._admit_team(team_id, model, request)
+        try:
+            team_claim = await self._admit_team(team_id, model, request)
+        except BaseException:
+            # The key's claim is already recorded and the caller never receives
+            # an `Admission` to release, so without this it stayed reserved for
+            # the full TTL (ISSUE-044). A retry loop against an at-capacity team
+            # would then fill the key's own cap with spend that is not in flight,
+            # and the key would start refusing its own traffic while nothing was
+            # running.
+            await self.release(Admission(reservations=(key_claim,)) if key_claim else None)
+            raise
         claims = tuple(c for c in (key_claim, team_claim) if c is not None)
         return Admission(reservations=claims) if claims else None
 
@@ -559,11 +579,29 @@ class UsageMeter:
     async def release(self, admission: Admission | None) -> None:
         """Give back a reservation taken at admission (settlement or failure).
         Idempotent — releasing the same claim twice deletes nothing the second
-        time — so callers may release defensively."""
+        time — so callers may release defensively.
+
+        Best effort, deliberately (ISSUE-045). Release runs in `finally` blocks
+        after the response was already produced and settled, so letting a store
+        error out of here turned a billed success into a 500 — the client then
+        retries a call the ledger has already charged — and on the streaming path
+        it aborted the settlement of the whole stream. A reservation that cannot
+        be released expires on its own TTL, which is a bounded, self-healing
+        failure; the two above are not. Every claim is attempted even if an
+        earlier one raises, or the second scope would be held because the first
+        was unreachable.
+        """
         if admission is None or self._reservations is None:
             return
         for reservation in admission.reservations:
-            await self._reservations.release(reservation)
+            try:
+                await self._reservations.release(reservation)
+            except Exception:
+                logger.warning(
+                    "budget reservation release failed for scope %s; it will expire with its TTL",
+                    reservation.scope,
+                    exc_info=True,
+                )
 
     def release_soon(self, admission: Admission | None) -> None:
         """Release from a context that cannot await — specifically the

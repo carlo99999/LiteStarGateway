@@ -106,16 +106,20 @@ class FakeCredentials:
 class FakeUsage:
     """Usage port with a configurable accumulated spend for the gate to read."""
 
-    def __init__(self, spent: float = 0.0) -> None:
+    def __init__(self, spent: float = 0.0, *, key_spent: str = "0") -> None:
         self.events: list[UsageEvent] = []
         self.spent = spent
         self.spend_since_calls: list[tuple[UUID, datetime]] = []
+        self._key_spent = to_cost(key_spent)
 
     async def record(self, event: UsageEvent) -> None:
         self.events.append(event)
 
     async def enqueue_pending(self, event: UsageEvent) -> None:  # pragma: no cover
         raise AssertionError("outbox must not be used in these tests")
+
+    async def key_spend_since(self, api_key_id: UUID, since: datetime) -> Any:
+        return self._key_spent
 
     async def spend_since(self, team_id: UUID, since: datetime) -> float:
         self.spend_since_calls.append((team_id, since))
@@ -180,6 +184,10 @@ def _service(
     budgets: FakeBudgets | None,
     model: Model | None = None,
     reservations: InMemoryBudgetReservationStore | None = None,
+    *,
+    key_budgets: Any = None,
+    rate_limiter: Any = None,
+    api_keys: Any = None,
 ) -> CompletionService:
     """`reservations` is explicit so a test can hand the SAME store to two
     services — which is what two replicas of the gateway are."""
@@ -193,6 +201,10 @@ def _service(
             emit_trace=traces.append,
             budgets=budgets,  # type: ignore[arg-type]
             reservations=reservations or InMemoryBudgetReservationStore(),
+            api_key_budgets=key_budgets,
+            rate_limiter=rate_limiter,
+            api_keys=api_keys,
+            teams=FakeTeams() if rate_limiter is not None else None,  # type: ignore[arg-type]
         ),
     )
 
@@ -787,3 +799,120 @@ async def test_a_replica_releasing_frees_the_bound_for_the_other() -> None:
     await replica_one._meter.release(held)
 
     assert await replica_two._meter.admit(TEAM_ID, _model(), dict(MAX_TOKENS_REQUEST)) is not None
+
+
+# ── Per-key caps on the OpenAI surface (ISSUE-037) ────────────────────────────
+
+
+class FakeTeams:
+    async def get(self, team_id: UUID) -> Any:
+        return SimpleNamespace(rate_limit_rpm=100)
+
+
+class CountingRateLimiter:
+    """Records which buckets were hit, so double-counting is visible."""
+
+    def __init__(self) -> None:
+        self.hits: list[str] = []
+
+    async def hit(self, key: str, limit: int, *, window_seconds: int = 60) -> Any:
+        self.hits.append(key)
+        return SimpleNamespace(allowed=True, retry_after=0)
+
+
+class FakeApiKeys:
+    def __init__(self, rpm: int | None = 100) -> None:
+        self._rpm = rpm
+
+    async def get(self, api_key_id: UUID) -> Any:
+        return SimpleNamespace(id=api_key_id, rate_limit_rpm=self._rpm)
+
+
+class FakeKeyBudgets:
+    def __init__(self, budget: Any) -> None:
+        self._budget = budget
+
+    async def get(self, api_key_id: UUID) -> Any:
+        return self._budget if api_key_id == KEY_ID else None
+
+
+def _spent_key_budget(limit: str) -> Any:
+    from litestar_gateway.domain.entities import ApiKeyBudget, BudgetWindow, KeyBudgetMode
+
+    return ApiKeyBudget(
+        id=uuid4(),
+        api_key_id=KEY_ID,
+        team_id=TEAM_ID,
+        limit_cost=to_cost(limit),
+        window=BudgetWindow.DAILY,
+        mode=KeyBudgetMode.BLOCK,
+        created_at=datetime.now(UTC),
+    )
+
+
+async def test_a_key_over_its_cap_is_refused_on_the_openai_surface() -> None:
+    """ISSUE-037: `_prepare` called `admit` without `api_key_id`, so `_admit_key`
+    short-circuited and the per-key cap bound only the four native call sites.
+    The cap was a no-op on `/v1/chat/completions` and everything else that goes
+    through `_prepare` — which is nearly all real traffic."""
+    usage = FakeUsage(key_spent="50")  # already over the key's cap
+    gateway = CountingGateway()
+    service = _service(
+        gateway,
+        usage,
+        FakeBudgets(_budget(1000.0)),  # the team has plenty of room
+        key_budgets=FakeKeyBudgets(_spent_key_budget("10")),
+    )
+
+    with pytest.raises(BudgetExceeded, match="key"):
+        await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+
+    assert gateway.calls == 0
+
+
+async def test_one_request_still_consumes_exactly_one_key_rate_limit_hit() -> None:
+    """The reason `_prepare` omitted the key in the first place: it takes the
+    key-RPM hit itself, early, before router strategies can make billable calls.
+    Passing the key to `admit` for the *budget* gate must not make that a second
+    hit, or every key's effective limit would halve."""
+    limiter = CountingRateLimiter()
+    gateway = CountingGateway()
+    service = _service(
+        gateway,
+        FakeUsage(),
+        FakeBudgets(_budget(1000.0)),
+        key_budgets=FakeKeyBudgets(_spent_key_budget("1000")),
+        rate_limiter=limiter,
+        api_keys=FakeApiKeys(),
+    )
+
+    await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+
+    assert limiter.hits.count(f"key:{KEY_ID}") == 1
+
+
+class ReleaseFailingStore(InMemoryBudgetReservationStore):
+    """Reserves normally, but every release raises — a Redis blip mid-flight."""
+
+    async def release(self, reservation: Any) -> None:
+        raise RuntimeError("boom: reservation store unavailable")
+
+
+async def test_a_release_failure_does_not_fail_an_already_billed_success() -> None:
+    """ISSUE-045: `release` runs in a `finally` after the response was produced
+    and settled, so an exception there replaced a billed success with a 500 —
+    and the client then retries a call the ledger has already charged. A
+    reservation that cannot be released expires on its own TTL, which is a
+    bounded failure; losing the response is not."""
+    usage = FakeUsage()
+    gateway = CountingGateway()
+    service = _service(
+        gateway, usage, FakeBudgets(_budget(1000.0)), reservations=ReleaseFailingStore()
+    )
+
+    response = await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+
+    # The caller still gets its answer, and the ledger row still exists.
+    assert response["usage"] == {"prompt_tokens": 1, "completion_tokens": 1}
+    assert len(usage.events) == 1  # settled exactly once, not lost
+    assert gateway.calls == 1

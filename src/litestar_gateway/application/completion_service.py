@@ -20,6 +20,8 @@ from time import perf_counter
 from typing import Any
 from uuid import UUID
 
+import anyio
+
 from litestar_gateway.application.callable_aliases import CallableAliasResolver, ResolvedCallable
 from litestar_gateway.application.guardrails.payloads import (
     can_redact_request,
@@ -1208,7 +1210,17 @@ class CompletionService:
         clean = await self._guard_request(
             team_id, api_key_id, model, operation, clean, routed_router_id
         )
-        reservation = await self._meter.admit(team_id, model, model.merge_params(clean))
+        reservation = await self._meter.admit(
+            team_id,
+            model,
+            model.merge_params(clean),
+            api_key_id=api_key_id,
+            # The key's own cap is checked here — without this the per-key budget
+            # bound only the native endpoints (ISSUE-037). The key-RPM hit was
+            # already taken at the top of this function, so it is skipped rather
+            # than charged twice.
+            skip_key_rate_limit=True,
+        )
         try:
             values = await self._credentials.get_values(model.credential_id)
             if values is None:
@@ -1459,7 +1471,12 @@ class CompletionService:
                         team_id,
                         attempt_model,
                         attempt_model.merge_params(attempt_clean),
+                        api_key_id=api_key_id,
                         skip_team_rate_limit=True,
+                        # One logical request, one hit of each rate limit — but a
+                        # real provider call, so it needs its own reservation on
+                        # both the team and the key scope.
+                        skip_key_rate_limit=True,
                     )
                 try:
                     async with self._within_deadline(router, start):
@@ -1645,18 +1662,26 @@ class CompletionService:
                 for chunk in _synthetic_chat_chunks(cached.body, model):
                     yield chunk
             finally:
-                await release()
-                latency_ms = (perf_counter() - start) * 1000
-                await self._meter.settle_cache_hit(
-                    team_id,
-                    api_key_id,
-                    model,
-                    operation,
-                    cached.prompt_tokens,
-                    cached.completion_tokens,
-                    latency_ms,
-                    attribution,
-                )
+                # Shielded for the same reason as `metered_stream`'s tail
+                # (ISSUE-045): a client that disconnects mid-replay leaves this
+                # frame already cancelled, and the first checkpoint — the release
+                # with a Redis store — would re-raise `CancelledError`, holding
+                # the reservation until its TTL and skipping the $0 settlement.
+                # `release()` sets its flag before awaiting, so the
+                # `weakref.finalize` fallback would not cover it either.
+                with anyio.CancelScope(shield=True):
+                    await release()
+                    latency_ms = (perf_counter() - start) * 1000
+                    await self._meter.settle_cache_hit(
+                        team_id,
+                        api_key_id,
+                        model,
+                        operation,
+                        cached.prompt_tokens,
+                        cached.completion_tokens,
+                        latency_ms,
+                        attribution,
+                    )
 
         generator = gen()
         weakref.finalize(generator, release_from_finalizer)
@@ -1736,7 +1761,12 @@ class CompletionService:
                         team_id,
                         attempt_model,
                         attempt_model.merge_params(attempt_clean),
+                        api_key_id=api_key_id,
                         skip_team_rate_limit=True,
+                        # One logical request, one hit of each rate limit — but a
+                        # real provider call, so it needs its own reservation on
+                        # both the team and the key scope.
+                        skip_key_rate_limit=True,
                     )
                 try:
                     async with self._within_deadline(router, start):
