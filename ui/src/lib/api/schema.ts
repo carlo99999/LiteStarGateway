@@ -897,6 +897,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/guardrails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the team's guardrail rules
+         * @description Ordered by position. Signing secrets are never returned.
+         */
+        get: operations["TeamsTeamIdGuardrailsListRules"];
+        put?: never;
+        /**
+         * Add a guardrail rule
+         * @description Adds one provider to the team's chain. A `webhook` rule requires an https url and a signing secret — the payload is the user's prompt, so unsigned cleartext egress is refused rather than defaulted.
+         */
+        post: operations["TeamsTeamIdGuardrailsCreateRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/guardrails/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one guardrail rule */
+        get: operations["TeamsTeamIdGuardrailsRuleIdGetRule"];
+        put?: never;
+        post?: never;
+        /** Remove a guardrail rule */
+        delete: operations["TeamsTeamIdGuardrailsRuleIdDeleteRule"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a guardrail rule
+         * @description Partial update. Omitting `signing_secret` keeps the stored one — it is never readable, so omission cannot mean 'clear'.
+         */
+        patch: operations["TeamsTeamIdGuardrailsRuleIdUpdateRule"];
+        trace?: never;
+    };
     "/platform/models": {
         parameters: {
             query?: never;
@@ -1750,6 +1796,38 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** CreateGuardrailRuleRequest */
+        CreateGuardrailRuleRequest: {
+            /** @description Operator-facing name, unique in the team. */
+            name: string;
+            /** @description `webhook` or `judge`. */
+            kind: string;
+            /** @description `request` (before the call) or `response` (after it). */
+            direction: string;
+            /** @description Provider knobs. webhook: `url` (https, required), `timeout_ms`. judge: `judge_model` (required), `block_categories`, `char_budget`. Unknown keys are rejected rather than ignored. */
+            config: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description What this provider's own failure means: `closed` refuses the request (a control that could not run has not passed), `open` lets it through (the guardrail is advisory).
+             * @default closed
+             */
+            fail_policy: string;
+            /**
+             * @description Order within the chain; redactions compose in this order.
+             * @default 0
+             */
+            position: number;
+            /** @description Scope the rule to one model of this team. Omit for team-wide. Model-scoped rules REPLACE the team-wide ones for that model. */
+            model_id?: string | null;
+            /**
+             * @description Whether the rule runs.
+             * @default true
+             */
+            enabled: boolean;
+            /** @description HMAC secret this gateway signs webhook calls with. Required for `webhook`; never returned by any endpoint. */
+            signing_secret?: string | null;
+        };
         /** CreateKeyRequest */
         CreateKeyRequest: {
             name?: string | null;
@@ -1873,6 +1951,26 @@ export interface components {
             alias: string;
             /** Format: date-time */
             created_at: string;
+        };
+        /** GuardrailRuleResponse */
+        GuardrailRuleResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            team_id: string;
+            name: string;
+            kind: string;
+            direction: string;
+            position: number;
+            fail_policy: string;
+            enabled: boolean;
+            has_secret: boolean;
+            model_id?: string | null;
+            config?: {
+                [key: string]: unknown;
+            };
+            created_at?: string | null;
+            updated_at?: string | null;
         };
         /** InviteCreateRequest */
         InviteCreateRequest: {
@@ -2302,6 +2400,27 @@ export interface components {
             values?: {
                 [key: string]: string;
             } | null;
+        };
+        /** UpdateGuardrailRuleRequest */
+        UpdateGuardrailRuleRequest: {
+            /** @description New name. */
+            name?: string | null;
+            /** @description `request` or `response`. */
+            direction?: string | null;
+            /** @description Replaces the whole config; validated as a whole. */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+            /** @description `open` or `closed`. */
+            fail_policy?: string | null;
+            /** @description Order within the chain. */
+            position?: number | null;
+            /** @description Scope to one model. */
+            model_id?: string | null;
+            /** @description Enable or disable the rule. */
+            enabled?: boolean | null;
+            /** @description Rotate the HMAC secret. Omit to keep the current one. */
+            signing_secret?: string | null;
         };
         /** UpdateModelRequest */
         UpdateModelRequest: {
@@ -5083,6 +5202,230 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelCredentialResponse"][];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdGuardrailsListRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardrailRuleResponse"][];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdGuardrailsCreateRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGuardrailRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Document created, URL follows */
+            201: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardrailRuleResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdGuardrailsRuleIdGetRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardrailRuleResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdGuardrailsRuleIdDeleteRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, nothing follows */
+            204: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdGuardrailsRuleIdUpdateRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateGuardrailRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardrailRuleResponse"];
                 };
             };
             /** @description Bad request syntax or unsupported method */
