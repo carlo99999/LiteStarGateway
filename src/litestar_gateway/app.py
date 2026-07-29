@@ -63,6 +63,10 @@ from litestar_gateway.infrastructure.web.credentials.dependencies import (
 from litestar_gateway.infrastructure.web.dependencies import provide_api_key_service
 from litestar_gateway.infrastructure.web.docs_site import create_docs_router
 from litestar_gateway.infrastructure.web.exception_handlers import domain_exception_handler
+from litestar_gateway.infrastructure.web.guardrails import GuardrailController
+from litestar_gateway.infrastructure.web.guardrails.dependencies import (
+    provide_guardrail_policy_service,
+)
 from litestar_gateway.infrastructure.web.models import (
     ModelController,
     ModelPricesController,
@@ -258,6 +262,7 @@ def _build_route_handlers(database: Database, settings: Settings) -> list:
         TeamController,  # team-admin: members + team-scoped API keys
         platform_cache_savings,  # platform-admin: cross-team response-cache savings
         ModelController,  # team-admin: team-scoped model deployments
+        GuardrailController,  # team-admin: the team's guardrail chain
         PlatformModelController,  # platform-admin: global models + extension grants
         ModelPricesController,  # default per-token pricing lookup (console prefill)
         PlaygroundController,  # compare a prompt across a team's models
@@ -304,6 +309,7 @@ def _build_dependencies(
         "organization_service": Provide(provide_organization_service, sync_to_thread=False),
         "team_service": Provide(provide_team_service, sync_to_thread=False),
         "model_service": Provide(provide_model_service, sync_to_thread=False),
+        "guardrail_policy_service": Provide(provide_guardrail_policy_service, sync_to_thread=False),
         "callable_resolver": Provide(provide_callable_resolver, sync_to_thread=False),
         "credential_service": Provide(provide_credential_service, sync_to_thread=False),
         "sso_settings_service": Provide(provide_sso_settings_service, sync_to_thread=False),
