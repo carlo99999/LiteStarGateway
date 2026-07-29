@@ -200,10 +200,26 @@ it.
 
 Rule changes (`guardrail.create` / `.update` / `.delete`) are in the audit trail.
 
+## Which surfaces are covered
+
+Every endpoint that reaches a provider, not just the OpenAI-shaped ones:
+`/v1/chat/completions`, `/v1/responses`, embeddings and images, **and** the
+provider-native passthroughs (`/v1/messages`, Gemini `generateContent`). The
+native surfaces speak their vendor's protocol — Anthropic answers in `content`
+blocks, Gemini in `candidates`/`parts` — and the chain reads and rewrites those
+shapes too, so switching wire format is not a way around a rule.
+
+Redaction on a native body is applied only where the target is unambiguous: one
+text block for Anthropic, one text part for Gemini. Anything else (a `tool_use`
+block alongside the text, several parts) is escalated to a block, exactly as a
+multimodal OpenAI message is — a redaction that cannot be placed exactly is not
+guessed at.
+
 ## Known limits
 
 - **Streaming responses are not guarded on the response side.** Content exists
-  only as it is already being delivered. Request-side guarding covers streams.
+  only as it is already being delivered. Request-side guarding covers streams,
+  on the native endpoints as well.
 - **No `guardrail.block` feed in the console.** Traces go to MLflow rather than a
   queryable table, so there is no read model for a feed yet.
 - **Tool-call-only answers have no text to judge**, and are allowed through.

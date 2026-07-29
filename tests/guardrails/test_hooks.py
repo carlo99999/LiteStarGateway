@@ -12,6 +12,7 @@ fails if the hook is moved:
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -409,3 +410,150 @@ def _resolver_for(
         return request_chain if direction is Direction.REQUEST else response_chain
 
     return guardrails
+
+
+# ── Provider-native endpoints (ISSUE-038) ─────────────────────────────────────
+#
+# `prepare_native` reapplies the OpenAI surface's governance guards centrally —
+# reserved-kwarg rejection and the output clamp — but not the guardrail chain.
+# A caller with a key could therefore evade every configured request rule by
+# switching to the native wire shape of the same model.
+
+
+def _anthropic_model() -> Model:
+    return replace(_model(), provider=Provider.ANTHROPIC)
+
+
+class NativeRecordingGateway:
+    """Answers the two native passthrough shapes, remembering what it was sent.
+
+    Present so that a request reaching the provider is a *test failure* rather
+    than an AttributeError — the assertion is that it never gets here.
+    """
+
+    def __init__(self) -> None:
+        self.requests: list[dict[str, Any]] = []
+
+    async def anative_messages(self, request, model, credentials) -> dict[str, Any]:
+        self.requests.append(request)
+        return {
+            "content": [{"type": "text", "text": "hi"}],
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+        }
+
+    async def agenerate_content(self, request, model, credentials) -> dict[str, Any]:
+        self.requests.append(request)
+        return {
+            "candidates": [{"content": {"parts": [{"text": "ciao"}]}}],
+            "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1},
+        }
+
+
+def _native_service(gateway: Any, chain: tuple[ChainedProvider, ...], model: Model) -> Any:
+    async def guardrails(
+        team_id: UUID,
+        api_key_id: UUID | None,
+        m: Model,
+        direction: Direction,
+        router_id: UUID | None = None,
+    ) -> tuple[ChainedProvider, ...]:
+        return chain if direction is Direction.REQUEST else ()
+
+    return CompletionService(
+        models=FakeModels(model),  # type: ignore[arg-type]
+        credentials=FakeCredentials(),  # type: ignore[arg-type]
+        gateway=gateway,  # type: ignore[arg-type]
+        meter=UsageMeter(usage=FakeUsage(), emit_trace=lambda _t: None),  # type: ignore[arg-type]
+        guardrails=guardrails,
+    )
+
+
+async def test_a_native_messages_request_is_screened_before_the_provider() -> None:
+    gateway = NativeRecordingGateway()
+    service = _native_service(gateway, _chain(_blocker()), _anthropic_model())
+
+    with pytest.raises(GuardrailBlocked):
+        await service.native_messages(
+            TEAM_ID,
+            KEY_ID,
+            {"model": "m", "max_tokens": 16, "messages": [{"role": "user", "content": "ssn 1234"}]},
+        )
+
+    assert gateway.requests == []
+
+
+async def test_a_native_gemini_request_is_screened_before_the_provider() -> None:
+    # Gemini carries the prompt in `contents`/`parts` and its alias in the URL,
+    # so it exercises a different extraction path than Anthropic Messages.
+    gateway = NativeRecordingGateway()
+    model = replace(_model(), provider=Provider.VERTEX_AI)
+    service = _native_service(gateway, _chain(_blocker()), model)
+
+    with pytest.raises(GuardrailBlocked):
+        await service.generate_content(
+            TEAM_ID,
+            KEY_ID,
+            "m",
+            {"contents": [{"role": "user", "parts": [{"text": "ssn 1234"}]}]},
+        )
+
+    assert gateway.requests == []
+
+
+def _native_response_service(gateway: Any, chain: tuple[ChainedProvider, ...], model: Model) -> Any:
+    async def guardrails(
+        team_id: UUID,
+        api_key_id: UUID | None,
+        m: Model,
+        direction: Direction,
+        router_id: UUID | None = None,
+    ) -> tuple[ChainedProvider, ...]:
+        return chain if direction is Direction.RESPONSE else ()
+
+    return CompletionService(
+        models=FakeModels(model),  # type: ignore[arg-type]
+        credentials=FakeCredentials(),  # type: ignore[arg-type]
+        gateway=gateway,  # type: ignore[arg-type]
+        meter=UsageMeter(usage=FakeUsage(), emit_trace=lambda _t: None),  # type: ignore[arg-type]
+        guardrails=guardrails,
+    )
+
+
+class _TextSensitiveBlocker:
+    """Refuses only when it was actually handed the answer's text.
+
+    A scripted provider would refuse regardless and prove nothing here: the
+    defect was that `response_text` flattened a native body to `""`, so the
+    verdict has to depend on the text for the test to have teeth.
+    """
+
+    name = "needs-text"
+
+    def supports(self, direction: Direction) -> bool:
+        return direction is Direction.RESPONSE
+
+    async def check(self, payload: GuardrailPayload) -> GuardrailVerdict:
+        if not payload.text:
+            return GuardrailVerdict(decision=Decision.ALLOW, provider=self.name)
+        return GuardrailVerdict(decision=Decision.BLOCK, provider=self.name, categories=("policy",))
+
+
+async def test_a_native_answer_is_actually_inspected_by_the_response_chain() -> None:
+    # The response hook did run for native calls, but `response_text` only knew
+    # `choices`/`output` — so an Anthropic answer flattened to "" and a blocking
+    # provider had nothing to object to. Passing was indistinguishable from
+    # being screened.
+    gateway = NativeRecordingGateway()
+    chain = (ChainedProvider(provider=_TextSensitiveBlocker(), fail=FailPolicy.CLOSED),)  # type: ignore[arg-type]
+    service = _native_response_service(gateway, chain, _anthropic_model())
+
+    with pytest.raises(GuardrailBlocked):
+        await service.native_messages(
+            TEAM_ID,
+            KEY_ID,
+            {"model": "m", "max_tokens": 16, "messages": [{"role": "user", "content": "hi"}]},
+        )
+
+    # The provider was reached (the answer is what is being judged), unlike the
+    # request-side test above.
+    assert len(gateway.requests) == 1
