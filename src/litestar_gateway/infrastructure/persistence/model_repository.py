@@ -57,6 +57,7 @@ class SQLAlchemyModelRepository:
             cache_read_cost_per_token=model.cache_read_cost_per_token,
             image_cost_per_image=model.image_cost_per_image,
             image_prices=model.image_prices,
+            capabilities=sorted(model.capabilities),
         )
         try:
             self._session.add(record)
@@ -220,6 +221,7 @@ class SQLAlchemyModelRepository:
         record.cache_read_cost_per_token = model.cache_read_cost_per_token
         record.image_cost_per_image = model.image_cost_per_image
         record.image_prices = model.image_prices
+        record.capabilities = sorted(model.capabilities)
 
     async def update_global(self, model: Model) -> Model | None:
         record = await lock_resource_lifecycle(self._session, CallableKind.MODEL, model.id)

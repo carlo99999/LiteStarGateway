@@ -1,10 +1,11 @@
 """Webhook `NotificationChannel` adapter (Plan 07 Phase 2, design doc §4).
 
-Reuses the SSRF-guarded egress from `application/routing/webhook.py`
-verbatim: the literal + resolved-IP deny-list (`_is_blocked`/`_literal_ip`),
-the per-call DNS-rebinding re-check (`resolve_approved_addresses`), and the
-IP-pinned POST that retains the original Host header and TLS SNI
-(`post_to_approved_address`). Nothing here re-implements any part of that
+Reuses the SSRF-guarded egress verbatim: the literal + resolved-IP deny-list
+(`_is_blocked`/`_literal_ip`) and the per-call DNS-rebinding re-check
+(`resolve_approved_addresses`) from `application/egress.py`, and the IP-pinned
+POST that retains the original Host header and TLS SNI
+(`post_to_approved_address`, still in `application/routing/webhook.py` with its
+routing caller). Nothing here re-implements any part of that
 guard — a budget-alert webhook targeting a private/loopback/link-local
 address is rejected the exact same way a routing webhook is."""
 
@@ -18,13 +19,15 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from litestar_gateway.application.egress import (
+    _is_blocked,
+    _literal_ip,
+    resolve_approved_addresses,
+)
 from litestar_gateway.application.routing import webhook as webhook_module
 from litestar_gateway.application.routing.webhook import (
     DEFAULT_TIMEOUT_MS,
-    _is_blocked,
-    _literal_ip,
     post_to_approved_address,
-    resolve_approved_addresses,
 )
 from litestar_gateway.domain.entities import PendingBudgetAlert
 from litestar_gateway.domain.webhook_signature import sign

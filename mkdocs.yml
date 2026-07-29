@@ -72,6 +72,7 @@ nav:
       - API reference (interactive): docs/api-reference.md
       - OpenAI-compatible API: docs/openai-compatible.md
       - Agent frameworks: docs/agent-frameworks.md
+      - Self-hosted models: docs/self-hosted-models.md
       - Provider APIs:
           - Native Anthropic: docs/native-anthropic.md
           - Native Gemini: docs/native-gemini.md

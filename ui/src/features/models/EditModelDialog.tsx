@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CapabilitiesField, CHAT_CAPABILITY } from "@/features/models/CapabilitiesField";
 import {
   lookupModelPrice,
   updateGlobalModel,
@@ -59,11 +60,15 @@ export function EditModelDialog({ model, onOpenChange }: EditModelDialogProps) {
   const [cacheEnabled, setCacheEnabled] = useState(false);
   const [cacheAllowNondeterministic, setCacheAllowNondeterministic] = useState(false);
   const [cacheSemanticEnabled, setCacheSemanticEnabled] = useState(false);
+  const [capabilities, setCapabilities] = useState<string[]>([CHAT_CAPABILITY]);
 
   // Re-seed the form whenever a different model is opened.
   useEffect(() => {
     if (model) {
       setProviderModelId(model.provider_model_id);
+      setCapabilities(
+        model.capabilities?.length ? model.capabilities : [CHAT_CAPABILITY],
+      );
       setMaxOutputTokens(model.max_output_tokens === null ? "" : String(model.max_output_tokens));
       setApiVersion(model.api_version ?? "");
       setInputCost(costText(model.input_cost_per_token));
@@ -97,6 +102,7 @@ export function EditModelDialog({ model, onOpenChange }: EditModelDialogProps) {
         cacheEnabled,
         cacheAllowNondeterministic,
         cacheSemanticEnabled,
+        capabilities: model?.provider === "openai_compatible" ? capabilities : null,
       };
       // A global model (team_id === null) updates through the platform endpoint.
       return model!.team_id === null
@@ -238,6 +244,11 @@ export function EditModelDialog({ model, onOpenChange }: EditModelDialogProps) {
               semantic tier (near-duplicate prompts)
             </label>
           </div>
+          <CapabilitiesField
+            provider={model?.provider ?? "openai"}
+            value={capabilities}
+            onChange={setCapabilities}
+          />
           {mutation.isError ? (
             <p className="font-mono text-xs text-destructive">{mutation.error.message}</p>
           ) : null}

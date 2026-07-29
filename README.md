@@ -51,7 +51,10 @@ client.chat.completions.create(model="<team-model-alias>", messages=[...])
 
 The alias resolves to a team `Model`, which selects the provider and a
 platform-managed, encrypted `Credential`. Providers: **OpenAI, Azure OpenAI,
-Anthropic, Vertex/Gemini, AWS Bedrock, Databricks**.
+Anthropic, Vertex/Gemini, AWS Bedrock, Databricks**, plus any
+**OpenAI-compatible** endpoint — a model server you host yourself (vLLM,
+Ollama, TGI) or a hosted OpenAI-shaped API, behind an explicit egress
+allowlist. See [self-hosted models](docs/self-hosted-models.md).
 
 For a local prod-like stack (app + Postgres + Redis, with optional external MLflow):
 `MASTER_KEY=… JWT_SECRET=… SALT_KEY=… POSTGRES_PASSWORD=… docker compose up --build`.
@@ -119,6 +122,13 @@ billing.
 
 `GET /v1/models` lists a team's callable models (its enabled models + routers)
 in the OpenAI shape, so stock clients can discover what to pass as `model`.
+
+**OpenAI-compatible** endpoints are not a column above because their surface is
+per-model rather than per-provider: each model declares which of
+`chat.completions`, `embeddings` and `image_generation` its backend serves
+(chat only by default), and anything undeclared returns 501. `/v1/responses`
+is not supported there. See
+[self-hosted models](docs/self-hosted-models.md).
 
 Structured outputs (`response_format` / `text.format`) work on OpenAI, Azure,
 Databricks, Anthropic and Vertex, streaming included. Bedrock currently supports

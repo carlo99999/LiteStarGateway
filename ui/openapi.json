@@ -13744,6 +13744,19 @@
                         "type": "boolean",
                         "default": false
                     },
+                    "capabilities": {
+                        "oneOf": [
+                            {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
                     "cache_write_cost_per_token": {
                         "oneOf": [
                             {
@@ -14759,6 +14772,12 @@
                             "type": "number"
                         },
                         "type": "object"
+                    },
+                    "capabilities": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
                     }
                 },
                 "type": "object",
@@ -15063,7 +15082,8 @@
                     "vertex_ai",
                     "azure_openai",
                     "bedrock",
-                    "databricks"
+                    "databricks",
+                    "openai_compatible"
                 ],
                 "title": "Provider",
                 "description": "The LLM provider this credential connects to."
@@ -16273,6 +16293,19 @@
                         "oneOf": [
                             {
                                 "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "capabilities": {
+                        "oneOf": [
+                            {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
                             },
                             {
                                 "type": "null"

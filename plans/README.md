@@ -49,7 +49,11 @@ It is deliberately separate from `docs/next-steps/`:
 | 15 | [Post-throughput next steps](15-next-steps.md) | 🚧 Phases A+B complete (in-network loadgen, true ceilings measured, B-i stop-optimizing decided); Phase C feature sequencing next | Bridge from Plan 14 to the feature roadmap (09 → 05 → 04 → 07 → 10) |
 | 16 | [Round 13 remediation](16-round-13-remediation.md) | ✅ complete (#392–#401) | One PR per finding, each with a regression that fails first |
 | 17 | [Post-Round-13 execution](17-post-round-13-execution.md) | ✅ Complete — all eight slices landed (#406–#428), plus the two webhook-checklist follow-ups (alert replay, per-team signing secret). Deviations and the four deliberately-open items are recorded in its **State at close** section | Correctness at scale-out, then the enterprise policy layer |
+<<<<<<< HEAD
 | 18 | [Generic OpenAI-compatible provider](18-openai-compatible-provider.md) | ⏳ designed, not started | Reach — one provider value over the existing `OpenAICompatibleAdapter` so self-hosted servers (vLLM, Ollama, TGI) and OpenAI-compatible SaaS endpoints become callable, behind a fail-closed egress allowlist |
+=======
+| 18 | [Generic OpenAI-compatible provider](18-openai-compatible-provider.md) | ✅ Complete — `Provider.OPENAI_COMPATIBLE` over the existing `OpenAICompatibleAdapter`; fail-closed egress allowlist (`OPENAI_COMPATIBLE_ALLOWED_HOSTS`, empty by default, re-resolved per call); per-model declared capabilities intersected at dispatch; `n>1` and Responses refused; console field + [docs/self-hosted-models.md](../docs/self-hosted-models.md). Open: the ledger still carries no estimated-vs-authoritative marker (design §5) | Reach — one provider value over the existing `OpenAICompatibleAdapter` so self-hosted servers (vLLM, Ollama, TGI) and OpenAI-compatible SaaS endpoints become callable, behind a fail-closed egress allowlist |
+>>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
 
 ## Recommended order
 

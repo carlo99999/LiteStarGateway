@@ -17,7 +17,7 @@ from litestar.di import NamedDependency, Provide
 from litestar.params import FromPath, FromQuery
 from litestar.status_codes import HTTP_204_NO_CONTENT
 
-from litestar_gateway.application.routing.webhook import _is_blocked, _literal_ip
+from litestar_gateway.application.egress import _is_blocked, _literal_ip
 from litestar_gateway.application.service import APIKeyService
 from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.domain.authorization import Permission

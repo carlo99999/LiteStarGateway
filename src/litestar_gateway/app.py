@@ -59,7 +59,7 @@ from litestar_gateway.infrastructure.web.audit.dependencies import provide_audit
 from litestar_gateway.infrastructure.web.callable_aliases import provide_callable_resolver
 from litestar_gateway.infrastructure.web.credentials import CredentialController
 from litestar_gateway.infrastructure.web.credentials.dependencies import (
-    provide_credential_service,
+    build_credential_service_provider,
 )
 from litestar_gateway.infrastructure.web.dependencies import provide_api_key_service
 from litestar_gateway.infrastructure.web.docs_site import create_docs_router
@@ -319,7 +319,9 @@ def _build_dependencies(
         "model_service": Provide(provide_model_service, sync_to_thread=False),
         "guardrail_policy_service": Provide(provide_guardrail_policy_service, sync_to_thread=False),
         "callable_resolver": Provide(provide_callable_resolver, sync_to_thread=False),
-        "credential_service": Provide(provide_credential_service, sync_to_thread=False),
+        "credential_service": Provide(
+            build_credential_service_provider(settings), sync_to_thread=False
+        ),
         "sso_settings_service": Provide(provide_sso_settings_service, sync_to_thread=False),
         # Deployment policy for the DB-backed SSO config: outside local, an
         # explicit callback URL is mandatory (ISSUE-028), matching the env-var

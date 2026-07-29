@@ -23,11 +23,9 @@ resolution — and redirects are never followed.
 
 from __future__ import annotations
 
-import asyncio
 import ipaddress
 import json
 import logging
-import socket
 import time
 from time import perf_counter
 from typing import Any
@@ -36,6 +34,11 @@ from uuid import uuid4
 
 import httpx
 
+from litestar_gateway.application.egress import (
+    _is_blocked,
+    _literal_ip,
+    resolve_approved_addresses,
+)
 from litestar_gateway.domain.routing import CandidateModel, RoutingContext, RoutingDecision
 from litestar_gateway.domain.webhook_signature import sign
 
@@ -48,56 +51,6 @@ DEFAULT_TIMEOUT_MS = 2000
 def _client_factory(timeout_seconds: float) -> httpx.AsyncClient:
     """Module-level for test injection."""
     return httpx.AsyncClient(timeout=timeout_seconds)
-
-
-async def _resolve_host_addresses(host: str) -> list[str]:
-    """Async DNS resolution (module-level for test injection)."""
-    infos = await asyncio.get_running_loop().getaddrinfo(host, None, type=socket.SOCK_STREAM)
-    return [str(info[4][0]) for info in infos]
-
-
-def _literal_ip(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
-    try:
-        return ipaddress.ip_address(host)
-    except ValueError:
-        return None
-
-
-def _is_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    """SSRF deny-list: anything that isn't a plain public unicast address."""
-    return (
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_multicast
-        or ip.is_reserved
-        or ip.is_unspecified
-    )
-
-
-async def resolve_approved_addresses(
-    host: str,
-) -> tuple[ipaddress.IPv4Address | ipaddress.IPv6Address, ...]:
-    """SSRF guard (R6-H18), re-checked on every call to resist DNS rebinding
-    between config-save and use: every address `host` resolves to must be
-    public. A blocked target raises. Extracted so other guarded-egress
-    callers (the Plan 07 budget-alert webhook channel,
-    `infrastructure/notifications/webhook_channel.py`) go through the exact
-    same deny-list rather than a re-implementation of it."""
-    literal = _literal_ip(host)
-    addresses = (literal,) if literal is not None else None
-    if addresses is None:
-        resolved = await _resolve_host_addresses(host)
-        addresses = tuple(ipaddress.ip_address(address) for address in resolved)
-    if not addresses:
-        raise ValueError(f"host {host!r} did not resolve to any address")
-    for address in addresses:
-        if _is_blocked(address):
-            raise ValueError(
-                f"host {host!r} resolves to blocked address {address}; "
-                "only public endpoints are allowed"
-            )
-    return addresses
 
 
 async def post_to_approved_address(

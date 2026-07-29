@@ -291,6 +291,11 @@ class InvalidModelPricing(DomainError):
     on every write path (→ 400)."""
 
 
+class InvalidModelCapabilities(DomainError):
+    """A model's declared capabilities name an unknown operation, or are
+    declared on a provider whose operation set is fixed (→ 400). Plan 18."""
+
+
 class InvalidUsageQuery(DomainError):
     """A usage-timeseries query is malformed (→ 400): unknown granularity or
     an empty/inverted `[start, end)` range."""
