@@ -183,6 +183,52 @@ async def test_stats_distribution(client: AsyncTestClient) -> None:
     assert stats["by_tier"] == {"SIMPLE": 2, "COMPLEX": 1}
 
 
+async def test_reliability_view_counts_attempts_and_reports_breaker_state(
+    client: AsyncTestClient,
+) -> None:
+    # Plan 05's last open item: attempts and breaker state were persisted and
+    # held but surfaced nowhere.
+    key, team, router, admin = await _setup(client)
+    await _chat(client, key, "Ciao, grazie!")
+    await _chat(client, key, COMPLEX_PROMPT)
+
+    view = (
+        await client.get(f"/teams/{team}/routers/{router}/reliability", headers=_bearer(admin))
+    ).json()
+
+    assert view["router"] == "auto"
+    assert view["total"] == 2
+    # Every call succeeded first try, so no failover and one attempt each.
+    assert view["by_attempts"] == {"1": 2}
+    assert view["failover_used"] == 0
+    assert view["failover_rate"] == 0.0
+    # Both candidates report a live breaker state, and nothing is tripped.
+    assert {c["model_name"] for c in view["candidates"]} == {"cheap-model", "big-model"}
+    assert {c["breaker"] for c in view["candidates"]} == {"closed"}
+
+
+async def test_reliability_view_requires_usage_read(client: AsyncTestClient) -> None:
+    key, team, router, admin = await _setup(client)
+    invite = await seed_team_and_invite(client, admin)
+    await client.post(
+        "/signup",
+        json={
+            "invite_token": invite,
+            "email": "outsider@example.com",
+            "password": "Sup3r-Secret!",  # pragma: allowlist secret
+        },
+    )
+    credentials = {
+        "email": "outsider@example.com",
+        "password": "Sup3r-Secret!",  # pragma: allowlist secret
+    }
+    token = (await client.post("/login", json=credentials)).json()["access_token"]
+
+    denied = await client.get(f"/teams/{team}/routers/{router}/reliability", headers=_bearer(token))
+
+    assert denied.status_code == HTTP_403_FORBIDDEN
+
+
 async def test_recreated_router_name_does_not_inherit_old_decisions(
     client: AsyncTestClient,
 ) -> None:

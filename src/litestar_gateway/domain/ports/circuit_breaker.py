@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
+
+BreakerStatus = Literal["closed", "open", "half_open"]
 
 
 @dataclass(frozen=True)
@@ -37,3 +39,21 @@ class CircuitBreaker(Protocol):
     async def allow(self, key: str) -> BreakerLease: ...
     async def record_failure(self, key: str, trial_token: str | None = None) -> None: ...
     async def record_success(self, key: str, trial_token: str | None = None) -> None: ...
+
+
+@runtime_checkable
+class CircuitBreakerInspector(Protocol):
+    """Read-only view of a breaker's state, for operators.
+
+    Separate from `CircuitBreaker` because `allow()` is not a read: it claims
+    the single half-open trial. A console that rendered breaker state by calling
+    it would consume the trial a real request should have had, and would do so
+    on every page refresh. This is the query that observes without deciding.
+
+    Kept as its own protocol rather than a method on `CircuitBreaker` so a
+    breaker that cannot answer it (a test double, a future adapter over a store
+    with no read API) is still a valid breaker; callers ask for the capability
+    and degrade when it is absent.
+    """
+
+    async def state(self, key: str) -> BreakerStatus: ...

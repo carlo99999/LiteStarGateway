@@ -23,7 +23,7 @@ from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.domain.authorization import Permission
 from litestar_gateway.domain.entities import User
 from litestar_gateway.domain.exceptions import InvalidRouterConfig
-from litestar_gateway.domain.ports import AuditLog
+from litestar_gateway.domain.ports import AuditLog, CircuitBreaker, CircuitBreakerInspector
 from litestar_gateway.domain.routing import (
     BEARER_TOKEN_MASK,
     CandidateModel,
@@ -422,6 +422,34 @@ class RouterController(Controller):
     ) -> dict[str, Any]:
         await team_service.ensure_team_permission(current_user, team_id, Permission.USAGE_READ)
         return await router_service.stats(team_id, router_id)
+
+    @get(
+        "/{team_id:uuid}/routers/{router_id:uuid}/reliability",
+        summary="Retry/failover distribution and current breaker state",
+        description=(
+            "How often real traffic needed a second provider, and which "
+            "candidates are shut out right now. Shadow runs are excluded — they "
+            "never served a caller. Read-only: it never claims a breaker's "
+            "half-open trial, so refreshing this view cannot consume the retry "
+            "a real request was owed."
+        ),
+    )
+    async def router_reliability(
+        self,
+        team_id: FromPath[UUID],
+        router_id: FromPath[UUID],
+        current_user: NamedDependency[User],
+        team_service: NamedDependency[TeamService],
+        router_service: NamedDependency[RouterService],
+        circuit_breaker: NamedDependency[CircuitBreaker],
+    ) -> dict[str, Any]:
+        await team_service.ensure_team_permission(current_user, team_id, Permission.USAGE_READ)
+        # The wired breaker may or may not be able to answer a read-only state
+        # query; asking for the capability keeps the panel working either way.
+        inspector = (
+            circuit_breaker if isinstance(circuit_breaker, CircuitBreakerInspector) else None
+        )
+        return await router_service.reliability(team_id, router_id, inspector)
 
     @get(
         "/{team_id:uuid}/routers/{router_id:uuid}/savings",

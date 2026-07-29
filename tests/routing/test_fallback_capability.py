@@ -58,6 +58,9 @@ class RecordingDecisionLog:
     ) -> list[tuple[str, str | None, bool, int]]:
         return []
 
+    async def reliability(self, team_id: UUID, router_id: UUID) -> list[tuple[int, bool, int]]:
+        return []
+
     async def savings(self, team_id: UUID, router_id: UUID) -> tuple[float, int, int]:
         return (0.0, 0, 0)
 
