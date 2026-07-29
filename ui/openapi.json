@@ -6321,6 +6321,539 @@
                 "deprecated": false
             }
         },
+        "/teams/{team_id}/guardrails": {
+            "get": {
+                "tags": [
+                    "guardrails"
+                ],
+                "summary": "List the team's guardrail rules",
+                "description": "Ordered by position. Signing secrets are never returned.",
+                "operationId": "TeamsTeamIdGuardrailsListRules",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/GuardrailRuleResponse"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "post": {
+                "tags": [
+                    "guardrails"
+                ],
+                "summary": "Add a guardrail rule",
+                "description": "Adds one provider to the team's chain. A `webhook` rule requires an https url and a signing secret — the payload is the user's prompt, so unsigned cleartext egress is refused rather than defaulted.",
+                "operationId": "TeamsTeamIdGuardrailsCreateRule",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateGuardrailRuleRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Document created, URL follows",
+                        "headers": {
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GuardrailRuleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/teams/{team_id}/guardrails/{rule_id}": {
+            "get": {
+                "tags": [
+                    "guardrails"
+                ],
+                "summary": "Get one guardrail rule",
+                "operationId": "TeamsTeamIdGuardrailsRuleIdGetRule",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    },
+                    {
+                        "name": "rule_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GuardrailRuleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "delete": {
+                "tags": [
+                    "guardrails"
+                ],
+                "summary": "Remove a guardrail rule",
+                "operationId": "TeamsTeamIdGuardrailsRuleIdDeleteRule",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    },
+                    {
+                        "name": "rule_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Request fulfilled, nothing follows",
+                        "headers": {
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "patch": {
+                "tags": [
+                    "guardrails"
+                ],
+                "summary": "Update a guardrail rule",
+                "description": "Partial update. Omitting `signing_secret` keeps the stored one — it is never readable, so omission cannot mean 'clear'.",
+                "operationId": "TeamsTeamIdGuardrailsRuleIdUpdateRule",
+                "parameters": [
+                    {
+                        "name": "team_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    },
+                    {
+                        "name": "rule_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true,
+                        "deprecated": false
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateGuardrailRuleRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GuardrailRuleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request syntax or unsupported method",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        },
+                                        "extra": {
+                                            "additionalProperties": {},
+                                            "type": [
+                                                "null",
+                                                "object",
+                                                "array"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object",
+                                    "required": [
+                                        "detail",
+                                        "status_code"
+                                    ],
+                                    "description": "Validation Exception",
+                                    "examples": [
+                                        {
+                                            "status_code": 400,
+                                            "detail": "Bad Request",
+                                            "extra": {}
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/platform/models": {
             "get": {
                 "tags": [
@@ -12374,6 +12907,73 @@
                     }
                 ]
             },
+            "CreateGuardrailRuleRequest": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Operator-facing name, unique in the team."
+                    },
+                    "kind": {
+                        "type": "string",
+                        "description": "`webhook` or `judge`."
+                    },
+                    "direction": {
+                        "type": "string",
+                        "description": "`request` (before the call) or `response` (after it)."
+                    },
+                    "config": {
+                        "additionalProperties": {},
+                        "type": "object",
+                        "description": "Provider knobs. webhook: `url` (https, required), `timeout_ms`. judge: `judge_model` (required), `block_categories`, `char_budget`. Unknown keys are rejected rather than ignored."
+                    },
+                    "fail_policy": {
+                        "type": "string",
+                        "description": "What this provider's own failure means: `closed` refuses the request (a control that could not run has not passed), `open` lets it through (the guardrail is advisory).",
+                        "default": "closed"
+                    },
+                    "position": {
+                        "type": "integer",
+                        "description": "Order within the chain; redactions compose in this order.",
+                        "default": 0
+                    },
+                    "model_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Scope the rule to one model of this team. Omit for team-wide. Model-scoped rules REPLACE the team-wide ones for that model."
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "Whether the rule runs.",
+                        "default": true
+                    },
+                    "signing_secret": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "HMAC secret this gateway signs webhook calls with. Required for `webhook`; never returned by any endpoint."
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "config",
+                    "direction",
+                    "kind",
+                    "name"
+                ],
+                "title": "CreateGuardrailRuleRequest"
+            },
             "CreateKeyRequest": {
                 "properties": {
                     "name": {
@@ -12881,6 +13481,89 @@
                     "team_id"
                 ],
                 "title": "GrantResponse"
+            },
+            "GuardrailRuleResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "team_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "direction": {
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    },
+                    "fail_policy": {
+                        "type": "string"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "has_secret": {
+                        "type": "boolean"
+                    },
+                    "model_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "config": {
+                        "additionalProperties": {},
+                        "type": "object"
+                    },
+                    "created_at": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "updated_at": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "direction",
+                    "enabled",
+                    "fail_policy",
+                    "has_secret",
+                    "id",
+                    "kind",
+                    "name",
+                    "position",
+                    "team_id"
+                ],
+                "title": "GuardrailRuleResponse"
             },
             "InviteCreateRequest": {
                 "properties": {
@@ -14611,6 +15294,103 @@
                 "type": "object",
                 "required": [],
                 "title": "UpdateCredentialRequest"
+            },
+            "UpdateGuardrailRuleRequest": {
+                "properties": {
+                    "name": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "New name."
+                    },
+                    "direction": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "`request` or `response`."
+                    },
+                    "config": {
+                        "oneOf": [
+                            {
+                                "additionalProperties": {},
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Replaces the whole config; validated as a whole."
+                    },
+                    "fail_policy": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "`open` or `closed`."
+                    },
+                    "position": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Order within the chain."
+                    },
+                    "model_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Scope to one model."
+                    },
+                    "enabled": {
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Enable or disable the rule."
+                    },
+                    "signing_secret": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Rotate the HMAC secret. Omit to keep the current one."
+                    }
+                },
+                "type": "object",
+                "required": [],
+                "title": "UpdateGuardrailRuleRequest"
             },
             "UpdateModelRequest": {
                 "properties": {
