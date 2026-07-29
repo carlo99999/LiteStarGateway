@@ -264,3 +264,13 @@ def test_name_and_position_are_validated() -> None:
         validate_rule(_rule("x" * 101))
     with pytest.raises(InvalidGuardrailRule, match="position"):
         validate_rule(_rule("ok", position=-1))
+
+
+def test_a_judge_timeout_is_bounded_like_the_webhook_one() -> None:
+    # The judge had no `timeout_ms` at all, so it inherited the provider client's
+    # 60 s budget. A guardrail's delay is the caller's delay whichever kind it
+    # is, so the knob and its bounds are the same ones the webhook already had.
+    validate_rule(_rule("j", config={"judge_model": "m", "timeout_ms": 500}))
+    for bad in (0, 99, 10_001):
+        with pytest.raises(InvalidGuardrailRule, match="timeout_ms"):
+            validate_rule(_rule("j", config={"judge_model": "m", "timeout_ms": bad}))
