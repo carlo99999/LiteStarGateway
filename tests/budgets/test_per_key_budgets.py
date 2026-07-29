@@ -345,3 +345,30 @@ async def test_a_key_cap_applies_even_with_no_team_budget_configured() -> None:
         await _meter(usage, key_budgets=key_budgets, team_limit=None).admit(
             TEAM_ID, _model(), REQUEST, api_key_id=KEY_ID
         )
+
+
+async def test_a_refused_team_leaves_no_key_reservation_behind() -> None:
+    """The mirror of the test above, and the direction that was not covered
+    (ISSUE-044).
+
+    The key gate runs first, so when the *team* gate then refuses, the key's
+    claim has already been recorded and nothing gives it back: `admit` has no
+    try/except between the two, and the caller never receives an `Admission` to
+    release. Every team-cap refusal therefore stranded that request's pessimistic
+    cost in the key's pool for the full reservation TTL — so a retry loop against
+    an at-capacity team could fill a key's own cap with spend that is not in
+    flight, and the key would then be refused for its own cap while nothing was
+    running.
+    """
+    store = InMemoryBudgetReservationStore()
+    # The key has plenty of room; the team has none.
+    usage = FakeUsage(team_spent="1000", key_spent={KEY_ID: "0"})
+    key_budgets = FakeKeyBudgets({KEY_ID: _key_budget("100")})
+
+    with pytest.raises(BudgetExceeded):
+        await _meter(usage, key_budgets=key_budgets, team_limit="1000", store=store).admit(
+            TEAM_ID, _model(), REQUEST, api_key_id=KEY_ID
+        )
+
+    assert await _reserved(store, key_scope(KEY_ID)) == 0.0
+    assert await _reserved(store, team_scope(TEAM_ID)) == 0.0
