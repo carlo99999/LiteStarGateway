@@ -110,6 +110,13 @@ class RoutingDecisionLog(Protocol):
         """(chosen_model, tier, is_shadow, count) rows for the router."""
         ...
 
+    async def reliability(self, team_id: UUID, router_id: UUID) -> list[tuple[int, bool, int]]:
+        """(attempts, failover_used, count) rows over one router's non-shadow
+        decisions. Shadow runs are excluded: they never served a caller, so
+        counting their retries would overstate how often real traffic had to
+        fail over."""
+        ...
+
     async def savings(self, team_id: UUID, router_id: UUID) -> tuple[float, int, int]:
         """(total_estimated_savings, decisions_counted, decisions_without_usage)
         over one router's non-shadow decisions: Σ (alt−chosen unit cost) ×

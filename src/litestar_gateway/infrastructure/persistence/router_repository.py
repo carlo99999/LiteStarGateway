@@ -686,6 +686,27 @@ class SQLAlchemyRoutingDecisionLog:
         )
         return [model.to_entity() for model in await self._session.scalars(stmt)]
 
+    async def reliability(self, team_id: UUID, router_id: UUID) -> list[tuple[int, bool, int]]:
+        stmt = (
+            select(
+                RoutingDecisionModel.attempts,
+                RoutingDecisionModel.failover_used,
+                func.count(),
+            )
+            .where(
+                RoutingDecisionModel.team_id == team_id,
+                RoutingDecisionModel.router_id == router_id,
+                # Shadow runs never served a caller: their retries would
+                # overstate how often real traffic had to fail over.
+                RoutingDecisionModel.is_shadow.is_(False),
+            )
+            .group_by(RoutingDecisionModel.attempts, RoutingDecisionModel.failover_used)
+        )
+        rows = await self._session.execute(stmt)
+        return [
+            (int(attempts or 1), bool(failover), int(count)) for attempts, failover, count in rows
+        ]
+
     async def distribution(
         self, team_id: UUID, router_id: UUID
     ) -> list[tuple[str, str | None, bool, int]]:

@@ -11,10 +11,17 @@ import {
   decisionsExportHref,
   listDecisionsPage,
   listRouters,
+  routerReliability,
   routerSavings,
   routerStats,
   type Decision,
+  type RouterReliability,
 } from "@/features/routing/api";
+import {
+  breakerLabel,
+  formatFailoverRate,
+  trippedCount,
+} from "@/features/routing/reliability";
 import {
   canReadDecisions,
   canReadModels,
@@ -126,6 +133,38 @@ const DECISION_COLUMNS: Column<Decision>[] = [
   },
 ];
 
+function BreakerPanel({
+  candidates,
+}: {
+  candidates: RouterReliability["candidates"];
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        // circuit breakers · live
+      </p>
+      <div className="space-y-2">
+        {candidates.map((candidate) => (
+          <div key={candidate.model_id} className="flex items-center gap-2 font-mono text-xs">
+            <span className="w-44 truncate text-foreground">{candidate.model_name}</span>
+            <span
+              className={
+                candidate.breaker === "closed"
+                  ? "text-muted-foreground"
+                  : candidate.breaker === "open"
+                    ? "text-destructive"
+                    : "text-foreground"
+              }
+            >
+              {breakerLabel(candidate.breaker)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** One router: live definition summary, decision distribution, estimated
  * savings, and the recent decision log (with JSONL export). */
 export function RouterDetailPage() {
@@ -150,6 +189,11 @@ export function RouterDetailPage() {
     queryFn: () => routerStats(teamId, routerId),
     enabled: canReadRouterUsage,
   });
+  const reliability = useQuery({
+    queryKey: ["team-routers", teamId, routerId, "reliability"],
+    queryFn: () => routerReliability(teamId, routerId),
+    enabled: canReadRouterUsage,
+  });
   const savings = useQuery({
     queryKey: ["team-routers", teamId, routerId, "savings"],
     queryFn: () => routerSavings(teamId, routerId),
@@ -161,8 +205,9 @@ export function RouterDetailPage() {
     enabled: canReadRouterUsage,
   });
 
-  // Stats and savings share a scope (USAGE_READ); surface either failure.
-  const statsError = toError(stats.error) ?? toError(savings.error);
+  // Stats, savings and reliability share a scope (USAGE_READ); surface any failure.
+  const statsError =
+    toError(stats.error) ?? toError(savings.error) ?? toError(reliability.error);
 
   useEffect(() => setOffset(0), [routerId]);
   useEffect(() => {
@@ -216,7 +261,22 @@ export function RouterDetailPage() {
             <Stat label="decisions costed" value={savings.data?.decisions_counted ?? "—"} />
           </div>
 
+          <div className="mb-6 grid gap-3 sm:grid-cols-3">
+            <Stat
+              label="failover rate"
+              value={formatFailoverRate(reliability.data)}
+            />
+            <Stat label="calls that failed over" value={reliability.data?.failover_used ?? "—"} />
+            <Stat label="candidates shut out" value={trippedCount(reliability.data)} />
+          </div>
+
           <div className="mb-6 grid gap-3 lg:grid-cols-2">
+            {reliability.data ? (
+              <Distribution label="provider attempts per call" entries={reliability.data.by_attempts} />
+            ) : null}
+            {reliability.data && reliability.data.candidates.length > 0 ? (
+              <BreakerPanel candidates={reliability.data.candidates} />
+            ) : null}
             {stats.data ? <Distribution label="by model" entries={stats.data.by_model} /> : null}
             {stats.data ? <Distribution label="by tier" entries={stats.data.by_tier} /> : null}
             {stats.data && Object.keys(stats.data.shadow_by_model).length > 0 ? (

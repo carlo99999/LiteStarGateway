@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from litestar_gateway.config import Settings
-from litestar_gateway.domain.ports import BreakerLease, CircuitBreaker
+from litestar_gateway.domain.ports import BreakerLease, BreakerStatus, CircuitBreaker
 
 _Status = Literal["closed", "open", "half_open"]
 
@@ -81,6 +81,25 @@ class InMemoryCircuitBreaker:
                 state.trial_token = uuid.uuid4().hex
                 return BreakerLease(allowed=True, trial_token=state.trial_token)
             return BreakerLease(allowed=False)
+
+    async def state(self, key: str) -> BreakerStatus:
+        """The effective status, without claiming anything.
+
+        An `open` breaker whose cooldown has already elapsed is reported as
+        `half_open`: that is what the next request would find, and reporting
+        `open` would tell an operator a provider is still shut out when it is
+        one request away from being retried.
+        """
+        async with self._lock:
+            state = self._states.get(key)
+            if state is None or state.status == "closed":
+                return "closed"
+            if state.status == "half_open":
+                return "half_open"
+            assert state.opened_at is not None
+            if self._clock() >= state.opened_at + self._cooldown_seconds:
+                return "half_open"
+            return "open"
 
     async def record_failure(self, key: str, trial_token: str | None = None) -> None:
         async with self._lock:
@@ -190,6 +209,16 @@ class RedisCircuitBreaker:
         if not claimed:
             return BreakerLease(allowed=False)
         return BreakerLease(allowed=True, trial_token=token)
+
+    async def state(self, key: str) -> BreakerStatus:
+        """Same reading as `InMemoryCircuitBreaker.state`, over the shared keys,
+        and with no `SET NX` — this must never take the trial."""
+        opened_raw = await self._redis.get(self._opened_key(key))  # type: ignore[attr-defined]
+        if opened_raw is None:
+            return "closed"
+        if self._clock() < float(opened_raw) + self._cooldown_seconds:
+            return "open"
+        return "half_open"
 
     async def record_failure(self, key: str, trial_token: str | None = None) -> None:
         trial_raw = await self._redis.get(self._trial_key(key))  # type: ignore[attr-defined]

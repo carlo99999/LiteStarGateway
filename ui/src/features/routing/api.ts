@@ -26,6 +26,19 @@ export interface RouterSavings {
   decisions_without_usage: number;
 }
 
+/** Shape of GET .../reliability (untyped dict in the OpenAPI schema).
+ * `by_attempts` is keyed by the number of provider attempts one client request
+ * took, so `{"1": 900, "2": 40}` reads as "940 requests, 40 of which needed a
+ * second provider". */
+export interface RouterReliability {
+  router: string;
+  total: number;
+  by_attempts: Record<string, number>;
+  failover_used: number;
+  failover_rate: number;
+  candidates: { model_name: string; model_id: string; breaker: string }[];
+}
+
 function fail(error: unknown, fallback: string): Error {
   if (error && typeof error === "object") {
     const env = error as { error?: { message?: string }; detail?: string };
@@ -221,6 +234,20 @@ export async function routerSavings(teamId: string, routerId: string): Promise<R
   });
   if (error || !data) throw fail(error, "Failed to load router savings");
   return data as unknown as RouterSavings;
+}
+
+/** GET .../reliability — retry/failover distribution plus live breaker state.
+ * Read-only: it never claims a breaker's half-open trial, so refreshing the
+ * panel cannot consume the retry a real request was owed. */
+export async function routerReliability(
+  teamId: string,
+  routerId: string,
+): Promise<RouterReliability> {
+  const { data, error } = await api.GET("/teams/{team_id}/routers/{router_id}/reliability", {
+    params: { path: { team_id: teamId, router_id: routerId } },
+  });
+  if (error || !data) throw fail(error, "Failed to load router reliability");
+  return data as unknown as RouterReliability;
 }
 
 /** GET .../decisions — one page of recent routing decisions (most recent first). */

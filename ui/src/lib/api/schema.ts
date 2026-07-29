@@ -1174,6 +1174,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/routers/{router_id}/reliability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retry/failover distribution and current breaker state
+         * @description How often real traffic needed a second provider, and which candidates are shut out right now. Shadow runs are excluded — they never served a caller. Read-only: it never claims a breaker's half-open trial, so refreshing this view cannot consume the retry a real request was owed.
+         */
+        get: operations["TeamsTeamIdRoutersRouterIdReliabilityRouterReliability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams/{team_id}/routers/{router_id}/savings": {
         parameters: {
             query?: never;
@@ -6187,6 +6207,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionResponse"][];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdRoutersRouterIdReliabilityRouterReliability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Bad request syntax or unsupported method */

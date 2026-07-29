@@ -40,6 +40,7 @@ from litestar_gateway.domain.exceptions import (
 from litestar_gateway.domain.ports import (
     AuditLog,
     CallableModelResolver,
+    CircuitBreakerInspector,
     CredentialRepository,
     LLMGateway,
     ModelRepository,
@@ -1189,6 +1190,60 @@ class RouterService:
             "by_model": by_model,
             "by_tier": by_tier,
             "shadow_by_model": shadow_by_model,
+        }
+
+    async def reliability(
+        self,
+        team_id: UUID,
+        router_id: UUID,
+        inspector: CircuitBreakerInspector | None = None,
+    ) -> dict[str, Any]:
+        """How often real traffic had to retry, and what is shut out right now.
+
+        Both halves of Plan 05 are already persisted or held — attempts and
+        `failover_used` on every decision, breaker state in Redis — and neither
+        was visible anywhere. `by_attempts` is keyed by the number of provider
+        attempts one client request took, so `{"1": 900, "2": 40}` reads as
+        "940 requests, 40 of which needed a second provider".
+
+        `inspector` is optional: a breaker that cannot answer a read-only state
+        query (a test double, an adapter over a store with no read API) leaves
+        `candidates` empty rather than making the whole view unavailable.
+        """
+        router = await self.get(team_id, router_id)
+        rows = await self._decisions.reliability(team_id, router.id)
+        by_attempts: dict[str, int] = {}
+        total = 0
+        failed_over = 0
+        for attempts, failover_used, count in rows:
+            by_attempts[str(attempts)] = by_attempts.get(str(attempts), 0) + count
+            total += count
+            if failover_used:
+                failed_over += count
+        candidates: list[dict[str, Any]] = []
+        if inspector is not None:
+            for candidate in router.candidates:
+                if candidate.model_id is None:
+                    # Pre-revision candidates have no stable id, and the breaker
+                    # is keyed by id — reporting a name with no state would look
+                    # like "closed" rather than "unknown".
+                    continue
+                candidates.append(
+                    {
+                        "model_name": candidate.model_name,
+                        "model_id": str(candidate.model_id),
+                        "breaker": await inspector.state(str(candidate.model_id)),
+                    }
+                )
+        return {
+            "router": router.name,
+            "total": total,
+            "by_attempts": by_attempts,
+            "failover_used": failed_over,
+            # Rounded for display but computed on the full counts: a rate over
+            # zero decisions is 0.0, not a division by zero.
+            "failover_rate": round(failed_over / total, 4) if total else 0.0,
+            "candidates": candidates,
         }
 
     async def savings(self, team_id: UUID, router_id: UUID) -> dict[str, Any]:
