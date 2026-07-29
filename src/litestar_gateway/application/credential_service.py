@@ -51,8 +51,10 @@ class CredentialService:
     async def _validate_egress(self, provider: Provider, values: dict[str, str]) -> None:
         """For `openai_compatible`, `api_base` must be an operator-authorized
         target. Resolved here so the admin gets an immediate, accurate error;
-        re-resolved per call at dispatch, which is what actually guards against
-        a name drifting out of the allowlisted range afterwards."""
+        re-resolved per call at dispatch (see
+        `OpenAICompatibleProviderAdapter._authorize_egress`), which is what
+        actually guards against a name drifting out of the allowlisted range
+        afterwards."""
         if provider is not Provider.OPENAI_COMPATIBLE:
             return
         api_base = values.get("api_base", "")
@@ -60,6 +62,14 @@ class CredentialService:
         if parsed.scheme not in ("http", "https") or not parsed.hostname:
             raise CredentialMisconfigured(
                 f"api_base must be an http(s) URL with a host, got {api_base!r}"
+            )
+        if parsed.username is not None or parsed.password is not None:
+            # `ClientKey.endpoint` keeps the endpoint in the clear for metric
+            # labels and registry log lines, so a password in the URL would be
+            # logged verbatim. Never echo the value back in the message.
+            raise CredentialMisconfigured(
+                "api_base must not carry userinfo (user:password@host); "
+                "put the secret in api_key instead"
             )
         try:
             await resolve_allowlisted_addresses(

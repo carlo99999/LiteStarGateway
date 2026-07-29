@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
+from litestar_gateway.domain.egress_policy import EgressAllowlist
 from litestar_gateway.domain.entities import Model, Provider
 from litestar_gateway.domain.exceptions import UnsupportedOperation
 from litestar_gateway.infrastructure.llm.anthropic_adapter import AnthropicAdapter
@@ -53,6 +54,7 @@ class LLMGatewayImpl:
         resilience: ResilienceConfig | None = None,
         client_registry: ClientRegistry | None = None,
         vertex_client_registry: ClientRegistry | None = None,
+        egress_allowlist: EgressAllowlist | None = None,
     ) -> None:
         resilience = resilience or ResilienceConfig()
         # Process-owned, bounded caches of provider SDK clients (Plan 14).
@@ -89,7 +91,9 @@ class LLMGatewayImpl:
             # implement Chat Completions, and Responses coverage is Plan 09's
             # contract rather than this one's.
             Provider.OPENAI_COMPATIBLE: (
-                OpenAICompatibleProviderAdapter(resilience, self._client_registry),
+                OpenAICompatibleProviderAdapter(
+                    resilience, self._client_registry, egress_allowlist
+                ),
                 frozenset({_CHAT, _EMBEDDINGS, _IMAGES}),
             ),
             # Anthropic: chat + emulated Responses + native Messages passthrough.
