@@ -76,6 +76,10 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
   assert.equal(canAccessConsoleSurface("usage", modelManager), false);
   assert.equal(canAccessConsoleSurface("budgets", modelManager), false);
   assert.equal(canAccessConsoleSurface("audit", modelManager), false);
+  // A content control the model owner can switch off is not a control, so the
+  // guardrails surface is not theirs — matching `guardrails:manage` on the
+  // backend, which `model-manager` deliberately does not hold.
+  assert.equal(canAccessConsoleSurface("guardrails", modelManager), false);
 
   assert.equal(canAccessConsoleSurface("models", teamAdmin), true);
   assert.equal(canAccessConsoleSurface("routing", teamAdmin), true);
@@ -83,11 +87,13 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
   assert.equal(canAccessConsoleSurface("credentials", teamAdmin), false);
   assert.equal(canAccessConsoleSurface("usage", teamAdmin), true);
   assert.equal(canAccessConsoleSurface("budgets", teamAdmin), true);
+  assert.equal(canAccessConsoleSurface("guardrails", teamAdmin), true);
 
   // ISSUE-021 (Round 12): billing-viewer holds usage:read/budget:read and
   // must see those two surfaces, but nothing model-related.
   assert.equal(canAccessConsoleSurface("usage", billingViewer), true);
   assert.equal(canAccessConsoleSurface("budgets", billingViewer), true);
+  assert.equal(canAccessConsoleSurface("guardrails", billingViewer), false);
   assert.equal(canAccessConsoleSurface("models", billingViewer), false);
   assert.equal(canAccessConsoleSurface("routing", billingViewer), false);
 
@@ -98,6 +104,9 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
   // (AUDITOR_TEAM_PERMISSIONS), independent of membership.
   assert.equal(canAccessConsoleSurface("usage", auditor), true);
   assert.equal(canAccessConsoleSurface("budgets", auditor), true);
+  // Read-only billing visibility does not extend to the guardrail policy: the
+  // auditor's grant is `usage:read`/`budget:read`, and nothing else.
+  assert.equal(canAccessConsoleSurface("guardrails", auditor), false);
 });
 
 test("platform admins retain every console surface", () => {
@@ -115,6 +124,7 @@ test("platform admins retain every console surface", () => {
     "service-principals",
     "usage",
     "budgets",
+    "guardrails",
     "audit",
     "sso-settings",
   ] as const;

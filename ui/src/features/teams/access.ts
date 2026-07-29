@@ -26,6 +26,7 @@ export type ConsoleSurface =
   | "teams"
   | "users"
   | "service-principals"
+  | "guardrails"
   | "usage"
   | "budgets"
   | "audit"
@@ -79,6 +80,13 @@ export function canReadUsage(role: TeamRole | null): boolean {
   return role === null || role === "admin" || role === "billing-viewer";
 }
 
+/** Guardrails are team-admin (or platform-admin) only: `guardrails:manage` is
+ * deliberately not part of `model-manager`, because a content control the model
+ * owner can switch off is not a control. */
+export function canManageGuardrails(role: TeamRole | null): boolean {
+  return role === null || role === "admin";
+}
+
 export function canReadDecisions(role: TeamRole | null): boolean {
   return role === null || role === "admin" || role === "model-manager";
 }
@@ -95,6 +103,9 @@ export function canAccessConsoleSurface(
   if (access.isPlatformAdmin) return true;
   if (surface === "dashboard") return true;
   if (surface === "audit") return access.isAuditor;
+  if (surface === "guardrails") {
+    return access.teamRoles.some((role) => canManageGuardrails(role));
+  }
   if (MODEL_SURFACES.includes(surface)) {
     return access.teamRoles.some((role) => canReadModels(role));
   }

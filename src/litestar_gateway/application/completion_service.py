@@ -13,8 +13,8 @@ import asyncio
 import logging
 import time
 import weakref
-from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import replace
 from time import perf_counter
 from typing import Any
@@ -440,12 +440,17 @@ class CompletionService:
             # consumed; refusing to bill a blocked answer would hand anyone who
             # can trip the response guardrail a free channel. So: bill, then
             # refuse to hand the content back.
-            return await self._guard_response(team_id, api_key_id, model, response)
+            return await self._guard_response(team_id, api_key_id, model, operation, response)
         finally:
             await self._meter.release(reservation)
 
     async def _guard_request(
-        self, team_id: UUID, api_key_id: UUID | None, model: Model, request: dict[str, Any]
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        operation: str,
+        request: dict[str, Any],
     ) -> dict[str, Any]:
         """Run the request-side chain, returning the request to actually send.
 
@@ -456,24 +461,33 @@ class CompletionService:
         chain = await self._guardrails(team_id, api_key_id, model, Direction.REQUEST)
         if not chain:
             return request
-        outcome = await run_chain(
-            chain,
-            GuardrailPayload(direction=Direction.REQUEST, text=request_text(request), raw=request),
-        )
-        if not outcome.redacted:
-            return request
-        if not can_redact_request(request):
-            # A redaction we cannot apply exactly is a redaction we do not
-            # apply: guessing which multimodal block each piece of the flattened
-            # text came from would be worse than refusing, and passing the
-            # original through would defeat the point of the verdict.
-            raise GuardrailBlocked(
-                "content had to be redacted but the request shape cannot be rewritten safely"
+        with self._traced_block(team_id, api_key_id, model, operation):
+            outcome = await run_chain(
+                chain,
+                GuardrailPayload(
+                    direction=Direction.REQUEST, text=request_text(request), raw=request
+                ),
             )
-        return redact_request(request, outcome.text)
+            if not outcome.redacted:
+                return request
+            if not can_redact_request(request):
+                # A redaction we cannot apply exactly is a redaction we do not
+                # apply: guessing which multimodal block each piece of the
+                # flattened text came from would be worse than refusing, and
+                # passing the original through would defeat the point of the
+                # verdict.
+                raise GuardrailBlocked(
+                    "content had to be redacted but the request shape cannot be rewritten safely"
+                )
+            return redact_request(request, outcome.text)
 
     async def _guard_response(
-        self, team_id: UUID, api_key_id: UUID | None, model: Model, response: dict[str, Any]
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        operation: str,
+        response: dict[str, Any],
     ) -> dict[str, Any]:
         """Run the response-side chain on an already-billed response."""
         if self._guardrails is None:
@@ -481,19 +495,46 @@ class CompletionService:
         chain = await self._guardrails(team_id, api_key_id, model, Direction.RESPONSE)
         if not chain:
             return response
-        outcome = await run_chain(
-            chain,
-            GuardrailPayload(
-                direction=Direction.RESPONSE, text=response_text(response), raw=response
-            ),
-        )
-        if not outcome.redacted:
-            return response
-        if not can_redact_response(response):
-            raise GuardrailBlocked(
-                "content had to be redacted but the response shape cannot be rewritten safely"
+        # The `ok` trace for the billed call was already emitted; this adds a
+        # second, `error` trace for the refusal. Two rows for one request is the
+        # honest record: the provider really was called and billed, AND the
+        # caller really was refused.
+        with self._traced_block(team_id, api_key_id, model, operation):
+            outcome = await run_chain(
+                chain,
+                GuardrailPayload(
+                    direction=Direction.RESPONSE, text=response_text(response), raw=response
+                ),
             )
-        return redact_response(response, outcome.text)
+            if not outcome.redacted:
+                return response
+            if not can_redact_response(response):
+                raise GuardrailBlocked(
+                    "content had to be redacted but the response shape cannot be rewritten safely"
+                )
+            return redact_response(response, outcome.text)
+
+    @contextmanager
+    def _traced_block(
+        self, team_id: UUID, api_key_id: UUID | None, model: Model, operation: str
+    ) -> Iterator[None]:
+        """Emit an `error` trace when the enclosed guardrail work refuses.
+
+        Without this a refused request leaves no trace at all — the request hook
+        runs before the dispatch that would have emitted one — so the console
+        would show a team nothing but a drop in traffic. The trace carries the
+        exception type and zero usage; it deliberately does not carry the
+        message, because a guardrail's message names what was found and the
+        trace table is not where that belongs.
+        """
+        start = perf_counter()
+        try:
+            yield
+        except GuardrailBlocked as exc:
+            self._meter.trace_error(
+                team_id, api_key_id, model, operation, (perf_counter() - start) * 1000, exc
+            )
+            raise
 
     async def _cache_get(self, key: CacheKey) -> CachedResponse | None:
         """A cache failure must never fail the request (design §8): any
@@ -1060,7 +1101,7 @@ class CompletionService:
         # reaches a provider. A redaction rewrites `clean`, so everything after
         # this line — admission, the trace, the provider call — sees the redacted
         # prompt and never the original.
-        clean = await self._guard_request(team_id, api_key_id, model, clean)
+        clean = await self._guard_request(team_id, api_key_id, model, operation, clean)
         reservation = await self._meter.admit(team_id, model, model.merge_params(clean))
         try:
             values = await self._credentials.get_values(model.credential_id)
