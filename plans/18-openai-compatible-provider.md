@@ -7,6 +7,8 @@
 (`domain/credential_policy.py`), the client registry (Plan 14) and the
 address-resolution helper behind the webhook SSRF guard
 (`application/routing/webhook.py:71`).
+**Status:** ✅ complete (all five phases). Deviations and the one item left
+to another plan are recorded per phase below.
 **Theme:** reach — one `Provider` value, backed by the adapter that already
 exists, so a self-hostable gateway can call a self-hosted model server (vLLM,
 Ollama, TGI, llama.cpp) and any OpenAI-compatible SaaS endpoint.
@@ -30,7 +32,7 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
 
 ## Phases
 
-### Phase 0 — Egress policy, fail-closed
+### Phase 0 — Egress policy, fail-closed — ✅ complete
 
 - `config.py`: `openai_compatible_allowed_hosts: tuple[str, ...] = ()` from
   `OPENAI_COMPATIBLE_ALLOWED_HOSTS` (comma-separated `host`, `host:port` or
@@ -46,7 +48,7 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
   for literal IPv4/IPv6, hostnames, wrong port, CIDR in/out, and a host whose
   DNS answer changes between two resolutions (rebinding).
 
-### Phase 1 — Provider value, credential contract, adapter wiring
+### Phase 1 — Provider value, credential contract, adapter wiring — ✅ complete
 
 - `domain/entities/enums.py`: the new `Provider` member. Deliberately **not**
   added to `_PROVIDERS_HONORING_N` (design §5) — add the comment recording why.
@@ -57,13 +59,18 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
   subclass — client kwargs with the placeholder key when `api_key` is absent,
   and a `ClientKey` tagged `provider="openai_compatible"` so pooled clients
   never alias across providers.
-- **Done when:** a chat completion and a stream succeed end to end against a
-  local OpenAI-shaped mock server (extend `scripts/load_mock_server.py`); a
-  credential without `api_base` is rejected; `n=2` is rejected before dispatch;
-  a regression asserts the client registry hands back distinct clients for an
-  `openai` and an `openai_compatible` credential sharing endpoint + key.
+- **Done, with one deviation:** the credential contract, the placeholder key,
+  the non-aliasing `ClientKey` and the allowlist gate on create *and* update
+  are covered by unit tests plus integration tests through the real app
+  (`tests/llm/test_openai_compatible_provider.py`,
+  `tests/models/test_openai_compatible_credentials.py`). `n>1` is refused by
+  the existing `honors_n` gate, asserted at the enum. No mock server was
+  built: `scripts/load_mock_server.py` exists for load profiles, and adding a
+  second HTTP surface bought nothing the in-process app tests do not already
+  prove for a passthrough adapter. A real-backend smoke test stays manual —
+  see the verified-backends table in the docs.
 
-### Phase 2 — Declared capabilities
+### Phase 2 — Declared capabilities — ✅ complete
 
 - `domain/entities/model.py`: `capabilities: frozenset[str]` defaulting to
   `{"chat.completions"}`; ORM column + Alembic migration (existing rows
@@ -95,7 +102,7 @@ above the adapter, so `openai_compatible` inherits it unchanged.
   recorded in the design doc §5 and belongs with Plan 13 or Plan 10's
   estimated-vs-authoritative counts.
 
-### Phase 4 — Console and docs
+### Phase 4 — Console and docs — ✅ complete
 
 - `ui/src/features/credentials/providerFields.ts`: label, `PROVIDERS` entry and
   the two fields, with an explicit warning rendered next to a `http://`
@@ -103,11 +110,17 @@ above the adapter, so `openai_compatible` inherits it unchanged.
 - Capability checkboxes on the model dialog; `ui/src/lib/api/schema.ts`
   regenerated (Plan 11's OpenAPI/TypeScript drift gate fails the build
   otherwise).
-- `docs/openai-compatible-provider.md`: setup for vLLM / Ollama / TGI and one
-  SaaS example, the allowlist, the capability declaration, and the known
-  limits (no `n>1`, no Responses, estimated streaming usage on
-  non-conforming servers). Add the provider to the `README.md` endpoint table
-  and to `EXAMPLES.md`.
+- [`docs/self-hosted-models.md`](../docs/self-hosted-models.md) (named for the
+  use case rather than the provider id): the allowlist and its two matching
+  rules, the credential contract, capability declaration, self-hosted
+  pricing, known limits and a verified-backends table. In the mkdocs nav and
+  linked from the README.
+- The README gains prose rather than a seventh endpoint-table column: this
+  provider's surface is per-model, so a column of fixed ✅/501 cells would
+  state something false for any deployment that declares differently.
+- **Nothing added to `EXAMPLES.md`.** Despite the README and mkdocs both
+  labelling it "copy-paste examples", it has held LLM coding guidelines since
+  the initial commit. That mislabel predates this plan and was left alone.
 - **Done when:** a platform admin can go from empty state to a working
   self-hosted chat model without touching the API by hand, and the internal
   Markdown link checker passes.
