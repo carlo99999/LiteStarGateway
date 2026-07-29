@@ -4,6 +4,7 @@ import {
   Route,
   FlaskConical,
   ShieldCheck,
+  ShieldAlert,
   KeyRound,
   Building2,
   Users,
@@ -63,6 +64,13 @@ export const NAV_GROUPS: NavGroup[] = [
         ready: true,
       },
       { to: "/api-keys", label: "api-keys", icon: KeyRound, surface: "api-keys", ready: true },
+      {
+        to: "/guardrails",
+        label: "guardrails",
+        icon: ShieldAlert,
+        surface: "guardrails",
+        ready: true,
+      },
     ],
   },
   {

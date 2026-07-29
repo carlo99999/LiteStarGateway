@@ -252,6 +252,28 @@ async def test_blocked_request_never_reaches_the_provider() -> None:
     assert provider.seen[0].direction is Direction.REQUEST
 
 
+async def test_a_blocked_request_is_visible_in_traces() -> None:
+    """A refusal has to leave a record.
+
+    The request hook runs before the dispatch that emits a trace, so without an
+    explicit one a blocked request produces nothing at all — and the console
+    would show the team a drop in traffic with no explanation for it.
+    """
+    gateway = RecordingGateway()
+    usage, traces = FakeUsage(), []
+    service = _service(gateway, usage, traces, request_chain=_chain(_blocker()))
+
+    with pytest.raises(GuardrailBlocked):
+        await service.chat_completion(TEAM_ID, KEY_ID, dict(REQUEST))
+
+    assert [t.status for t in traces] == ["error"]
+    trace = traces[0]
+    assert trace.error_type == "GuardrailBlocked"
+    assert trace.operation == "chat.completions"
+    # Nothing was consumed, so nothing is billed on the trace either.
+    assert (trace.prompt_tokens, trace.completion_tokens, trace.cost) == (0, 0, 0.0)
+
+
 async def test_blocked_request_never_reserves_budget() -> None:
     """The placement test for the request hook.
 
@@ -330,9 +352,11 @@ async def test_blocked_response_is_withheld_but_still_billed() -> None:
     # can trip it deliberately.
     assert len(usage.events) == 1
     assert (usage.events[0].prompt_tokens, usage.events[0].completion_tokens) == (2, 3)
-    # The trace stays 'ok': it records what the provider did and what was
-    # billed. The refusal is a guardrail event, not a failed call.
-    assert [t.status for t in traces] == ["ok"]
+    # Two traces for one request, which is the honest record: the provider
+    # really was called and billed ('ok'), AND the caller really was refused
+    # ('error'). Collapsing them into one would hide half of what happened.
+    assert [t.status for t in traces] == ["ok", "error"]
+    assert traces[1].error_type == "GuardrailBlocked"
     assert provider.seen[0].text == "here is the leak"
     assert provider.seen[0].direction is Direction.RESPONSE
 
