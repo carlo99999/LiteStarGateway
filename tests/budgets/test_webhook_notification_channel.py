@@ -19,6 +19,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
+import litestar_gateway.application.egress as egress_module
 import litestar_gateway.application.routing.webhook as webhook_module
 from litestar_gateway.domain.entities import BudgetWindow, PendingBudgetAlert
 from litestar_gateway.domain.money import to_cost
@@ -62,7 +63,7 @@ async def _public_resolver(host: str) -> list[str]:
 
 
 async def test_send_posts_alert_payload(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", _public_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", _public_resolver)
     seen: dict = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -92,7 +93,7 @@ async def test_send_posts_alert_payload(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 async def test_send_raises_on_non_2xx(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", _public_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", _public_resolver)
     _mock_transport(monkeypatch, lambda r: httpx.Response(500))
     channel = WebhookNotificationChannel("https://alerts.example/hook")
     with pytest.raises(httpx.HTTPStatusError):
@@ -138,7 +139,7 @@ async def test_rejects_hostname_resolving_to_private_at_send_time(
     async def private_resolver(host: str) -> list[str]:
         return ["10.1.2.3"]
 
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", private_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", private_resolver)
     channel = WebhookNotificationChannel("https://alerts.example/hook")
     with pytest.raises(ValueError):
         await channel.send(_alert())
@@ -157,7 +158,7 @@ async def test_dns_rebinding_is_caught_by_per_call_recheck(
     async def rebinding_resolver(host: str) -> list[str]:
         return ["10.0.0.9"]  # "later" resolution: private
 
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", rebinding_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", rebinding_resolver)
     # Construction succeeds: "alerts.example" is a hostname, not a literal IP,
     # so no DNS happens until send().
     channel = WebhookNotificationChannel("https://alerts.example/hook")
@@ -166,7 +167,7 @@ async def test_dns_rebinding_is_caught_by_per_call_recheck(
 
 
 async def test_public_hostname_passes_guard(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", _public_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", _public_resolver)
     _mock_transport(monkeypatch, lambda r: httpx.Response(200))
     await WebhookNotificationChannel("https://alerts.example/hook").send(_alert())
 
@@ -183,7 +184,7 @@ async def test_connects_to_pinned_ip_retaining_host_and_sni(
         requests.append(request)
         return httpx.Response(200)
 
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", resolver)
     _mock_transport(monkeypatch, handler)
 
     await WebhookNotificationChannel("https://alerts.example:8443/hook").send(_alert())
@@ -212,7 +213,7 @@ async def test_the_alert_is_signed_and_verifies(monkeypatch: pytest.MonkeyPatch)
         seen["event_id"] = request.headers.get(EVENT_ID_HEADER)
         return httpx.Response(200)
 
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", _public_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", _public_resolver)
     _mock_transport(monkeypatch, handler)
     channel = WebhookNotificationChannel(
         "https://alerts.example/hook", signing_secret=SIGNING_MATERIAL
@@ -233,7 +234,7 @@ async def test_a_retry_reuses_the_same_event_id(monkeypatch: pytest.MonkeyPatch)
         ids.append(request.headers[EVENT_ID_HEADER])
         return httpx.Response(200)
 
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", _public_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", _public_resolver)
     _mock_transport(monkeypatch, handler)
     channel = WebhookNotificationChannel(
         "https://alerts.example/hook", signing_secret=SIGNING_MATERIAL
@@ -257,7 +258,7 @@ async def test_without_a_secret_it_still_sends_but_warns(
         seen["signature"] = request.headers.get(SIGNATURE_HEADER)
         return httpx.Response(200)
 
-    monkeypatch.setattr(webhook_module, "_resolve_host_addresses", _public_resolver)
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", _public_resolver)
     _mock_transport(monkeypatch, handler)
     channel = WebhookNotificationChannel("https://alerts.example/hook")
 
