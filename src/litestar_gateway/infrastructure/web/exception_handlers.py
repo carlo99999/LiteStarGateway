@@ -31,8 +31,10 @@ from litestar_gateway.domain.exceptions import (
     DomainError,
     EmailAlreadyRegistered,
     GuardrailBlocked,
+    GuardrailRuleNotFound,
     InvalidAPIKey,
     InvalidCredentials,
+    InvalidGuardrailRule,
     InvalidInvite,
     InvalidModelPricing,
     InvalidPasswordReset,
@@ -92,6 +94,7 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     (MembershipNotFound, HTTP_404_NOT_FOUND),
     (APIKeyNotFound, HTTP_404_NOT_FOUND),
     (BudgetNotFound, HTTP_404_NOT_FOUND),
+    (GuardrailRuleNotFound, HTTP_404_NOT_FOUND),
     (ServicePrincipalNotFound, HTTP_404_NOT_FOUND),
     (ScimTokenNotFound, HTTP_404_NOT_FOUND),
     (SSONotConfigured, HTTP_404_NOT_FOUND),
@@ -127,6 +130,7 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     (WeakPassword, HTTP_400_BAD_REQUEST),
     (ProviderMismatch, HTTP_400_BAD_REQUEST),
     (ModelTypeMismatch, HTTP_400_BAD_REQUEST),
+    (InvalidGuardrailRule, HTTP_400_BAD_REQUEST),
     (InvalidModelPricing, HTTP_400_BAD_REQUEST),
     # A guardrail refusal is not a malformed request: it is a well-formed one the
     # operator's policy declined. 422 keeps the two distinguishable in a

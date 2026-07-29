@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.application.callable_aliases import CallableAliasResolver
 from litestar_gateway.application.completion_service import CompletionService
+from litestar_gateway.application.guardrails.factory import build_chain
+from litestar_gateway.application.guardrails.judge_call import judge_completer
+from litestar_gateway.application.guardrails.service import ChainedProvider
 from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.config import Settings
+from litestar_gateway.domain.entities import Model
+from litestar_gateway.domain.guardrails import Direction
 from litestar_gateway.domain.ports import (
     BudgetAlertStateRepository,
     BudgetRepository,
@@ -35,6 +42,9 @@ from litestar_gateway.infrastructure.persistence.budget_repository import (
 )
 from litestar_gateway.infrastructure.persistence.credential_repository import (
     SQLAlchemyCredentialRepository,
+)
+from litestar_gateway.infrastructure.persistence.guardrail_repository import (
+    SQLAlchemyGuardrailRuleRepository,
 )
 from litestar_gateway.infrastructure.persistence.model_repository import (
     SQLAlchemyModelRepository,
@@ -113,13 +123,41 @@ def provide_completion_service(
         budget_alert_state=SQLAlchemyBudgetAlertStateRepository(db_session),
     )
     models = SQLAlchemyModelRepository(db_session)
+    credentials = SQLAlchemyCredentialRepository(db_session, keyring)
+    guardrail_rules = SQLAlchemyGuardrailRuleRepository(db_session, keyring)
+
+    async def guardrails(
+        team_id: UUID, api_key_id: UUID | None, model: Model, direction: Direction
+    ) -> tuple[ChainedProvider, ...]:
+        """Resolve and instantiate the team's chain for this call.
+
+        Rules are read per request rather than cached: a chain is a safety
+        control, and an operator who disables one expects the next request to
+        respect that, not the one after the cache expires. The read is a single
+        indexed query on a table with a handful of rows per team.
+        """
+        active = await guardrail_rules.resolve(team_id, model.id, direction)
+        if not active:
+            return ()
+        return build_chain(
+            active,
+            complete=judge_completer(
+                models=models,
+                credentials=credentials,
+                gateway=llm_gateway,
+                meter=meter,
+                team_id=team_id,
+                api_key_id=api_key_id,
+            ),
+        )
+
     routers = SQLAlchemyRouterRepository(db_session, keyring)
     router_service = RouterService(
         routers=routers,
         models=models,
         decisions=SQLAlchemyRoutingDecisionLog(db_session),
         shadow_decisions=shadow_decision_log_factory,
-        credentials=SQLAlchemyCredentialRepository(db_session, keyring),
+        credentials=credentials,
         gateway=llm_gateway,
         shadow_repos=shadow_repos_factory,
         meter=meter,
@@ -127,7 +165,7 @@ def provide_completion_service(
     )
     return CompletionService(
         models=models,
-        credentials=SQLAlchemyCredentialRepository(db_session, keyring),
+        credentials=credentials,
         gateway=llm_gateway,
         router_service=router_service,
         meter=meter,
@@ -138,4 +176,5 @@ def provide_completion_service(
         semantic_cache=semantic_cache,
         semantic_threshold=semantic_threshold,
         semantic_embedding_model=semantic_embedding_model,
+        guardrails=guardrails,
     )
