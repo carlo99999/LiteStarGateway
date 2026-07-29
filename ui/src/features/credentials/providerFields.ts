@@ -10,6 +10,15 @@ export interface CredentialField {
   placeholder?: string;
 }
 
+/**
+ * True when an endpoint field holds a plaintext URL. Permitted (in-cluster
+ * plaintext is the realistic self-hosted deployment) but worth surfacing: any
+ * API key on the credential then crosses the network unencrypted.
+ */
+export function isPlaintextEndpoint(key: string, value: string | undefined): boolean {
+  return key === "api_base" && (value ?? "").trim().toLowerCase().startsWith("http://");
+}
+
 /** Provider display labels for selects and table cells. */
 export const PROVIDER_LABELS: Record<Provider, string> = {
   openai: "OpenAI",

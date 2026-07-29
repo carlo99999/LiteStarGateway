@@ -12,7 +12,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createCredential, type Provider } from "@/features/credentials/api";
-import { PROVIDER_FIELDS, PROVIDER_LABELS, PROVIDERS } from "@/features/credentials/providerFields";
+import {
+  isPlaintextEndpoint,
+  PROVIDER_FIELDS,
+  PROVIDER_LABELS,
+  PROVIDERS,
+} from "@/features/credentials/providerFields";
 
 interface CreateCredentialDialogProps {
   open: boolean;
@@ -130,6 +135,12 @@ export function CreateCredentialDialog({ open, onOpenChange }: CreateCredentialD
                 placeholder={field.placeholder}
                 autoComplete="off"
               />
+              {isPlaintextEndpoint(field.key, values[field.key]) ? (
+                <p className="text-xs text-muted-foreground">
+                  Plaintext endpoint: the API key is sent unencrypted. Prefer in-cluster
+                  TLS or a service mesh.
+                </p>
+              ) : null}
             </div>
           ))}
           {mutation.isError ? (
