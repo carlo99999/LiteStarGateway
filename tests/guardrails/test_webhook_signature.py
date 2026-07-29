@@ -21,6 +21,8 @@ BODY = b'{"event":"guardrail.check","text":"hello"}'
 # Shared HMAC material for these tests. Named to keep the repo's
 # credential-assignment scanner quiet about an obvious fixture.
 SIGNING_MATERIAL = "endpoint-shared-fixture-value"
+# A second endpoint's material, to prove one does not verify the other's traffic.
+OTHER_MATERIAL = "a-different-endpoints-fixture-value"
 
 
 def test_a_signed_payload_verifies() -> None:
@@ -52,7 +54,7 @@ def test_another_endpoints_secret_does_not_verify() -> None:
     now = int(time.time())
     signed = sign(BODY, secret=SIGNING_MATERIAL, timestamp=now, event_id="evt_1")
 
-    assert not verify(BODY, signed.headers[SIGNATURE_HEADER], secret="other", now=now)
+    assert not verify(BODY, signed.headers[SIGNATURE_HEADER], secret=OTHER_MATERIAL, now=now)
 
 
 def test_a_replayed_request_is_stale_after_the_tolerance() -> None:
