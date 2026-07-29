@@ -131,6 +131,28 @@ single model. An operator who guards the whole team and needs one model exempted
 — an internal summarizer over already-classified text, say — could not express
 it. Overriding gives "team default, unless this model says otherwise".
 
+### Scoping to a router
+
+A rule may instead carry a `router_id`, scoping it to the **router the caller
+asked for** rather than to whichever candidate the strategy picked. `model_id`
+and `router_id` are mutually exclusive; a rule carrying both is refused.
+
+Three tiers apply, most specific first:
+
+```text
+router the caller named  →  resolved model  →  team-wide
+```
+
+**The router outranks the resolved model, deliberately.** The caller asked for
+the router; which candidate serves the request is the gateway's choice. Were a
+candidate's own rule to win, attaching a rule to one candidate would quietly
+exempt it from the router's guard. Scoping by router is also the only stable
+way to guard a virtual model: attach the policy to the candidates instead and
+the coverage silently develops a hole the day someone adds a candidate.
+
+A direct call to that same model still resolves the model's own rule, so the
+per-model exemption above keeps working exactly where it was meant to.
+
 ## Managing rules
 
 `/teams/{team_id}/guardrails` — `GET` (list), `POST` (add), `GET`/`PATCH`/`DELETE`

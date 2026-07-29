@@ -104,6 +104,7 @@ class GuardrailController(Controller):
             config=data.config,
             position=data.position,
             model_id=data.model_id,
+            router_id=data.router_id,
             enabled=data.enabled,
             secret=data.signing_secret,
         )
@@ -150,6 +151,7 @@ class GuardrailController(Controller):
             config=data.config,
             position=data.position,
             model_id=data.model_id,
+            router_id=data.router_id,
             enabled=data.enabled,
         )
         await record_audit(

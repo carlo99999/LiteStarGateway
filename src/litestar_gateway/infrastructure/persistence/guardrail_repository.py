@@ -53,6 +53,7 @@ class SQLAlchemyGuardrailRuleRepository:
             id=rule.id,
             team_id=rule.team_id,
             model_id=rule.model_id,
+            router_id=rule.router_id,
             name=rule.name,
             kind=rule.kind.value,
             direction=rule.direction.value,
@@ -72,6 +73,7 @@ class SQLAlchemyGuardrailRuleRepository:
         if row is None:
             raise LookupError(str(rule.id))
         row.model_id = rule.model_id
+        row.router_id = rule.router_id
         row.name = rule.name
         row.kind = rule.kind.value
         row.direction = rule.direction.value
@@ -99,7 +101,11 @@ class SQLAlchemyGuardrailRuleRepository:
         return bool(result.rowcount)
 
     async def resolve(
-        self, team_id: UUID, model_id: UUID, direction: Direction
+        self,
+        team_id: UUID,
+        model_id: UUID,
+        direction: Direction,
+        router_id: UUID | None = None,
     ) -> list[ActiveGuardrailRule]:
         rows = await self._session.scalars(
             select(GuardrailRuleModel).where(
@@ -110,7 +116,10 @@ class SQLAlchemyGuardrailRuleRepository:
         )
         by_id = {row.id: row for row in rows}
         chain = resolve_chain(
-            [row.to_entity() for row in by_id.values()], model_id=model_id, direction=direction
+            [row.to_entity() for row in by_id.values()],
+            model_id=model_id,
+            direction=direction,
+            router_id=router_id,
         )
         return [
             ActiveGuardrailRule(rule=rule, secret=await self._secret(by_id[rule.id]))

@@ -88,7 +88,7 @@ from litestar_gateway.domain.routing import (
 # because a judge guardrail makes a real, billable provider call: it has to be
 # attributed to the key that caused it, or the safety layer looks free.
 GuardrailChainFn = Callable[
-    [UUID, UUID | None, Model, Direction], Awaitable[tuple[ChainedProvider, ...]]
+    [UUID, UUID | None, Model, Direction, UUID | None], Awaitable[tuple[ChainedProvider, ...]]
 ]
 
 logger = logging.getLogger("litestar_gateway.response_cache")
@@ -341,6 +341,7 @@ class CompletionService:
         attribution: UsageAttribution | None = None,
         cache_key: CacheKey | None = None,
         semantic_text: str | None = None,
+        router_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Run one gateway call, observing success (usage + trace) and failure
         (error trace) before the exception propagates to the HTTP layer. The
@@ -440,7 +441,9 @@ class CompletionService:
             # consumed; refusing to bill a blocked answer would hand anyone who
             # can trip the response guardrail a free channel. So: bill, then
             # refuse to hand the content back.
-            return await self._guard_response(team_id, api_key_id, model, operation, response)
+            return await self._guard_response(
+                team_id, api_key_id, model, operation, response, router_id
+            )
         finally:
             await self._meter.release(reservation)
 
@@ -451,6 +454,7 @@ class CompletionService:
         model: Model,
         operation: str,
         request: dict[str, Any],
+        router_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Run the request-side chain, returning the request to actually send.
 
@@ -458,7 +462,7 @@ class CompletionService:
         or billed for a call that never happens."""
         if self._guardrails is None:
             return request
-        chain = await self._guardrails(team_id, api_key_id, model, Direction.REQUEST)
+        chain = await self._guardrails(team_id, api_key_id, model, Direction.REQUEST, router_id)
         if not chain:
             return request
         with self._traced_block(team_id, api_key_id, model, operation):
@@ -488,11 +492,12 @@ class CompletionService:
         model: Model,
         operation: str,
         response: dict[str, Any],
+        router_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Run the response-side chain on an already-billed response."""
         if self._guardrails is None:
             return response
-        chain = await self._guardrails(team_id, api_key_id, model, Direction.RESPONSE)
+        chain = await self._guardrails(team_id, api_key_id, model, Direction.RESPONSE, router_id)
         if not chain:
             return response
         # The `ok` trace for the billed call was already emitted; this adds a
@@ -1029,6 +1034,10 @@ class CompletionService:
         await self._meter.enforce_key_rate_limit(api_key_id)
         alias = request.get("model")
         model = None
+        # The router the caller named, when the alias was one. Known here
+        # because routing happens just below, before the guardrail hook —
+        # a router-scoped rule needs it to outrank the resolved model's.
+        routed_router_id: UUID | None = None
         resolved = (
             await self._callable_resolver.resolve(team_id, alias)
             if alias and self._callable_resolver is not None
@@ -1052,6 +1061,7 @@ class CompletionService:
                 decision = await self._router_service.route(
                     router, request, acting_team_id=team_id, api_key_id=api_key_id
                 )
+                routed_router_id = router.id
                 if router_context is not None:
                     router_context["router"] = router
                     router_context["decision"] = decision
@@ -1085,6 +1095,7 @@ class CompletionService:
                 decision = await self._router_service.route(
                     router, request, acting_team_id=team_id, api_key_id=api_key_id
                 )
+                routed_router_id = router.id
                 if router_context is not None:
                     router_context["router"] = router
                     router_context["decision"] = decision
@@ -1101,7 +1112,9 @@ class CompletionService:
         # reaches a provider. A redaction rewrites `clean`, so everything after
         # this line — admission, the trace, the provider call — sees the redacted
         # prompt and never the original.
-        clean = await self._guard_request(team_id, api_key_id, model, operation, clean)
+        clean = await self._guard_request(
+            team_id, api_key_id, model, operation, clean, routed_router_id
+        )
         reservation = await self._meter.admit(team_id, model, model.merge_params(clean))
         try:
             values = await self._credentials.get_values(model.credential_id)
@@ -1152,6 +1165,7 @@ class CompletionService:
             lambda: self._gateway.achat_completion(clean, model, values),
             reservation,
             attribution=attribution,
+            router_id=router.id if isinstance(router, RouterConfig) else None,
             cache_key=self._cache_key_for(team_id, api_key_id, "chat.completions", clean, model),
             semantic_text=self._semantic_text_for("chat.completions", clean, model),
         )

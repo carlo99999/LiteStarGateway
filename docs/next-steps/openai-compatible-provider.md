@@ -133,7 +133,9 @@ append-only audit trail like every other credential write.
   `UsageMeter`'s existing estimated-tokens path and record the call as
   estimated rather than authoritative — the machinery exists, this design only
   requires that the case is covered by a regression instead of discovered in
-  production.
+
+## production
+
 =======
   compatible servers ignore that field. Metering then falls through to
   `UsageMeter.metered_stream`'s estimated-tokens path (prompt text + streamed
@@ -166,7 +168,7 @@ append-only audit trail like every other credential write.
   configured at `0.0` (or an amortized synthetic rate) and budgets, the ledger,
   usage analytics and cache-savings all behave exactly as they do today.
 
-## 6. Non-goals
+### 6. Non-goals
 
 - **No Responses API.** `openai_compatible` is not added to
   `_EMULATED_RESPONSES_TOOL_PROVIDERS` or the streaming tool sets; `responses`

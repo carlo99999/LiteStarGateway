@@ -176,7 +176,11 @@ def _service(
     resolver_calls: list[Direction] | None = None,
 ) -> CompletionService:
     async def guardrails(
-        team_id: UUID, api_key_id: UUID | None, model: Model, direction: Direction
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        direction: Direction,
+        router_id: UUID | None = None,
     ) -> tuple[ChainedProvider, ...]:
         assert (team_id, api_key_id) == (TEAM_ID, KEY_ID)
         if resolver_calls is not None:
@@ -396,7 +400,11 @@ def _resolver_for(
     response_chain: tuple[ChainedProvider, ...] = (),
 ) -> Any:
     async def guardrails(
-        team_id: UUID, api_key_id: UUID | None, model: Model, direction: Direction
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        direction: Direction,
+        router_id: UUID | None = None,
     ) -> tuple[ChainedProvider, ...]:
         return request_chain if direction is Direction.REQUEST else response_chain
 
