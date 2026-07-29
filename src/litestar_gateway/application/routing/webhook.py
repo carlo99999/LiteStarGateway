@@ -98,12 +98,19 @@ async def post_to_approved_address(
     url: httpx.URL,
     host: str,
     addresses: tuple[ipaddress.IPv4Address | ipaddress.IPv6Address, ...],
-    payload: dict[str, Any],
+    payload: dict[str, Any] | None,
     headers: dict[str, str],
+    content: bytes | None = None,
 ) -> httpx.Response:
     """Connect to validated IPs while retaining the original HTTP/TLS
     identity (Host header + SNI = `host`, not the pinned IP). Shared by
-    `WebhookStrategy` and the Plan 07 budget-alert webhook channel."""
+    `WebhookStrategy`, the Plan 07 budget-alert webhook channel and the
+    guardrail webhook provider.
+
+    `content` sends pre-serialized bytes instead of letting httpx encode a
+    dict. A signed payload has to be transmitted byte-for-byte as it was
+    signed — re-encoding it here (different key order, different separators)
+    would produce a body whose MAC no longer verifies."""
     for index, address in enumerate(addresses):
         pinned_url = url.copy_with(host=str(address))
         try:
@@ -113,7 +120,8 @@ async def post_to_approved_address(
             # certificate validation. Redirects stay disabled.
             return await client.post(
                 pinned_url,
-                json=payload,
+                json=payload if content is None else None,
+                content=content,
                 headers=headers,
                 follow_redirects=False,
                 extensions={"sni_hostname": host},
