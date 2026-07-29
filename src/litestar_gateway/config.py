@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
+from litestar_gateway.domain.egress_policy import EgressAllowlist, parse_allowlist
 from litestar_gateway.domain.entities import TeamGrant, parse_team_mapping
 
 DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///gateway.db"
@@ -236,6 +237,15 @@ class Settings:
     # whether to trust the header. Empty ⇒ no inbound id is ever trusted; every
     # request gets a freshly generated one.
     trusted_proxy_ips: tuple[str, ...] = ()
+    # Egress allowlist for the `openai_compatible` provider (Plan 18): the only
+    # targets a credential of that provider may point `api_base` at. Entries are
+    # `<host|ip|cidr>[:port]`, comma-separated; see domain/egress_policy.py for
+    # the grammar. Unlike every other outbound target the gateway has, these are
+    # *expected* to be private (a self-hosted model server), so the SSRF
+    # deny-list cannot be applied — this list is what constrains them instead.
+    # Empty ⇒ the provider is unusable, so a deployment that upgrades gains no
+    # new egress reach until an operator opts in.
+    openai_compatible_allowed_hosts: tuple[str, ...] = ()
     # SSO via OIDC. No discovery URL ⇒ disabled. `oidc_admin_groups` (comma-sep)
     # maps IdP groups to platform admin.
     oidc_discovery_url: str | None = None
@@ -335,7 +345,17 @@ class Settings:
     def is_postgres(self) -> bool:
         return self.database_url.startswith(("postgresql", "postgres"))
 
+    def egress_allowlist(self) -> EgressAllowlist:
+        """The parsed `openai_compatible` egress allowlist (Plan 18). Empty
+        unless an operator opted in, which makes that provider unusable."""
+        return parse_allowlist(self.openai_compatible_allowed_hosts)
+
     def __post_init__(self) -> None:
+        # Before the local-env shortcut below: a malformed allowlist entry is a
+        # typo, not an insecurity, and the environment most likely to catch it
+        # is the developer's. Silently dropping it would leave an operator
+        # believing a target is authorized when it is not.
+        self.egress_allowlist()
         # Fail fast on insecure secrets everywhere except explicitly-local envs, so a
         # staging or misspelled environment cannot silently run on the public default
         # or a brute-forceable short key.
@@ -484,6 +504,11 @@ class Settings:
             ),
             trusted_proxy_ips=tuple(
                 v.strip() for v in os.environ.get("TRUSTED_PROXY_IPS", "").split(",") if v.strip()
+            ),
+            openai_compatible_allowed_hosts=tuple(
+                v.strip()
+                for v in os.environ.get("OPENAI_COMPATIBLE_ALLOWED_HOSTS", "").split(",")
+                if v.strip()
             ),
             oidc_discovery_url=os.environ.get("OIDC_DISCOVERY_URL"),
             oidc_client_id=os.environ.get("OIDC_CLIENT_ID"),
