@@ -28,6 +28,7 @@ from contextlib import asynccontextmanager
 from litestar import Litestar
 
 from litestar_gateway.config import Settings
+from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.notifications.channel_resolver import make_channel_resolver
 from litestar_gateway.infrastructure.persistence.budget_alert_state_repository import (
     SQLAlchemyBudgetAlertStateRepository,
@@ -36,6 +37,9 @@ from litestar_gateway.infrastructure.persistence.budget_repository import (
     SQLAlchemyBudgetRepository,
 )
 from litestar_gateway.infrastructure.persistence.database import Database
+from litestar_gateway.infrastructure.persistence.secret_key_repository import (
+    SQLAlchemySecretKeyRepository,
+)
 
 logger = logging.getLogger("litestar_gateway.budget_alerts")
 
@@ -55,7 +59,13 @@ def make_budget_alert_dispatcher(database: Database, settings: Settings):
         session_maker = app.state[database.config.session_maker_app_state_key]
         async with session_maker() as session:
             repo = SQLAlchemyBudgetAlertStateRepository(session)
-            resolve = make_channel_resolver(SQLAlchemyBudgetRepository(session), settings)
+            # The keyring is required here, not optional: this is the path that
+            # signs a team's alert webhook, so it is the one place that has to be
+            # able to decrypt that team's own secret.
+            keyring = Keyring(
+                SQLAlchemySecretKeyRepository(session), settings.salt_key, settings.jwt_secret
+            )
+            resolve = make_channel_resolver(SQLAlchemyBudgetRepository(session, keyring), settings)
             delivered = await repo.dispatch_pending(resolve, limit=_DISPATCH_BATCH)
             if delivered:
                 logger.info("delivered %d pending budget alert(s)", delivered)

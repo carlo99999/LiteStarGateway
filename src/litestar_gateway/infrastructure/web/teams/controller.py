@@ -697,7 +697,9 @@ class TeamController(Controller):
         await team_service.ensure_team_permission(
             current_admin, team_id, Permission.BUDGET_READ
         )  # team must exist
-        budget = await budget_repository.set(_parse_budget(data, team_id))
+        budget = await budget_repository.set(
+            _parse_budget(data, team_id), alert_webhook_secret=data.alert_webhook_secret
+        )
         await record_audit(
             audit_log,
             request,

@@ -84,8 +84,13 @@ def provide_usage_repository(db_session: NamedDependency[AsyncSession]) -> Usage
     return SQLAlchemyUsageRepository(db_session)
 
 
-def provide_budget_repository(db_session: NamedDependency[AsyncSession]) -> BudgetRepository:
-    return SQLAlchemyBudgetRepository(db_session)
+def provide_budget_repository(
+    db_session: NamedDependency[AsyncSession],
+    keyring: NamedDependency[Keyring],
+) -> BudgetRepository:
+    # The keyring is only used for the per-team webhook secret; the budget gate
+    # itself never touches it.
+    return SQLAlchemyBudgetRepository(db_session, keyring)
 
 
 def provide_api_key_budget_repository(

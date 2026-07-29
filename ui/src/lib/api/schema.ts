@@ -1755,6 +1755,8 @@ export interface components {
             thresholds: number[];
             alert_webhook_url: string | null;
             alert_email: string | null;
+            /** @default false */
+            has_alert_webhook_secret: boolean;
         };
         /** CallableModelResponse */
         CallableModelResponse: {
@@ -2320,6 +2322,7 @@ export interface components {
             thresholds?: number[] | null;
             alert_webhook_url?: string | null;
             alert_email?: string | null;
+            alert_webhook_secret?: string | null;
         };
         /** SetKeyBudgetRequest */
         SetKeyBudgetRequest: {
