@@ -264,7 +264,9 @@ class OpenAICompatibleProviderAdapter(OpenAICompatibleAdapter):
     """
 
     def _sync_client(self, model: Model, credentials: dict[str, str]) -> OpenAI:
-        return OpenAI(**_compatible_client_kwargs(credentials), **self._resilience.client_kwargs)
+        return OpenAI(
+            **_compatible_client_kwargs(credentials), **self._resilience.sync_client_kwargs
+        )
 
     def _async_client(self, model: Model, credentials: dict[str, str]) -> AsyncOpenAI:
         return AsyncOpenAI(

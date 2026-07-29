@@ -7,11 +7,8 @@
 (`domain/credential_policy.py`), the client registry (Plan 14) and the
 address-resolution helper behind the webhook SSRF guard
 (`application/routing/webhook.py:71`).
-<<<<<<< HEAD
-=======
 **Status:** ✅ complete (all five phases). Deviations and the one item left
 to another plan are recorded per phase below.
->>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
 **Theme:** reach — one `Provider` value, backed by the adapter that already
 exists, so a self-hostable gateway can call a self-hosted model server (vLLM,
 Ollama, TGI, llama.cpp) and any OpenAI-compatible SaaS endpoint.
@@ -35,15 +32,7 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
 
 ## Phases
 
-<<<<<<< HEAD
-
-### Phase 0 — Egress policy, fail-closed
-
-=======
-
 ### Phase 0 — Egress policy, fail-closed — ✅ complete
-
->>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
 
 - `config.py`: `openai_compatible_allowed_hosts: tuple[str, ...] = ()` from
   `OPENAI_COMPATIBLE_ALLOWED_HOSTS` (comma-separated `host`, `host:port` or
@@ -59,15 +48,7 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
   for literal IPv4/IPv6, hostnames, wrong port, CIDR in/out, and a host whose
   DNS answer changes between two resolutions (rebinding).
 
-<<<<<<< HEAD
-
-### Phase 1 — Provider value, credential contract, adapter wiring
-
-=======
-
 ### Phase 1 — Provider value, credential contract, adapter wiring — ✅ complete
-
->>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
 
 - `domain/entities/enums.py`: the new `Provider` member. Deliberately **not**
   added to `_PROVIDERS_HONORING_N` (design §5) — add the comment recording why.
@@ -78,17 +59,6 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
   subclass — client kwargs with the placeholder key when `api_key` is absent,
   and a `ClientKey` tagged `provider="openai_compatible"` so pooled clients
   never alias across providers.
-<<<<<<< HEAD
-- **Done when:** a chat completion and a stream succeed end to end against a
-  local OpenAI-shaped mock server (extend `scripts/load_mock_server.py`); a
-  credential without `api_base` is rejected; `n=2` is rejected before dispatch;
-  a regression asserts the client registry hands back distinct clients for an
-  `openai` and an `openai_compatible` credential sharing endpoint + key.
-
-### Phase 2 — Declared capabilities
-
-=======
-
 - **Done, with one deviation:** the credential contract, the placeholder key,
   the non-aliasing `ClientKey` and the allowlist gate on create *and* update
   are covered by unit tests plus integration tests through the real app
@@ -102,8 +72,6 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
 
 ### Phase 2 — Declared capabilities — ✅ complete
 
->>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
-
 - `domain/entities/model.py`: `capabilities: frozenset[str]` defaulting to
   `{"chat.completions"}`; ORM column + Alembic migration (existing rows
   backfill to the default, which is a no-op for the six current providers since
@@ -115,21 +83,6 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
   `embeddings` returns 501 with the existing `UnsupportedOperation` envelope,
   one that has declared it reaches the mock server, and the full suite is green
   proving the six existing providers resolve exactly as before.
-
-<<<<<<< HEAD
-
-### Phase 3 — Metering robustness
-
-- Cover the backend that ignores `stream_options.include_usage`: settlement
-  falls through to `UsageMeter`'s estimated-token path, the event is flagged
-  estimated rather than authoritative, and budget admission still holds.
-- **Done when:** a mock server that streams without a final usage chunk still
-  produces exactly one settled `usage_event` marked estimated, and a team at
-  its cap is still refused the next call.
-
-### Phase 4 — Console and docs
-
-=======
 
 ### Phase 3 — Metering robustness — ✅ complete
 
@@ -151,24 +104,12 @@ above the adapter, so `openai_compatible` inherits it unchanged.
 
 ### Phase 4 — Console and docs — ✅ complete
 
->>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
-
 - `ui/src/features/credentials/providerFields.ts`: label, `PROVIDERS` entry and
   the two fields, with an explicit warning rendered next to a `http://`
   `api_base` (the key crosses the network in clear).
 - Capability checkboxes on the model dialog; `ui/src/lib/api/schema.ts`
   regenerated (Plan 11's OpenAPI/TypeScript drift gate fails the build
   otherwise).
-<<<<<<< HEAD
-- `docs/openai-compatible-provider.md`: setup for vLLM / Ollama / TGI and one
-  SaaS example, the allowlist, the capability declaration, and the known
-  limits (no `n>1`, no Responses, estimated streaming usage on
-  non-conforming servers). Add the provider to the `README.md` endpoint table
-
-## and to `EXAMPLES.md`
-
-=======
-
 - [`docs/self-hosted-models.md`](../docs/self-hosted-models.md) (named for the
   use case rather than the provider id): the allowlist and its two matching
   rules, the credential contract, capability declaration, self-hosted
@@ -180,7 +121,6 @@ above the adapter, so `openai_compatible` inherits it unchanged.
 - **Nothing added to `EXAMPLES.md`.** Despite the README and mkdocs both
   labelling it "copy-paste examples", it has held LLM coding guidelines since
   the initial commit. That mislabel predates this plan and was left alone.
->>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
 - **Done when:** a platform admin can go from empty state to a working
   self-hosted chat model without touching the API by hand, and the internal
   Markdown link checker passes.

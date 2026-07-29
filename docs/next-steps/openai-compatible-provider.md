@@ -128,15 +128,6 @@ append-only audit trail like every other credential write.
   capability later is a clean follow-up; guessing now is a billing bug.
 - **Streaming usage may be absent.** `astream_chat_completion` forces
   `stream_options.include_usage` so billing never depends on the client. Many
-<<<<<<< HEAD
-  compatible servers ignore that field. Metering must therefore fall through to
-  `UsageMeter`'s existing estimated-tokens path and record the call as
-  estimated rather than authoritative — the machinery exists, this design only
-  requires that the case is covered by a regression instead of discovered in
-
-## production
-
-=======
   compatible servers ignore that field. Metering then falls through to
   `UsageMeter.metered_stream`'s estimated-tokens path (prompt text + streamed
   output at ~4 chars/token) rather than billing zero. That fallback sits
@@ -153,7 +144,6 @@ append-only audit trail like every other credential write.
   materially worse here. Adding the flag is a ledger column and belongs with
   Plan 13 (billing integrity) or Plan 10's estimated-vs-authoritative counts,
   not to this plan — but it should be raised there rather than left implicit.
->>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
 - **Client pooling must not alias.** `OpenAIAdapter._client_key` hardcodes
   `provider="openai"`. The new subclass must tag its `ClientKey` with
   `openai_compatible` so a pooled client is never shared across two providers
