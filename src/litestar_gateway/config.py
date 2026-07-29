@@ -393,6 +393,19 @@ class Settings:
                 "outside local environments (otherwise any Host header is accepted, "
                 "and URLs derived from it are attacker-controlled)"
             )
+        # A single `*` anywhere disables the check for the whole list — the
+        # middleware short-circuits on it and compiles no pattern at all — so a
+        # config that looks specific would not be. It is also the obvious thing
+        # to write to get past this very setting, which would leave the
+        # deployment exactly where the setting exists to move it from.
+        # `*.example.com` is a real constraint and stays allowed.
+        if any(host.strip() == "*" for host in self.allowed_hosts):
+            raise InsecureConfigurationError(
+                "ALLOWED_HOSTS must not contain '*' outside local environments: it "
+                "accepts every Host header, which is what this setting exists to "
+                "prevent. List the hostnames this deployment answers to, or use "
+                "'*.example.com' to match subdomains"
+            )
         if self.is_production and not self.redis_url:
             raise InsecureConfigurationError(
                 "Production requires Redis: set REDIS_URL (without it rate limits, "

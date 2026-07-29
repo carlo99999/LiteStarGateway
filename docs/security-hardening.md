@@ -54,7 +54,16 @@ already shipped (moved here from the README as the list grew).
   a request whose `Host` is not on it is refused. Several places derive a URL
   from the request host (the SSO callback when no fixed one is configured is the
   one that produced two findings), so this closes the class rather than each
-  instance. `*.example.com` matches subdomains.
+  instance. `*.example.com` matches subdomains; a bare `*` is **refused** at
+  startup, because it accepts every `Host` and so undoes the setting entirely.
+
+  Two things to get right when deploying, both of which fail loudly rather
+  than silently: entries are matched against the **whole `Host` header,
+  including the port**, so if your proxy forwards `Host: gw.example.com:8443`
+  the entry has to carry that port too (`gw.example.com:8443`) or every
+  request is refused with a 400. And only the real `Host` header is consulted —
+  `X-Forwarded-Host` is deliberately not, since a header any client can set is
+  not a statement about which hostname this deployment answers to.
 - **Durable billing** — a failed usage-ledger write no longer just
   logs-and-drops: the event is dead-lettered to a `pending_usage_event` outbox
   and a background reconciler (every 60s) retries it into `usage_event`
