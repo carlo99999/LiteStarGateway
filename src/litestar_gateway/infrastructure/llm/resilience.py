@@ -15,6 +15,11 @@ from typing import Any
 
 import httpx
 
+# The gateway never follows a redirect to a provider. An egress allowlist bounds
+# the host it was told to call, and a 307 from that host names a target nobody
+# authorized — so the bound has to survive the response, not just the request.
+_FOLLOW_REDIRECTS = False
+
 
 @dataclass(frozen=True)
 class ResilienceConfig:
@@ -47,7 +52,29 @@ class ResilienceConfig:
                 max_keepalive_connections=self.max_keepalive_connections,
             ),
             timeout=self.timeout,
+            follow_redirects=_FOLLOW_REDIRECTS,
         )
+
+    def build_sync_http_client(self) -> httpx.Client:
+        """The sync twin of `build_async_http_client`.
+
+        It exists for one reason: the SDK's own default client sets
+        `follow_redirects=True`, so a sync constructor left to itself is the
+        only client the gateway builds that would chase a redirect.
+        """
+        return httpx.Client(
+            limits=httpx.Limits(
+                max_connections=self.max_connections,
+                max_keepalive_connections=self.max_keepalive_connections,
+            ),
+            timeout=self.timeout,
+            follow_redirects=_FOLLOW_REDIRECTS,
+        )
+
+    @property
+    def sync_client_kwargs(self) -> dict[str, Any]:
+        """`client_kwargs` plus a sync client that does not follow redirects."""
+        return {**self.client_kwargs, "http_client": self.build_sync_http_client()}
 
     @property
     def async_client_kwargs(self) -> dict[str, Any]:

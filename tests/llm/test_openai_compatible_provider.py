@@ -98,6 +98,17 @@ class TestClientConstruction:
         )
         assert client.api_key == SUPPLIED_KEY
 
+    def test_neither_client_follows_redirects(self) -> None:
+        # A redirect is one hop out of the egress allowlist: the target of a 307
+        # from an allowlisted endpoint is not what the operator authorized, so
+        # whatever bound the allowlist provides would be void. The async client
+        # inherits httpx's `False`; the sync constructor is handed the SDK's own
+        # default client, which sets `follow_redirects=True` unless we pass one.
+        adapter = OpenAICompatibleProviderAdapter()
+        credentials = {"api_base": "https://allowed.test/v1"}
+        assert adapter._async_client(self._model(), credentials)._client.follow_redirects is False
+        assert adapter._sync_client(self._model(), credentials)._client.follow_redirects is False
+
     def test_the_client_key_cannot_alias_with_plain_openai(self) -> None:
         # Same endpoint, same key, different provider: the pooled client must
         # not be shared, or one provider's request would be served by the
