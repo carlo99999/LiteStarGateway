@@ -90,6 +90,21 @@ async def test_a_target_outside_the_allowlist_is_refused(opted_in: AsyncTestClie
     assert "not permitted" in body
 
 
+async def test_credentials_embedded_in_the_url_are_refused(opted_in: AsyncTestClient) -> None:
+    # `ClientKey.endpoint` holds `api_base` in the clear on purpose — it is a
+    # metric label and appears in registry log lines — so a password in the URL
+    # would be logged verbatim. This is the first provider whose only required
+    # field is a URL and whose `api_key` is optional, which makes
+    # `user:pass@host` the natural thing for an operator to paste.
+    url = "http://operator:pw-must-not-leak@10.42.0.9:8000/v1"  # pragma: allowlist secret
+    status, body = await _create(opted_in, url)
+    assert status == HTTP_400_BAD_REQUEST
+    # The host itself is allowlisted, so only the userinfo can be the reason.
+    assert "userinfo" in body
+    # The refusal must not echo back the very value it is refusing.
+    assert "pw-must-not-leak" not in body
+
+
 async def test_a_non_http_scheme_is_refused(opted_in: AsyncTestClient) -> None:
     status, _ = await _create(opted_in, "file:///etc/passwd")
     assert status == HTTP_400_BAD_REQUEST

@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from litestar_gateway.domain.credential_policy import validate_credential_values
+from litestar_gateway.domain.egress_policy import parse_allowlist
 from litestar_gateway.domain.entities import Provider
 from litestar_gateway.domain.exceptions import CredentialMisconfigured, UnsupportedOperation
 from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
@@ -22,6 +23,29 @@ from litestar_gateway.infrastructure.llm.openai_adapter import (
 # Test fixtures, not credentials.
 SUPPLIED_KEY = "real"  # pragma: allowlist secret
 SHARED_KEY = "same"  # pragma: allowlist secret
+
+
+def _compatible_model():
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from litestar_gateway.domain.entities import Model, ModelType
+
+    return Model(
+        id=uuid4(),
+        team_id=uuid4(),
+        name="local-llama",
+        provider=Provider.OPENAI_COMPATIBLE,
+        credential_id=uuid4(),
+        type=ModelType.CHAT,
+        provider_model_id="llama-3.1-8b",
+        params={},
+        api_version=None,
+        input_cost_per_token=0.0,
+        output_cost_per_token=0.0,
+        enabled=True,
+        created_at=datetime.now(UTC),
+    )
 
 
 class TestProviderValue:
@@ -139,3 +163,68 @@ class TestGatewayCapabilities:
         gateway = LLMGatewayImpl()
         with pytest.raises(UnsupportedOperation):
             gateway._resolve(TestClientConstruction()._model(), operation)
+
+
+class TestEgressAtDispatch:
+    """The allowlist has to hold when the connection is made, not only when the
+    credential is written.
+
+    Write-time validation cannot see either of the two things that change
+    afterwards: a name that resolves somewhere else later, and an operator who
+    narrows or clears the allowlist. The stored `api_base` is what the adapter
+    connects to on every subsequent call, so the check belongs there too.
+    """
+
+    def _adapter(self, entries: tuple[str, ...]) -> OpenAICompatibleProviderAdapter:
+        return OpenAICompatibleProviderAdapter(egress_allowlist=parse_allowlist(entries))
+
+    def _resolving_to(self, monkeypatch: pytest.MonkeyPatch, address: str) -> None:
+        import litestar_gateway.application.egress as egress_module
+
+        async def resolver(host: str) -> list[str]:
+            return [address]
+
+        monkeypatch.setattr(egress_module, "_resolve_host_addresses", resolver)
+
+    async def _lease(self, adapter: OpenAICompatibleProviderAdapter, api_base: str) -> object:
+        async with adapter._leased_async_client(_compatible_model(), {"api_base": api_base}) as c:
+            return c
+
+    async def test_a_host_that_rebinds_out_of_range_is_refused(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Allowlisted at write time, metadata endpoint by the time it is called.
+        self._resolving_to(monkeypatch, "169.254.169.254")
+        with pytest.raises(CredentialMisconfigured, match="not permitted"):
+            await self._lease(self._adapter(("10.42.0.0/16",)), "http://vllm.internal:8000/v1")
+
+    async def test_clearing_the_allowlist_stops_an_existing_credential(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Revoking an entry has to bite on traffic, or it is not a revocation.
+        self._resolving_to(monkeypatch, "10.42.0.9")
+        with pytest.raises(CredentialMisconfigured, match="OPENAI_COMPATIBLE_ALLOWED_HOSTS"):
+            await self._lease(self._adapter(()), "http://vllm.internal:8000/v1")
+
+    async def test_an_allowlisted_target_still_dispatches(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._resolving_to(monkeypatch, "10.42.0.9")
+        client = await self._lease(self._adapter(("10.42.0.0/16",)), "http://vllm.internal:8000/v1")
+        assert client is not None
+
+    async def test_a_literal_address_is_checked_without_dns(self) -> None:
+        # No resolver patched: a literal must not need one, and must still be
+        # matched against the allowlist rather than waved through.
+        with pytest.raises(CredentialMisconfigured, match="not permitted"):
+            await self._lease(self._adapter(("10.42.0.0/16",)), "http://169.254.169.254/v1")
+
+    def test_the_gateway_wires_the_allowlist_into_the_adapter(self) -> None:
+        # Without this the guard above is dead code in the running gateway.
+        allowlist = parse_allowlist(("10.42.0.0/16",))
+        gateway = LLMGatewayImpl(egress_allowlist=allowlist)
+        adapter, _ = gateway._registry[Provider.OPENAI_COMPATIBLE]
+        # The registered adapter must be the guarded subclass, not a plain
+        # OpenAI one: the guard lives there, so the type is the guarantee.
+        assert isinstance(adapter, OpenAICompatibleProviderAdapter)
+        assert adapter._egress_allowlist == allowlist

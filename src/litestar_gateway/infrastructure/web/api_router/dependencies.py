@@ -76,7 +76,11 @@ def build_llm_gateway(settings: Settings) -> LLMGatewayImpl:
     port's request-serving surface can still assign it to an `LLMGateway`-typed
     variable, since `LLMGatewayImpl` satisfies that Protocol structurally."""
     return LLMGatewayImpl(
-        ResilienceConfig(timeout=settings.request_timeout, max_retries=settings.max_retries)
+        ResilienceConfig(timeout=settings.request_timeout, max_retries=settings.max_retries),
+        # Static config, parsed once here rather than per call: the same
+        # allowlist the credential write path uses, so a target cannot be
+        # authorized by one and not the other.
+        egress_allowlist=settings.egress_allowlist(),
     )
 
 

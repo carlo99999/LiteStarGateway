@@ -70,7 +70,7 @@ curl -X POST https://<gateway>/credentials \
 
 | Field | Required | Notes |
 |---|---|---|
-| `api_base` | ✅ | The endpoint, including the `/v1` suffix your server expects. The **only** endpoint source: a team admin cannot redirect it. |
+| `api_base` | ✅ | The endpoint, including the `/v1` suffix your server expects. The **only** endpoint source: a team admin cannot redirect it. Credentials in the URL (`user:password@host`) are refused — the endpoint is kept in the clear for metric labels and log lines, so put the secret in `api_key`. |
 | `api_key` | — | Omit it for a server that needs no auth. The gateway then sends a fixed, non-secret placeholder, because the SDK refuses an empty key. A server that *does* require auth answers 401. |
 
 ## 3. Declare what the model serves

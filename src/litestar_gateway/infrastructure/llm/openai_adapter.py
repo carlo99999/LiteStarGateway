@@ -11,9 +11,12 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
+from urllib.parse import urlsplit
 
 from openai import AsyncOpenAI, BadRequestError, OpenAI
 
+from litestar_gateway.application.egress import resolve_allowlisted_addresses
+from litestar_gateway.domain.egress_policy import EgressAllowlist
 from litestar_gateway.domain.entities import Model
 from litestar_gateway.domain.exceptions import CredentialMisconfigured
 from litestar_gateway.infrastructure.llm.client_registry import (
@@ -261,7 +264,61 @@ class OpenAICompatibleProviderAdapter(OpenAICompatibleAdapter):
     **No vendor branches, ever.** A backend needing special-casing is by
     definition not OpenAI-compatible and belongs behind its own provider with
     its own official SDK (design §1).
+
+    Unlike every other provider, the endpoint here is operator-supplied, so it
+    is the one adapter that carries an egress allowlist and re-checks it on
+    every call — see `_leased_async_client`.
     """
+
+    def __init__(
+        self,
+        resilience: ResilienceConfig | None = None,
+        client_registry: ClientRegistry | None = None,
+        egress_allowlist: EgressAllowlist | None = None,
+    ) -> None:
+        super().__init__(resilience, client_registry)
+        # Empty refuses everything, which is the fail-closed default the
+        # provider ships with (Plan 18 §4): a deployment that has not opted in
+        # gains no egress reach, at write time *or* at call time.
+        self._egress_allowlist = egress_allowlist or EgressAllowlist(entries=())
+
+    async def _authorize_egress(self, credentials: dict[str, str]) -> None:
+        """Re-resolve `api_base` and refuse a target the operator has not
+        authorized.
+
+        Validating on credential write cannot cover either of the two things
+        that change afterwards: the name may resolve somewhere else later (DNS
+        rebinding), and the operator may narrow or clear the allowlist — in
+        which case every stored `api_base` would otherwise keep being called,
+        making a revocation a no-op on traffic.
+        """
+        api_base = credentials.get("api_base", "")
+        parsed = urlsplit(api_base)
+        try:
+            host, port = parsed.hostname, parsed.port
+        except ValueError as exc:  # malformed port
+            raise CredentialMisconfigured(f"api_base is not a usable URL: {exc}") from exc
+        if not host:
+            raise CredentialMisconfigured(f"api_base has no host, got {api_base!r}")
+        try:
+            await resolve_allowlisted_addresses(host, port, self._egress_allowlist)
+        except ValueError as exc:
+            raise CredentialMisconfigured(str(exc)) from exc
+
+    @asynccontextmanager
+    async def _leased_async_client(
+        self, model: Model, credentials: dict[str, str]
+    ) -> AsyncIterator[Any]:
+        """Every async operation funnels through here — chat, streaming,
+        embeddings, images — so the allowlist is checked once, before a client
+        is leased, and no operation can be added that skips it.
+
+        The check runs *before* the lease deliberately: a refused target must
+        not construct or reuse a pooled client for itself.
+        """
+        await self._authorize_egress(credentials)
+        async with super()._leased_async_client(model, credentials) as client:
+            yield client
 
     def _sync_client(self, model: Model, credentials: dict[str, str]) -> OpenAI:
         return OpenAI(
