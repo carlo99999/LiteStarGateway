@@ -23,6 +23,7 @@ from litestar_gateway.domain.exceptions import (
 from litestar_gateway.domain.key_generator import generate_key, hash_key
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.domain.ports import (
+    ApiKeyBudgetRepository,
     APIKeyRepository,
     AuditLog,
     ServicePrincipalRepository,
@@ -60,12 +61,16 @@ class APIKeyService:
         users: UserRepository,
         service_principals: ServicePrincipalRepository | None = None,
         audit_log: AuditLog | None = None,
+        api_key_budgets: ApiKeyBudgetRepository | None = None,
     ) -> None:
         self._repo = repository
         self._transaction = transaction
         self._users = users
         self._sps = service_principals
         self._audit = audit_log
+        # Only rotation needs it: a replacement key must inherit its
+        # predecessor's spend cap (ISSUE-052).
+        self._key_budgets = api_key_budgets
 
     @asynccontextmanager
     async def _unit_of_work(self) -> AsyncGenerator[None]:
@@ -247,6 +252,20 @@ class APIKeyService:
                 _now() + grace,
             ):
                 raise APIKeyNotFound(str(key_id))
+            # The cap follows the key. Rotation already preserves scope, rate
+            # limit, owner and TTL; the per-key cap was simply missed when it was
+            # added later, so routine hygiene silently turned a capped key into an
+            # uncapped one and the old cap died with the old key (ISSUE-052).
+            # Staged, not committed, so there is no window in which the
+            # replacement is live without its cap.
+            if self._key_budgets is not None:
+                cap = await self._key_budgets.get(key_id)
+                if cap is not None:
+                    await self._key_budgets.stage_set(
+                        dataclasses.replace(
+                            cap, id=uuid4(), api_key_id=issued.key.id, created_at=_now()
+                        )
+                    )
             if audit_event is not None:
                 if self._audit is None:
                     raise RuntimeError("Audit log is required for audited rotation")

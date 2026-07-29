@@ -31,14 +31,27 @@ class SQLAlchemyApiKeyBudgetRepository:
 
     async def set(self, budget: ApiKeyBudget) -> ApiKeyBudget:
         try:
-            return await self._upsert(budget)
+            row = await self._upsert(budget)
         except IntegrityError:
             # Concurrent insert for the same key lost the unique-constraint
             # race; retry once — the row now exists, so this becomes an update.
             await self._session.rollback()
-            return await self._upsert(budget)
+            row = await self._upsert(budget)
+        await self._session.commit()
+        await self._session.refresh(row)
+        return row.to_entity()
 
-    async def _upsert(self, budget: ApiKeyBudget) -> ApiKeyBudget:
+    async def stage_set(self, budget: ApiKeyBudget) -> ApiKeyBudget:
+        """`set` without the commit, for a caller that owns the transaction.
+
+        Key rotation copies a cap onto the replacement key inside the same unit
+        of work that issues it: committing here would break that atomicity and
+        leave a window where the new key is live and uncapped, which is the whole
+        thing the copy exists to prevent (ISSUE-052).
+        """
+        return (await self._upsert(budget)).to_entity()
+
+    async def _upsert(self, budget: ApiKeyBudget) -> ApiKeyBudgetModel:
         row = await self._session.scalar(
             select(ApiKeyBudgetModel).where(ApiKeyBudgetModel.api_key_id == budget.api_key_id)
         )
@@ -56,9 +69,8 @@ class SQLAlchemyApiKeyBudgetRepository:
             row.limit_cost = budget.limit_cost
             row.window = budget.window.value
             row.mode = budget.mode.value
-        await self._session.commit()
-        await self._session.refresh(row)
-        return row.to_entity()
+        await self._session.flush()
+        return row
 
     async def remove(self, api_key_id: UUID) -> bool:
         # Any: the async execute() is typed Result, but at runtime it is a
