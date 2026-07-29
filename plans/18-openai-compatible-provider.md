@@ -77,14 +77,23 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
   one that has declared it reaches the mock server, and the full suite is green
   proving the six existing providers resolve exactly as before.
 
-### Phase 3 — Metering robustness
+### Phase 3 — Metering robustness — ✅ complete
 
-- Cover the backend that ignores `stream_options.include_usage`: settlement
-  falls through to `UsageMeter`'s estimated-token path, the event is flagged
-  estimated rather than authoritative, and budget admission still holds.
-- **Done when:** a mock server that streams without a final usage chunk still
-  produces exactly one settled `usage_event` marked estimated, and a team at
-  its cap is still refused the next call.
+Scoped down on contact with the code. The estimated-token fallback for a
+stream that never reports usage was **already implemented and tested**
+(`UsageMeter.metered_stream`, `tests/completions/test_stream_usage_fallback.py`
+`::test_stream_without_usage_chunk_records_estimated_usage`), and it lives
+above the adapter, so `openai_compatible` inherits it unchanged.
+
+- Delivered: that regression is parametrized over `openai_compatible`, pinning
+  that the new provider goes through the same settlement path — on a
+  self-hosted backend the estimate is the normal case, not an edge one.
+- **Not delivered, and not this plan's to deliver:** the phase originally said
+  the event would be "flagged estimated rather than authoritative". No such
+  flag exists — `UsageEvent` has no estimated/authoritative marker, so nobody
+  can query which spend was estimated. Adding it is a ledger column; it is
+  recorded in the design doc §5 and belongs with Plan 13 or Plan 10's
+  estimated-vs-authoritative counts.
 
 ### Phase 4 — Console and docs
 

@@ -42,7 +42,7 @@ async def _credential(client: AsyncTestClient, provider: str, name: str) -> str:
     values = (
         {"api_base": "http://10.42.0.9:8000/v1"}
         if provider == "openai_compatible"
-        else {"api_key": "sk-test"}
+        else {"api_key": "sk-test"}  # pragma: allowlist secret
     )
     response = await client.post(
         "/credentials",
