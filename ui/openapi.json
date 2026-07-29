@@ -13595,6 +13595,18 @@
                         ],
                         "description": "Scope the rule to one model of this team. Omit for team-wide. Model-scoped rules REPLACE the team-wide ones for that model."
                     },
+                    "router_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Scope the rule to one router of this team — the alias the caller asks for, rather than whichever candidate the strategy picks. OUTRANKS a model-scoped rule on the resolved model. Mutually exclusive with model_id."
+                    },
                     "enabled": {
                         "type": "boolean",
                         "description": "Whether the rule runs.",
@@ -14174,6 +14186,17 @@
                         "type": "boolean"
                     },
                     "model_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "router_id": {
                         "oneOf": [
                             {
                                 "type": "string",
@@ -16157,6 +16180,18 @@
                             }
                         ],
                         "description": "Scope to one model."
+                    },
+                    "router_id": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Scope to one router; outranks a model-scoped rule."
                     },
                     "enabled": {
                         "oneOf": [

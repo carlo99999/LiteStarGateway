@@ -1901,6 +1901,8 @@ export interface components {
             position: number;
             /** @description Scope the rule to one model of this team. Omit for team-wide. Model-scoped rules REPLACE the team-wide ones for that model. */
             model_id?: string | null;
+            /** @description Scope the rule to one router of this team — the alias the caller asks for, rather than whichever candidate the strategy picks. OUTRANKS a model-scoped rule on the resolved model. Mutually exclusive with model_id. */
+            router_id?: string | null;
             /**
              * @description Whether the rule runs.
              * @default true
@@ -2048,6 +2050,7 @@ export interface components {
             enabled: boolean;
             has_secret: boolean;
             model_id?: string | null;
+            router_id?: string | null;
             config?: {
                 [key: string]: unknown;
             };
@@ -2536,6 +2539,8 @@ export interface components {
             position?: number | null;
             /** @description Scope to one model. */
             model_id?: string | null;
+            /** @description Scope to one router; outranks a model-scoped rule. */
+            router_id?: string | null;
             /** @description Enable or disable the rule. */
             enabled?: boolean | null;
             /** @description Rotate the HMAC secret. Omit to keep the current one. */

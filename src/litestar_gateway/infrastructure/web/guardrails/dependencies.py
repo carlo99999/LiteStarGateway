@@ -18,6 +18,9 @@ from litestar_gateway.infrastructure.persistence.guardrail_repository import (
 from litestar_gateway.infrastructure.persistence.model_repository import (
     SQLAlchemyModelRepository,
 )
+from litestar_gateway.infrastructure.persistence.router_repository import (
+    SQLAlchemyRouterRepository,
+)
 
 
 def provide_guardrail_policy_service(
@@ -29,4 +32,5 @@ def provide_guardrail_policy_service(
         SQLAlchemyGuardrailRuleRepository(db_session, keyring),
         team_service,
         SQLAlchemyModelRepository(db_session),
+        SQLAlchemyRouterRepository(db_session),
     )

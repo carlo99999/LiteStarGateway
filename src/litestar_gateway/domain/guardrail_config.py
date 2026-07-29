@@ -50,6 +50,11 @@ def validate_rule(rule: GuardrailRule, *, secret: str | None = None) -> None:
         raise InvalidGuardrailRule(f"name must be at most {MAX_NAME_LENGTH} characters")
     if rule.position < 0:
         raise InvalidGuardrailRule("position must be zero or positive")
+    if rule.model_id is not None and rule.router_id is not None:
+        # `resolve_chain` picks one tier; a rule claiming both would apply
+        # under the router tier and never under the model one, so the model
+        # scope would be a lie the operator could read back.
+        raise InvalidGuardrailRule("a rule is scoped to a model or a router, not both")
     if rule.kind is GuardrailKind.WEBHOOK:
         _validate_webhook(rule.config, secret=secret, has_secret=rule.has_secret)
     else:

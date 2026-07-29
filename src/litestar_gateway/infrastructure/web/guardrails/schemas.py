@@ -58,6 +58,17 @@ class CreateGuardrailRuleRequest:
             )
         ),
     ] = None
+    router_id: Annotated[
+        UUID | None,
+        Parameter(
+            description=(
+                "Scope the rule to one router of this team — the alias the caller "
+                "asks for, rather than whichever candidate the strategy picks. "
+                "OUTRANKS a model-scoped rule on the resolved model. Mutually "
+                "exclusive with model_id."
+            )
+        ),
+    ] = None
     enabled: Annotated[bool, Parameter(description="Whether the rule runs.")] = True
     signing_secret: Annotated[
         str | None,
@@ -84,6 +95,10 @@ class UpdateGuardrailRuleRequest:
     fail_policy: Annotated[str | None, Parameter(description="`open` or `closed`.")] = None
     position: Annotated[int | None, Parameter(description="Order within the chain.")] = None
     model_id: Annotated[UUID | None, Parameter(description="Scope to one model.")] = None
+    router_id: Annotated[
+        UUID | None,
+        Parameter(description="Scope to one router; outranks a model-scoped rule."),
+    ] = None
     enabled: Annotated[bool | None, Parameter(description="Enable or disable the rule.")] = None
     signing_secret: Annotated[
         str | None, Parameter(description="Rotate the HMAC secret. Omit to keep the current one.")
@@ -102,6 +117,7 @@ class GuardrailRuleResponse:
     enabled: bool
     has_secret: bool
     model_id: UUID | None = None
+    router_id: UUID | None = None
     config: dict[str, Any] = field(default_factory=dict)
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -112,6 +128,7 @@ class GuardrailRuleResponse:
             id=rule.id,
             team_id=rule.team_id,
             model_id=rule.model_id,
+            router_id=rule.router_id,
             name=rule.name,
             kind=rule.kind.value,
             direction=rule.direction.value,

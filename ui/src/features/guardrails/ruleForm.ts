@@ -36,7 +36,8 @@ export interface RuleFormState {
   direction: GuardrailDirection;
   failPolicy: FailPolicy;
   position: string;
-  modelId: string;
+  /** Scope, as one select value: "" (team-wide), "model:<id>" or "router:<id>". */
+  scope: string;
   enabled: boolean;
   /** webhook */
   url: string;
@@ -57,7 +58,7 @@ export const EMPTY_RULE_FORM: RuleFormState = {
   // have to say so.
   failPolicy: "closed",
   position: "0",
-  modelId: "",
+  scope: "",
   enabled: true,
   url: "",
   timeoutMs: "",
@@ -74,9 +75,29 @@ export interface RulePayload {
   fail_policy: FailPolicy;
   position: number;
   model_id: string | null;
+  router_id: string | null;
   enabled: boolean;
   config: Record<string, unknown>;
   signing_secret?: string;
+}
+
+
+export const SCOPE_TEAM_WIDE = "";
+
+/** Encode a scope pick for the single select. */
+export function scopeValue(kind: "model" | "router", id: string): string {
+  return `${kind}:${id}`;
+}
+
+/** Split a scope value into the two mutually exclusive API fields. The backend
+ * refuses a rule carrying both, so exactly one is ever non-null. */
+export function scopeToFields(scope: string): {
+  model_id: string | null;
+  router_id: string | null;
+} {
+  if (scope.startsWith("model:")) return { model_id: scope.slice(6), router_id: null };
+  if (scope.startsWith("router:")) return { model_id: null, router_id: scope.slice(7) };
+  return { model_id: null, router_id: null };
 }
 
 function optionalInt(text: string, label: string, low: number, high: number): number | undefined {
@@ -124,7 +145,7 @@ export function toPayload(form: RuleFormState): RulePayload {
     direction: form.direction,
     fail_policy: form.failPolicy,
     position,
-    model_id: form.modelId.trim() === "" ? null : form.modelId.trim(),
+    ...scopeToFields(form.scope),
     enabled: form.enabled,
     config,
   };
@@ -154,6 +175,7 @@ interface StoredRule {
   position: number;
   enabled: boolean;
   model_id?: string | null;
+  router_id?: string | null;
   config?: Record<string, unknown>;
 }
 
@@ -177,7 +199,11 @@ export function fromRule(rule: StoredRule): RuleFormState {
     direction: rule.direction === "response" ? "response" : "request",
     failPolicy: rule.fail_policy === "open" ? "open" : "closed",
     position: String(rule.position),
-    modelId: rule.model_id ?? "",
+    scope: rule.router_id
+      ? scopeValue("router", rule.router_id)
+      : rule.model_id
+        ? scopeValue("model", rule.model_id)
+        : SCOPE_TEAM_WIDE,
     enabled: rule.enabled,
     url: asString(config.url),
     timeoutMs: asString(config.timeout_ms),
@@ -190,7 +216,7 @@ export function fromRule(rule: StoredRule): RuleFormState {
 
 /** Human summary of what a rule does, for the list. */
 export function describeRule(rule: StoredRule): string {
-  const scope = rule.model_id ? "one model" : "all models";
+  const scope = rule.router_id ? "one router" : rule.model_id ? "one model" : "all models";
   const config = rule.config ?? {};
   const target = rule.kind === "webhook" ? asString(config.url) : asString(config.judge_model);
   return `${rule.direction} · ${scope} · fail ${rule.fail_policy} · ${target}`;

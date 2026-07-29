@@ -25,10 +25,15 @@ from litestar_gateway.domain.exceptions import (
     GuardrailRuleNotFound,
     InvalidGuardrailRule,
     ModelNotFound,
+    RouterNotFound,
 )
 from litestar_gateway.domain.guardrail_config import validate_rule
 from litestar_gateway.domain.guardrails import Direction, FailPolicy
-from litestar_gateway.domain.ports import GuardrailRuleRepository, ModelRepository
+from litestar_gateway.domain.ports import (
+    GuardrailRuleRepository,
+    ModelRepository,
+    RouterRepository,
+)
 
 
 class GuardrailPolicyService:
@@ -37,9 +42,11 @@ class GuardrailPolicyService:
         rules: GuardrailRuleRepository,
         teams: TeamService,
         models: ModelRepository | None = None,
+        routers: RouterRepository | None = None,
     ) -> None:
         self._rules = rules
         self._teams = teams
+        self._routers = routers
         # Optional only so library use can skip the model check; the web wiring
         # always passes one.
         self._models = models
@@ -68,6 +75,7 @@ class GuardrailPolicyService:
         config: dict[str, Any],
         position: int = 0,
         model_id: UUID | None = None,
+        router_id: UUID | None = None,
         enabled: bool = True,
         secret: str | None = None,
     ) -> GuardrailRule:
@@ -75,10 +83,12 @@ class GuardrailPolicyService:
             principal, team_id, Permission.GUARDRAILS_MANAGE
         )
         await self._ensure_model_visible(team_id, model_id)
+        await self._ensure_router_visible(team_id, router_id)
         rule = GuardrailRule(
             id=uuid4(),
             team_id=team_id,
             model_id=model_id,
+            router_id=router_id,
             name=name,
             kind=kind,
             direction=direction,
@@ -109,6 +119,7 @@ class GuardrailPolicyService:
         applied = {k: v for k, v in changes.items() if v is not None}
         updated = dataclasses.replace(current, **applied)
         await self._ensure_model_visible(team_id, updated.model_id)
+        await self._ensure_router_visible(team_id, updated.router_id)
         # Validated as a whole: a partial edit that leaves the url untouched
         # must still be judged against the resulting rule, not the diff.
         validate_rule(updated, secret=secret)
@@ -135,6 +146,15 @@ class GuardrailPolicyService:
         existing = await self._rules.list_for_team(team_id)
         if any(r.name == name for r in existing):
             raise InvalidGuardrailRule(f"a guardrail rule named '{name}' already exists")
+
+    async def _ensure_router_visible(self, team_id: UUID, router_id: UUID | None) -> None:
+        """Same reasoning as `_ensure_model_visible`: a rule scoped to another
+        team's router would never fire, leaving the operator believing an
+        alias is guarded when it is not."""
+        if router_id is None or self._routers is None:
+            return
+        if await self._routers.get(team_id, router_id) is None:
+            raise RouterNotFound(str(router_id))
 
     async def _ensure_model_visible(self, team_id: UUID, model_id: UUID | None) -> None:
         """A model-scoped rule must name a model of this team.

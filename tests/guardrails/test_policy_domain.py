@@ -20,6 +20,8 @@ from litestar_gateway.domain.guardrails import Direction, FailPolicy
 TEAM = uuid4()
 MODEL = uuid4()
 OTHER_MODEL = uuid4()
+ROUTER = uuid4()
+OTHER_ROUTER = uuid4()
 SIGNING_MATERIAL = "webhook-signing-material"  # pragma: allowlist secret
 
 
@@ -29,6 +31,7 @@ def _rule(
     direction: Direction = Direction.REQUEST,
     position: int = 0,
     model_id=None,
+    router_id=None,
     enabled: bool = True,
     kind: GuardrailKind = GuardrailKind.JUDGE,
     config: dict | None = None,
@@ -38,6 +41,7 @@ def _rule(
         id=uuid4(),
         team_id=TEAM,
         model_id=model_id,
+        router_id=router_id,
         name=name,
         kind=kind,
         direction=direction,
@@ -94,6 +98,71 @@ def test_disabled_and_other_direction_rules_are_excluded() -> None:
 def test_no_applicable_rules_is_an_empty_chain() -> None:
     # Which the call path treats exactly like having no guardrails at all.
     assert resolve_chain([], model_id=MODEL, direction=Direction.REQUEST) == []
+
+
+# ── Resolution: router scope ──────────────────────────────────────────────────
+#
+# A rule can be attached to the *router* the caller asked for, not only to the
+# model the gateway happened to pick. Attaching to candidates instead leaves a
+# silent hole: add a candidate to the router later and it is unguarded.
+
+
+def test_a_router_scoped_rule_applies_to_a_call_routed_through_it() -> None:
+    rules = [_rule("guard-the-router", router_id=ROUTER)]
+    chain = resolve_chain(rules, model_id=MODEL, router_id=ROUTER, direction=Direction.REQUEST)
+    assert [r.name for r in chain] == ["guard-the-router"]
+
+
+def test_a_router_scoped_rule_does_not_apply_to_a_direct_model_call() -> None:
+    # Same model, but the caller named the model rather than the router: the
+    # router's policy is about the alias, so it must not leak onto direct calls.
+    rules = [_rule("guard-the-router", router_id=ROUTER)]
+    assert resolve_chain(rules, model_id=MODEL, router_id=None, direction=Direction.REQUEST) == []
+
+
+def test_a_router_scoped_rule_does_not_apply_to_another_router() -> None:
+    rules = [_rule("guard-the-router", router_id=ROUTER)]
+    chain = resolve_chain(
+        rules, model_id=MODEL, router_id=OTHER_ROUTER, direction=Direction.REQUEST
+    )
+    assert chain == []
+
+
+def test_the_router_rule_wins_over_a_rule_on_the_resolved_model() -> None:
+    # The precedence decision. The caller asked for the router; the model is the
+    # gateway's choice. If a candidate's own rule outranked the router's, adding
+    # a rule to one candidate would quietly exempt it from the router's guard —
+    # the hole this scope exists to close.
+    rules = [
+        _rule("team-wide"),
+        _rule("on-the-model", model_id=MODEL),
+        _rule("on-the-router", router_id=ROUTER),
+    ]
+    chain = resolve_chain(rules, model_id=MODEL, router_id=ROUTER, direction=Direction.REQUEST)
+    assert [r.name for r in chain] == ["on-the-router"]
+
+
+def test_without_a_router_the_model_rule_still_wins_over_team_wide() -> None:
+    # The pre-existing ladder is unchanged for direct calls.
+    rules = [
+        _rule("team-wide"),
+        _rule("on-the-model", model_id=MODEL),
+        _rule("on-the-router", router_id=ROUTER),
+    ]
+    chain = resolve_chain(rules, model_id=MODEL, router_id=None, direction=Direction.REQUEST)
+    assert [r.name for r in chain] == ["on-the-model"]
+
+
+def test_a_routed_call_falls_back_to_the_model_rule_when_the_router_has_none() -> None:
+    rules = [_rule("team-wide"), _rule("on-the-model", model_id=MODEL)]
+    chain = resolve_chain(rules, model_id=MODEL, router_id=ROUTER, direction=Direction.REQUEST)
+    assert [r.name for r in chain] == ["on-the-model"]
+
+
+def test_a_routed_call_falls_back_to_team_wide_when_nothing_more_specific_exists() -> None:
+    rules = [_rule("team-wide")]
+    chain = resolve_chain(rules, model_id=MODEL, router_id=ROUTER, direction=Direction.REQUEST)
+    assert [r.name for r in chain] == ["team-wide"]
 
 
 # ── Validation: webhook ───────────────────────────────────────────────────────
@@ -175,6 +244,17 @@ def test_judge_char_budget_is_bounded() -> None:
 
 
 # ── Validation: identity ──────────────────────────────────────────────────────
+
+
+def test_a_rule_cannot_be_scoped_to_both_a_model_and_a_router() -> None:
+    # `resolve_chain` picks one tier, so such a rule would apply under the
+    # router tier and never under the model one — the model scope would be a
+    # lie the operator can read back from the API.
+    with pytest.raises(InvalidGuardrailRule, match="not both"):
+        validate_rule(_rule("both", model_id=MODEL, router_id=ROUTER))
+    # Either alone is fine.
+    validate_rule(_rule("model-only", model_id=MODEL))
+    validate_rule(_rule("router-only", router_id=ROUTER))
 
 
 def test_name_and_position_are_validated() -> None:

@@ -21,12 +21,15 @@ import {
   GUARDRAIL_KINDS,
   JUDGE_CATEGORIES,
   requiresSecret,
+  scopeValue,
   toPayload,
   type GuardrailDirection,
   type GuardrailKind,
   type FailPolicy,
   type RuleFormState,
 } from "@/features/guardrails/ruleForm";
+import { listCallableModels } from "@/features/models/api";
+import { listCallableRouters } from "@/features/routing/api";
 import { canManageGuardrails } from "@/features/teams/access";
 import { useAccessibleTeams } from "@/features/teams/useAccessibleTeams";
 import { toError } from "@/lib/toError";
@@ -100,6 +103,18 @@ export function GuardrailsPage() {
   const rules = useQuery({
     queryKey: ["teams", teamId, "guardrails"],
     queryFn: () => listGuardrailRules(teamId),
+    enabled: teamId.length > 0,
+  });
+  // Everything the team can call, for the two scope/judge selects. A rule used
+  // to be scoped by typing a raw model UUID.
+  const callableModels = useQuery({
+    queryKey: ["teams", teamId, "models", "callable"],
+    queryFn: () => listCallableModels(teamId),
+    enabled: teamId.length > 0,
+  });
+  const callableRouters = useQuery({
+    queryKey: ["teams", teamId, "routers", "callable"],
+    queryFn: () => listCallableRouters(teamId),
     enabled: teamId.length > 0,
   });
 
@@ -345,13 +360,25 @@ export function GuardrailsPage() {
             <div className="flex flex-wrap items-end gap-3">
               <div className="grid gap-2">
                 <Label htmlFor="guardrail-judge">judge model</Label>
-                <Input
+                {/* Chat models only, and no routers: the judge resolves through
+                    the model repository and rejects a non-chat model, so any
+                    other option here would be a guaranteed runtime failure. A
+                    safety control also wants a fixed model, not a routed one. */}
+                <select
                   id="guardrail-judge"
-                  className="min-w-64"
+                  className={SELECT_CLASS + " min-w-64"}
                   value={form.judgeModel}
                   onChange={(event) => set("judgeModel", event.target.value)}
-                  placeholder="a chat model of this team"
-                />
+                >
+                  <option value="">select a chat model…</option>
+                  {(callableModels.data ?? [])
+                    .filter((entry) => entry.model.type === "chat")
+                    .map((entry) => (
+                      <option key={entry.alias} value={entry.alias}>
+                        {entry.alias}
+                      </option>
+                    ))}
+                </select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="guardrail-budget">char budget</Label>
@@ -387,14 +414,28 @@ export function GuardrailsPage() {
 
         <div className="flex flex-wrap items-end gap-3">
           <div className="grid gap-2">
-            <Label htmlFor="guardrail-model">model id (blank = all models)</Label>
-            <Input
-              id="guardrail-model"
-              className="min-w-80"
-              value={form.modelId}
-              onChange={(event) => set("modelId", event.target.value)}
-              placeholder="scope to one model of this team"
-            />
+            <Label htmlFor="guardrail-scope">scope</Label>
+            {/* A router scope outranks a rule on the resolved model: the caller
+                asked for the alias, and attaching the policy to candidates
+                instead leaves a hole that opens the day one is added. */}
+            <select
+              id="guardrail-scope"
+              className={SELECT_CLASS + " min-w-80"}
+              value={form.scope}
+              onChange={(event) => set("scope", event.target.value)}
+            >
+              <option value="">all models (team-wide)</option>
+              {(callableRouters.data ?? []).map((entry) => (
+                <option key={`router-${entry.router.id}`} value={scopeValue("router", entry.router.id)}>
+                  router · {entry.alias}
+                </option>
+              ))}
+              {(callableModels.data ?? []).map((entry) => (
+                <option key={`model-${entry.model.id}`} value={scopeValue("model", entry.model.id)}>
+                  model · {entry.alias}
+                </option>
+              ))}
+            </select>
           </div>
           <label className="flex items-center gap-2 font-mono text-xs">
             <input

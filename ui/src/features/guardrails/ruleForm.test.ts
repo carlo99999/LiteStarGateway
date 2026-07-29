@@ -99,9 +99,24 @@ test("a name is required and a position cannot be negative", () => {
   assert.equal(toPayload(webhookForm({ position: "" })).position, 0);
 });
 
-test("a blank model id means team-wide", () => {
-  assert.equal(toPayload(webhookForm({ modelId: "  " })).model_id, null);
-  assert.equal(toPayload(webhookForm({ modelId: "abc" })).model_id, "abc");
+test("an empty scope means team-wide", () => {
+  const payload = toPayload(webhookForm({ scope: "" }));
+  assert.equal(payload.model_id, null);
+  assert.equal(payload.router_id, null);
+});
+
+test("a model scope fills model_id and leaves router_id null", () => {
+  const payload = toPayload(webhookForm({ scope: "model:abc" }));
+  assert.equal(payload.model_id, "abc");
+  assert.equal(payload.router_id, null);
+});
+
+test("a router scope fills router_id and leaves model_id null", () => {
+  // The two are mutually exclusive: the backend refuses a rule carrying both,
+  // because resolve_chain would only ever honour the router tier.
+  const payload = toPayload(webhookForm({ scope: "router:r-1" }));
+  assert.equal(payload.router_id, "r-1");
+  assert.equal(payload.model_id, null);
 });
 
 test("the other kind's config is never carried along", () => {
@@ -135,7 +150,7 @@ test("a stored rule round-trips into the form", () => {
   assert.equal(form.direction, "response");
   assert.equal(form.failPolicy, "open");
   assert.equal(form.position, "2");
-  assert.equal(form.modelId, "model-1");
+  assert.equal(form.scope, "model:model-1");
   assert.equal(form.enabled, false);
   assert.equal(form.url, "https://scanner.internal/check");
   assert.equal(form.timeoutMs, "900");

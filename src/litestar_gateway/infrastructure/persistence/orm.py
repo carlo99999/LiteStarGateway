@@ -802,6 +802,12 @@ class GuardrailRuleModel(base.UUIDAuditBase):
     model_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("model.id", ondelete="CASCADE"), default=None, index=True
     )
+    # Scope to the router the caller asked for (outranks `model_id` — see
+    # `resolve_chain`). Cascades for the same reason: a deleted router must not
+    # leave a rule that silently widens into a team-wide one.
+    router_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("router.id", ondelete="CASCADE"), default=None, index=True
+    )
     name: Mapped[str] = mapped_column()
     kind: Mapped[str] = mapped_column()
     direction: Mapped[str] = mapped_column()
@@ -820,6 +826,7 @@ class GuardrailRuleModel(base.UUIDAuditBase):
             id=self.id,
             team_id=self.team_id,
             model_id=self.model_id,
+            router_id=self.router_id,
             name=self.name,
             kind=GuardrailKind(self.kind),
             direction=Direction(self.direction),

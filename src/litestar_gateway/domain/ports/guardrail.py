@@ -34,9 +34,15 @@ class GuardrailRuleRepository(Protocol):
     async def remove(self, team_id: UUID, rule_id: UUID) -> bool: ...
 
     async def resolve(
-        self, team_id: UUID, model_id: UUID, direction: Direction
+        self,
+        team_id: UUID,
+        model_id: UUID,
+        direction: Direction,
+        router_id: UUID | None = None,
     ) -> list[ActiveGuardrailRule]:
-        """The ordered, enabled rules that apply to this model and direction,
+        """The ordered, enabled rules that apply to this call and direction,
         each with its secret. Per `domain.entities.guardrail.resolve_chain`,
-        model-specific rules override the team-wide ones."""
+        scoped rules override broader ones, most specific first: the router the
+        caller named, then the resolved model, then team-wide. `router_id` is
+        `None` for a direct model call."""
         ...

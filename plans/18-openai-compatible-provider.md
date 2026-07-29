@@ -36,9 +36,13 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
 ## Phases
 
 <<<<<<< HEAD
+
 ### Phase 0 — Egress policy, fail-closed
+
 =======
+
 ### Phase 0 — Egress policy, fail-closed — ✅ complete
+
 >>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
 
 - `config.py`: `openai_compatible_allowed_hosts: tuple[str, ...] = ()` from
@@ -56,9 +60,13 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
   DNS answer changes between two resolutions (rebinding).
 
 <<<<<<< HEAD
+
 ### Phase 1 — Provider value, credential contract, adapter wiring
+
 =======
+
 ### Phase 1 — Provider value, credential contract, adapter wiring — ✅ complete
+
 >>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
 
 - `domain/entities/enums.py`: the new `Provider` member. Deliberately **not**
@@ -78,7 +86,9 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
   `openai` and an `openai_compatible` credential sharing endpoint + key.
 
 ### Phase 2 — Declared capabilities
+
 =======
+
 - **Done, with one deviation:** the credential contract, the placeholder key,
   the non-aliasing `ClientKey` and the allowlist gate on create *and* update
   are covered by unit tests plus integration tests through the real app
@@ -91,6 +101,7 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
   see the verified-backends table in the docs.
 
 ### Phase 2 — Declared capabilities — ✅ complete
+
 >>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
 
 - `domain/entities/model.py`: `capabilities: frozenset[str]` defaulting to
@@ -106,6 +117,7 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
   proving the six existing providers resolve exactly as before.
 
 <<<<<<< HEAD
+
 ### Phase 3 — Metering robustness
 
 - Cover the backend that ignores `stream_options.include_usage`: settlement
@@ -116,7 +128,9 @@ none — `ModelRecord.provider` and `CredentialRecord.provider` are plain
   its cap is still refused the next call.
 
 ### Phase 4 — Console and docs
+
 =======
+
 ### Phase 3 — Metering robustness — ✅ complete
 
 Scoped down on contact with the code. The estimated-token fallback for a
@@ -136,6 +150,7 @@ above the adapter, so `openai_compatible` inherits it unchanged.
   estimated-vs-authoritative counts.
 
 ### Phase 4 — Console and docs — ✅ complete
+
 >>>>>>> c6986eb4f587e38b5849930fb820d3fcf0425f99
 
 - `ui/src/features/credentials/providerFields.ts`: label, `PROVIDERS` entry and
@@ -149,8 +164,11 @@ above the adapter, so `openai_compatible` inherits it unchanged.
   SaaS example, the allowlist, the capability declaration, and the known
   limits (no `n>1`, no Responses, estimated streaming usage on
   non-conforming servers). Add the provider to the `README.md` endpoint table
-  and to `EXAMPLES.md`.
+
+## and to `EXAMPLES.md`
+
 =======
+
 - [`docs/self-hosted-models.md`](../docs/self-hosted-models.md) (named for the
   use case rather than the provider id): the allowlist and its two matching
   rules, the credential contract, capability declaration, self-hosted
@@ -167,7 +185,7 @@ above the adapter, so `openai_compatible` inherits it unchanged.
   self-hosted chat model without touching the API by hand, and the internal
   Markdown link checker passes.
 
-## TDD strategy
+### TDD strategy
 
 - **Unit (table-driven):** allowlist matching (host, host:port, CIDR, IPv6,
   scheme); credential field validation (missing `api_base`, unexpected key,
@@ -184,7 +202,7 @@ above the adapter, so `openai_compatible` inherits it unchanged.
 - **No-regression proof for the six existing providers:** the whole suite is
   the gate, since Phase 2 touches the shared `_resolve` signature.
 
-## Risks & mitigations
+### Risks & mitigations
 
 - **Broadened SSRF surface** — this feature exists to reach private hosts, so
   the mitigation is an allowlist that is empty by default, platform-admin-only,
@@ -202,7 +220,7 @@ above the adapter, so `openai_compatible` inherits it unchanged.
 - **Support expectations** — the docs must be explicit that the gateway
   guarantees the *protocol*, not any particular backend's conformance to it.
 
-## Execution
+### Execution
 
 - One branch per phase, TDD (RED→GREEN), gate before every PR (`just test`,
   `just lint`, `just typecheck`, `just pre-commit`).

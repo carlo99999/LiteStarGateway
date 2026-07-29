@@ -143,7 +143,11 @@ def provide_completion_service(
     guardrail_rules = SQLAlchemyGuardrailRuleRepository(db_session, keyring)
 
     async def guardrails(
-        team_id: UUID, api_key_id: UUID | None, model: Model, direction: Direction
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        direction: Direction,
+        router_id: UUID | None = None,
     ) -> tuple[ChainedProvider, ...]:
         """Resolve and instantiate the team's chain for this call.
 
@@ -152,7 +156,7 @@ def provide_completion_service(
         respect that, not the one after the cache expires. The read is a single
         indexed query on a table with a handful of rows per team.
         """
-        active = await guardrail_rules.resolve(team_id, model.id, direction)
+        active = await guardrail_rules.resolve(team_id, model.id, direction, router_id)
         if not active:
             return ()
         return build_chain(
