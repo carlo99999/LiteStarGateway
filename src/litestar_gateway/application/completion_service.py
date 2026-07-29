@@ -755,7 +755,14 @@ class CompletionService:
         )
 
     async def prepare_native(
-        self, team_id: UUID, expected_type: ModelType, alias: str | None, data: dict[str, Any]
+        self,
+        team_id: UUID,
+        expected_type: ModelType,
+        alias: str | None,
+        data: dict[str, Any],
+        *,
+        api_key_id: UUID | None,
+        operation: str,
     ) -> tuple[Model, dict[str, str], dict[str, Any], UsageAttribution]:
         """Resolve a provider-native request's model `alias` to a usable team
         `Model` plus its decrypted credentials, and return the *governed* body.
@@ -790,6 +797,14 @@ class CompletionService:
             raise CredentialNotFound(str(model.credential_id))
         reject_native_control_kwargs(data)
         governed = clamp_native_output_tokens(model.provider, data, model.max_output_tokens)
+        # Third governance guard, applied here for the same reason as the other
+        # two: every native method goes through this function, so a rule cannot
+        # be evaded by reaching for a different one. Without it a caller with a
+        # key could bypass every configured request rule by switching to the
+        # native wire shape of the same model (ISSUE-038). `api_key_id` and
+        # `operation` are required arguments rather than defaulted so a new
+        # native method cannot quietly opt out.
+        governed = await self._guard_request(team_id, api_key_id, model, operation, governed)
         return model, values, governed, self._usage_attribution(team_id, alias, model, resolved)
 
     async def native_messages(
@@ -809,7 +824,12 @@ class CompletionService:
         fields are touched (reserved-kwarg rejection + output-token clamp in
         `prepare_native`); the rest of the body flows to the provider verbatim."""
         model, values, governed, attribution = await self.prepare_native(
-            team_id, ModelType.CHAT, data.get("model"), data
+            team_id,
+            ModelType.CHAT,
+            data.get("model"),
+            data,
+            api_key_id=api_key_id,
+            operation="native.messages",
         )
         if model.provider is not Provider.ANTHROPIC:
             raise ProviderMismatch(
@@ -844,7 +864,12 @@ class CompletionService:
         untranslated; usage is accumulated from the raw events and settled at the
         tail (or on disconnect — `_rechain`'s aclose propagation)."""
         model, values, governed, attribution = await self.prepare_native(
-            team_id, ModelType.CHAT, data.get("model"), data
+            team_id,
+            ModelType.CHAT,
+            data.get("model"),
+            data,
+            api_key_id=api_key_id,
+            operation="native.messages",
         )
         if model.provider is not Provider.ANTHROPIC:
             raise ProviderMismatch(
@@ -929,7 +954,12 @@ class CompletionService:
         OpenAI-shaped reservation view is passed as the settlement request, so a
         response missing `usageMetadata` is estimated instead of billed as $0."""
         model, values, governed, attribution = await self.prepare_native(
-            team_id, ModelType.CHAT, model_alias, data
+            team_id,
+            ModelType.CHAT,
+            model_alias,
+            data,
+            api_key_id=api_key_id,
+            operation="native.generate_content",
         )
         if model.provider is not Provider.VERTEX_AI:
             raise ProviderMismatch(
@@ -964,7 +994,12 @@ class CompletionService:
         untranslated; usage is accumulated from the raw `usageMetadata` and settled
         at the tail (or on disconnect — `_rechain`'s aclose propagation)."""
         model, values, governed, attribution = await self.prepare_native(
-            team_id, ModelType.CHAT, model_alias, data
+            team_id,
+            ModelType.CHAT,
+            model_alias,
+            data,
+            api_key_id=api_key_id,
+            operation="native.generate_content",
         )
         if model.provider is not Provider.VERTEX_AI:
             raise ProviderMismatch(

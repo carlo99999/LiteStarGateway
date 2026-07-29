@@ -146,3 +146,87 @@ def test_response_without_string_content_cannot_be_redacted() -> None:
     assert not can_redact_response(
         {"choices": [{"message": {"content": "ok"}}, {"message": {"content": None}}]}
     )
+
+
+# ── Provider-native shapes (ISSUE-038) ────────────────────────────────────────
+#
+# The native passthrough endpoints speak their vendor's protocol, not OpenAI's.
+# Anthropic Messages reuses `messages`, so the request side was already covered;
+# Gemini carries `contents`/`parts`, and neither vendor answers in `choices`, so
+# the response side judged an empty string and allowed everything through.
+
+
+def test_request_text_reads_a_gemini_contents_turn() -> None:
+    body = {"contents": [{"role": "user", "parts": [{"text": "my ssn is 1234"}]}]}
+
+    assert request_text(body) == "my ssn is 1234"
+
+
+def test_request_text_reads_the_last_gemini_turn_only() -> None:
+    body = {
+        "contents": [
+            {"role": "user", "parts": [{"text": "old"}]},
+            {"role": "model", "parts": [{"text": "answer"}]},
+            {"role": "user", "parts": [{"text": "new"}]},
+        ]
+    }
+
+    assert request_text(body) == "new"
+
+
+def test_request_text_reads_a_gemini_turn_without_an_explicit_role() -> None:
+    # The protocol lets `role` be omitted, and it means user.
+    assert request_text({"contents": [{"parts": [{"text": "hi"}]}]}) == "hi"
+
+
+def test_redact_request_rewrites_a_gemini_turn() -> None:
+    body = {"contents": [{"role": "user", "parts": [{"text": "ssn 1234"}]}]}
+
+    assert can_redact_request(body)
+    redacted = redact_request(body, "ssn [MASKED]")
+
+    assert redacted["contents"][0]["parts"][0]["text"] == "ssn [MASKED]"
+    # The caller's dict is never mutated.
+    assert body["contents"][0]["parts"][0]["text"] == "ssn 1234"
+
+
+def test_a_gemini_turn_with_several_parts_cannot_be_redacted() -> None:
+    # Which part did each piece of the flattened text come from? Unanswerable,
+    # so this escalates to a block rather than a guess.
+    body = {"contents": [{"role": "user", "parts": [{"text": "a"}, {"text": "b"}]}]}
+
+    assert not can_redact_request(body)
+
+
+def test_response_text_reads_anthropic_content_blocks() -> None:
+    body = {"content": [{"type": "text", "text": "hi there"}], "usage": {"input_tokens": 1}}
+
+    assert response_text(body) == "hi there"
+
+
+def test_response_text_reads_gemini_candidates() -> None:
+    body = {"candidates": [{"content": {"parts": [{"text": "ciao"}]}}]}
+
+    assert response_text(body) == "ciao"
+
+
+def test_redact_response_rewrites_an_anthropic_text_block() -> None:
+    body = {"content": [{"type": "text", "text": "secret"}]}
+
+    assert can_redact_response(body)
+    assert redact_response(body, "[MASKED]")["content"][0]["text"] == "[MASKED]"
+
+
+def test_redact_response_rewrites_a_gemini_candidate() -> None:
+    body = {"candidates": [{"content": {"parts": [{"text": "secret"}]}}]}
+
+    assert can_redact_response(body)
+    redacted = redact_response(body, "[MASKED]")
+
+    assert redacted["candidates"][0]["content"]["parts"][0]["text"] == "[MASKED]"
+
+
+def test_an_anthropic_answer_with_a_toolcall_block_cannot_be_redacted() -> None:
+    body = {"content": [{"type": "text", "text": "a"}, {"type": "tool_use", "id": "t"}]}
+
+    assert not can_redact_response(body)

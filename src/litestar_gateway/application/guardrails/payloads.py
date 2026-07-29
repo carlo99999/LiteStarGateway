@@ -35,6 +35,9 @@ def request_text(request: dict[str, Any]) -> str:
         return "\n".join(
             _content_text(item.get("content")) for item in value if isinstance(item, dict)
         )
+    turn = _last_gemini_turn(request)
+    if turn is not None:
+        return _parts_text(turn)
     return ""
 
 
@@ -49,6 +52,14 @@ def response_text(response: dict[str, Any]) -> str:
     for item in response.get("output", []) or []:
         if isinstance(item, dict):
             parts.append(_content_text(item.get("content")))
+    # Anthropic Messages answers in top-level `content` blocks, Gemini in
+    # `candidates[].content.parts[]`. Neither uses `choices`, so without these
+    # the native surface handed every response chain an empty string — which
+    # reads as "nothing to object to" and allowed everything through.
+    parts.append(_content_text(response.get("content")))
+    for candidate in response.get("candidates", []) or []:
+        if isinstance(candidate, dict):
+            parts.append(_parts_text(candidate.get("content")))
     return "\n".join(p for p in parts if p)
 
 
@@ -56,7 +67,15 @@ def can_redact_request(request: dict[str, Any]) -> bool:
     message = _last_user_message(request)
     if message is not None:
         return isinstance(message.get("content"), str)
-    return isinstance(request.get("input"), str)
+    if isinstance(request.get("input"), str):
+        return True
+    turn = _last_gemini_turn(request)
+    if turn is not None:
+        # One text part is an unambiguous target; several are not, and guessing
+        # which one the flattened text belongs to is the guess this module
+        # refuses to make.
+        return len(_text_parts(turn)) == 1
+    return False
 
 
 def redact_request(request: dict[str, Any], text: str) -> dict[str, Any]:
@@ -72,19 +91,39 @@ def redact_request(request: dict[str, Any], text: str) -> dict[str, Any]:
         return updated
     if isinstance(updated.get("input"), str):
         updated["input"] = text
+        return updated
+    turn = _last_gemini_turn(updated)
+    if turn is not None:
+        texts = _text_parts(turn)
+        if len(texts) == 1:
+            texts[0]["text"] = text
     return updated
 
 
 def can_redact_response(response: dict[str, Any]) -> bool:
     choices = response.get("choices")
-    if not isinstance(choices, list) or not choices:
-        return False
-    return all(
-        isinstance(c, dict)
-        and isinstance(c.get("message"), dict)
-        and isinstance(c["message"].get("content"), str)
-        for c in choices
-    )
+    if isinstance(choices, list) and choices:
+        return all(
+            isinstance(c, dict)
+            and isinstance(c.get("message"), dict)
+            and isinstance(c["message"].get("content"), str)
+            for c in choices
+        )
+    # Anthropic: a single text block. More than one block means the answer also
+    # carries something that is not text (a tool_use), and the flattened verdict
+    # cannot be mapped back onto it.
+    blocks = response.get("content")
+    if isinstance(blocks, list):
+        return (
+            len(blocks) == 1
+            and isinstance(blocks[0], dict)
+            and isinstance(blocks[0].get("text"), str)
+        )
+    candidates = response.get("candidates")
+    if isinstance(candidates, list) and len(candidates) == 1:
+        turn = candidates[0].get("content") if isinstance(candidates[0], dict) else None
+        return isinstance(turn, dict) and len(_text_parts(turn)) == 1
+    return False
 
 
 def redact_response(response: dict[str, Any], text: str) -> dict[str, Any]:
@@ -94,8 +133,22 @@ def redact_response(response: dict[str, Any], text: str) -> dict[str, Any]:
     their concatenation — splitting it back per choice would be invention.
     """
     updated = deepcopy(response)
-    for choice in updated.get("choices", []):
-        choice["message"]["content"] = text
+    choices = updated.get("choices")
+    if isinstance(choices, list) and choices:
+        for choice in choices:
+            choice["message"]["content"] = text
+        return updated
+    blocks = updated.get("content")
+    if isinstance(blocks, list):
+        for block in blocks:
+            if isinstance(block, dict) and isinstance(block.get("text"), str):
+                block["text"] = text
+        return updated
+    for candidate in updated.get("candidates", []) or []:
+        turn = candidate.get("content") if isinstance(candidate, dict) else None
+        if isinstance(turn, dict):
+            for part in _text_parts(turn):
+                part["text"] = text
     return updated
 
 
@@ -107,6 +160,36 @@ def _last_user_message(request: dict[str, Any]) -> dict[str, Any] | None:
         if isinstance(message, dict) and message.get("role") == "user":
             return message
     return None
+
+
+def _last_gemini_turn(request: dict[str, Any]) -> dict[str, Any] | None:
+    """Gemini keeps the conversation in `contents`, each turn a list of `parts`.
+
+    `role` may be omitted, and when it is the turn is the user's — so an absent
+    role must not make a turn invisible to the guardrail.
+    """
+    contents = request.get("contents")
+    if not isinstance(contents, list):
+        return None
+    for turn in reversed(contents):
+        if isinstance(turn, dict) and turn.get("role", "user") == "user":
+            return turn
+    return None
+
+
+def _text_parts(turn: Any) -> list[dict[str, Any]]:
+    """The text-carrying parts of one Gemini turn, as live references so a
+    caller holding a copy can rewrite them in place."""
+    if not isinstance(turn, dict):
+        return []
+    parts = turn.get("parts")
+    if not isinstance(parts, list):
+        return []
+    return [p for p in parts if isinstance(p, dict) and isinstance(p.get("text"), str)]
+
+
+def _parts_text(turn: Any) -> str:
+    return "\n".join(part["text"] for part in _text_parts(turn))
 
 
 def _content_text(content: Any) -> str:
