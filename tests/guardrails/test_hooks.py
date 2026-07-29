@@ -557,3 +557,22 @@ async def test_a_native_answer_is_actually_inspected_by_the_response_chain() -> 
     # The provider was reached (the answer is what is being judged), unlike the
     # request-side test above.
     assert len(gateway.requests) == 1
+
+
+async def test_a_native_stream_is_refused_when_a_response_guardrail_is_configured() -> None:
+    # The native funnel gets the same refusal as the OpenAI one — otherwise
+    # `stream: true` on `/v1/messages` would be the way around it. The fake
+    # gateway has no native stream method on purpose: reaching it at all is a
+    # failure, whether by assertion or by AttributeError.
+    gateway = NativeRecordingGateway()
+    chain = (ChainedProvider(provider=_TextSensitiveBlocker(), fail=FailPolicy.CLOSED),)  # type: ignore[arg-type]
+    service = _native_response_service(gateway, chain, _anthropic_model())
+
+    with pytest.raises(GuardrailBlocked, match="stream"):
+        await service.open_native_messages_stream(
+            TEAM_ID,
+            KEY_ID,
+            {"model": "m", "max_tokens": 16, "messages": [{"role": "user", "content": "hi"}]},
+        )
+
+    assert gateway.requests == []

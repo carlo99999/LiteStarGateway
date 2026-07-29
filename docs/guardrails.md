@@ -217,9 +217,19 @@ guessed at.
 
 ## Known limits
 
-- **Streaming responses are not guarded on the response side.** Content exists
-  only as it is already being delivered. Request-side guarding covers streams,
-  on the native endpoints as well.
+- **A response-side rule and streaming are mutually exclusive.** A streamed
+  answer cannot be screened before it has already reached the client, and a
+  verdict cannot recall a chunk. So when a team has *any* response-side rule for
+  a model, `stream: true` on that model is refused (422) with a message saying
+  why — rather than served with the rule silently not running. Request-side
+  guarding is unaffected and covers streams, native endpoints included. A cached
+  entry replayed as a synthetic stream is refused on the same grounds.
+
+  The stricter reading is deliberate: whether a provider will refuse an answer
+  depends on the answer, so "is this rule a blocking one?" cannot be decided
+  up front. Removing the response rule, or calling without `stream`, are the
+  two ways forward; a delay-window incremental scan that bounds the exposure
+  instead of removing it is designed but not built.
 - **No `guardrail.block` feed in the console.** Traces go to MLflow rather than a
   queryable table, so there is no read model for a feed yet.
 - **Tool-call-only answers have no text to judge**, and are allowed through.
