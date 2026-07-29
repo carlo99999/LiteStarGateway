@@ -114,6 +114,12 @@ already shipped (moved here from the README as the list grew).
 - **`JWT_SECRET` dev default** — with `ENVIRONMENT=production` the app fails
   fast at startup if `JWT_SECRET` is unset or left at the insecure dev
   default. Outside production the dev default is allowed for convenience.
+- **Rotation carries the key's governance** — a replacement key inherits the
+  original's scope, rate limit, owner, absolute TTL **and per-key spend cap**.
+  The cap was the one that did not follow (it is keyed by key id), so routine
+  hygiene quietly turned a capped key into an uncapped one; it is copied inside
+  the same transaction that issues the replacement, so there is no window where
+  the new key is live without it.
 - **Key rotation with grace** — rotating an API key issues the replacement and
   expires the old key after a 1-hour grace window (time-aware `is_active`), so
   rotation never needs a downtime window.

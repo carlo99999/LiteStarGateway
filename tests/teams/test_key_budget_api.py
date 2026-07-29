@@ -13,6 +13,7 @@ from collections.abc import AsyncIterator
 import pytest
 from litestar.status_codes import (
     HTTP_200_OK,
+    HTTP_201_CREATED,
     HTTP_204_NO_CONTENT,
     HTTP_400_BAD_REQUEST,
     HTTP_403_FORBIDDEN,
@@ -162,3 +163,32 @@ async def test_an_invalid_cap_is_a_bad_request(client: AsyncTestClient, payload:
     )
 
     assert written.status_code == HTTP_400_BAD_REQUEST, written.text
+
+
+async def test_rotating_a_capped_key_carries_the_cap_to_its_replacement(
+    client: AsyncTestClient,
+) -> None:
+    """ISSUE-052: rotation issues a new key id, and the cap is keyed by
+    `api_key_id`, so nothing carried it over. Routine hygiene therefore turned a
+    capped key into an uncapped one with no signal, and the old cap died with the
+    old key. Rotation already preserves scope, rate limit, owner and TTL — the
+    cap was simply missed when it was added later."""
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    key_id = await _key(client, admin, team)
+    capped = await client.put(
+        f"/teams/{team}/keys/{key_id}/budget",
+        json={"limit_cost": 25.0, "window": "monthly", "mode": "block"},
+        headers=_bearer(admin),
+    )
+    assert capped.status_code == HTTP_200_OK, capped.text
+
+    rotated = await client.post(f"/teams/{team}/keys/{key_id}/rotate", headers=_bearer(admin))
+    assert rotated.status_code in (HTTP_200_OK, HTTP_201_CREATED), rotated.text
+    new_key_id = rotated.json()["id"]
+    assert new_key_id != key_id
+
+    carried = await client.get(f"/teams/{team}/keys/{new_key_id}/budget", headers=_bearer(admin))
+    assert carried.status_code == HTTP_200_OK, carried.text
+    body = carried.json()
+    assert (body["limit_cost"], body["window"], body["mode"]) == (25.0, "monthly", "block")
