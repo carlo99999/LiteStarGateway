@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import sqlite3
+import time
+import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,6 +22,7 @@ from litestar_gateway.app import create_app
 from litestar_gateway.application.routing.webhook import WebhookStrategy
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.routing import CandidateModel, QualityTier, RoutingContext
+from litestar_gateway.domain.webhook_signature import SIGNATURE_HEADER, verify
 from litestar_gateway.infrastructure.llm import openai_adapter
 
 MASTER_KEY = "master-secret"  # pragma: allowlist secret
@@ -73,7 +77,11 @@ async def test_webhook_choice_by_index_and_payload_contract(
 
     assert decision.model_name == "m2"  # 1-based index
     assert decision.strategy == "webhook"
-    assert seen["payload"] == {
+    payload = seen["payload"]
+    # An event id is now part of the contract so a receiver can correlate its
+    # logs with ours; the rest of the payload is unchanged.
+    assert uuid.UUID(payload.pop("event_id"))
+    assert payload == {
         "task": "pick one",
         "system_prompt": "sys",
         "models": ["m1", "m2"],
@@ -384,7 +392,7 @@ async def test_unreachable_webhook_falls_back_to_default(
         {
             "strategy": "webhook",
             # RFC 2606: .invalid never resolves — creation passes, the call fails.
-            "strategy_config": {"url": "http://picker.invalid:9/route", "timeout_ms": 200},
+            "strategy_config": {"url": "https://picker.invalid:9/route", "timeout_ms": 200},
         },
     )
     body = await _chat(client, key)
@@ -406,7 +414,7 @@ async def test_blocked_webhook_target_falls_back_to_default(
         client,
         {
             "strategy": "webhook",
-            "strategy_config": {"url": "http://picker.example/route", "timeout_ms": 200},
+            "strategy_config": {"url": "https://picker.example/route", "timeout_ms": 200},
         },
     )
     body = await _chat(client, key)
@@ -440,7 +448,7 @@ async def test_failing_shadow_never_touches_the_request(
         {
             "shadow_strategy": "webhook",
             "strategy_config": {
-                "shadow": {"url": "http://picker.invalid/route", "timeout_ms": 100}
+                "shadow": {"url": "https://picker.invalid/route", "timeout_ms": 100}
             },
         },
     )
@@ -585,12 +593,12 @@ async def test_router_validation_rejects_bad_webhook_and_shadow(
         {  # SSRF guard: cloud metadata target rejected at save time (R6-H18)
             "name": "r5",
             "strategy": "webhook",
-            "strategy_config": {"url": "http://169.254.169.254/latest/meta-data"},
+            "strategy_config": {"url": "https://169.254.169.254/latest/meta-data"},
         },
         {  # SSRF guard applies to the shadow webhook too
             "name": "r6",
             "shadow_strategy": "webhook",
-            "strategy_config": {"shadow": {"url": "http://127.0.0.1:9/route"}},
+            "strategy_config": {"shadow": {"url": "https://127.0.0.1:9/route"}},
         },
     ):
         body = {
@@ -602,3 +610,64 @@ async def test_router_validation_rejects_bad_webhook_and_shadow(
         }
         resp = await client.post(f"/teams/{team}/routers", json=body, headers=_bearer(admin))
         assert resp.status_code == HTTP_400_BAD_REQUEST, (extra, resp.text)
+
+
+# ---------------------------------------------------------------------------
+# Sender obligations for the routing webhook: it carries the user's prompt.
+# ---------------------------------------------------------------------------
+
+ROUTING_SIGNING_MATERIAL = "routing-endpoint-fixture-value"
+
+
+async def test_the_routing_payload_is_signed_and_verifies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["content"] = request.content
+        seen["signature"] = request.headers.get(SIGNATURE_HEADER)
+        return httpx.Response(200, json={"choice": "m1"})
+
+    _mock_webhook(monkeypatch, handler)
+    strategy = WebhookStrategy(
+        {"url": "https://picker.example/route", "signing_secret": ROUTING_SIGNING_MATERIAL}
+    )
+
+    await strategy.select(_ctx("pick one"), CANDIDATES)
+
+    assert verify(
+        seen["content"],
+        seen["signature"],
+        secret=ROUTING_SIGNING_MATERIAL,
+        now=int(time.time()),
+    )
+
+
+async def test_without_a_signing_secret_the_prompt_still_goes_but_warns(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # An existing router must keep working after an upgrade; an operator sending
+    # prompts to an endpoint that cannot verify them must be told.
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["signature"] = request.headers.get(SIGNATURE_HEADER)
+        return httpx.Response(200, json={"choice": "m1"})
+
+    _mock_webhook(monkeypatch, handler)
+    strategy = WebhookStrategy({"url": "https://picker.example/route"})
+
+    with caplog.at_level(logging.WARNING):
+        await strategy.select(_ctx("pick one"), CANDIDATES)
+
+    assert seen["signature"] is None
+    assert any("UNSIGNED" in record.message for record in caplog.records)
+
+
+def test_a_plaintext_routing_webhook_is_refused() -> None:
+    # This payload is the user's prompt and system prompt. The SSRF guard
+    # already bans private targets, so plaintext here means prompts crossing
+    # the public internet in the clear.
+    with pytest.raises(ValueError, match="https"):
+        WebhookStrategy({"url": "http://picker.example/route"})

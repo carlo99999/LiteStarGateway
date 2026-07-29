@@ -10,6 +10,9 @@ address is rejected the exact same way a routing webhook is."""
 
 from __future__ import annotations
 
+import json
+import logging
+import time
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -24,6 +27,9 @@ from litestar_gateway.application.routing.webhook import (
     resolve_approved_addresses,
 )
 from litestar_gateway.domain.entities import PendingBudgetAlert
+from litestar_gateway.domain.webhook_signature import sign
+
+logger = logging.getLogger("litestar_gateway.budget_alerts")
 
 
 class WebhookNotificationChannel:
@@ -38,10 +44,15 @@ class WebhookNotificationChannel:
         url: str,
         *,
         bearer_token: str | None = None,
+        signing_secret: str | None = None,
         timeout_ms: int = DEFAULT_TIMEOUT_MS,
     ) -> None:
-        if not isinstance(url, str) or not url.startswith(("http://", "https://")):
-            raise ValueError("budget alert webhook requires an http(s) url")
+        # https only. The SSRF guard already refuses loopback and private
+        # ranges, so a plaintext target is by definition a public one — there is
+        # no remaining case where sending a team's spend over cleartext is the
+        # intended configuration.
+        if not isinstance(url, str) or not url.startswith("https://"):
+            raise ValueError("budget alert webhook requires an https url")
         host = urlsplit(url).hostname
         if not host:
             raise ValueError("budget alert webhook url has no host")
@@ -55,10 +66,17 @@ class WebhookNotificationChannel:
         self._host = host
         self._host_header = self._url.netloc.decode("ascii")
         self._bearer_token = bearer_token
+        self._signing_secret = signing_secret
         self._timeout_seconds = timeout_ms / 1000
 
     async def send(self, alert: PendingBudgetAlert) -> None:
         payload: dict[str, Any] = {
+            # The outbox row's id, stable across every retry of this alert: the
+            # idempotency key a receiver needs, because delivery is
+            # at-least-once by design and a timeout can duplicate a delivery
+            # that in fact succeeded.
+            "event_id": str(alert.id),
+            "event": "budget.threshold_crossed",
             "team_id": str(alert.team_id),
             "window": alert.window.value,
             "period_start": alert.period_start.isoformat(),
@@ -69,10 +87,16 @@ class WebhookNotificationChannel:
             "spend": float(alert.spend),
             "limit_cost": float(alert.limit_cost),
         }
+        body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
         auth_headers = (
             {"Authorization": f"Bearer {self._bearer_token}"} if self._bearer_token else {}
         )
-        headers = {**auth_headers, "Host": self._host_header}
+        headers = {
+            **auth_headers,
+            **self._signature_headers(body, event_id=str(alert.id)),
+            "Host": self._host_header,
+            "Content-Type": "application/json",
+        }
         # Re-checked on every send (DNS-rebinding guard), not cached from
         # construction — see `resolve_approved_addresses`.
         addresses = await resolve_approved_addresses(self._host)
@@ -82,6 +106,25 @@ class WebhookNotificationChannel:
         # here too.
         async with webhook_module._client_factory(self._timeout_seconds) as client:
             response = await post_to_approved_address(
-                client, self._url, self._host, addresses, payload, headers
+                client, self._url, self._host, addresses, None, headers, content=body
             )
         response.raise_for_status()
+
+    def _signature_headers(self, body: bytes, *, event_id: str) -> dict[str, str]:
+        """Sign when a secret is configured; say so loudly when it is not.
+
+        Unsigned is the pre-existing behaviour, so this stays a warning rather
+        than a refusal: turning it into an error would break every deployment
+        that upgrades before setting the key. But a receiver with no signature to
+        check cannot distinguish our alerts from anyone else's who learned the
+        URL, so it must not be quiet either."""
+        if not self._signing_secret:
+            logger.warning(
+                "WEBHOOK_SIGNING_SECRET is not set: budget-alert webhooks are sent UNSIGNED, "
+                "so the receiver cannot verify they came from this gateway"
+            )
+            return {}
+        signed = sign(
+            body, secret=self._signing_secret, timestamp=int(time.time()), event_id=event_id
+        )
+        return signed.headers

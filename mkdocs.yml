@@ -86,6 +86,7 @@ nav:
       - Weighted routing: docs/weighted-routing.md
       - Semantic routing: docs/routing-embeddings.md
       - Webhook routing: docs/routing-webhook.md
+      - Outbound webhook contract: docs/webhook-contract.md
   - Observe and operate:
       - Observability: docs/observability.md
       - Logging: docs/logging.md
