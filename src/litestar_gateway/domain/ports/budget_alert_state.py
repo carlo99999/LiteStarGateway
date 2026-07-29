@@ -53,6 +53,28 @@ class BudgetAlertStateRepository(Protocol):
         build on."""
         ...
 
+    async def quarantined_alerts(
+        self, *, limit: int = DEFAULT_PAGE_SIZE
+    ) -> list[PendingBudgetAlert]:
+        """Alerts the dispatcher has given up on, oldest-first.
+
+        These are invisible otherwise: the drain query skips them, so without a
+        read they sit in the table forever and the operator's only clue is a log
+        line from whenever the last attempt failed."""
+        ...
+
+    async def requeue(self, alert_id: UUID) -> bool:
+        """Put one quarantined alert back in the queue — the replay step the
+        webhook checklist asks for.
+
+        Resets `attempts` and clears the lease so the next drain picks it up;
+        keeps `last_error` so the reason it was quarantined survives the replay.
+        Returns False when the id is unknown or the row is not quarantined:
+        resetting a row that is merely mid-retry would hand a second dispatcher
+        a claim the first one still holds.
+        """
+        ...
+
     async def recent_fired(
         self, team_id: UUID, *, limit: int = DEFAULT_PAGE_SIZE
     ) -> list[BudgetAlertState]:

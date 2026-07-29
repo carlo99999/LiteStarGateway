@@ -107,7 +107,12 @@ from litestar_gateway.infrastructure.web.sso_settings import SsoSettingsControll
 from litestar_gateway.infrastructure.web.sso_settings.dependencies import (
     provide_sso_settings_service,
 )
-from litestar_gateway.infrastructure.web.teams import TeamController, platform_cache_savings
+from litestar_gateway.infrastructure.web.teams import (
+    TeamController,
+    platform_cache_savings,
+    quarantined_budget_alerts,
+    requeue_budget_alert,
+)
 from litestar_gateway.infrastructure.web.ui_site import create_ui_router
 from litestar_gateway.infrastructure.web.users import create_users_router
 from litestar_gateway.infrastructure.web.users.dependencies import provide_user_service
@@ -262,6 +267,8 @@ def _build_route_handlers(database: Database, settings: Settings) -> list:
         OrganizationController,  # platform-admin: orgs + team creation
         TeamController,  # team-admin: members + team-scoped API keys
         platform_cache_savings,  # platform-admin: cross-team response-cache savings
+        quarantined_budget_alerts,  # platform-admin: alerts the dispatcher gave up on
+        requeue_budget_alert,  # platform-admin: replay one of them
         ModelController,  # team-admin: team-scoped model deployments
         GuardrailController,  # team-admin: the team's guardrail chain
         PlatformModelController,  # platform-admin: global models + extension grants
