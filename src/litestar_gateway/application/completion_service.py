@@ -84,7 +84,12 @@ from litestar_gateway.domain.routing import (
 
 # Resolves the chain for one (team, model, direction). A function rather than a
 # repository so the wiring can cache, and so tests can hand over a literal chain.
-GuardrailChainFn = Callable[[UUID, Model, Direction], Awaitable[tuple[ChainedProvider, ...]]]
+# Resolves the chain for one (team, key, model, direction). The key is here
+# because a judge guardrail makes a real, billable provider call: it has to be
+# attributed to the key that caused it, or the safety layer looks free.
+GuardrailChainFn = Callable[
+    [UUID, UUID | None, Model, Direction], Awaitable[tuple[ChainedProvider, ...]]
+]
 
 logger = logging.getLogger("litestar_gateway.response_cache")
 
@@ -435,12 +440,12 @@ class CompletionService:
             # consumed; refusing to bill a blocked answer would hand anyone who
             # can trip the response guardrail a free channel. So: bill, then
             # refuse to hand the content back.
-            return await self._guard_response(team_id, model, response)
+            return await self._guard_response(team_id, api_key_id, model, response)
         finally:
             await self._meter.release(reservation)
 
     async def _guard_request(
-        self, team_id: UUID, model: Model, request: dict[str, Any]
+        self, team_id: UUID, api_key_id: UUID | None, model: Model, request: dict[str, Any]
     ) -> dict[str, Any]:
         """Run the request-side chain, returning the request to actually send.
 
@@ -448,7 +453,7 @@ class CompletionService:
         or billed for a call that never happens."""
         if self._guardrails is None:
             return request
-        chain = await self._guardrails(team_id, model, Direction.REQUEST)
+        chain = await self._guardrails(team_id, api_key_id, model, Direction.REQUEST)
         if not chain:
             return request
         outcome = await run_chain(
@@ -468,12 +473,12 @@ class CompletionService:
         return redact_request(request, outcome.text)
 
     async def _guard_response(
-        self, team_id: UUID, model: Model, response: dict[str, Any]
+        self, team_id: UUID, api_key_id: UUID | None, model: Model, response: dict[str, Any]
     ) -> dict[str, Any]:
         """Run the response-side chain on an already-billed response."""
         if self._guardrails is None:
             return response
-        chain = await self._guardrails(team_id, model, Direction.RESPONSE)
+        chain = await self._guardrails(team_id, api_key_id, model, Direction.RESPONSE)
         if not chain:
             return response
         outcome = await run_chain(
@@ -1055,7 +1060,7 @@ class CompletionService:
         # reaches a provider. A redaction rewrites `clean`, so everything after
         # this line — admission, the trace, the provider call — sees the redacted
         # prompt and never the original.
-        clean = await self._guard_request(team_id, model, clean)
+        clean = await self._guard_request(team_id, api_key_id, model, clean)
         reservation = await self._meter.admit(team_id, model, model.merge_params(clean))
         try:
             values = await self._credentials.get_values(model.credential_id)
