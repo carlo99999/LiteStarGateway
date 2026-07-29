@@ -16,6 +16,7 @@ from litestar_gateway.domain.entities import (
     Budget,
     BudgetAlertState,
     IssuedKey,
+    PendingBudgetAlert,
     ServicePrincipal,
     Team,
     TeamMembership,
@@ -112,6 +113,39 @@ class KeyBudgetResponse:
             spent=float(spent),
             remaining=float(max(ZERO, budget.limit_cost - spent)),
             over_limit=spent >= budget.limit_cost,
+        )
+
+
+@dataclass(frozen=True)
+class PendingBudgetAlertResponse:
+    """One undelivered alert still in the outbox — the quarantined view.
+
+    `last_error` is carried because it is the only account of why delivery
+    failed; `attempts` because it is what makes the row quarantined.
+    """
+
+    id: UUID
+    team_id: UUID
+    window: str
+    threshold: int
+    spend: float
+    limit_cost: float
+    attempts: int
+    last_error: str | None
+    created_at: datetime
+
+    @classmethod
+    def from_entity(cls, alert: PendingBudgetAlert) -> PendingBudgetAlertResponse:
+        return cls(
+            id=alert.id,
+            team_id=alert.team_id,
+            window=alert.window.value,
+            threshold=alert.threshold,
+            spend=float(alert.spend),
+            limit_cost=float(alert.limit_cost),
+            attempts=alert.attempts,
+            last_error=alert.last_error,
+            created_at=alert.created_at,
         )
 
 

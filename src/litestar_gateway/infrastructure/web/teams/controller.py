@@ -64,6 +64,7 @@ from litestar_gateway.infrastructure.web.teams.schemas import (
     KeyResponse,
     KeySpendingResponse,
     MembershipResponse,
+    PendingBudgetAlertResponse,
     SetBudgetRequest,
     SetKeyBudgetRequest,
     SetRoleRequest,
@@ -875,3 +876,61 @@ async def platform_cache_savings(
         total,
     ) = await usage_repository.platform_cache_savings()
     return _cache_savings_response(avoided_cost, priced_hits, hits_without_price, total)
+
+
+# Quarantined budget alerts — platform-wide, so outside the /teams controller for
+# the same reason as `platform_cache_savings`.
+@get(
+    "/platform/budget-alerts/quarantined",
+    summary="Budget alerts the dispatcher has given up on",
+    description=(
+        "Alerts that failed delivery enough times to be quarantined. They are "
+        "invisible otherwise — the drain query skips them — so this is the read "
+        "that makes a stuck alert findable before it is replayed."
+    ),
+    dependencies={"admin_user": Provide(provide_current_admin)},
+    tags=["teams"],
+)
+async def quarantined_budget_alerts(
+    admin_user: NamedDependency[User],
+    budget_alert_state_repository: NamedDependency[BudgetAlertStateRepository],
+    limit: FromQuery[int | None] = None,
+) -> list[PendingBudgetAlertResponse]:
+    page_limit, _ = resolve_page(limit, None)
+    alerts = await budget_alert_state_repository.quarantined_alerts(limit=page_limit)
+    return [PendingBudgetAlertResponse.from_entity(a) for a in alerts]
+
+
+@post(
+    "/platform/budget-alerts/{alert_id:uuid}/requeue",
+    summary="Replay a quarantined budget alert",
+    description=(
+        "Resets the alert's failed-attempt count so the next drain retries it. "
+        "404 when the id is unknown or the alert is not quarantined — resetting a "
+        "row that is merely mid-retry would clear a lease the dispatcher "
+        "currently holding it still needs."
+    ),
+    dependencies={"admin_user": Provide(provide_current_admin)},
+    tags=["teams"],
+    status_code=200,
+)
+async def requeue_budget_alert(
+    request: Request,
+    alert_id: FromPath[UUID],
+    admin_user: NamedDependency[User],
+    budget_alert_state_repository: NamedDependency[BudgetAlertStateRepository],
+    audit_log: NamedDependency[AuditLog],
+) -> dict[str, Any]:
+    if not await budget_alert_state_repository.requeue(alert_id):
+        raise BudgetNotFound(f"No quarantined budget alert {alert_id}")
+    # Audited: a replay re-sends a notification, which is an outward-facing
+    # side effect someone may later need explained.
+    await record_audit(
+        audit_log,
+        request,
+        admin_user,
+        "budget_alert.requeue",
+        target_type="pending_budget_alert",
+        target_id=alert_id,
+    )
+    return {"requeued": True, "alert_id": str(alert_id)}

@@ -698,6 +698,8 @@ class PendingBudgetAlertModel(base.UUIDAuditBase):
             window=BudgetWindow(self.window),
             period_start=self.period_start,
             threshold=self.threshold,
+            attempts=self.attempts,
+            last_error=self.last_error,
             spend=self.spend,
             limit_cost=self.limit_cost,
             created_at=self.created_at,

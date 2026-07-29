@@ -119,6 +119,12 @@ class PendingBudgetAlert:
     spend: Decimal
     limit_cost: Decimal
     created_at: datetime
+    # Delivery bookkeeping, carried so the quarantined view can explain itself:
+    # `attempts` is what makes a row quarantined and `last_error` is the only
+    # account of why. Default to a fresh row's values so writers that do not
+    # care can keep constructing this without them.
+    attempts: int = 0
+    last_error: str | None = None
 
 
 @dataclass(frozen=True)

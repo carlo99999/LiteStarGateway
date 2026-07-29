@@ -837,6 +837,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/platform/budget-alerts/quarantined": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Budget alerts the dispatcher has given up on
+         * @description Alerts that failed delivery enough times to be quarantined. They are invisible otherwise — the drain query skips them — so this is the read that makes a stuck alert findable before it is replayed.
+         */
+        get: operations["PlatformBudgetAlertsQuarantinedQuarantinedBudgetAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/budget-alerts/{alert_id}/requeue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replay a quarantined budget alert
+         * @description Resets the alert's failed-attempt count so the next drain retries it. 404 when the id is unknown or the alert is not quarantined — resetting a row that is merely mid-retry would clear a lease the dispatcher currently holding it still needs.
+         */
+        post: operations["PlatformBudgetAlertsAlertIdRequeueRequeueBudgetAlert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams/{team_id}/models": {
         parameters: {
             query?: never;
@@ -2188,6 +2228,21 @@ export interface components {
             token: string;
             /** Format: date-time */
             expires_at: string;
+        };
+        /** PendingBudgetAlertResponse */
+        PendingBudgetAlertResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            team_id: string;
+            window: string;
+            threshold: number;
+            spend: number;
+            limit_cost: number;
+            attempts: number;
+            last_error: string | null;
+            /** Format: date-time */
+            created_at: string;
         };
         /** PlaygroundResultResponse */
         PlaygroundResultResponse: {
@@ -5140,6 +5195,94 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    PlatformBudgetAlertsQuarantinedQuarantinedBudgetAlerts: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingBudgetAlertResponse"][];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    PlatformBudgetAlertsAlertIdRequeueRequeueBudgetAlert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
                     };
                 };
             };

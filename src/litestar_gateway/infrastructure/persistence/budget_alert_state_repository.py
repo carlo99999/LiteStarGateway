@@ -153,6 +153,39 @@ class SQLAlchemyBudgetAlertStateRepository:
         )
         return [row.to_entity() for row in rows.all()]
 
+    async def quarantined_alerts(
+        self, *, limit: int = DEFAULT_PAGE_SIZE
+    ) -> list[PendingBudgetAlert]:
+        rows = await self._session.scalars(
+            select(PendingBudgetAlertModel)
+            .where(PendingBudgetAlertModel.attempts >= MAX_DISPATCH_ATTEMPTS)
+            .order_by(PendingBudgetAlertModel.created_at)
+            .limit(limit)
+        )
+        return [row.to_entity() for row in rows]
+
+    async def requeue(self, alert_id: UUID) -> bool:
+        """Reset one quarantined row so the next drain retries it.
+
+        The `attempts >= MAX_DISPATCH_ATTEMPTS` predicate is part of the UPDATE,
+        not a separate read: a row that is merely mid-retry must not have its
+        lease cleared underneath the dispatcher currently holding it.
+        """
+        # Any: the async execute() is typed Result, but at runtime it is a
+        # CursorResult exposing rowcount.
+        result: Any = await self._session.execute(
+            update(PendingBudgetAlertModel)
+            .where(
+                PendingBudgetAlertModel.id == alert_id,
+                PendingBudgetAlertModel.attempts >= MAX_DISPATCH_ATTEMPTS,
+            )
+            # `last_error` is kept deliberately: after a replay an operator still
+            # needs to know what went wrong the first ten times.
+            .values(attempts=0, claimed_until=None)
+        )
+        await self._session.commit()
+        return bool(result.rowcount)
+
     async def dispatch_pending(
         self, resolve_channels: ChannelResolver, *, limit: int = DEFAULT_PAGE_SIZE
     ) -> int:
