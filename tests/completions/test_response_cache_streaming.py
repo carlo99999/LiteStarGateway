@@ -22,9 +22,19 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+import pytest
+
 from litestar_gateway.application.completion_service import CompletionService
+from litestar_gateway.application.guardrails.service import ChainedProvider
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.domain.entities import Model, ModelType, Provider, TraceRecord, UsageEvent
+from litestar_gateway.domain.exceptions import GuardrailBlocked
+from litestar_gateway.domain.guardrails import (
+    Decision,
+    Direction,
+    FailPolicy,
+    GuardrailVerdict,
+)
 from litestar_gateway.infrastructure.cache.redis import RedisResponseCache
 
 TEAM_ID = uuid4()
@@ -140,6 +150,7 @@ def _service(
     *,
     response_cache: object,
     model: Model | None = None,
+    guardrails: Any = None,
 ) -> CompletionService:
     """`model` is explicit for the multi-replica test: two replicas read the
     same model row, so they must be given the same `Model` — the cache key
@@ -150,6 +161,7 @@ def _service(
         gateway=gateway,  # type: ignore[arg-type]
         meter=UsageMeter(usage=usage, emit_trace=traces.append),  # type: ignore[arg-type]
         response_cache=response_cache,  # type: ignore[arg-type]
+        guardrails=guardrails,
     )
 
 
@@ -233,3 +245,109 @@ async def test_two_service_instances_sharing_one_fake_redis_client_share_hits() 
     assert chunks
     assert len(usage_2.events) == 1
     assert usage_2.events[0].cache_hit is True
+
+
+# ── Streaming vs a response-side guardrail (ISSUE-042) ────────────────────────
+
+
+def _response_rule() -> Any:
+    """A resolver that reports one RESPONSE-direction rule for every model."""
+
+    class _Provider:
+        name = "response-guard"
+
+        def supports(self, direction: Direction) -> bool:
+            return direction is Direction.RESPONSE
+
+        async def check(self, payload: Any) -> Any:  # pragma: no cover - never reached
+            raise AssertionError("a refused stream must not run the chain")
+
+    chain = (ChainedProvider(provider=_Provider(), fail=FailPolicy.CLOSED),)  # type: ignore[arg-type]
+
+    async def resolver(
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        direction: Direction,
+        router_id: UUID | None = None,
+    ) -> Any:
+        return chain if direction is Direction.RESPONSE else ()
+
+    return resolver
+
+
+def _request_only_rule(seen: list[Direction]) -> Any:
+    """A REQUEST-only rule: streaming must keep working for it."""
+
+    class _Provider:
+        name = "request-guard"
+
+        def supports(self, direction: Direction) -> bool:
+            return direction is Direction.REQUEST
+
+        async def check(self, payload: Any) -> Any:
+            seen.append(payload.direction)
+            return GuardrailVerdict(decision=Decision.ALLOW, provider=self.name)
+
+    chain = (ChainedProvider(provider=_Provider(), fail=FailPolicy.CLOSED),)  # type: ignore[arg-type]
+
+    async def resolver(
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        direction: Direction,
+        router_id: UUID | None = None,
+    ) -> Any:
+        return chain if direction is Direction.REQUEST else ()
+
+    return resolver
+
+
+async def test_streaming_is_refused_when_a_response_guardrail_is_configured() -> None:
+    """A response-side rule cannot be honoured on a stream: the answer only
+    exists as it is already being delivered, and a chunk cannot be recalled. The
+    safe default from the design is to refuse the stream — previously it was
+    served, with the configured control simply not running."""
+    gateway = Gateway(allow_stream=True)
+    service = _service(gateway, FakeUsage(), [], response_cache=None, guardrails=_response_rule())
+
+    with pytest.raises(GuardrailBlocked, match="stream"):
+        await service.open_chat_stream(TEAM_ID, KEY_ID, dict(_CHAT_REQUEST))
+
+    assert gateway.stream_calls == 0  # refused before the provider stream opened
+
+
+async def test_a_cached_stream_replay_is_refused_too() -> None:
+    """The synthetic replay is a stream as well, so it cannot be the way around
+    the refusal — and the entry may predate the rule."""
+    cache = RedisResponseCache(FakeRedis())
+    gateway = Gateway(allow_stream=True)
+    unguarded = _service(gateway, FakeUsage(), [], response_cache=cache)
+    # Populate the cache through the non-streamed path, before any rule exists.
+    await unguarded.chat_completion(TEAM_ID, KEY_ID, dict(_CHAT_REQUEST))
+
+    guarded = _service(
+        Gateway(allow_stream=False),
+        FakeUsage(),
+        [],
+        response_cache=cache,
+        guardrails=_response_rule(),
+    )
+    with pytest.raises(GuardrailBlocked):
+        await guarded.open_chat_stream(TEAM_ID, KEY_ID, dict(_CHAT_REQUEST))
+
+
+async def test_a_request_only_guardrail_leaves_streaming_working() -> None:
+    """The refusal is about the response side only: screening the prompt works
+    fine on a stream, and must not cost the tenant streaming."""
+    seen: list[Direction] = []
+    gateway = Gateway(allow_stream=True)
+    service = _service(
+        gateway, FakeUsage(), [], response_cache=None, guardrails=_request_only_rule(seen)
+    )
+
+    chunks = await _drain(await service.open_chat_stream(TEAM_ID, KEY_ID, dict(_CHAT_REQUEST)))
+
+    assert gateway.stream_calls == 1
+    assert chunks  # the stream was served
+    assert seen == [Direction.REQUEST]

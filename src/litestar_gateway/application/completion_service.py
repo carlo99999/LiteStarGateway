@@ -459,6 +459,42 @@ class CompletionService:
         finally:
             await self._meter.release(reservation)
 
+    async def _refuse_stream_when_response_guarded(
+        self,
+        team_id: UUID,
+        api_key_id: UUID | None,
+        model: Model,
+        router_id: UUID | None = None,
+    ) -> None:
+        """Refuse to stream when a response-side rule is configured (ISSUE-042).
+
+        A response guardrail judges a complete answer. On a stream there is no
+        complete answer until the last chunk, and the earlier chunks are already
+        with the client — a verdict cannot recall them. Serving the stream anyway
+        is what the gateway did, which means the operator's control silently did
+        not run for any caller who passed `stream: true`.
+
+        Refusing is the safe default this feature was designed with
+        ("block-streaming-when-active"); the alternative it names — a
+        delay-window incremental scan — bounds the leak instead of removing it
+        and is deliberately not built yet.
+
+        Any RESPONSE-direction rule counts, not just a blocking one: whether a
+        provider will block is decided at runtime from the answer's content, so
+        there is nothing to inspect up front. Erring the other way would mean
+        guessing that a rule is harmless and streaming past it.
+        """
+        if self._guardrails is None:
+            return
+        chain = await self._guardrails(team_id, api_key_id, model, Direction.RESPONSE, router_id)
+        if not chain:
+            return
+        raise GuardrailBlocked(
+            "streaming is not available for this model: a response-side guardrail is "
+            "configured, and a streamed answer cannot be screened before it has already "
+            "been delivered. Retry without `stream`, or remove the response-side rule."
+        )
+
     async def _guard_request(
         self,
         team_id: UUID,
@@ -763,6 +799,7 @@ class CompletionService:
         *,
         api_key_id: UUID | None,
         operation: str,
+        streaming: bool = False,
     ) -> tuple[Model, dict[str, str], dict[str, Any], UsageAttribution]:
         """Resolve a provider-native request's model `alias` to a usable team
         `Model` plus its decrypted credentials, and return the *governed* body.
@@ -804,6 +841,8 @@ class CompletionService:
         # native wire shape of the same model (ISSUE-038). `api_key_id` and
         # `operation` are required arguments rather than defaulted so a new
         # native method cannot quietly opt out.
+        if streaming:
+            await self._refuse_stream_when_response_guarded(team_id, api_key_id, model)
         governed = await self._guard_request(team_id, api_key_id, model, operation, governed)
         return model, values, governed, self._usage_attribution(team_id, alias, model, resolved)
 
@@ -870,6 +909,7 @@ class CompletionService:
             data,
             api_key_id=api_key_id,
             operation="native.messages",
+            streaming=True,
         )
         if model.provider is not Provider.ANTHROPIC:
             raise ProviderMismatch(
@@ -1000,6 +1040,7 @@ class CompletionService:
             data,
             api_key_id=api_key_id,
             operation="native.generate_content",
+            streaming=True,
         )
         if model.provider is not Provider.VERTEX_AI:
             raise ProviderMismatch(
@@ -1073,6 +1114,7 @@ class CompletionService:
         request_validator: RequestValidator | None = None,
         *,
         router_context: dict[str, Any] | None = None,
+        streaming: bool = False,
     ) -> tuple[Model, dict[str, str], Admission | None, dict[str, Any], UsageAttribution]:
         # Gate the caller before router strategies: judge/embedding strategies
         # may make billable provider calls while resolving a virtual model.
@@ -1154,6 +1196,10 @@ class CompletionService:
         clean = clamp_output_tokens(operation, request, model.max_output_tokens)
         if request_validator is not None:
             clean = request_validator(model, clean)
+        if streaming:
+            await self._refuse_stream_when_response_guarded(
+                team_id, api_key_id, model, routed_router_id
+            )
         # Guardrails run BEFORE admission: a blocked request must not consume
         # the team's budget reservation or its rate-limit slot, because it never
         # reaches a provider. A redaction rewrites `clean`, so everything after
@@ -1516,6 +1562,7 @@ class CompletionService:
             api_key_id,
             validate_chat_request,
             router_context=router_context,
+            streaming=True,
         )
         router = router_context.get("router")
         decision = router_context.get("decision")
@@ -1762,6 +1809,7 @@ class CompletionService:
             ModelType.CHAT,
             api_key_id,
             validate_responses_request,
+            streaming=True,
         )
         try:
             stream = await self._gateway.astream_responses(clean, model, values)
