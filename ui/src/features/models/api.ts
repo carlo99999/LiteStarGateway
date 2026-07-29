@@ -34,6 +34,10 @@ export interface NewModel {
   cacheAllowNondeterministic: boolean;
   /** Semantic-tier opt-in; only takes effect when `cacheEnabled` is also true. */
   cacheSemanticEnabled: boolean;
+  /** Gateway operations this model serves (Plan 18). Only meaningful for
+   * `openai_compatible`, where the provider cannot say what a given backend
+   * does; omitted or empty means chat only. */
+  capabilities: string[] | null;
 }
 
 function fail(error: unknown, fallback: string): Error {
@@ -126,6 +130,7 @@ export async function createModel(teamId: string, model: NewModel): Promise<Mode
       cache_enabled: model.cacheEnabled,
       cache_allow_nondeterministic: model.cacheAllowNondeterministic,
       cache_semantic_enabled: model.cacheSemanticEnabled,
+      capabilities: model.capabilities,
     },
   });
   if (error || !data) throw fail(error, "Failed to create model");
@@ -157,6 +162,10 @@ export interface EditModel {
   cacheEnabled: boolean;
   cacheAllowNondeterministic: boolean;
   cacheSemanticEnabled: boolean;
+  /** Gateway operations this model serves (Plan 18). Only meaningful for
+   * `openai_compatible`, where the provider cannot say what a given backend
+   * does; omitted or empty means chat only. */
+  capabilities: string[] | null;
 }
 
 /** PATCH /teams/{id}/models/{modelId} — update mutable fields. The backend
@@ -178,6 +187,7 @@ export async function updateModel(
       cache_enabled: changes.cacheEnabled,
       cache_allow_nondeterministic: changes.cacheAllowNondeterministic,
       cache_semantic_enabled: changes.cacheSemanticEnabled,
+      capabilities: changes.capabilities,
     },
   });
   if (error || !data) throw fail(error, "Failed to update model");
@@ -199,6 +209,7 @@ function modelBody(model: NewModel) {
     cache_enabled: model.cacheEnabled,
     cache_allow_nondeterministic: model.cacheAllowNondeterministic,
     cache_semantic_enabled: model.cacheSemanticEnabled,
+    capabilities: model.capabilities,
   };
 }
 
@@ -238,6 +249,7 @@ export async function updateGlobalModel(modelId: string, changes: EditModel): Pr
       cache_enabled: changes.cacheEnabled,
       cache_allow_nondeterministic: changes.cacheAllowNondeterministic,
       cache_semantic_enabled: changes.cacheSemanticEnabled,
+      capabilities: changes.capabilities,
     },
   });
   if (error || !data) throw fail(error, "Failed to update global model");
