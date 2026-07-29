@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from litestar_gateway.domain.entities import Organization, Team, User
@@ -13,6 +14,7 @@ from litestar_gateway.domain.exceptions import (
     OrganizationNotFound,
     PermissionDenied,
 )
+from litestar_gateway.domain.money import ZERO
 from litestar_gateway.domain.pagination import DEFAULT_PAGE_SIZE
 from litestar_gateway.domain.ports import (
     OrganizationRepository,
@@ -26,7 +28,7 @@ class TeamSpend:
     """One team's recorded cost over the rollup window."""
 
     team: Team
-    cost: float
+    cost: Decimal
 
 
 @dataclass(frozen=True)
@@ -34,7 +36,7 @@ class OrganizationSpend:
     """An organization's spend since `since`: the total plus a per-team breakdown."""
 
     since: datetime
-    total_cost: float
+    total_cost: Decimal
     teams: list[TeamSpend]
 
 
@@ -108,7 +110,7 @@ class OrganizationService:
         if await self._orgs.get(organization_id) is None:
             raise OrganizationNotFound(str(organization_id))
         per_team: list[TeamSpend] = []
-        total = 0.0
+        total = ZERO
         for team in await self._all_teams(organization_id):
             cost = await self._usage.spend_since(team.id, since)
             per_team.append(TeamSpend(team=team, cost=cost))

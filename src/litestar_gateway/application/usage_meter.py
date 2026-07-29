@@ -437,9 +437,11 @@ class UsageMeter:
             # The store's arithmetic is a comparison against the budget, both
             # still floats; PR 2/3 of this slice migrates the columns and this
             # conversion goes away.
+            # The reservation store still compares floats; PR 3/3 of this
+            # slice decimalizes it together with the rate columns.
             float(_reservation_cost(model, request)),
-            spent=spent,
-            limit=budget.limit_cost,
+            spent=float(spent),
+            limit=float(budget.limit_cost),
             ttl_s=self._reservation_ttl_s,
         )
         if not outcome.admitted:
@@ -562,9 +564,7 @@ class UsageMeter:
                 operation=operation,
                 prompt_tokens=prompt,
                 completion_tokens=completion,
-                # `as_float` at the edge: the trace is an observability record,
-                # and the columns are migrated in the next PR of this slice.
-                cost=float(cost),
+                cost=cost,
                 latency_ms=latency_ms,
                 status="ok",
                 created_at=now,
@@ -613,7 +613,7 @@ class UsageMeter:
                 operation=operation,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                cost=0.0,
+                cost=ZERO,
                 latency_ms=latency_ms,
                 status="ok",
                 created_at=now,
@@ -719,7 +719,7 @@ class UsageMeter:
                 operation=operation,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                cost=float(cost),
+                cost=cost,
                 latency_ms=latency_ms,
                 status="error",
                 created_at=datetime.now(UTC),
@@ -787,7 +787,7 @@ class UsageMeter:
                 operation=operation,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
-                cost=float(cost),
+                cost=cost,
                 created_at=now,
                 request_id=current_request_id(),
                 requested_alias=attribution.requested_alias if attribution else None,

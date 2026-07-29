@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -24,6 +25,7 @@ from litestar_gateway.domain.entities import (
     UsageTimeseries,
 )
 from litestar_gateway.domain.exceptions import InvalidKeyExpiry
+from litestar_gateway.domain.money import ZERO
 
 
 @dataclass(frozen=True)
@@ -52,13 +54,13 @@ class BudgetResponse:
     alert_email: str | None
 
     @classmethod
-    def from_budget(cls, budget: Budget, spent: float) -> BudgetResponse:
+    def from_budget(cls, budget: Budget, spent: Decimal) -> BudgetResponse:
         return cls(
             team_id=budget.team_id,
-            limit_cost=budget.limit_cost,
+            limit_cost=float(budget.limit_cost),
             window=budget.window.value,
-            spent=spent,
-            remaining=max(0.0, budget.limit_cost - spent),
+            spent=float(spent),
+            remaining=float(max(ZERO, budget.limit_cost - spent)),
             thresholds=list(budget.thresholds),
             alert_webhook_url=budget.alert_webhook_url,
             alert_email=budget.alert_email,
@@ -112,7 +114,7 @@ class UsageResponse:
             prompt_tokens=a.prompt_tokens,
             completion_tokens=a.completion_tokens,
             total_tokens=a.prompt_tokens + a.completion_tokens,
-            cost=a.cost,
+            cost=float(a.cost),
             calls=a.calls,
             row_id=(
                 f"{a.resolved_model_id or a.model_id}:"
@@ -148,7 +150,7 @@ class UsageBucketResponse:
             prompt_tokens=b.prompt_tokens,
             completion_tokens=b.completion_tokens,
             total_tokens=b.prompt_tokens + b.completion_tokens,
-            cost=b.cost,
+            cost=float(b.cost),
             group_key=b.group_key,
         )
 
@@ -375,7 +377,7 @@ class KeySpendingResponse:
             prompt_tokens=prompt,
             completion_tokens=completion,
             total_tokens=prompt + completion,
-            cost=spend.cost if spend else 0.0,
+            cost=float(spend.cost) if spend else 0.0,
             calls=spend.calls if spend else 0,
         )
 
@@ -439,7 +441,7 @@ class TeamUsageEventResponse:
             operation=e.operation,
             prompt_tokens=e.prompt_tokens,
             completion_tokens=e.completion_tokens,
-            cost=e.cost,
+            cost=float(e.cost),
             created_at=e.created_at,
             requested_alias=e.requested_alias,
             cache_hit=e.cache_hit,

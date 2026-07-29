@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal, Protocol, runtime_checkable
 from uuid import UUID
 
@@ -46,7 +47,7 @@ class UsageRepository(Protocol):
         are now revoked, as long as they have recorded usage)."""
         ...
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
         """Total cost recorded for the team from `since` onwards. Read on the
         hot path by the budget gate — must stay a cheap indexed aggregate."""
         ...

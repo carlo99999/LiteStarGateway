@@ -100,9 +100,9 @@ class OrganizationController(Controller):
         return OrganizationSpendResponse(
             organization_id=organization_id,
             since=rollup.since,
-            total_cost=rollup.total_cost,
+            total_cost=float(rollup.total_cost),
             teams=[
-                TeamSpendResponse(team_id=ts.team.id, name=ts.team.name, cost=ts.cost)
+                TeamSpendResponse(team_id=ts.team.id, name=ts.team.name, cost=float(ts.cost))
                 for ts in rollup.teams
             ],
         )

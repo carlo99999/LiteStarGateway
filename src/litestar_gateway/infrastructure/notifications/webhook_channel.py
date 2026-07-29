@@ -63,8 +63,11 @@ class WebhookNotificationChannel:
             "window": alert.window.value,
             "period_start": alert.period_start.isoformat(),
             "threshold": alert.threshold,
-            "spend": alert.spend,
-            "limit_cost": alert.limit_cost,
+            # JSON numbers, like every other outbound payload: `Decimal` is
+            # authoritative in the domain and at rest, never on the wire — and
+            # `json.dumps` cannot serialize it at all.
+            "spend": float(alert.spend),
+            "limit_cost": float(alert.limit_cost),
         }
         auth_headers = (
             {"Authorization": f"Bearer {self._bearer_token}"} if self._bearer_token else {}

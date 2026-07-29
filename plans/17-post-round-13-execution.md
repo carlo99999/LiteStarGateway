@@ -364,7 +364,31 @@ rather than the instance.
 
 ---
 
-## Slice 5 — Decimal money (3 PRs, ~5 d)
+## Slice 5 — Decimal money (2 PRs, closed early — see below)
+
+> **Status: done, deliberately short of the original plan.** PR 1/3 (#413) put
+> `Decimal` in the pricing seam; PR 2/3 made the money *columns* exact. **PR 3/3
+> was dropped.** It would have converted the per-token RATE columns
+> (`model.*_cost_per_token`, `routing_decision.*_cost`) to Decimal as well, and
+> the honest accounting is that it buys almost nothing: `rate_card()` already
+> converts every rate exactly via `Decimal(str(x))` when it reads them, so the
+> cost calculation is exact today with the columns still `float`. The other half
+> of 3/3 — order-independent aggregates — is already proved by
+> `tests/persistence/test_money_round_trip.py` on both dialects.
+>
+> Worth recording plainly, because it is the weakest cost/benefit in this plan:
+> **no review round ever found a defect caused by float money.** R3-L15 flagged
+> it in Round 3 and every round since re-confirmed it was not exploitable. What
+> the two PRs bought is an exact ledger and an order-independent total — an
+> accounting and audit property, not a fix for an observed bug. Finishing the
+> rate columns would have cost another wave of churn across every test that
+> builds a `Model`, for a property already held.
+>
+> One real defect did surface on the way: the budget-alert **webhook payload**
+> serializes the alert to JSON, and `Decimal` is not JSON-serializable. Caught
+> by the existing channel tests, fixed at that boundary.
+
+## Slice 5 (original plan) — Decimal money (3 PRs, ~5 d)
 
 Executes [13-billing-integrity.md](13-billing-integrity.md) Phase 2 and retires
 the R3-L15 deferral that has survived every round since Round 3. Phase 1 built

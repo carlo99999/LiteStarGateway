@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -38,6 +39,7 @@ from litestar_gateway.domain.entities import (
     User,
     parse_team_mapping,
 )
+from litestar_gateway.domain.money import ZERO
 from litestar_gateway.domain.routing import (
     CandidateModel,
     QualityTier,
@@ -45,6 +47,7 @@ from litestar_gateway.domain.routing import (
     RouterGrant,
     RoutingDecisionRecord,
 )
+from litestar_gateway.infrastructure.persistence.money_type import Money
 
 
 class UserModel(base.UUIDAuditBase):
@@ -381,6 +384,9 @@ class RoutingDecisionModel(base.UUIDAuditBase):
     is_shadow: Mapped[bool] = mapped_column(default=False)
     fallback_used: Mapped[bool] = mapped_column(default=False)
     api_key_id: Mapped[UUID | None] = mapped_column(default=None)
+    # Per-token RATES, not amounts: quantizing these at cost scale would round
+    # a 0.0000005 rate to 0.000001 and corrupt the savings arithmetic. They move
+    # to the rate scale together with the model's own rate columns.
     chosen_input_cost: Mapped[float | None] = mapped_column(default=None)
     chosen_output_cost: Mapped[float | None] = mapped_column(default=None)
     alt_input_cost: Mapped[float | None] = mapped_column(default=None)
@@ -510,7 +516,7 @@ class UsageEventModel(base.UUIDAuditBase):
     operation: Mapped[str] = mapped_column()
     prompt_tokens: Mapped[int] = mapped_column(default=0)
     completion_tokens: Mapped[int] = mapped_column(default=0)
-    cost: Mapped[float] = mapped_column(default=0.0)
+    cost: Mapped[Decimal] = mapped_column(Money, default=ZERO)
     cache_hit: Mapped[bool] = mapped_column(default=False)
     # Non-token billing dimensions (Plan 13 Phase 1): Anthropic prompt-cache
     # write/read token counts and the number of generated images.
@@ -570,7 +576,7 @@ class PendingUsageEventModel(base.UUIDAuditBase):
     operation: Mapped[str] = mapped_column()
     prompt_tokens: Mapped[int] = mapped_column(default=0)
     completion_tokens: Mapped[int] = mapped_column(default=0)
-    cost: Mapped[float] = mapped_column(default=0.0)
+    cost: Mapped[Decimal] = mapped_column(Money, default=ZERO)
     cache_hit: Mapped[bool] = mapped_column(default=False)
     # Non-token billing dimensions (Plan 13 Phase 1) — carried through to the
     # ledger row when the reconciler drains this dead-letter entry.
@@ -593,7 +599,7 @@ class TeamBudgetModel(base.UUIDAuditBase):
     __tablename__ = "team_budget"
 
     team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), unique=True, index=True)
-    limit_cost: Mapped[float] = mapped_column()
+    limit_cost: Mapped[Decimal] = mapped_column(Money)
     window: Mapped[str] = mapped_column()
     # Alert threshold percentages of limit_cost (Plan 07 Phase 0, design §2/§8),
     # e.g. [50, 80, 100]. server_default backfills existing rows for the
@@ -659,8 +665,8 @@ class PendingBudgetAlertModel(base.UUIDAuditBase):
     window: Mapped[str] = mapped_column()
     period_start: Mapped[datetime] = mapped_column()
     threshold: Mapped[int] = mapped_column()
-    spend: Mapped[float] = mapped_column()
-    limit_cost: Mapped[float] = mapped_column()
+    spend: Mapped[Decimal] = mapped_column(Money)
+    limit_cost: Mapped[Decimal] = mapped_column(Money)
     # Poison-message bookkeeping, unused until Phase 2's delivery worker exists —
     # reserved now so that phase doesn't need another migration.
     attempts: Mapped[int] = mapped_column(default=0)

@@ -15,6 +15,7 @@ from typing import Any
 from uuid import uuid4
 
 from litestar_gateway.domain.entities import TraceRecord
+from litestar_gateway.domain.money import to_cost
 from litestar_gateway.infrastructure.observability.mlflow_sink import MLflowTraceSink
 
 
@@ -74,7 +75,7 @@ def _record(status: str = "ok", error_type: str | None = None) -> TraceRecord:
         operation="chat.completions",
         prompt_tokens=5,
         completion_tokens=7,
-        cost=0.02,
+        cost=to_cost("0.02"),
         latency_ms=123.0,
         status=status,
         created_at=datetime.now(UTC),
@@ -104,7 +105,9 @@ def test_write_creates_experiment_and_emits_ok_trace() -> None:
     assert attrs["provider"] == "openai"
     assert attrs["prompt_tokens"] == "5"
     assert attrs["completion_tokens"] == "7"
-    assert attrs["cost"] == "0.02"
+    # Cost-scale string: the sink stringifies the Decimal, so the trailing
+    # zeros are the money scale, not noise.
+    assert attrs["cost"] == "0.020000"
     assert attrs["latency_ms"] == "123.0"
     assert "error_type" not in attrs  # only set on error traces
     # Status maps to MLflow's OK on a successful call.

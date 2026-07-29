@@ -34,6 +34,7 @@ from litestar_gateway.domain.exceptions import (
     UpstreamTimeout,
     UpstreamUnavailable,
 )
+from litestar_gateway.domain.money import to_cost
 from litestar_gateway.domain.ports.rate_limiter import RateLimitDecision
 from litestar_gateway.domain.routing import (
     CandidateModel,
@@ -73,7 +74,7 @@ def _budget(limit: float) -> Budget:
     return Budget(
         id=uuid4(),
         team_id=TEAM_ID,
-        limit_cost=limit,
+        limit_cost=to_cost(limit),
         window=BudgetWindow.MONTHLY,
         created_at=datetime.now(UTC),
     )

@@ -5,6 +5,7 @@ relies on, exercised directly against the collaborator (no HTTP app needed)."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -21,6 +22,7 @@ from litestar_gateway.domain.entities import (
     UsageEvent,
 )
 from litestar_gateway.domain.entities.enums import ModelType
+from litestar_gateway.domain.money import ZERO
 
 
 class _FakeUsageRepository:
@@ -41,8 +43,8 @@ class _FakeUsageRepository:
     async def spend_by_api_key(self, team_id: UUID) -> list[ApiKeySpend]:
         return []
 
-    async def spend_since(self, team_id: UUID, since: datetime) -> float:
-        return 0.0
+    async def spend_since(self, team_id: UUID, since: datetime) -> Decimal:
+        return ZERO
 
     async def enqueue_pending(self, event: UsageEvent) -> None:
         raise AssertionError("outbox must not be used in this test")

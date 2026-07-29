@@ -50,6 +50,7 @@ from litestar_gateway.domain.entities import (
 )
 from litestar_gateway.domain.entities.enums import BudgetWindow
 from litestar_gateway.domain.exceptions import BudgetExceeded
+from litestar_gateway.domain.money import to_cost
 from litestar_gateway.infrastructure.budget_reservation import (
     InMemoryBudgetReservationStore,
 )
@@ -487,7 +488,7 @@ class _FakeBudgets:
         return Budget(
             id=uuid4(),
             team_id=team_id,
-            limit_cost=self._limit,
+            limit_cost=to_cost(str(self._limit)),
             window=BudgetWindow.MONTHLY,
             created_at=datetime.now(UTC),
         )
