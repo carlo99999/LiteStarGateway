@@ -4,6 +4,7 @@ Titan/Cohere embeddings, Titan images — boto3 monkeypatched, no real AWS."""
 from __future__ import annotations
 
 import base64
+import dataclasses
 import json
 import threading
 import time
@@ -1403,7 +1404,7 @@ def test_gateway_still_rejects_unregistered_providers() -> None:
     gateway = LLMGatewayImpl()
     gateway._registry.pop(Provider.BEDROCK)
     with pytest.raises(UnsupportedOperation):
-        gateway._resolve(Provider.BEDROCK, "chat.completions")
+        gateway._resolve(_model(), "chat.completions")
 
 
 async def test_gateway_native_messages_rejects_unsupported_provider_via_matrix() -> None:
@@ -1433,7 +1434,11 @@ async def test_gateway_native_capability_slots_still_resolve_for_supported_provi
     from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
 
     gateway = LLMGatewayImpl()
-    anthropic_adapter = gateway._resolve(Provider.ANTHROPIC, "native.messages")
+    anthropic_adapter = gateway._resolve(
+        dataclasses.replace(_model(), provider=Provider.ANTHROPIC), "native.messages"
+    )
     assert hasattr(anthropic_adapter, "anative_messages")
-    vertex_adapter = gateway._resolve(Provider.VERTEX_AI, "native.generate_content")
+    vertex_adapter = gateway._resolve(
+        dataclasses.replace(_model(), provider=Provider.VERTEX_AI), "native.generate_content"
+    )
     assert hasattr(vertex_adapter, "agenerate_content")

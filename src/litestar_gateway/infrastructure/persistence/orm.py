@@ -43,6 +43,7 @@ from litestar_gateway.domain.entities import (
     User,
     parse_team_mapping,
 )
+from litestar_gateway.domain.entities.model import DEFAULT_CAPABILITIES
 from litestar_gateway.domain.guardrails import Direction, FailPolicy
 from litestar_gateway.domain.money import ZERO
 from litestar_gateway.domain.routing import (
@@ -927,6 +928,10 @@ class ModelRecord(base.UUIDAuditBase):
     cache_read_cost_per_token: Mapped[float | None] = mapped_column(default=None)
     image_cost_per_image: Mapped[float | None] = mapped_column(default=None)
     image_prices: Mapped[dict[str, float]] = mapped_column(JSON, default=dict)
+    # Declared gateway operations (Plan 18) — see domain/entities/model.py.
+    # Stored as a JSON list; empty/NULL reads back as the chat-only default, so
+    # every pre-existing row backfills to it without a data migration.
+    capabilities: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     def to_entity(self) -> Model:
         return Model(
@@ -953,6 +958,7 @@ class ModelRecord(base.UUIDAuditBase):
             cache_read_cost_per_token=self.cache_read_cost_per_token,
             image_cost_per_image=self.image_cost_per_image,
             image_prices=self.image_prices or {},
+            capabilities=frozenset(self.capabilities) or DEFAULT_CAPABILITIES,
         )
 
 

@@ -19,6 +19,10 @@ from litestar_gateway.infrastructure.llm.openai_adapter import (
     OpenAICompatibleProviderAdapter,
 )
 
+# Test fixtures, not credentials.
+SUPPLIED_KEY = "real"  # pragma: allowlist secret
+SHARED_KEY = "same"  # pragma: allowlist secret
+
 
 class TestProviderValue:
     def test_the_provider_exists(self) -> None:
@@ -80,17 +84,19 @@ class TestClientConstruction:
         # not a fallback that could mask a misconfigured secret: a server that
         # does require auth answers 401, which the error translator handles.
         adapter = OpenAICompatibleProviderAdapter()
-        client = adapter._async_client(
-            self._model(), {"api_base": "http://vllm.internal:8000/v1"}
-        )
+        client = adapter._async_client(self._model(), {"api_base": "http://vllm.internal:8000/v1"})
         assert client.api_key == PLACEHOLDER_API_KEY
 
     def test_a_supplied_api_key_is_used(self) -> None:
         adapter = OpenAICompatibleProviderAdapter()
         client = adapter._async_client(
-            self._model(), {"api_base": "https://api.groq.test/openai/v1", "api_key": "real"}
+            self._model(),
+            {
+                "api_base": "https://api.groq.test/openai/v1",
+                "api_key": SUPPLIED_KEY,
+            },
         )
-        assert client.api_key == "real"
+        assert client.api_key == SUPPLIED_KEY
 
     def test_the_client_key_cannot_alias_with_plain_openai(self) -> None:
         # Same endpoint, same key, different provider: the pooled client must
@@ -98,7 +104,10 @@ class TestClientConstruction:
         # other's configured client.
         from litestar_gateway.infrastructure.llm.openai_adapter import OpenAIAdapter
 
-        credentials = {"api_base": "https://shared.test/v1", "api_key": "same"}
+        credentials = {
+            "api_base": "https://shared.test/v1",
+            "api_key": SHARED_KEY,
+        }
         compatible = OpenAICompatibleProviderAdapter()._client_key(self._model(), credentials)
         plain = OpenAIAdapter()._client_key(self._model(), credentials)
         assert compatible.provider == "openai_compatible"
@@ -107,16 +116,15 @@ class TestClientConstruction:
 
 
 class TestGatewayCapabilities:
-    """Phase 1 advertises chat only — the fail-closed default. Phase 2 opens
-    the rest through per-model declared capabilities, so each phase is safe on
-    its own rather than only once both have landed."""
+    """A model that declares nothing serves chat and nothing else. The
+    intersection itself is covered in `test_declared_capabilities.py`."""
 
-    def test_chat_resolves(self) -> None:
+    def test_chat_resolves_by_default(self) -> None:
         gateway = LLMGatewayImpl()
-        assert gateway._resolve(Provider.OPENAI_COMPATIBLE, "chat.completions") is not None
+        assert gateway._resolve(TestClientConstruction()._model(), "chat.completions") is not None
 
     @pytest.mark.parametrize("operation", ["embeddings", "image_generation", "responses"])
     def test_undeclared_operations_are_refused(self, operation: str) -> None:
         gateway = LLMGatewayImpl()
         with pytest.raises(UnsupportedOperation):
-            gateway._resolve(Provider.OPENAI_COMPATIBLE, operation)
+            gateway._resolve(TestClientConstruction()._model(), operation)

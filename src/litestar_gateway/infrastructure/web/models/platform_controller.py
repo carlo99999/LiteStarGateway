@@ -66,6 +66,7 @@ class PlatformModelController(Controller):
             cache_read_cost_per_token=data.cache_read_cost_per_token,
             image_cost_per_image=data.image_cost_per_image,
             image_prices=data.image_prices,
+            capabilities=data.capabilities,
         )
         await record_audit(
             audit_log,
@@ -118,6 +119,7 @@ class PlatformModelController(Controller):
             cache_read_cost_per_token=data.cache_read_cost_per_token,
             image_cost_per_image=data.image_cost_per_image,
             image_prices=data.image_prices,
+            capabilities=data.capabilities,
         )
         await record_audit(
             audit_log,
