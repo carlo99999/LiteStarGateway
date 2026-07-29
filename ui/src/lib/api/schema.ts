@@ -2261,7 +2261,7 @@ export interface components {
          * @description The LLM provider this credential connects to.
          * @enum {string}
          */
-        Provider: "openai" | "anthropic" | "vertex_ai" | "azure_openai" | "bedrock" | "databricks";
+        Provider: "openai" | "anthropic" | "vertex_ai" | "azure_openai" | "bedrock" | "databricks" | "openai_compatible";
         /** ResetPasswordRequest */
         ResetPasswordRequest: {
             reset_token: string;

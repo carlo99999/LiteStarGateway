@@ -21,7 +21,10 @@ from litestar_gateway.infrastructure.llm.errors import (
     run_translated,
     translate_stream,
 )
-from litestar_gateway.infrastructure.llm.openai_adapter import OpenAIAdapter
+from litestar_gateway.infrastructure.llm.openai_adapter import (
+    OpenAIAdapter,
+    OpenAICompatibleProviderAdapter,
+)
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.llm.responses_emulation import ChatToResponsesAdapter
 from litestar_gateway.infrastructure.llm.vertex_adapter import VertexAdapter
@@ -78,6 +81,14 @@ class LLMGatewayImpl:
             Provider.DATABRICKS: (
                 ChatToResponsesAdapter(openai_adapter),
                 frozenset({_CHAT, _RESPONSES, _EMBEDDINGS}),
+            ),
+            # Any OpenAI-protocol endpoint (Plan 18). Chat only for now: the
+            # fail-closed default, since the gateway cannot know what a given
+            # backend serves. Phase 2 opens embeddings/images per model through
+            # declared capabilities rather than by assuming them here.
+            Provider.OPENAI_COMPATIBLE: (
+                OpenAICompatibleProviderAdapter(resilience, self._client_registry),
+                frozenset({_CHAT}),
             ),
             # Anthropic: chat + emulated Responses + native Messages passthrough.
             # No embeddings API.

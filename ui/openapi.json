@@ -15063,7 +15063,8 @@
                     "vertex_ai",
                     "azure_openai",
                     "bedrock",
-                    "databricks"
+                    "databricks",
+                    "openai_compatible"
                 ],
                 "title": "Provider",
                 "description": "The LLM provider this credential connects to."

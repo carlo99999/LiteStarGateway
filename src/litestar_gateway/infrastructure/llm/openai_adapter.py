@@ -236,6 +236,50 @@ def _openai_client_kwargs(credentials: dict[str, str]) -> dict[str, Any]:
     return {"api_key": require_api_key(credentials), "base_url": _base_url(credentials)}
 
 
+# Sent when an `openai_compatible` credential carries no key. The SDK refuses an
+# empty one, and an unauthenticated local server ignores whatever arrives; a
+# server that does require auth answers 401, which `errors.py` translates. Not a
+# secret, and deliberately recognizable in a request log.
+PLACEHOLDER_API_KEY = "not-used"  # pragma: allowlist secret
+
+
+def _compatible_client_kwargs(credentials: dict[str, str]) -> dict[str, Any]:
+    return {
+        "api_key": credentials.get("api_key") or PLACEHOLDER_API_KEY,
+        "base_url": _base_url(credentials),
+    }
+
+
+class OpenAICompatibleProviderAdapter(OpenAICompatibleAdapter):
+    """Any endpoint speaking the OpenAI wire protocol (Plan 18).
+
+    Identical to `OpenAIAdapter` but for two things: the API key is optional,
+    and the client-cache key is tagged with its own provider so a pooled client
+    is never shared with plain OpenAI when endpoint and credential happen to
+    match.
+
+    **No vendor branches, ever.** A backend needing special-casing is by
+    definition not OpenAI-compatible and belongs behind its own provider with
+    its own official SDK (design §1).
+    """
+
+    def _sync_client(self, model: Model, credentials: dict[str, str]) -> OpenAI:
+        return OpenAI(**_compatible_client_kwargs(credentials), **self._resilience.client_kwargs)
+
+    def _async_client(self, model: Model, credentials: dict[str, str]) -> AsyncOpenAI:
+        return AsyncOpenAI(
+            **_compatible_client_kwargs(credentials), **self._resilience.async_client_kwargs
+        )
+
+    def _client_key(self, model: Model, credentials: dict[str, str]) -> ClientKey:
+        kwargs = _compatible_client_kwargs(credentials)
+        return ClientKey(
+            provider="openai_compatible",
+            fingerprint=fingerprint_material(*kwargs.values()),
+            endpoint=kwargs.get("base_url") or "",
+        )
+
+
 class OpenAIAdapter(OpenAICompatibleAdapter):
     """Plain OpenAI, and OpenAI-compatible endpoints (e.g. Databricks via base_url)."""
 
