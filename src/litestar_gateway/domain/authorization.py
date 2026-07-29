@@ -30,6 +30,11 @@ class Permission(StrEnum):
     # Routing-decision content (raw prompts, §S6 export) — deliberately split
     # from `usage:read`, which only covers token/cost aggregates.
     DECISIONS_READ = "decisions:read"
+    # Guardrail policy. Deliberately NOT granted to `model_manager`: a content
+    # control that the person configuring models can switch off is not a
+    # control. Team admins and platform admins only.
+    GUARDRAILS_READ = "guardrails:read"
+    GUARDRAILS_MANAGE = "guardrails:manage"
 
 
 # The single source of truth for what each team role may do. `admin` holds

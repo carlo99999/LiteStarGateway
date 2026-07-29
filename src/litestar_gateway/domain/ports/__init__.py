@@ -24,6 +24,7 @@ from litestar_gateway.domain.ports.callable_alias import (
 )
 from litestar_gateway.domain.ports.circuit_breaker import BreakerLease, CircuitBreaker
 from litestar_gateway.domain.ports.credential import CredentialRepository
+from litestar_gateway.domain.ports.guardrail import GuardrailRuleRepository
 from litestar_gateway.domain.ports.identity import IdentityProvider
 from litestar_gateway.domain.ports.invite import InviteRepository, PasswordResetRepository
 from litestar_gateway.domain.ports.llm_gateway import LLMGateway
@@ -64,6 +65,7 @@ __all__ = [
     "BreakerLease",
     "BudgetAlertStateRepository",
     "BudgetRepository",
+    "GuardrailRuleRepository",
     "BudgetReservationStore",
     "CacheKey",
     "CachedResponse",

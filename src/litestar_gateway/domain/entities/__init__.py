@@ -22,6 +22,7 @@ from .enums import (
     Provider,
     TeamRole,
 )
+from .guardrail import ActiveGuardrailRule, GuardrailKind, GuardrailRule, resolve_chain
 from .identity import (
     ExternalIdentity,
     Invite,
@@ -48,6 +49,11 @@ __all__ = [
     "ServicePrincipal",
     # Audit
     "AuditEvent",
+    # Guardrails
+    "ActiveGuardrailRule",
+    "GuardrailKind",
+    "GuardrailRule",
+    "resolve_chain",
     # Billing
     "ApiKeySpend",
     "Budget",

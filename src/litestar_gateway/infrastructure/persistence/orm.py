@@ -18,6 +18,8 @@ from litestar_gateway.domain.entities import (
     BudgetAlertState,
     BudgetWindow,
     Credential,
+    GuardrailKind,
+    GuardrailRule,
     Invite,
     KeyPurpose,
     KeyScope,
@@ -39,6 +41,7 @@ from litestar_gateway.domain.entities import (
     User,
     parse_team_mapping,
 )
+from litestar_gateway.domain.guardrails import Direction, FailPolicy
 from litestar_gateway.domain.money import ZERO
 from litestar_gateway.domain.routing import (
     CandidateModel,
@@ -724,6 +727,63 @@ class CredentialModel(base.UUIDAuditBase):
             name=self.name,
             provider=Provider(self.provider),
             created_at=self.created_at,
+        )
+
+
+class GuardrailRuleModel(base.UUIDAuditBase):
+    """One configured guardrail provider in a team's chain (Plan 06).
+
+    `model_id` NULL means the rule applies to every model the team can call; a
+    row bound to a model overrides the team-wide rows for it (see
+    `domain.entities.guardrail.resolve_chain`). The provider's knobs live in
+    `config` as JSON, validated per kind in `domain.guardrail_config` — a column
+    per knob would make adding a provider a migration.
+    """
+
+    __tablename__ = "guardrail_rule"
+    __table_args__ = (
+        # A name identifies the rule to an operator, and it is what appears in a
+        # verdict, so it must be unambiguous within a team.
+        UniqueConstraint("team_id", "name"),
+        Index("ix_guardrail_rule_team_direction", "team_id", "direction"),
+    )
+
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    # No FK cascade concerns beyond the team: a deleted model leaves its rules
+    # behind harmlessly (they resolve for a model_id nothing can call anymore),
+    # and ON DELETE CASCADE would silently widen a per-model exception into a
+    # team-wide rule if the FK were dropped instead.
+    model_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("model.id", ondelete="CASCADE"), default=None, index=True
+    )
+    name: Mapped[str] = mapped_column()
+    kind: Mapped[str] = mapped_column()
+    direction: Mapped[str] = mapped_column()
+    position: Mapped[int] = mapped_column(default=0)
+    fail_policy: Mapped[str] = mapped_column()
+    enabled: Mapped[bool] = mapped_column(default=True)
+    config: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Data-key Fernet ciphertext of the webhook signing secret (same envelope
+    # scheme as CredentialModel.encrypted_values). NULL for kinds that need no
+    # secret.
+    encrypted_secret: Mapped[str | None] = mapped_column(default=None)
+    key_id: Mapped[UUID | None] = mapped_column(ForeignKey("secret_key.id"), default=None)
+
+    def to_entity(self) -> GuardrailRule:
+        return GuardrailRule(
+            id=self.id,
+            team_id=self.team_id,
+            model_id=self.model_id,
+            name=self.name,
+            kind=GuardrailKind(self.kind),
+            direction=Direction(self.direction),
+            position=self.position,
+            fail_policy=FailPolicy(self.fail_policy),
+            enabled=self.enabled,
+            config=dict(self.config or {}),
+            has_secret=self.encrypted_secret is not None,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
         )
 
 
