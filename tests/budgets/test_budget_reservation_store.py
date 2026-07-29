@@ -16,6 +16,7 @@ import pytest
 from support.doubles import MutableClock
 from support.redis import REDIS_TEST_URL, requires_redis
 
+from litestar_gateway.domain.ports.budget_reservation import team_scope
 from litestar_gateway.infrastructure.budget_reservation import (
     InMemoryBudgetReservationStore,
     RedisBudgetReservationStore,
@@ -74,21 +75,21 @@ async def store_factory(
 async def test_a_request_within_the_cap_is_admitted(store_factory) -> None:
     clock = MutableClock()
     store = store_factory(clock)
-    team = uuid4()
+    team = team_scope(uuid4())
 
     outcome = await store.try_reserve(team, 1.0, spent=0.0, limit=10.0, ttl_s=TTL)
 
     assert outcome.admitted
     assert outcome.reserved == 0.0
     assert outcome.reservation is not None
-    assert outcome.reservation.team_id == team
+    assert outcome.reservation.scope == team
 
 
 async def test_in_flight_reservations_count_towards_the_cap(store_factory) -> None:
     # The whole point of the store: committed spend alone would admit both.
     clock = MutableClock()
     store = store_factory(clock)
-    team = uuid4()
+    team = team_scope(uuid4())
     first = await store.try_reserve(team, 6.0, spent=0.0, limit=10.0, ttl_s=TTL)
     assert first.admitted
 
@@ -104,7 +105,7 @@ async def test_two_replicas_sharing_one_store_admit_only_one(store_factory) -> N
     counter cannot provide, and the reason this port exists."""
     clock = MutableClock()
     replica_one, replica_two = store_factory(clock), store_factory(clock)
-    team = uuid4()
+    team = team_scope(uuid4())
 
     first = await replica_one.try_reserve(team, 10.0, spent=0.0, limit=10.0, ttl_s=TTL)
     second = await replica_two.try_reserve(team, 10.0, spent=0.0, limit=10.0, ttl_s=TTL)
@@ -115,7 +116,7 @@ async def test_two_replicas_sharing_one_store_admit_only_one(store_factory) -> N
 async def test_releasing_gives_the_headroom_back(store_factory) -> None:
     clock = MutableClock()
     store = store_factory(clock)
-    team = uuid4()
+    team = team_scope(uuid4())
     held = await store.try_reserve(team, 10.0, spent=0.0, limit=10.0, ttl_s=TTL)
     assert held.reservation is not None
     assert not (await store.try_reserve(team, 1.0, spent=0.0, limit=10.0, ttl_s=TTL)).admitted
@@ -130,7 +131,7 @@ async def test_releasing_twice_is_a_no_op(store_factory) -> None:
     # under-count and hand the team free headroom.
     clock = MutableClock()
     store = store_factory(clock)
-    team = uuid4()
+    team = team_scope(uuid4())
     held = await store.try_reserve(team, 4.0, spent=0.0, limit=10.0, ttl_s=TTL)
     assert held.reservation is not None
 
@@ -146,7 +147,7 @@ async def test_an_expired_reservation_stops_holding_headroom(store_factory) -> N
     its reservations would hold the team's headroom forever."""
     clock = MutableClock()
     store = store_factory(clock)
-    team = uuid4()
+    team = team_scope(uuid4())
     assert (await store.try_reserve(team, 10.0, spent=0.0, limit=10.0, ttl_s=TTL)).admitted
 
     clock.now += TTL + 1
@@ -159,7 +160,7 @@ async def test_an_expired_reservation_stops_holding_headroom(store_factory) -> N
 async def test_a_live_reservation_is_not_swept_early(store_factory) -> None:
     clock = MutableClock()
     store = store_factory(clock)
-    team = uuid4()
+    team = team_scope(uuid4())
     assert (await store.try_reserve(team, 10.0, spent=0.0, limit=10.0, ttl_s=TTL)).admitted
 
     clock.now += TTL - 1
@@ -184,7 +185,7 @@ async def test_a_zero_amount_request_still_respects_an_exhausted_cap(store_facto
     # is admitted, however cheap it claims to be.
     clock = MutableClock()
     store = store_factory(clock)
-    team = uuid4()
+    team = team_scope(uuid4())
 
     outcome = await store.try_reserve(team, 0.0, spent=10.0, limit=10.0, ttl_s=TTL)
 

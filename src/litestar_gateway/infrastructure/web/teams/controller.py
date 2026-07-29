@@ -23,8 +23,11 @@ from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.domain.authorization import Permission
 from litestar_gateway.domain.budget import validate_thresholds, window_start
 from litestar_gateway.domain.entities import (
+    APIKey,
+    ApiKeyBudget,
     Budget,
     BudgetWindow,
+    KeyBudgetMode,
     KeyScope,
     Principal,
     UsageTimeseries,
@@ -39,6 +42,7 @@ from litestar_gateway.domain.exceptions import (
 from litestar_gateway.domain.money import to_cost
 from litestar_gateway.domain.pagination import resolve_page
 from litestar_gateway.domain.ports import (
+    ApiKeyBudgetRepository,
     AuditLog,
     BudgetAlertStateRepository,
     BudgetRepository,
@@ -56,10 +60,12 @@ from litestar_gateway.infrastructure.web.teams.schemas import (
     BudgetResponse,
     CreatedKeyResponse,
     CreateKeyRequest,
+    KeyBudgetResponse,
     KeyResponse,
     KeySpendingResponse,
     MembershipResponse,
     SetBudgetRequest,
+    SetKeyBudgetRequest,
     SetRoleRequest,
     TeamExportResponse,
     TeamResponse,
@@ -117,6 +123,33 @@ def _validate_alert_email(value: str) -> str:
     if not local or "." not in domain:
         raise InvalidBudget("alert_email must be a valid email address")
     return address
+
+
+def _parse_key_budget(data: SetKeyBudgetRequest, key: APIKey) -> ApiKeyBudget:
+    if data.limit_cost <= 0:
+        raise InvalidBudget("limit_cost must be a positive USD amount")
+    try:
+        window = BudgetWindow(data.window)
+    except ValueError:
+        valid = ", ".join(w.value for w in BudgetWindow)
+        raise InvalidBudget(f"window must be one of: {valid}") from None
+    try:
+        mode = KeyBudgetMode(data.mode)
+    except ValueError:
+        valid = ", ".join(m.value for m in KeyBudgetMode)
+        raise InvalidBudget(f"mode must be one of: {valid}") from None
+    return ApiKeyBudget(
+        id=uuid4(),
+        api_key_id=key.id,
+        # Taken from the key, not from the path: the key has already been
+        # resolved within the team, so this cannot record a cap under a team the
+        # key does not belong to.
+        team_id=key.team_id,
+        limit_cost=to_cost(data.limit_cost),
+        window=window,
+        mode=mode,
+        created_at=datetime.now(UTC),
+    )
 
 
 def _parse_budget(data: SetBudgetRequest, team_id: UUID) -> Budget:
@@ -492,6 +525,111 @@ class TeamController(Controller):
         )
         issued = await api_key_service.rotate_for_team(team_id, key_id, audit_event=audit_event)
         return CreatedKeyResponse.from_issued(issued)
+
+    @get(
+        "/{team_id:uuid}/keys/{key_id:uuid}/budget",
+        dependencies={"principal": Provide(provide_principal)},
+        summary="One API key's spend cap and its current-window spend",
+    )
+    async def get_key_budget(
+        self,
+        team_id: FromPath[UUID],
+        key_id: FromPath[UUID],
+        principal: NamedDependency[Principal],
+        team_service: NamedDependency[TeamService],
+        api_key_service: NamedDependency[APIKeyService],
+        api_key_budget_repository: NamedDependency[ApiKeyBudgetRepository],
+        usage_repository: NamedDependency[UsageRepository],
+    ) -> KeyBudgetResponse:
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.BUDGET_READ
+        )
+        # Resolved through the team so a key id from another team is a 404 here
+        # rather than a cap read across tenants. Active-only, deliberately: a
+        # revoked key cannot spend, so it has no budget worth reading.
+        await api_key_service.get_active_for_team(team_id, key_id)
+        budget = await api_key_budget_repository.get(key_id)
+        if budget is None:
+            raise BudgetNotFound(f"API key {key_id} has no budget configured")
+        spent = await usage_repository.key_spend_since(
+            key_id, window_start(budget.window, datetime.now(UTC))
+        )
+        return KeyBudgetResponse.from_budget(budget, spent)
+
+    @put(
+        "/{team_id:uuid}/keys/{key_id:uuid}/budget",
+        dependencies={"principal": Provide(provide_principal)},
+        summary="Create or replace an API key's spend cap",
+    )
+    async def set_key_budget(
+        self,
+        request: Request,
+        team_id: FromPath[UUID],
+        key_id: FromPath[UUID],
+        data: SetKeyBudgetRequest,
+        principal: NamedDependency[Principal],
+        team_service: NamedDependency[TeamService],
+        api_key_service: NamedDependency[APIKeyService],
+        api_key_budget_repository: NamedDependency[ApiKeyBudgetRepository],
+        usage_repository: NamedDependency[UsageRepository],
+        audit_log: NamedDependency[AuditLog],
+    ) -> KeyBudgetResponse:
+        """Unlike the team cap — platform-admin only, because a team admin must
+        not raise their own limit — this is `keys:issue`. A per-key cap can only
+        ever make a key spend *less*: the team gate runs regardless, so whoever
+        hands out the keys can divide the team's budget between them without
+        being able to enlarge it."""
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.KEYS_ISSUE
+        )
+        key = await api_key_service.get_active_for_team(team_id, key_id)
+        budget = await api_key_budget_repository.set(_parse_key_budget(data, key))
+        await record_audit(
+            audit_log,
+            request,
+            principal.user,
+            "api_key.budget.set",
+            target_type="api_key",
+            target_id=key_id,
+            detail=f"{budget.limit_cost} USD / {budget.window.value} / {budget.mode.value}",
+        )
+        spent = await usage_repository.key_spend_since(
+            key_id, window_start(budget.window, datetime.now(UTC))
+        )
+        return KeyBudgetResponse.from_budget(budget, spent)
+
+    @delete(
+        "/{team_id:uuid}/keys/{key_id:uuid}/budget",
+        dependencies={"principal": Provide(provide_principal)},
+        summary="Remove an API key's spend cap",
+        status_code=204,
+    )
+    async def delete_key_budget(
+        self,
+        request: Request,
+        team_id: FromPath[UUID],
+        key_id: FromPath[UUID],
+        principal: NamedDependency[Principal],
+        team_service: NamedDependency[TeamService],
+        api_key_service: NamedDependency[APIKeyService],
+        api_key_budget_repository: NamedDependency[ApiKeyBudgetRepository],
+        audit_log: NamedDependency[AuditLog],
+    ) -> None:
+        await team_service.ensure_principal_team_permission(
+            principal, team_id, Permission.KEYS_ISSUE
+        )
+        await api_key_service.get_active_for_team(team_id, key_id)
+        if not await api_key_budget_repository.remove(key_id):
+            raise BudgetNotFound(f"API key {key_id} has no budget configured")
+        # Audited: removing a cap is the change someone will need explained.
+        await record_audit(
+            audit_log,
+            request,
+            principal.user,
+            "api_key.budget.delete",
+            target_type="api_key",
+            target_id=key_id,
+        )
 
     @get("/{team_id:uuid}/budget", dependencies={"principal": Provide(provide_principal)})
     async def get_budget(

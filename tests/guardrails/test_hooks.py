@@ -109,12 +109,12 @@ class SpyingReservations:
         self.reserved: list[float] = []
 
     async def try_reserve(
-        self, team_id: UUID, amount: float, *, spent: float, limit: float, ttl_s: int
+        self, scope: str, amount: float, *, spent: float, limit: float, ttl_s: int
     ) -> ReservationOutcome:
         self.reserved.append(amount)
         return ReservationOutcome(
             reserved=amount,
-            reservation=Reservation(id=uuid4(), team_id=team_id, amount=amount),
+            reservation=Reservation(id=uuid4(), scope=scope, amount=amount),
         )
 
     async def release(self, reservation: Reservation) -> None:

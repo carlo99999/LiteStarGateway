@@ -25,6 +25,7 @@ from litestar_gateway.application.usage_meter import (
 )
 from litestar_gateway.domain.entities import Model, ModelType, Provider
 from litestar_gateway.domain.ports import Reservation
+from litestar_gateway.domain.ports.budget_reservation import team_scope
 from litestar_gateway.infrastructure.budget_reservation import (
     InMemoryBudgetReservationStore,
 )
@@ -124,7 +125,9 @@ async def test_releasing_an_unknown_reservation_changes_nothing(amounts: list[fl
     await _reserve_all(store, amounts)
     before = await _reserved_total(store)
 
-    await store.release(Reservation(id=uuid4(), team_id=TEAM_ID, amount=sum(amounts) * 2 + 1))
+    await store.release(
+        Reservation(id=uuid4(), scope=team_scope(TEAM_ID), amount=sum(amounts) * 2 + 1)
+    )
 
     assert await _reserved_total(store) == before
 

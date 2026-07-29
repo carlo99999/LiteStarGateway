@@ -611,6 +611,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/keys/{key_id}/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One API key's spend cap and its current-window spend */
+        get: operations["TeamsTeamIdKeysKeyIdBudgetGetKeyBudget"];
+        /** Create or replace an API key's spend cap */
+        put: operations["TeamsTeamIdKeysKeyIdBudgetSetKeyBudget"];
+        post?: never;
+        /** Remove an API key's spend cap */
+        delete: operations["TeamsTeamIdKeysKeyIdBudgetDeleteKeyBudget"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams/{team_id}": {
         parameters: {
             query?: never;
@@ -1892,6 +1911,19 @@ export interface components {
             team_id: string | null;
             role: string | null;
         };
+        /** KeyBudgetResponse */
+        KeyBudgetResponse: {
+            /** Format: uuid */
+            api_key_id: string;
+            /** Format: uuid */
+            team_id: string;
+            limit_cost: number;
+            window: string;
+            mode: string;
+            spent: number;
+            remaining: number;
+            over_limit: boolean;
+        };
         /** KeyResponse */
         KeyResponse: {
             /** Format: uuid */
@@ -2170,6 +2202,13 @@ export interface components {
             thresholds?: number[] | null;
             alert_webhook_url?: string | null;
             alert_email?: string | null;
+        };
+        /** SetKeyBudgetRequest */
+        SetKeyBudgetRequest: {
+            limit_cost: number;
+            window: string;
+            /** @default alert */
+            mode: string;
         };
         /** SetRoleRequest */
         SetRoleRequest: {
@@ -4140,6 +4179,140 @@ export interface operations {
             header?: never;
             path: {
                 team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, nothing follows */
+            204: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdKeysKeyIdBudgetGetKeyBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyBudgetResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdKeysKeyIdBudgetSetKeyBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetKeyBudgetRequest"];
+            };
+        };
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyBudgetResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdKeysKeyIdBudgetDeleteKeyBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                key_id: string;
             };
             cookie?: never;
         };

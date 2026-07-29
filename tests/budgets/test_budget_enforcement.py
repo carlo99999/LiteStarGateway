@@ -31,6 +31,7 @@ from litestar_gateway.domain.entities import (
 )
 from litestar_gateway.domain.exceptions import BudgetExceeded, UnsupportedOperation
 from litestar_gateway.domain.money import to_cost
+from litestar_gateway.domain.ports.budget_reservation import team_scope
 from litestar_gateway.domain.routing import CandidateModel, QualityTier, RouterConfig
 from litestar_gateway.infrastructure.budget_reservation import (
     InMemoryBudgetReservationStore,
@@ -42,7 +43,9 @@ TEAM_ID = uuid4()
 async def _reserved_total(service) -> float:
     """The team's in-flight reservations, read through the store the meter uses."""
     store = service._meter._reservations
-    outcome = await store.try_reserve(TEAM_ID, 0.0, spent=0.0, limit=float("inf"), ttl_s=1)
+    outcome = await store.try_reserve(
+        team_scope(TEAM_ID), 0.0, spent=0.0, limit=float("inf"), ttl_s=1
+    )
     if outcome.reservation is not None:
         await store.release(outcome.reservation)
     return outcome.reserved

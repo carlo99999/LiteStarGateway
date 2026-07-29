@@ -10,13 +10,17 @@ pattern earns its abstraction beyond testability.
 from __future__ import annotations
 
 from litestar_gateway.domain.ports.api_key import APIKeyRepository
+from litestar_gateway.domain.ports.api_key_budget import ApiKeyBudgetRepository
 from litestar_gateway.domain.ports.audit import AuditLog
 from litestar_gateway.domain.ports.budget import BudgetRepository
 from litestar_gateway.domain.ports.budget_alert_state import BudgetAlertStateRepository
 from litestar_gateway.domain.ports.budget_reservation import (
+    Admission,
     BudgetReservationStore,
     Reservation,
     ReservationOutcome,
+    key_scope,
+    team_scope,
 )
 from litestar_gateway.domain.ports.callable_alias import (
     CallableAliasRepository,
@@ -61,12 +65,16 @@ from litestar_gateway.domain.ports.user import UserRepository
 
 __all__ = [
     "APIKeyRepository",
+    "Admission",
+    "ApiKeyBudgetRepository",
     "AuditLog",
     "BreakerLease",
     "BudgetAlertStateRepository",
     "BudgetRepository",
     "GuardrailRuleRepository",
     "BudgetReservationStore",
+    "key_scope",
+    "team_scope",
     "CacheKey",
     "CachedResponse",
     "CallableAliasRepository",

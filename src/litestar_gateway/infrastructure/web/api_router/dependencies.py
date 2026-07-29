@@ -11,6 +11,7 @@ from litestar_gateway.application.routing.service import RouterService
 from litestar_gateway.application.usage_meter import UsageMeter
 from litestar_gateway.config import Settings
 from litestar_gateway.domain.ports import (
+    ApiKeyBudgetRepository,
     BudgetAlertStateRepository,
     BudgetRepository,
     BudgetReservationStore,
@@ -27,6 +28,9 @@ from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.llm.gateway import LLMGatewayImpl
 from litestar_gateway.infrastructure.llm.resilience import ResilienceConfig
 from litestar_gateway.infrastructure.observability.dispatcher import TraceDispatcher
+from litestar_gateway.infrastructure.persistence.api_key_budget_repository import (
+    SQLAlchemyApiKeyBudgetRepository,
+)
 from litestar_gateway.infrastructure.persistence.budget_alert_state_repository import (
     SQLAlchemyBudgetAlertStateRepository,
 )
@@ -74,6 +78,12 @@ def provide_budget_repository(db_session: NamedDependency[AsyncSession]) -> Budg
     return SQLAlchemyBudgetRepository(db_session)
 
 
+def provide_api_key_budget_repository(
+    db_session: NamedDependency[AsyncSession],
+) -> ApiKeyBudgetRepository:
+    return SQLAlchemyApiKeyBudgetRepository(db_session)
+
+
 def provide_budget_alert_state_repository(
     db_session: NamedDependency[AsyncSession],
 ) -> BudgetAlertStateRepository:
@@ -111,6 +121,7 @@ def provide_completion_service(
         teams=SQLAlchemyTeamRepository(db_session),
         api_keys=SQLAlchemyAPIKeyRepository(db_session),
         budget_alert_state=SQLAlchemyBudgetAlertStateRepository(db_session),
+        api_key_budgets=SQLAlchemyApiKeyBudgetRepository(db_session),
     )
     models = SQLAlchemyModelRepository(db_session)
     routers = SQLAlchemyRouterRepository(db_session, keyring)
