@@ -275,6 +275,16 @@ class GuardrailBlocked(DomainError):
     than solve it."""
 
 
+class InvalidGuardrailRule(DomainError):
+    """A guardrail rule could not run, or could run differently than written:
+    an unknown config key, a cleartext webhook url, a missing signing secret, a
+    timeout past what a request path tolerates (→ 400)."""
+
+
+class GuardrailRuleNotFound(DomainError):
+    """No guardrail rule exists for the given id in this team (→ 404)."""
+
+
 class InvalidModelPricing(DomainError):
     """A model rate is negative or not a finite number. A negative rate would
     make settlement credit the ledger the budget gate reads, so it is refused
