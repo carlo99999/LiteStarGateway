@@ -215,10 +215,18 @@ async def test_an_expired_inventory_is_refreshed_without_force(session: AsyncSes
     assert discovery.calls == 2
 
 
-async def test_an_empty_inventory_is_never_treated_as_fresh(session: AsyncSession) -> None:
-    """ "We asked and it offers nothing" and "we never asked" look identical in
-    storage. Treating the second as fresh would mean the first discovery never
-    happens — the server would stay permanently empty."""
+async def test_a_server_that_offers_nothing_is_still_fresh_once_discovered(
+    session: AsyncSession,
+) -> None:
+    """Changed in S4, and the console is the reason.
+
+    "We asked and it offers nothing" and "we never asked" used to be the same
+    empty inventory, so freshness was read off the tools and a server offering
+    nothing was re-queried on every refresh regardless of the TTL.
+    `mcp_server.last_discovered_at` makes the two distinguishable, which fixes the
+    TTL here and lets the Tools page stop telling an operator to run a discovery
+    that already ran.
+    """
     discovery = ScriptedDiscovery([])
     service = _service(session, discovery)
     server = await _register(service)
@@ -226,33 +234,32 @@ async def test_an_empty_inventory_is_never_treated_as_fresh(session: AsyncSessio
     await service.refresh_inventory(PRINCIPAL, TEAM, server.id)
     await service.refresh_inventory(PRINCIPAL, TEAM, server.id)
 
-    assert discovery.calls == 2
+    assert discovery.calls == 1
+    stored = await service.get_server(PRINCIPAL, TEAM, server.id)
+    assert stored.last_discovered_at is not None
 
 
-async def test_an_inventory_with_no_timestamp_is_not_fresh(session: AsyncSession) -> None:
-    """Defence against a row written without `discovered_at` — a `max()` over an
-    empty list of stamps must not read as "just refreshed"."""
-    discovery = ScriptedDiscovery([("search", ToolEffect.READ)])
-    service = _service(session, discovery)
+async def test_a_server_never_discovered_carries_no_stamp(session: AsyncSession) -> None:
+    """The state the console renders as "never queried" rather than "no tools"."""
+    service = _service(session, ScriptedDiscovery([]))
     server = await _register(service)
-    repo = _repo(session)
-    await repo.replace_tools(
-        server.id,
-        [McpTool(id=uuid4(), server_id=server.id, name="search", description="", schema={})],
-    )
-    stored = await repo.tools(server.id)
-    assert stored and stored[0].discovered_at is not None  # the repo always stamps
 
-    # So construct the degenerate case directly against the predicate.
-    assert service._is_fresh([]) is False
-    assert (
-        service._is_fresh(
-            [dataclasses.replace(stored[0], discovered_at=None)],
-        )
-        is False
-    )
-    old = dataclasses.replace(stored[0], discovered_at=datetime.now(UTC) - timedelta(days=2))
-    assert service._is_fresh([old]) is False
+    stored = await service.get_server(PRINCIPAL, TEAM, server.id)
+
+    assert stored.last_discovered_at is None
+
+
+async def test_a_stale_stamp_is_not_fresh(session: AsyncSession) -> None:
+    """The predicate directly: no stamp and an expired stamp both mean re-query."""
+    service = _service(session, ScriptedDiscovery([("search", ToolEffect.READ)]))
+    server = await _register(service)
+
+    assert service._is_fresh(server) is False  # never discovered
+    assert service._is_fresh(dataclasses.replace(server, last_discovered_at=None)) is False
+    stale = dataclasses.replace(server, last_discovered_at=datetime.now(UTC) - timedelta(days=2))
+    assert service._is_fresh(stale) is False
+    just_now = dataclasses.replace(server, last_discovered_at=datetime.now(UTC))
+    assert service._is_fresh(just_now) is True
 
 
 # ── authorization and the token ──────────────────────────────────────────────

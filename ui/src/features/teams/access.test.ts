@@ -80,6 +80,10 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
   // guardrails surface is not theirs — matching `guardrails:manage` on the
   // backend, which `model-manager` deliberately does not hold.
   assert.equal(canAccessConsoleSurface("guardrails", modelManager), false);
+  // Same argument for tool servers: attaching one is an egress decision, and an
+  // earlier draft of the design gave `model-manager` `tools:read` purely for
+  // convenience. The backend's RBAC tests refused it, so the console matches.
+  assert.equal(canAccessConsoleSurface("tools", modelManager), false);
 
   assert.equal(canAccessConsoleSurface("models", teamAdmin), true);
   assert.equal(canAccessConsoleSurface("routing", teamAdmin), true);
@@ -88,12 +92,14 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
   assert.equal(canAccessConsoleSurface("usage", teamAdmin), true);
   assert.equal(canAccessConsoleSurface("budgets", teamAdmin), true);
   assert.equal(canAccessConsoleSurface("guardrails", teamAdmin), true);
+  assert.equal(canAccessConsoleSurface("tools", teamAdmin), true);
 
   // ISSUE-021 (Round 12): billing-viewer holds usage:read/budget:read and
   // must see those two surfaces, but nothing model-related.
   assert.equal(canAccessConsoleSurface("usage", billingViewer), true);
   assert.equal(canAccessConsoleSurface("budgets", billingViewer), true);
   assert.equal(canAccessConsoleSurface("guardrails", billingViewer), false);
+  assert.equal(canAccessConsoleSurface("tools", billingViewer), false);
   assert.equal(canAccessConsoleSurface("models", billingViewer), false);
   assert.equal(canAccessConsoleSurface("routing", billingViewer), false);
 
@@ -107,6 +113,9 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
   // Read-only billing visibility does not extend to the guardrail policy: the
   // auditor's grant is `usage:read`/`budget:read`, and nothing else.
   assert.equal(canAccessConsoleSurface("guardrails", auditor), false);
+  // Nor to the tool inventory: an inventory is not billing, which is why the
+  // corrected permission table gives the auditor no `tools:read` either.
+  assert.equal(canAccessConsoleSurface("tools", auditor), false);
 });
 
 test("platform admins retain every console surface", () => {
@@ -125,6 +134,7 @@ test("platform admins retain every console surface", () => {
     "usage",
     "budgets",
     "guardrails",
+    "tools",
     "audit",
     "sso-settings",
   ] as const;

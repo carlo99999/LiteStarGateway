@@ -226,9 +226,8 @@ class McpServerService:
         server = await self._require_visible(team_id, server_id)
         if self._discovery is None:  # pragma: no cover - wiring guarantees one
             raise InvalidMcpServer("tool discovery is not configured on this deployment")
-        stored = await self._servers.tools(server_id)
-        if not force and self._is_fresh(stored):
-            return stored
+        if not force and self._is_fresh(server):
+            return await self._servers.tools(server_id)
         # The token is read here and nowhere else on this path: the repository
         # hands it over only for the call, and no entity a response is built from
         # carries it.
@@ -239,16 +238,19 @@ class McpServerService:
         # operator already classified by changing its own hints.
         return await self._servers.replace_tools(server_id, discovered)
 
-    def _is_fresh(self, tools: list[McpTool]) -> bool:
-        """An empty inventory is never fresh: "we asked and it offers nothing" and
-        "we never asked" are indistinguishable in storage, and treating the second
-        as fresh would mean the first discovery never happens."""
-        if not tools:
+    def _is_fresh(self, server: McpServer) -> bool:
+        """Freshness comes from the server's own discovery stamp, not from the
+        tools it happens to hold.
+
+        Read off the tools it could not answer for a server that offers nothing:
+        an empty inventory looks the same whether discovery ran or never did, so
+        that server was re-queried on every refresh regardless of the TTL. The
+        stamp is set even when `tools/list` returns an empty list, which is what
+        makes "it ran and there is nothing" expressible.
+        """
+        if server.last_discovered_at is None:
             return False
-        stamps = [tool.discovered_at for tool in tools if tool.discovered_at is not None]
-        if not stamps:
-            return False
-        return datetime.now(UTC) - max(stamps) < self._inventory_ttl
+        return datetime.now(UTC) - server.last_discovered_at < self._inventory_ttl
 
     # ── platform admin ───────────────────────────────────────────────────────
     #

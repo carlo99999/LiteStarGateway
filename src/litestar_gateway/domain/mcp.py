@@ -72,6 +72,10 @@ class McpServer:
     has_auth: bool = False
     tool_allowlist: tuple[str, ...] = ()
     origin: CallableOrigin = CallableOrigin.OWN
+    # When `tools/list` last succeeded. `None` means it never ran — a different
+    # state from "it ran and the server offers nothing", which is otherwise the
+    # same empty inventory.
+    last_discovered_at: datetime | None = None
 
     @property
     def is_global(self) -> bool:

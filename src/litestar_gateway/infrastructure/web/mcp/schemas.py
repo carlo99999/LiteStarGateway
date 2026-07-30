@@ -125,6 +125,10 @@ class McpServerResponse:
     origin: str  # own | extended | global
     tool_allowlist: list[str] = field(default_factory=list)
     created_at: datetime | None = None
+    # `null` means discovery never ran. With an empty tool list that is a
+    # different state from "it ran and this server offers nothing", and a console
+    # that cannot tell them apart shows a working server as unconfigured.
+    last_discovered_at: datetime | None = None
 
     @classmethod
     def from_entity(cls, server: McpServer) -> McpServerResponse:
@@ -138,6 +142,7 @@ class McpServerResponse:
             origin=server.origin.value,
             tool_allowlist=list(server.tool_allowlist),
             created_at=server.created_at,
+            last_discovered_at=server.last_discovered_at,
         )
 
 
@@ -207,7 +212,12 @@ class KeyToolPolicyResponse:
     api_key_id: UUID
     restricted: bool
     destructive_enabled: bool
-    allowed_tools: list[str] = field(default_factory=list)
+    # No default on purpose. A dataclass default keeps the field out of the
+    # OpenAPI `required` list, so the generated client types it as possibly
+    # `undefined` and every consumer has to handle a state the gateway never
+    # sends — the mirror of Round 15's lesson, where a request flag with a plain
+    # default landed *in* `required` and broke the client the other way.
+    allowed_tools: list[str]
     created_at: datetime | None = None
 
     @classmethod

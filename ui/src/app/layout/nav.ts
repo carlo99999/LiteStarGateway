@@ -5,6 +5,7 @@ import {
   FlaskConical,
   ShieldCheck,
   ShieldAlert,
+  Wrench,
   KeyRound,
   Building2,
   Users,
@@ -71,6 +72,7 @@ export const NAV_GROUPS: NavGroup[] = [
         surface: "guardrails",
         ready: true,
       },
+      { to: "/tools", label: "tools", icon: Wrench, surface: "tools", ready: true },
     ],
   },
   {

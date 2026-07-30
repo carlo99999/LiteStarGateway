@@ -27,6 +27,7 @@ export type ConsoleSurface =
   | "users"
   | "service-principals"
   | "guardrails"
+  | "tools"
   | "usage"
   | "budgets"
   | "audit"
@@ -87,6 +88,15 @@ export function canManageGuardrails(role: TeamRole | null): boolean {
   return role === null || role === "admin";
 }
 
+/** MCP tool servers are team-admin (or platform-admin) only, on the guardrail
+ * precedent: `tools:manage` is deliberately withheld from `model-manager`,
+ * because attaching a tool server is an egress decision rather than a model one.
+ * `tools:read` is the same set — reading a tool inventory is not the models
+ * domain, and the backend's RBAC tests refuse the widening. */
+export function canManageTools(role: TeamRole | null): boolean {
+  return role === null || role === "admin";
+}
+
 export function canReadDecisions(role: TeamRole | null): boolean {
   return role === null || role === "admin" || role === "model-manager";
 }
@@ -105,6 +115,9 @@ export function canAccessConsoleSurface(
   if (surface === "audit") return access.isAuditor;
   if (surface === "guardrails") {
     return access.teamRoles.some((role) => canManageGuardrails(role));
+  }
+  if (surface === "tools") {
+    return access.teamRoles.some((role) => canManageTools(role));
   }
   if (MODEL_SURFACES.includes(surface)) {
     return access.teamRoles.some((role) => canReadModels(role));

@@ -16752,6 +16752,7 @@
                 },
                 "type": "object",
                 "required": [
+                    "allowed_tools",
                     "api_key_id",
                     "destructive_enabled",
                     "restricted"
@@ -16860,6 +16861,17 @@
                         "type": "array"
                     },
                     "created_at": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "last_discovered_at": {
                         "oneOf": [
                             {
                                 "type": "string",

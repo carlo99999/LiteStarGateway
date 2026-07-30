@@ -60,6 +60,9 @@ const UsagePage = lazy(() =>
 const GuardrailsPage = lazy(() =>
   import("@/features/guardrails/GuardrailsPage").then((m) => ({ default: m.GuardrailsPage })),
 );
+const ToolsPage = lazy(() =>
+  import("@/features/tools/ToolsPage").then((m) => ({ default: m.ToolsPage })),
+);
 const BudgetsPage = lazy(() =>
   import("@/features/budgets/BudgetsPage").then((m) => ({ default: m.BudgetsPage })),
 );
@@ -197,6 +200,12 @@ const guardrailsRoute = createRoute({
   component: GuardrailsPage,
 });
 
+const toolsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/tools",
+  component: ToolsPage,
+});
+
 const budgetsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/budgets",
@@ -234,6 +243,7 @@ const routeTree = rootRoute.addChildren([
     routerDetailRoute,
     usageRoute,
     guardrailsRoute,
+    toolsRoute,
     budgetsRoute,
     auditRoute,
     ssoSettingsRoute,
