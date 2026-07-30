@@ -84,6 +84,23 @@ class McpServer:
 
 
 @dataclasses.dataclass(frozen=True)
+class McpServerGrant:
+    """A team-owned server extended to another team, mirroring `ModelGrant`.
+
+    Unlike a model grant there is no `alias`: a server is referenced by its own
+    name, and the extension is refused outright when the target team already sees
+    that name (application layer). Renaming-on-extend is a mechanism this feature
+    does not need yet, and inventing one here would put two spellings of the same
+    server in front of one team.
+    """
+
+    id: UUID
+    server_id: UUID
+    team_id: UUID  # the team the server is extended to
+    created_at: datetime | None = None
+
+
+@dataclasses.dataclass(frozen=True)
 class McpTool:
     """One tool discovered from a server, with the effect an operator declared.
 

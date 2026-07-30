@@ -11,6 +11,7 @@ from advanced_alchemy.extensions.litestar import base
 from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from litestar_gateway.domain.callable_alias import CallableOrigin
 from litestar_gateway.domain.entities import (
     APIKey,
     ApiKeyBudget,
@@ -45,7 +46,13 @@ from litestar_gateway.domain.entities import (
 )
 from litestar_gateway.domain.entities.model import DEFAULT_CAPABILITIES
 from litestar_gateway.domain.guardrails import Direction, FailPolicy
-from litestar_gateway.domain.mcp import ApiKeyToolPolicy, McpServer, McpTool, ToolEffect
+from litestar_gateway.domain.mcp import (
+    ApiKeyToolPolicy,
+    McpServer,
+    McpServerGrant,
+    McpTool,
+    ToolEffect,
+)
 from litestar_gateway.domain.money import ZERO
 from litestar_gateway.domain.routing import (
     CandidateModel,
@@ -1166,6 +1173,11 @@ class McpServerModel(base.UUIDAuditBase):
             created_at=self.created_at,
             has_auth=self.encrypted_auth is not None,
             tool_allowlist=tuple(self.tool_allowlist or ()),
+            # `global` is the one origin readable from the row alone — a NULL
+            # `team_id` is global to every viewer. `own` vs `extended` depends on
+            # who is asking, so `visible_to` decides those. Defaulting this to
+            # `own` made the platform surface report a global server as owned.
+            origin=(CallableOrigin.GLOBAL if self.team_id is None else CallableOrigin.OWN),
         )
 
 
@@ -1182,6 +1194,14 @@ class McpServerGrantModel(base.UUIDAuditBase):
         ForeignKey("mcp_server.id", ondelete="CASCADE"), index=True
     )
     team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+
+    def to_entity(self) -> McpServerGrant:
+        return McpServerGrant(
+            id=self.id,
+            server_id=self.server_id,
+            team_id=self.team_id,
+            created_at=self.created_at,
+        )
 
 
 class McpServerSuppressionModel(base.UUIDAuditBase):

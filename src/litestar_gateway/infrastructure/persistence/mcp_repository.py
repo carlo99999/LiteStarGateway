@@ -22,9 +22,16 @@ from litestar_gateway.domain.exceptions import (
     InvalidMcpServer,
     SaltKeyMissing,
 )
-from litestar_gateway.domain.mcp import McpServer, McpTool, ToolEffect
+from litestar_gateway.domain.mcp import (
+    ApiKeyToolPolicy,
+    McpServer,
+    McpServerGrant,
+    McpTool,
+    ToolEffect,
+)
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.persistence.orm import (
+    ApiKeyToolPolicyModel,
     McpServerGrantModel,
     McpServerModel,
     McpServerSuppressionModel,
@@ -167,6 +174,51 @@ class SQLAlchemyMcpServerRepository:
         self._session.add(McpServerGrantModel(id=uuid4(), server_id=server_id, team_id=team_id))
         await self._session.commit()
 
+    async def list_global(self) -> list[McpServer]:
+        """Global servers only — the platform admin's own inventory.
+
+        Deliberately *not* expressed as `visible_to(some_team)`: that answers a
+        team's question and would fold in whatever that team owns.
+        """
+        rows = await self._session.scalars(
+            select(McpServerModel)
+            .where(McpServerModel.team_id.is_(None))
+            .order_by(McpServerModel.name)
+        )
+        # No origin fix-up needed: a NULL `team_id` reads as global from the row
+        # itself, which is the one origin that does not depend on who is asking.
+        return [row.to_entity() for row in rows]
+
+    async def others_named(self, name: str, exclude_id: UUID) -> list[McpServer]:
+        """Every other server carrying this name, whoever owns it.
+
+        A server is referenced by name (there is no alias), so sharing a name
+        across origins would put two spellings of "github" in front of one team.
+        The application layer uses this to refuse the extension or promotion that
+        would create the ambiguity, rather than resolving it silently later.
+        """
+        rows = await self._session.scalars(
+            select(McpServerModel).where(
+                McpServerModel.name == name, McpServerModel.id != exclude_id
+            )
+        )
+        return [row.to_entity() for row in rows]
+
+    async def list_grants(self, server_id: UUID) -> list[McpServerGrant]:
+        rows = await self._session.scalars(
+            select(McpServerGrantModel).where(McpServerGrantModel.server_id == server_id)
+        )
+        return [row.to_entity() for row in rows]
+
+    async def revoke_grant_by_id(self, grant_id: UUID) -> bool:
+        """By grant id, for the platform's un-extend endpoint — the `model_grant`
+        shape, where the console holds the grant row it is revoking."""
+        result: Any = await self._session.execute(
+            delete(McpServerGrantModel).where(McpServerGrantModel.id == grant_id)
+        )
+        await self._session.commit()
+        return bool(result.rowcount)
+
     async def revoke_grant(self, server_id: UUID, team_id: UUID) -> bool:
         result: Any = await self._session.execute(
             delete(McpServerGrantModel).where(
@@ -268,3 +320,48 @@ class SQLAlchemyMcpServerRepository:
         key_id, cipher = await self._require_keyring().active_credential_cipher()
         row.encrypted_auth = cipher.encrypt({_AUTH_FIELD: auth})
         row.auth_key_id = key_id
+
+
+class SQLAlchemyApiKeyToolPolicyRepository:
+    """Per-key tool policy, on the `api_key_budget` adapter's shape: one row per
+    key, replaced on write, absent meaning unrestricted."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get(self, api_key_id: UUID) -> ApiKeyToolPolicy | None:
+        row = await self._session.scalar(
+            select(ApiKeyToolPolicyModel).where(ApiKeyToolPolicyModel.api_key_id == api_key_id)
+        )
+        return row.to_entity() if row else None
+
+    async def set(self, policy: ApiKeyToolPolicy) -> ApiKeyToolPolicy:
+        """Create or replace. Upsert rather than insert: the endpoint is a `PUT`,
+        so a second call must not trip the unique constraint on `api_key_id`."""
+        row = await self._session.scalar(
+            select(ApiKeyToolPolicyModel).where(
+                ApiKeyToolPolicyModel.api_key_id == policy.api_key_id
+            )
+        )
+        if row is None:
+            row = ApiKeyToolPolicyModel(
+                id=uuid4(),
+                api_key_id=policy.api_key_id,
+                team_id=policy.team_id,
+                allowed_tools=list(policy.allowed_tools),
+                destructive_enabled=policy.destructive_enabled,
+            )
+            self._session.add(row)
+        else:
+            row.allowed_tools = list(policy.allowed_tools)
+            row.destructive_enabled = policy.destructive_enabled
+        await self._session.commit()
+        await self._session.refresh(row)
+        return row.to_entity()
+
+    async def remove(self, api_key_id: UUID) -> bool:
+        result: Any = await self._session.execute(
+            delete(ApiKeyToolPolicyModel).where(ApiKeyToolPolicyModel.api_key_id == api_key_id)
+        )
+        await self._session.commit()
+        return bool(result.rowcount)

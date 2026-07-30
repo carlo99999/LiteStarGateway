@@ -1002,6 +1002,241 @@ export interface paths {
         patch: operations["TeamsTeamIdGuardrailsRuleIdUpdateRule"];
         trace?: never;
     };
+    "/teams/{team_id}/mcp-servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the MCP servers this team can use
+         * @description The team's own servers, those extended to it, and global ones — minus any it detached. Bearer tokens are never returned.
+         */
+        get: operations["TeamsTeamIdMcpServersListServers"];
+        put?: never;
+        /**
+         * Register an MCP server for this team
+         * @description The url must be https and must resolve into `MCP_ALLOWED_HOSTS`, re-checked on every call rather than only here.
+         */
+        post: operations["TeamsTeamIdMcpServersCreateServer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/mcp-servers/{server_id}/tools/{tool_name}/effect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Declare what a tool does
+         * @description `read`, `write`, or `destructive`. Declared by an operator, never detected from the server's own annotations. Only the owning team may set it: a team that merely sees a shared server must not be able to relabel a destructive tool as harmless for everybody else.
+         */
+        put: operations["TeamsTeamIdMcpServersServerIdToolsToolNameEffectDeclareEffect"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/keys/{key_id}/tool-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which tools one API key may invoke
+         * @description `restricted: false` is the default and not an error: a key with no policy may call every tool except those declared `destructive`.
+         */
+        get: operations["TeamsTeamIdKeysKeyIdToolPolicyGetKeyToolPolicy"];
+        /** Create or replace an API key's tool policy */
+        put: operations["TeamsTeamIdKeysKeyIdToolPolicySetKeyToolPolicy"];
+        post?: never;
+        /**
+         * Remove an API key's tool policy
+         * @description The key becomes permissive again, so this is a widening.
+         */
+        delete: operations["TeamsTeamIdKeysKeyIdToolPolicyDeleteKeyToolPolicy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/mcp-servers/{server_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one MCP server */
+        get: operations["TeamsTeamIdMcpServersServerIdGetServer"];
+        put?: never;
+        post?: never;
+        /**
+         * Remove the team's server, or detach a shared one
+         * @description Deletes a server this team owns. A global or extended server is **detached** instead — hidden from this team alone and left live for every other one. The response says which happened.
+         */
+        delete: operations["TeamsTeamIdMcpServersServerIdRemoveServer"];
+        options?: never;
+        head?: never;
+        /** Update the team's MCP server */
+        patch: operations["TeamsTeamIdMcpServersServerIdUpdateServer"];
+        trace?: never;
+    };
+    "/teams/{team_id}/mcp-servers/{server_id}/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The server's discovered tool inventory
+         * @description What the server last advertised, with the effect an operator declared for each tool. A tool nobody classified counts as `destructive`.
+         */
+        get: operations["TeamsTeamIdMcpServersServerIdToolsListTools"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/mcp-servers/{server_id}/reattach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo a detach
+         * @description Takes back a shared server this team previously detached, without needing a platform admin — which is what makes the detach reversible.
+         */
+        post: operations["TeamsTeamIdMcpServersServerIdReattachReattachServer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/mcp-servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List global (platform) MCP servers */
+        get: operations["PlatformMcpServersListGlobal"];
+        put?: never;
+        /** Register a global MCP server usable by every team */
+        post: operations["PlatformMcpServersCreateGlobal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/mcp-servers/{server_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete any MCP server, including a global one */
+        delete: operations["PlatformMcpServersServerIdDeleteAny"];
+        options?: never;
+        head?: never;
+        /** Update any MCP server */
+        patch: operations["PlatformMcpServersServerIdUpdateAny"];
+        trace?: never;
+    };
+    "/platform/mcp-servers/{server_id}/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Extend a team server to other teams */
+        post: operations["PlatformMcpServersServerIdExtendExtend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/mcp-servers/{server_id}/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Teams a server is extended to */
+        get: operations["PlatformMcpServersServerIdGrantsListGrants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/mcp-servers/{server_id}/make-global": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Promote a team server to global */
+        post: operations["PlatformMcpServersServerIdMakeGlobalMakeGlobal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/mcp-servers/grants/{grant_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Un-extend (revoke a grant) */
+        delete: operations["PlatformMcpServersGrantsGrantIdUnextend"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/platform/models": {
         parameters: {
             query?: never;
@@ -1919,6 +2154,19 @@ export interface components {
             rate_limit_rpm?: number | null;
             expires_in_days?: number | null;
         };
+        /** CreateMcpServerRequest */
+        CreateMcpServerRequest: {
+            /** @description Operator-facing name, unique among its owner's. */
+            name: string;
+            /** @description The server's https endpoint. Must resolve into `MCP_ALLOWED_HOSTS` — the platform's one veto over a team-owned server — and must not carry userinfo. */
+            url: string;
+            /** @description Bearer token this gateway presents to the server. Stored envelope-encrypted; never returned by any endpoint. */
+            auth?: string | null;
+            /** @description Restrict which advertised tools this server exposes. Omitted or empty exposes everything it advertises; a non-empty list is exhaustive. */
+            tool_allowlist?: string[] | null;
+            /** @description Whether the server is usable. */
+            enabled?: boolean | null;
+        };
         /** CreateModelRequest */
         CreateModelRequest: {
             name: string;
@@ -2011,6 +2259,16 @@ export interface components {
             completion_tokens: number | null;
             /** Format: date-time */
             created_at: string;
+        };
+        /** DeclareToolEffectRequest */
+        DeclareToolEffectRequest: {
+            /** @description `read`, `write`, or `destructive`. */
+            effect: string;
+        };
+        /** ExtendMcpServerRequest */
+        ExtendMcpServerRequest: {
+            /** @description Teams the server becomes visible to. */
+            team_ids: string[];
         };
         /** ExtendModelRequest */
         ExtendModelRequest: {
@@ -2123,10 +2381,57 @@ export interface components {
             cost: number;
             calls: number;
         };
+        /** KeyToolPolicyResponse */
+        KeyToolPolicyResponse: {
+            /** Format: uuid */
+            api_key_id: string;
+            restricted: boolean;
+            destructive_enabled: boolean;
+            allowed_tools?: string[];
+            created_at?: string | null;
+        };
         /** LoginRequest */
         LoginRequest: {
             email: string;
             password: string;
+        };
+        /** McpRemovalResponse */
+        McpRemovalResponse: {
+            /** @description `deleted` (the team's own server is gone) or `detached` (a shared server is hidden from this team and still live for the others). */
+            outcome: string;
+        };
+        /** McpServerGrantResponse */
+        McpServerGrantResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            server_id: string;
+            /** Format: uuid */
+            team_id: string;
+            created_at?: string | null;
+        };
+        /** McpServerResponse */
+        McpServerResponse: {
+            /** Format: uuid */
+            id: string;
+            team_id: string | null;
+            name: string;
+            url: string;
+            enabled: boolean;
+            has_auth: boolean;
+            origin: string;
+            tool_allowlist?: string[];
+            created_at?: string | null;
+        };
+        /** McpToolResponse */
+        McpToolResponse: {
+            name: string;
+            description: string;
+            effect: string;
+            schema?: {
+                [key: string]: unknown;
+            };
+            discovered_at?: string | null;
         };
         /** MembershipResponse */
         MembershipResponse: {
@@ -2392,6 +2697,13 @@ export interface components {
             /** @default alert */
             mode: string;
         };
+        /** SetKeyToolPolicyRequest */
+        SetKeyToolPolicyRequest: {
+            /** @description Tools this key may invoke. Omitted or empty means unrestricted — the row exists mainly to carry `destructive_enabled`, so enabling destructive tools does not require enumerating every read tool. */
+            allowed_tools?: string[] | null;
+            /** @description Permit tools declared `destructive` (they delete or irreversibly change something). Off unless set: an unclassified tool counts as destructive, so this is the one class the permissive default excludes. */
+            destructive_enabled?: boolean | null;
+        };
         /** SetRoleRequest */
         SetRoleRequest: {
             role: components["schemas"]["TeamRole"];
@@ -2548,6 +2860,19 @@ export interface components {
             enabled?: boolean | null;
             /** @description Rotate the HMAC secret. Omit to keep the current one. */
             signing_secret?: string | null;
+        };
+        /** UpdateMcpServerRequest */
+        UpdateMcpServerRequest: {
+            /** @description New name. */
+            name?: string | null;
+            /** @description New https endpoint; re-validated. */
+            url?: string | null;
+            /** @description Rotate the bearer token. Omit to keep the current one. */
+            auth?: string | null;
+            /** @description Replaces the whole allowlist. */
+            tool_allowlist?: string[] | null;
+            /** @description Enable or disable the server. */
+            enabled?: boolean | null;
         };
         /** UpdateModelRequest */
         UpdateModelRequest: {
@@ -5777,6 +6102,834 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GuardrailRuleResponse"];
                 };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServersListServers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerResponse"][];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServersCreateServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMcpServerRequest"];
+            };
+        };
+        responses: {
+            /** @description Document created, URL follows */
+            201: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServersServerIdToolsToolNameEffectDeclareEffect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                server_id: string;
+                tool_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclareToolEffectRequest"];
+            };
+        };
+        responses: {
+            /** @description Request fulfilled, nothing follows */
+            204: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdKeysKeyIdToolPolicyGetKeyToolPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyToolPolicyResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdKeysKeyIdToolPolicySetKeyToolPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetKeyToolPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyToolPolicyResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdKeysKeyIdToolPolicyDeleteKeyToolPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, nothing follows */
+            204: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServersServerIdGetServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServersServerIdRemoveServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpRemovalResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServersServerIdUpdateServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMcpServerRequest"];
+            };
+        };
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServersServerIdToolsListTools: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpToolResponse"][];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServersServerIdReattachReattachServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    PlatformMcpServersListGlobal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerResponse"][];
+                };
+            };
+        };
+    };
+    PlatformMcpServersCreateGlobal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMcpServerRequest"];
+            };
+        };
+        responses: {
+            /** @description Document created, URL follows */
+            201: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    PlatformMcpServersServerIdDeleteAny: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, nothing follows */
+            204: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    PlatformMcpServersServerIdUpdateAny: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMcpServerRequest"];
+            };
+        };
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    PlatformMcpServersServerIdExtendExtend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendMcpServerRequest"];
+            };
+        };
+        responses: {
+            /** @description Document created, URL follows */
+            201: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerGrantResponse"][];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    PlatformMcpServersServerIdGrantsListGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerGrantResponse"][];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    PlatformMcpServersServerIdMakeGlobalMakeGlobal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document created, URL follows */
+            201: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    PlatformMcpServersGrantsGrantIdUnextend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, nothing follows */
+            204: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad request syntax or unsupported method */
             400: {
