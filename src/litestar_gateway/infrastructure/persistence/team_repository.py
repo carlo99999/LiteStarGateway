@@ -23,6 +23,9 @@ from litestar_gateway.infrastructure.persistence.orm import (
     BudgetAlertStateModel,
     GuardrailRuleModel,
     InviteModel,
+    McpServerGrantModel,
+    McpServerModel,
+    McpServerSuppressionModel,
     ModelGrantRecord,
     PendingBudgetAlertModel,
     PendingUsageEventModel,
@@ -214,6 +217,13 @@ class SQLAlchemyTeamRepository:
                 PendingBudgetAlertModel,
                 BudgetAlertStateModel,
                 GuardrailRuleModel,
+                # MCP: the team's own servers, the grants it received, and its
+                # detaches of servers it does not own. Registered here in the
+                # slice that creates the tables, not after a review finds them
+                # missing — which is how ISSUE-040 was found for guardrail_rule.
+                McpServerSuppressionModel,
+                McpServerGrantModel,
+                McpServerModel,
                 ModelGrantRecord,
                 RouterGrantModel,
                 RouterModel,
