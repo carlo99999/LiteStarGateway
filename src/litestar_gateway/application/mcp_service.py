@@ -3,13 +3,18 @@
 Two behaviours carry the design's weight and are worth reading before changing
 anything here.
 
-**The allowlist is the platform's only veto.** A team admin registers servers
-freely, but `MCP_ALLOWED_HOSTS` bounds where any of them may point, and it is
-checked here on write *and* again on every call by the dispatch path. Write-time
-only is precisely the defect Round 15 found in the openai_compatible provider
-(ISSUE-034): a name that resolved into the allowlisted range at save time and
-elsewhere at call time was called anyway, and clearing the allowlist did not stop
-existing credentials.
+**The allowlist is the platform's only veto, and it is optional.** A team admin
+registers servers freely. With `MCP_ALLOWED_HOSTS` unset the SSRF deny-list applies
+instead, so any *public* endpoint is reachable and the feature works on a fresh
+deployment — an allowlist entry is then how an operator additionally authorizes an
+*internal* target, which is the only thing the deny-list would otherwise stop. With
+it set, it bounds where every server may point.
+
+Either way the check runs here on write *and* again on every call by the dispatch
+path. Write-time only is precisely the defect Round 15 found in the
+openai_compatible provider (ISSUE-034): a name that resolved into the allowlisted
+range at save time and elsewhere at call time was called anyway, and clearing the
+allowlist did not stop existing credentials.
 
 **`remove` is one verb with two effects.** Deleting a server the team owns
 removes the resource; "deleting" a global or extended one detaches it for that
@@ -24,7 +29,7 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
-from litestar_gateway.application.egress import resolve_allowlisted_addresses
+from litestar_gateway.application.egress import resolve_optionally_allowlisted_addresses
 from litestar_gateway.domain.authorization import Permission
 from litestar_gateway.domain.callable_alias import CallableOrigin
 from litestar_gateway.domain.egress_policy import EgressAllowlist
@@ -54,11 +59,17 @@ def validate_mcp_name(name: str) -> None:
 
 
 async def validate_mcp_url(url: str, allowlist: EgressAllowlist) -> None:
-    """The platform's veto, in one function.
+    """Where the gateway may be pointed, in one function.
 
     Module-level rather than a method because two services apply it: registering a
     server, and approving a proposal to register one. A second copy is how the two
     drift, and the copy that drifts is the one that stops refusing something.
+
+    `MCP_ALLOWED_HOSTS` is **optional**. Unset, the SSRF deny-list applies and any
+    public https endpoint is reachable, so the feature works on a fresh deployment
+    without configuration. Set, it is the platform's veto (D2) and nothing outside
+    it is reachable. Either way the check re-resolves per call, so a name that
+    drifts is refused at call time and not merely here.
     """
     parsed = urlsplit(url)
     if parsed.scheme != "https":
@@ -79,12 +90,23 @@ async def validate_mcp_url(url: str, allowlist: EgressAllowlist) -> None:
     if not host:
         raise InvalidMcpServer(f"url has no host, got {url!r}")
     try:
-        await resolve_allowlisted_addresses(host, port, allowlist)
+        await resolve_optionally_allowlisted_addresses(host, port, allowlist)
     except ValueError as exc:
         # Not `str(exc)`: the shared resolver names the *provider* variable
         # (`OPENAI_COMPATIBLE_ALLOWED_HOSTS`) in its message, and this surface
         # is bounded by `MCP_ALLOWED_HOSTS`. Passing it through would send an
         # operator to edit the wrong setting.
+        #
+        # The two refusals need different messages, because the fix differs. With
+        # no allowlist the target was refused for *what it resolves to* — and the
+        # remedy is to authorize that internal host explicitly, which an operator
+        # cannot guess from "not permitted".
+        if allowlist.is_empty:
+            raise InvalidMcpServer(
+                f"host {host!r} is not a public address, so it is refused while no "
+                "MCP_ALLOWED_HOSTS is configured; add it there to authorize an "
+                "internal tool server"
+            ) from exc
         raise InvalidMcpServer(
             f"host {host!r} (port {port}) is not permitted by MCP_ALLOWED_HOSTS"
         ) from exc
@@ -107,9 +129,9 @@ class McpServerService:
     ) -> None:
         self._servers = servers
         self._teams = teams
-        # Empty refuses everything, which is the fail-closed default the feature
-        # ships with: a deployment that upgrades gains no egress reach until an
-        # operator opts in, so no team can register a server yet.
+        # Empty means "no allowlist configured", which for this surface falls
+        # through to the SSRF deny-list rather than refusing everything: public
+        # tool servers work with no configuration, private ones need an entry.
         self._allowlist = allowlist or EgressAllowlist(entries=())
         # Absent means this service instance cannot cause egress at all — which is
         # what the management paths that never discover should be built with.

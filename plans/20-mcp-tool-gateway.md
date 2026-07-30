@@ -38,6 +38,18 @@ the executable summary.
 - **D2 — a server is a team resource; the platform keeps one veto.** Team admins
   create and remove servers; `MCP_ALLOWED_HOSTS` bounds where any of them may
   point, checked on write **and re-resolved per call**.
+  **Amended after S5, by decision:** the allowlist is **optional**. It shipped
+  fail-closed — empty refused every target — which meant the feature did nothing on
+  a fresh deployment until an operator configured it. Empty now falls through to the
+  existing SSRF deny-list: any public https endpoint is reachable, everything
+  non-public is refused, and an entry is how an operator authorizes an *internal*
+  target (the one thing the deny-list never permits) and simultaneously makes the
+  list exhaustive. The veto still exists for anyone who wants it; it is no longer
+  the price of admission. Implemented as a **third** primitive
+  (`resolve_optionally_allowlisted_addresses`) rather than a flag on the existing
+  guard, because inverting that guard's polarity in place would silently loosen
+  `OPENAI_COMPATIBLE_ALLOWED_HOSTS`, where clearing the list failing to stop
+  existing credentials was ISSUE-034.
 - **D3 — effects are declared, never detected.** `read` | `write` |
   `destructive`, set by the operator, optionally seeded from MCP annotations but
   never trusted from them. An unclassified tool counts as `destructive`.

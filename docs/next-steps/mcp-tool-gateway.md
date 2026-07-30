@@ -61,6 +61,14 @@ Concretely, `MCP_ALLOWED_HOSTS` at platform level — same shape as
 call** (§6). Inside it, team admins add and remove servers freely, with no
 platform-admin round trip.
 
+**Amended in implementation (post-S5):** that boundary is **optional**, unlike the
+provider allowlist it borrows its shape from. Unset, the gateway falls back to the
+SSRF deny-list — every public https endpoint is reachable and nothing else is — so
+the feature works on a fresh deployment. Setting it does two things: authorizes
+*internal* targets, which the deny-list alone never permits, and makes the boundary
+exhaustive. The sentence above still holds when an operator wants it to; it is no
+longer a precondition for the feature existing.
+
 | field | notes |
 |---|---|
 | `name` | unique per team (or platform-wide for a global server) |

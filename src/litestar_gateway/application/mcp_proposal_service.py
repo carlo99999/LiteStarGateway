@@ -66,9 +66,9 @@ class McpProposalService:
         self._proposals = proposals
         self._servers = servers
         self._teams = teams
-        # Empty refuses everything: the same fail-closed default the server
-        # service ships with, so a deployment that has not opted into MCP egress
-        # cannot be talked into it through the proposal path either.
+        # The same rule the server service applies, so the proposal path cannot be
+        # a way around it: empty falls through to the SSRF deny-list, an entry
+        # authorizes an internal target, and a configured list bounds everything.
         self._allowlist = allowlist or EgressAllowlist(entries=())
         self._discovery = discovery
 

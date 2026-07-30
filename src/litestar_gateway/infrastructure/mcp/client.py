@@ -49,7 +49,7 @@ from uuid import uuid4
 
 import httpx
 
-from litestar_gateway.application.egress import resolve_allowlisted_addresses
+from litestar_gateway.application.egress import resolve_optionally_allowlisted_addresses
 from litestar_gateway.application.routing.webhook import post_to_approved_address
 from litestar_gateway.domain.egress_policy import EgressAllowlist
 from litestar_gateway.domain.exceptions import McpDiscoveryFailed
@@ -100,14 +100,21 @@ class McpDiscoveryClient:
         if not host:  # pragma: no cover - refused at registration
             raise McpDiscoveryFailed(f"server {server.name!r} has no host in its url")
         try:
-            addresses = await resolve_allowlisted_addresses(host, url.port, self._allowlist)
+            addresses = await resolve_optionally_allowlisted_addresses(
+                host, url.port, self._allowlist
+            )
         except ValueError as exc:
-            # The ISSUE-034 case: allowlisted when registered, not now. Refusing
-            # here is the whole point of re-resolving, so the message says which
-            # of the two checks failed.
+            # The ISSUE-034 case: reachable when registered, not now. Refusing here
+            # is the whole point of re-resolving. Which check refused depends on
+            # whether an allowlist is configured — with none, the deny-list did,
+            # meaning the name now resolves somewhere private.
+            refused_by = (
+                "the SSRF deny-list (no MCP_ALLOWED_HOSTS is configured)"
+                if self._allowlist.is_empty
+                else "MCP_ALLOWED_HOSTS"
+            )
             raise McpDiscoveryFailed(
-                f"server {server.name!r} at {host} is no longer permitted by "
-                f"MCP_ALLOWED_HOSTS: {exc}"
+                f"server {server.name!r} at {host} is no longer permitted by {refused_by}: {exc}"
             ) from exc
         except OSError as exc:
             raise McpDiscoveryFailed(f"server {server.name!r} at {host} did not resolve") from exc

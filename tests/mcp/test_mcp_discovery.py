@@ -304,17 +304,54 @@ async def test_a_host_that_stops_resolving_is_a_typed_failure_not_a_crash(
         await _client(_scripted()).list_tools(_server())
 
 
-async def test_an_empty_allowlist_refuses_before_resolving(tmp_path) -> None:
-    """The fail-closed default: a deployment that has not opted in gains no
-    egress reach, and emits no DNS traffic for a target it would refuse."""
+async def test_with_no_allowlist_an_internal_target_is_refused_by_the_deny_list() -> None:
+    """`MCP_ALLOWED_HOSTS` is optional, so an empty one no longer refuses
+    everything — it falls through to the SSRF deny-list.
+
+    `_server()` points at `tools.internal`, which resolves privately, so it is
+    still refused here. What changed is *which* check refuses it and what the fix
+    is: an allowlist entry, because reaching a private target is the one thing the
+    deny-list never permits on its own. The message has to say so, or an operator
+    reads "not permitted" and goes looking for a permission.
+    """
     client = McpDiscoveryClient(
         client_factory=lambda seconds: httpx.AsyncClient(
             transport=httpx.MockTransport(_scripted()), timeout=seconds
         )
     )
 
-    with pytest.raises(McpDiscoveryFailed, match="MCP_ALLOWED_HOSTS"):
+    with pytest.raises(McpDiscoveryFailed, match="deny-list") as refused:
         await client.list_tools(_server())
+
+    assert "MCP_ALLOWED_HOSTS" in str(refused.value)
+
+
+async def test_with_no_allowlist_a_public_target_is_discovered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The other half of the optional default, and the reason it changed: a hosted
+    MCP server is usable on a deployment where nobody configured anything.
+
+    Asserted on the discovery path specifically. Registration and discovery apply
+    the rule separately — the second one re-resolves per call — so a change that
+    only loosened registration would leave the feature registering servers it then
+    refused to query.
+    """
+    import litestar_gateway.application.egress as egress_module
+
+    async def public(host: str) -> list[str]:
+        return ["93.184.216.34"]
+
+    monkeypatch.setattr(egress_module, "_resolve_host_addresses", public)
+    client = McpDiscoveryClient(
+        client_factory=lambda seconds: httpx.AsyncClient(
+            transport=httpx.MockTransport(_scripted()), timeout=seconds
+        )
+    )
+
+    tools = await client.list_tools(_server())
+
+    assert [tool.name for tool in tools] == ["search"]
 
 
 # ── strict parsing: an off-contract inventory is no inventory ────────────────
