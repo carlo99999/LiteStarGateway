@@ -22,7 +22,7 @@ from litestar.status_codes import (
     HTTP_409_CONFLICT,
 )
 from litestar.testing import AsyncTestClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from litestar_gateway.domain.entities import BudgetWindow
@@ -69,8 +69,25 @@ async def _login(client: AsyncTestClient, email: str, password: str) -> str:
 async def raw_session(database_url: str) -> AsyncIterator[AsyncSession]:
     """A second, independent connection to the SAME database as `client` —
     for seeding usage events and inspecting rows the HTTP API deliberately
-    hides (a soft-deleted team's row, its retained usage history)."""
+    hides (a soft-deleted team's row, its retained usage history).
+
+    Foreign keys are enforced here on purpose. The application's engine turns the
+    pragma on (`_create_engine_with_sqlite_fk`), but this fixture builds its own,
+    and aiosqlite ignores foreign keys unless asked *per connection*. Without it
+    a seeded row can reference a parent that does not exist, which SQLite accepts
+    and Postgres rejects — so the test passes locally and fails in CI fourteen
+    minutes later. That happened: a suppression row seeded with a fabricated
+    `server_id` reached main in Plan 20 S1 and only the Postgres job caught it.
+    """
     engine = create_async_engine(database_url)
+    if engine.dialect.name == "sqlite":
+
+        @event.listens_for(engine.sync_engine, "connect")
+        def _set_sqlite_pragma(dbapi_connection: object, _: object) -> None:
+            cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as session:
         yield session
@@ -524,7 +541,22 @@ async def _seed_mcp_server(session: AsyncSession, team_id: str) -> None:
             url="https://tools.internal:8443/mcp",
         )
     )
-    session.add(McpServerSuppressionModel(id=uuid4(), server_id=uuid4(), team_id=UUID(team_id)))
+    # The suppressed server has to exist: `suppress()` is only ever reached after
+    # the server was resolved as visible, so a suppression pointing at nothing is
+    # a state the code cannot produce — and the FK says so.
+    somebody_elses_global = McpServerModel(
+        id=uuid4(),
+        team_id=None,
+        name="shared",
+        url="https://tools.internal:8443/shared",
+    )
+    session.add(somebody_elses_global)
+    await session.flush()
+    session.add(
+        McpServerSuppressionModel(
+            id=uuid4(), server_id=somebody_elses_global.id, team_id=UUID(team_id)
+        )
+    )
     await session.commit()
 
 
