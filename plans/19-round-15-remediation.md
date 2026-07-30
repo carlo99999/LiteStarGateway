@@ -1,5 +1,9 @@
 # Plan 19 — Round 15 remediation
 
+**Status: ✅ completo.** Tutti i 19 finding chiusi in dodici PR (#442–#453), una
+per slice, ognuna con almeno una regressione che falliva prima della fix. Le
+deviazioni dal piano sono registrate in fondo, in [State at close](#state-at-close).
+
 Chiude i 19 finding di [issues/round-15.md](../issues/round-15.md)
 (0C · 7H · 6M · 6L), tutti Open. Il tema è unico: **una garanzia dichiarata non
 viene applicata su un percorso alternativo** (failover, cache, endpoint native,
@@ -288,3 +292,58 @@ lavoro chiudono in ~6-7 giorni di calendario.
 ri-verifica i 19 finding sul tree post-remediation, con particolare attenzione
 agli interleaving stale/stream/failover che le regressioni di questo piano
 introducono.
+
+---
+
+## State at close
+
+Dodici PR, una per slice tranne due aggregazioni deliberate: S6 è stata **spezzata**
+in due (6a native, 6b streaming: due cambiamenti indipendenti in una slice), e
+S9+S11 sono state **unite** (#453) perché sono lo stesso difetto — due intenzioni
+su un unico valore nullable — e condividono gli artefatti OpenAPI rigenerati.
+
+### Deviazioni dal piano
+
+| # | Previsto | Fatto, e perché |
+|---|---|---|
+| S4 | Migrazione dati per i team già tombstoned | **Nessuna migrazione.** Il fix del codice li sblocca da sé e la FK RESTRICT esclude righe orfane. Il piano non ha migrazioni. Scoperto inoltre che il difetto colpiva anche la `delete_team` ordinaria, non solo il purge. |
+| S2 | Pinnare l'IP risolto come fa il webhook | **Non fattibile** con la stessa tecnica: l'SDK OpenAI costruisce le richieste da `base_url`, il path webhook pinna per-request via `extensions`. Finestra TOCTOU residua dichiarata, non nascosta. Anche `ClientKey` non è stato toccato: con il controllo per-call il client in cache non è più un bypass. |
+| S5 | Derivare i tentativi di failover da `clean` | **Sbagliato**: `clean` porta il clamp del primo candidato. Si rieseguono clamp+validate da `sanitized` **più la chain**, che chiude anche la metà del finding solo annotata (chain non risolta per il nuovo candidato). |
+| S8 | Concorrenza per il rilevamento BLOCK + ricomposizione sequenziale dei soli redattori | **Catena interamente sequenziale.** Un test ha mostrato che anche un provider non-redattore deve vedere il testo composto (può bloccare su ciò che una redazione espone). Meno codice, una chiamata per provider, short-circuit sul rifiuto; costo: somma dei tempi. Rimosso un test verde che asseriva la concorrenza. |
+| S6b | Rifiutare lo stream con una regola *bloccante* | Condizione **non decidibile**: il verdetto dipende dal contenuto. Rifiutiamo con qualsiasi regola RESPONSE (fail-closed), e lo diciamo nella doc invece di implicare che fosse la condizione del design. |
+| S7 | Passare `api_key_id` ad `admit` | Da solo avrebbe **dimezzato il rate limit di ogni chiave**: `_prepare` prende già l'hit RPM. Aggiunto `skip_key_rate_limit`, simmetrico al flag team, con una regressione che fissa "un hit per richiesta". |
+| S12 | Copiare il cap nella stessa transazione | Il repository dei budget **committava internamente**. Aggiunto `stage_set` (staging senza commit), che è la convenzione già documentata del repo, così non resta una finestra in cui la chiave nuova è viva senza cap. |
+| S3 | Rifiutare `*` **e** normalizzare la porta | `*` rifiutato; la porta **documentata** — il match vive nel middleware di Litestar e normalizzare un solo lato scambierebbe un 400 rumoroso per un mismatch silenzioso. |
+
+### Copertura dichiarata incompleta
+
+- **045 (shield del replay in cache)**: nessun test lo riproduce. Lo store
+  in-memory rilascia senza punti di sospensione, quindi la cancellazione non può
+  colpire quel checkpoint, e forzarla dipenderebbe da GC e timing — la classe di
+  test che questo repo ha già imparato a non scrivere (#2cda620). È parità
+  difensiva col gemello coperto.
+- **`just test-postgres` e `just test-redis`** non sono stati eseguiti in locale.
+  Tre slice li vorrebbero in CI: S12 (`stage_set` cambia quando avviene il flush
+  rispetto all'indice unico), S9 (`IntegrityError` su vincolo unico è
+  dialect-sensitive) e S7 (lo shield ha una motivazione Redis-specifica).
+
+### Due cose che il gate ha trovato e la review no
+
+- **pyrefly** ha intercettato un difetto in un *mio* test (accesso a un attributo
+  su un tipo unione di adapter). Invece di silenziarlo, l'`isinstance` aggiunto
+  fissa anche che l'adapter registrato per `openai_compatible` è la sottoclasse
+  guardata — se cambiasse, il guard diventerebbe inerte e il test lo direbbe.
+- **il client TypeScript generato** ha intercettato che un campo `bool = False`
+  finisce comunque nella lista `required` dell'OpenAPI: entrambi i nuovi flag
+  avrebbero detto a ogni client generato che un campo mai inviato era
+  obbligatorio. Una rottura di contratto silenziosa, introdotta mentre si
+  chiudevano finding sulla chiarezza dei contratti. Ora sono `bool | None = None`.
+
+### Nota di metodo
+
+Una regressione va verificata in **entrambe le direzioni**. Due volte un test è
+passato *anche senza* la fix — il provider di test restituiva un verdetto
+scriptato ignorando il payload, e un'asserzione usava una forma di risposta che
+il fake di quel file non produce — e in entrambi i casi ho ripristinato il file
+pre-fix da `main` per provare che il test regredisse davvero. Senza quel
+controllo il PR body avrebbe dichiarato una regressione inesistente.

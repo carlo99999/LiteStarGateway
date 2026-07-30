@@ -567,11 +567,76 @@ moderazione), risolvendo il timeout secondo la fail policy.
 
 ## Resolution status
 
-Tutti i finding sono **Open** (modalità sola-review). ISSUE-034…052 sono difetti
-nuovi in codice nuovo del delta; dove pertinente citano la classe storica
-correlata già chiusa (ISSUE-030/#401 per il purge, ISSUE-028/032 per l'Host,
-R13 #393/#394 per la cache). Le remediation dei Round 13/14 (#392–#405) sono
-state ricampionate a campione e reggono (vedi *Verified clean*).
+**Tutti i 19 finding sono chiusi** (#442–#453), una PR per slice di
+[Plan 19](../plans/19-round-15-remediation.md), ognuna con almeno una regressione
+che falliva prima della fix. La review in sé non ha modificato codice di
+prodotto; la remediation è arrivata subito dopo.
+
+| PR | Slice | Finding |
+|---|---|---|
+| #442 | S1 | 050, 051 |
+| #443 | S2 | **034**, 048 |
+| #444 | S4 | **040** |
+| #445 | S8 | **039** |
+| #446 | S5 | **035**, **036** |
+| #447 | S6a | **038** |
+| #448 | S6b | 042 |
+| #449 | S7 | **037**, 044, 045 |
+| #450 | S3 | 043 |
+| #451 | S10 | 046 |
+| #452 | S12 | 052 |
+| #453 | S9+S11 | 041, 047, 049 |
+
+Sei correzioni hanno richiesto una decisione più larga del finding, e sono
+registrate nelle rispettive PR:
+
+- **034**: il controllo per-call è al dispatch, ma il **pinning dell'IP non è
+  replicabile** attraverso l'SDK OpenAI (che costruisce le richieste da
+  `base_url`, mentre il path webhook pinna per-request). Resta una finestra
+  TOCTOU fra la nostra risoluzione e la connect dell'SDK: dichiarata, non chiusa.
+- **035**: la fix ovvia (usare `clean` al posto di `sanitized`) era sbagliata —
+  avrebbe fatto ereditare al secondo candidato il clamp del primo. La chain viene
+  rieseguita per tentativo, il che chiude anche la metà del finding che il report
+  aveva solo annotato (la chain non era risolta per il nuovo candidato).
+- **039**: la catena è ora **sequenziale**, quindi paga la somma dei tempi e non
+  il massimo. Un test verde che asseriva la concorrenza è stato **rimosso**: era
+  la proprietà che causava il leak.
+- **042**: il design chiedeva di rifiutare lo stream solo con una regola
+  *bloccante*, condizione **non decidibile a priori** (dipende dal contenuto
+  della risposta). Rifiutiamo con qualsiasi regola RESPONSE: un team con una
+  regola di sola redazione perde lo streaming su quel modello.
+- **037**: passare `api_key_id` ad `admit` avrebbe **dimezzato il rate limit di
+  ogni chiave** (doppio hit RPM). Risolto con `skip_key_rate_limit`, simmetrico
+  al flag team già esistente, e una regressione che fissa "un hit per richiesta".
+- **040**: la migrazione dati prevista **non serviva** (il fix del codice sblocca
+  i team già tombstoned, e la FK RESTRICT esclude righe orfane). Il difetto era
+  inoltre più ampio del riportato: colpiva anche la `delete_team` ordinaria.
+
+Due punti dove la copertura è dichiarata incompleta: lo **shield** del replay in
+cache (045) non ha un test che lo riproduca — lo store in-memory rilascia senza
+punti di sospensione — ed è parità difensiva col gemello coperto; e la metà
+**porta** di 043 è documentata, non normalizzata, perché il match vive nel
+middleware di Litestar.
+
+ISSUE-034…052 erano difetti nuovi in codice nuovo del delta; dove pertinente
+citano la classe storica correlata già chiusa (ISSUE-030/#401 per il purge,
+ISSUE-028/032 per l'Host, R13 #393/#394 per la cache). Le remediation dei
+Round 13/14 (#392–#405) sono state ricampionate a campione e reggono (vedi
+*Verified clean*).
+
+**La lezione trasversale.** In cinque casi su diciannove il difetto non era una
+distrazione ma una **promessa non mantenuta già scritta**: le docstring di
+`egress.py` e `docs/self-hosted-models.md` garantivano la ri-risoluzione per
+chiamata (034), `docs/guardrails.md` garantiva che i redattori componessero
+(039), `prepare_native` si dichiarava il punto centrale delle governance guard
+(038), il commento del purge affermava di elencare "ogni tabella con questo
+team_id" (040). In un sesto caso il design doc chiedeva due cose incompatibili —
+`asyncio.gather` *e* composizione left-to-right — e l'implementazione l'ha seguito
+fedelmente (039). Per il prossimo round: **leggere le promesse del codice come
+asserzioni da verificare, non come contesto**. È stata la traccia più produttiva
+di tutta la review. Il secondo pattern ricorrente, comparso tre volte in feature
+diverse, è **due intenzioni compresse in un unico valore nullable** (041, 047, e
+il `kind` ignorato in PATCH).
 
 ## Deferred / product decision
 
