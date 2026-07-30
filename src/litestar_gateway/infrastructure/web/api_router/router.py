@@ -21,6 +21,7 @@ from litestar_gateway.infrastructure.web.api_router.completions import (
     images,
     responses,
 )
+from litestar_gateway.infrastructure.web.api_router.mcp_list import list_mcp_servers
 from litestar_gateway.infrastructure.web.api_router.models_list import list_models
 from litestar_gateway.infrastructure.web.api_router.wo_am_i import whoami
 from litestar_gateway.infrastructure.web.auth import APIKeyAuthMiddleware
@@ -46,6 +47,7 @@ def create_api_router(
         route_handlers=[
             whoami,
             list_models,
+            list_mcp_servers,
             chat_completions,
             responses,
             embeddings,

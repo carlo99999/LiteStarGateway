@@ -198,6 +198,56 @@
                 "deprecated": false
             }
         },
+        "/v1/mcp/servers": {
+            "get": {
+                "tags": [
+                    "api-endpoint"
+                ],
+                "summary": "The MCP servers this API key may use, with their tools",
+                "description": "A **registry**: the gateway does not execute tools and does not proxy MCP traffic. It lists the servers this key may use — its team's own, those extended to it, and global ones, minus any the team detached — each with the tools this key is permitted to invoke.\n\nA tool declared `destructive` appears only for a key whose policy enables them explicitly, and an unclassified tool counts as destructive. A server this key may invoke nothing on is omitted; one nobody has run discovery against is listed with `discovered: false` and an empty `tools`, because there the inventory is unknown rather than empty.\n\nBearer tokens are never returned — `requires_auth` says whether the server needs one.",
+                "operationId": "V1McpServersListMcpServers",
+                "responses": {
+                    "200": {
+                        "description": "Request fulfilled, document follows",
+                        "headers": {
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Referrer",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "MIME sniffing",
+                                "required": false,
+                                "deprecated": false
+                            },
+                            "X-Frame-Options": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "Clickjacking",
+                                "required": false,
+                                "deprecated": false
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {},
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/v1/chat/completions": {
             "post": {
                 "tags": [
