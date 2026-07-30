@@ -115,6 +115,7 @@ nav:
           - 13 · Billing integrity: plans/13-billing-integrity.md
           - 14 · Gateway throughput: plans/14-hot-path-throughput.md
       - Design proposals:
+          - MCP tool gateway: docs/next-steps/mcp-tool-gateway.md
           - Response caching: docs/next-steps/response-caching.md
           - Cross-provider failover: docs/next-steps/cross-provider-failover.md
           - Guardrails: docs/next-steps/guardrails.md
