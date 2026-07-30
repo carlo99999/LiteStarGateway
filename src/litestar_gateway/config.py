@@ -246,6 +246,13 @@ class Settings:
     # Empty ⇒ the provider is unusable, so a deployment that upgrades gains no
     # new egress reach until an operator opts in.
     openai_compatible_allowed_hosts: tuple[str, ...] = ()
+    # Egress allowlist for MCP tool servers (Plan 20). Same grammar and parser as
+    # the provider allowlist above, and deliberately a *separate* list: a host
+    # authorized to serve a self-hosted model is not thereby authorized to
+    # receive tool arguments, which is different data leaving the gateway. This
+    # is the platform's one veto over a team-owned resource — a team admin
+    # registers servers freely, but only inside this list.
+    mcp_allowed_hosts: tuple[str, ...] = ()
     # SSO via OIDC. No discovery URL ⇒ disabled. `oidc_admin_groups` (comma-sep)
     # maps IdP groups to platform admin.
     oidc_discovery_url: str | None = None
@@ -350,12 +357,18 @@ class Settings:
         unless an operator opted in, which makes that provider unusable."""
         return parse_allowlist(self.openai_compatible_allowed_hosts)
 
+    def mcp_allowlist(self) -> EgressAllowlist:
+        """The parsed MCP tool-server allowlist (Plan 20). Empty unless an
+        operator opted in, so no team can register a server yet."""
+        return parse_allowlist(self.mcp_allowed_hosts)
+
     def __post_init__(self) -> None:
         # Before the local-env shortcut below: a malformed allowlist entry is a
         # typo, not an insecurity, and the environment most likely to catch it
         # is the developer's. Silently dropping it would leave an operator
         # believing a target is authorized when it is not.
         self.egress_allowlist()
+        self.mcp_allowlist()
         # Fail fast on insecure secrets everywhere except explicitly-local envs, so a
         # staging or misspelled environment cannot silently run on the public default
         # or a brute-forceable short key.

@@ -45,6 +45,7 @@ from litestar_gateway.domain.entities import (
 )
 from litestar_gateway.domain.entities.model import DEFAULT_CAPABILITIES
 from litestar_gateway.domain.guardrails import Direction, FailPolicy
+from litestar_gateway.domain.mcp import ApiKeyToolPolicy, McpServer, McpTool, ToolEffect
 from litestar_gateway.domain.money import ZERO
 from litestar_gateway.domain.routing import (
     CandidateModel,
@@ -1121,4 +1122,145 @@ class APIKeyModel(base.UUIDAuditBase):
             scope=KeyScope(self.scope),
             service_principal_id=self.service_principal_id,
             rate_limit_rpm=self.rate_limit_rpm,
+        )
+
+
+class McpServerModel(base.UUIDAuditBase):
+    """A registered MCP tool server (Plan 20).
+
+    `team_id` NULL means global — the same spelling a global `Model` uses, which
+    is what lets one visibility union serve both instead of a per-resource rule.
+
+    The bearer token is envelope-encrypted exactly like `guardrail_rule`'s signing
+    secret: ciphertext plus the data key that sealed it, decrypted only on the
+    call path. No `to_entity` ever carries it, so no response can leak it.
+    """
+
+    __tablename__ = "mcp_server"
+    __table_args__ = (
+        # A name identifies the server to an operator and appears in a tool
+        # error, so it must be unambiguous within its owner. Two teams may both
+        # have a "github"; a global one is unique on its own (team_id NULL).
+        UniqueConstraint("team_id", "name"),
+    )
+
+    # Nullable for a global server. No `ondelete` on purpose: a team's servers
+    # are removed explicitly by the purge child list, which is where ISSUE-040
+    # was found for `guardrail_rule` — the same table is registered there from
+    # this slice rather than after a review notices it.
+    team_id: Mapped[UUID | None] = mapped_column(ForeignKey("team.id"), default=None, index=True)
+    name: Mapped[str] = mapped_column()
+    url: Mapped[str] = mapped_column()
+    enabled: Mapped[bool] = mapped_column(default=True)
+    tool_allowlist: Mapped[list[str]] = mapped_column(JSON, default=list)
+    encrypted_auth: Mapped[str | None] = mapped_column(default=None)
+    auth_key_id: Mapped[UUID | None] = mapped_column(ForeignKey("secret_key.id"), default=None)
+
+    def to_entity(self) -> McpServer:
+        return McpServer(
+            id=self.id,
+            team_id=self.team_id,
+            name=self.name,
+            url=self.url,
+            enabled=self.enabled,
+            created_at=self.created_at,
+            has_auth=self.encrypted_auth is not None,
+            tool_allowlist=tuple(self.tool_allowlist or ()),
+        )
+
+
+class McpServerGrantModel(base.UUIDAuditBase):
+    """A team-owned server extended to another team, mirroring `model_grant`.
+
+    Global servers need no grant rows — they resolve to every team.
+    """
+
+    __tablename__ = "mcp_server_grant"
+    __table_args__ = (UniqueConstraint("server_id", "team_id"),)
+
+    server_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mcp_server.id", ondelete="CASCADE"), index=True
+    )
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+
+
+class McpServerSuppressionModel(base.UUIDAuditBase):
+    """One team's detach of a server it does not own (design §2.2).
+
+    A separate table rather than a flag on the grant, because a *global* server
+    has no grant row to carry one. Removing a global or extended server is a
+    suppression here; only the platform's own delete removes the resource, which
+    is what stops a team admin revoking a capability from every other tenant —
+    the ISSUE-020 mistake.
+    """
+
+    __tablename__ = "mcp_server_suppression"
+    __table_args__ = (UniqueConstraint("server_id", "team_id"),)
+
+    server_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mcp_server.id", ondelete="CASCADE"), index=True
+    )
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+
+
+class McpToolModel(base.UUIDAuditBase):
+    """A tool discovered from a server, with the effect an operator declared.
+
+    The inventory is a cache of `tools/list`; `effect` is not — it is operator
+    state that survives re-discovery, because a value re-read from the server on
+    every refresh would be a value the server controls.
+    """
+
+    __tablename__ = "mcp_tool"
+    __table_args__ = (UniqueConstraint("server_id", "name"),)
+
+    server_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mcp_server.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column()
+    description: Mapped[str] = mapped_column(default="")
+    schema: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Defaults to the most dangerous class: a tool nobody classified must not be
+    # invocable under the permissive per-key default.
+    effect: Mapped[str] = mapped_column(default=ToolEffect.DESTRUCTIVE.value)
+    discovered_at: Mapped[datetime | None] = mapped_column(default=None)
+
+    def to_entity(self) -> McpTool:
+        return McpTool(
+            id=self.id,
+            server_id=self.server_id,
+            name=self.name,
+            description=self.description,
+            schema=dict(self.schema or {}),
+            effect=ToolEffect(self.effect),
+            discovered_at=self.discovered_at,
+        )
+
+
+class ApiKeyToolPolicyModel(base.UUIDAuditBase):
+    """Per-key tool restriction, on the `api_key_budget` precedent.
+
+    `api_key_id` is unique: one policy per key, replaced on write, CASCADE on the
+    key for the same reason a cap cascades — a policy for a deleted key is a row
+    nothing can reach. Absent means unrestricted; the row exists mainly to carry
+    `destructive_enabled`, which is the one thing the permissive default excludes.
+    """
+
+    __tablename__ = "api_key_tool_policy"
+
+    api_key_id: Mapped[UUID] = mapped_column(
+        ForeignKey("api_key.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    allowed_tools: Mapped[list[str]] = mapped_column(JSON, default=list)
+    destructive_enabled: Mapped[bool] = mapped_column(default=False)
+
+    def to_entity(self) -> ApiKeyToolPolicy:
+        return ApiKeyToolPolicy(
+            id=self.id,
+            api_key_id=self.api_key_id,
+            team_id=self.team_id,
+            allowed_tools=tuple(self.allowed_tools or ()),
+            destructive_enabled=self.destructive_enabled,
+            created_at=self.created_at,
         )

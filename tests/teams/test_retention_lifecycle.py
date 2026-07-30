@@ -29,6 +29,8 @@ from litestar_gateway.domain.entities import BudgetWindow
 from litestar_gateway.infrastructure.persistence.orm import (
     BudgetAlertStateModel,
     GuardrailRuleModel,
+    McpServerModel,
+    McpServerSuppressionModel,
     ModelGrantRecord,
     ModelRecord,
     PendingBudgetAlertModel,
@@ -505,3 +507,40 @@ async def test_a_team_with_a_guardrail_rule_and_no_usage_is_still_hard_deleted(
 
     assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
     assert await raw_session.get(TeamModel, UUID(team_id)) is None
+
+
+async def _seed_mcp_server(session: AsyncSession, team_id: str) -> None:
+    """A team-owned MCP server, plus a suppression of someone else's global one.
+
+    Both carry this team's id, so both must go with the team — the ISSUE-040
+    shape, covered from the slice that introduces the tables rather than by a
+    later review.
+    """
+    session.add(
+        McpServerModel(
+            id=uuid4(),
+            team_id=UUID(team_id),
+            name="github",
+            url="https://tools.internal:8443/mcp",
+        )
+    )
+    session.add(McpServerSuppressionModel(id=uuid4(), server_id=uuid4(), team_id=UUID(team_id)))
+    await session.commit()
+
+
+async def test_a_team_with_mcp_servers_can_still_be_purged(
+    client: AsyncTestClient, raw_session: AsyncSession
+) -> None:
+    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
+    team_id = await _tombstoned_team(client, admin, raw_session)
+    await _seed_mcp_server(raw_session, team_id)
+
+    resp = await client.post(f"/teams/{team_id}/purge", headers=_bearer(admin))
+
+    assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
+    assert await raw_session.get(TeamModel, UUID(team_id)) is None
+    for model in (McpServerModel, McpServerSuppressionModel):
+        rows = (
+            await raw_session.scalars(select(model).where(model.team_id == UUID(team_id)))
+        ).all()
+        assert rows == [], model.__name__
