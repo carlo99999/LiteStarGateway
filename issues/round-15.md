@@ -69,25 +69,25 @@ Counts: **0 CRITICAL · 7 HIGH · 6 MEDIUM · 6 LOW**.
 
 | ID | Title | Severity | Files | Status |
 |---|---|---|---|---|
-| ISSUE-034 | L'allowlist egress `openai_compatible` non è applicata al dispatch (rebinding DNS + revoca no-op) | HIGH | `application/egress.py`; `application/credential_service.py`; `infrastructure/llm/openai_adapter.py` | Open |
-| ISSUE-035 | Il retry di failover invia il prompt NON redatto al provider di fallback | HIGH | `application/completion_service.py` | Open |
-| ISSUE-036 | La response cache memorizza e riserve il body pre-guardrail (bypass BLOCK/REDACT) | HIGH | `application/completion_service.py` | Open |
-| ISSUE-037 | Il budget per-chiave non è applicato sulla superficie OpenAI (`/v1/chat`, `/v1/responses`, embeddings, images) | HIGH | `application/completion_service.py`; `application/usage_meter.py` | Open |
-| ISSUE-038 | Gli endpoint native bypassano il guard di richiesta e il guard di risposta è un no-op | HIGH | `application/completion_service.py`; `application/guardrails/payloads.py` | Open |
-| ISSUE-039 | REDACT non compone: l'ultimo redattore vince, le redazioni precedenti si perdono | HIGH | `application/guardrails/service.py` | Open |
-| ISSUE-040 | Il purge del team omette le regole guardrail team-wide → purge negato/definitivamente bloccato | HIGH | `infrastructure/persistence/team_repository.py`; `persistence/orm.py`; migration guardrail_rule | Open |
-| ISSUE-041 | Lo scope di una regola guardrail non è allargabile/commutabile via PATCH; la console lo offre e risponde 200 | MEDIUM | `application/guardrail_policy_service.py`; `web/guardrails/schemas.py`; `ui/.../guardrails` | Open |
-| ISSUE-042 | Lo streaming salta il guardrail di risposta bloccante (default sicuro non implementato) | MEDIUM | `application/completion_service.py` | Open |
-| ISSUE-043 | `ALLOWED_HOSTS=*` supera il gate di startup e disabilita la validazione dell'Host | MEDIUM | `config.py`; `app.py` | Open |
-| ISSUE-044 | La prenotazione key-scope resta appesa quando il gate team rifiuta dopo quello key | MEDIUM | `application/usage_meter.py` | Open |
-| ISSUE-045 | Release delle prenotazioni non fail-safe / cache-hit stream non shieldato | MEDIUM | `application/usage_meter.py`; `application/completion_service.py` | Open |
-| ISSUE-046 | Il guardrail judge non ha time budget (eredita il timeout gateway da 60 s) | MEDIUM | `application/guardrails/judge.py`; `domain/guardrail_config.py` | Open |
-| ISSUE-047 | Segreto webhook per-team stringa vuota → fallback silenzioso al segreto di piattaforma | LOW | `web/teams/schemas.py`; `persistence/budget_repository.py`; `notifications/channel_resolver.py` | Open |
-| ISSUE-048 | `api_base` accetta userinfo (`user:pass@`) che finisce in `ClientKey.endpoint` loggato in chiaro | LOW | `application/credential_service.py`; `infrastructure/llm/openai_adapter.py` | Open |
-| ISSUE-049 | Unicità del nome regola guardrail check-then-write → 500 sotto concorrenza | LOW | `application/guardrail_policy_service.py` | Open |
-| ISSUE-050 | Marker di conflitto di merge committati in doc pubblicate nella nav mkdocs | LOW | `plans/README.md`; `plans/18-openai-compatible-provider.md`; `docs/next-steps/openai-compatible-provider.md` | Open |
-| ISSUE-051 | Il client sync `openai_compatible` ha `follow_redirects=True` (latente) | LOW | `infrastructure/llm/openai_adapter.py`; `infrastructure/llm/resilience.py` | Open |
-| ISSUE-052 | La rotazione della chiave perde silenziosamente il cap per-chiave | LOW | `infrastructure/web/teams/controller.py` | Open |
+| ISSUE-034 | L'allowlist egress `openai_compatible` non è applicata al dispatch (rebinding DNS + revoca no-op) | HIGH | `application/egress.py`; `application/credential_service.py`; `infrastructure/llm/openai_adapter.py` | Fixed by #443 |
+| ISSUE-035 | Il retry di failover invia il prompt NON redatto al provider di fallback | HIGH | `application/completion_service.py` | Fixed by #446 |
+| ISSUE-036 | La response cache memorizza e riserve il body pre-guardrail (bypass BLOCK/REDACT) | HIGH | `application/completion_service.py` | Fixed by #446 |
+| ISSUE-037 | Il budget per-chiave non è applicato sulla superficie OpenAI (`/v1/chat`, `/v1/responses`, embeddings, images) | HIGH | `application/completion_service.py`; `application/usage_meter.py` | Fixed by #449 |
+| ISSUE-038 | Gli endpoint native bypassano il guard di richiesta e il guard di risposta è un no-op | HIGH | `application/completion_service.py`; `application/guardrails/payloads.py` | Fixed by #447 |
+| ISSUE-039 | REDACT non compone: l'ultimo redattore vince, le redazioni precedenti si perdono | HIGH | `application/guardrails/service.py` | Fixed by #445 |
+| ISSUE-040 | Il purge del team omette le regole guardrail team-wide → purge negato/definitivamente bloccato | HIGH | `infrastructure/persistence/team_repository.py`; `persistence/orm.py`; migration guardrail_rule | Fixed by #444 |
+| ISSUE-041 | Lo scope di una regola guardrail non è allargabile/commutabile via PATCH; la console lo offre e risponde 200 | MEDIUM | `application/guardrail_policy_service.py`; `web/guardrails/schemas.py`; `ui/.../guardrails` | Fixed by #453 |
+| ISSUE-042 | Lo streaming salta il guardrail di risposta bloccante (default sicuro non implementato) | MEDIUM | `application/completion_service.py` | Fixed by #448 |
+| ISSUE-043 | `ALLOWED_HOSTS=*` supera il gate di startup e disabilita la validazione dell'Host | MEDIUM | `config.py`; `app.py` | Fixed by #450 |
+| ISSUE-044 | La prenotazione key-scope resta appesa quando il gate team rifiuta dopo quello key | MEDIUM | `application/usage_meter.py` | Fixed by #449 |
+| ISSUE-045 | Release delle prenotazioni non fail-safe / cache-hit stream non shieldato | MEDIUM | `application/usage_meter.py`; `application/completion_service.py` | Fixed by #449 |
+| ISSUE-046 | Il guardrail judge non ha time budget (eredita il timeout gateway da 60 s) | MEDIUM | `application/guardrails/judge.py`; `domain/guardrail_config.py` | Fixed by #451 |
+| ISSUE-047 | Segreto webhook per-team stringa vuota → fallback silenzioso al segreto di piattaforma | LOW | `web/teams/schemas.py`; `persistence/budget_repository.py`; `notifications/channel_resolver.py` | Fixed by #453 |
+| ISSUE-048 | `api_base` accetta userinfo (`user:pass@`) che finisce in `ClientKey.endpoint` loggato in chiaro | LOW | `application/credential_service.py`; `infrastructure/llm/openai_adapter.py` | Fixed by #443 |
+| ISSUE-049 | Unicità del nome regola guardrail check-then-write → 500 sotto concorrenza | LOW | `application/guardrail_policy_service.py` | Fixed by #453 |
+| ISSUE-050 | Marker di conflitto di merge committati in doc pubblicate nella nav mkdocs | LOW | `plans/README.md`; `plans/18-openai-compatible-provider.md`; `docs/next-steps/openai-compatible-provider.md` | Fixed by #442 |
+| ISSUE-051 | Il client sync `openai_compatible` ha `follow_redirects=True` (latente) | LOW | `infrastructure/llm/openai_adapter.py`; `infrastructure/llm/resilience.py` | Fixed by #442 |
+| ISSUE-052 | La rotazione della chiave perde silenziosamente il cap per-chiave | LOW | `infrastructure/web/teams/controller.py` | Fixed by #452 |
 
 ## Findings
 
