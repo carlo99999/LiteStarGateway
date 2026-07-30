@@ -4,9 +4,10 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { canManageTools } from "@/features/teams/access";
+import { canManageTools, canProposeTools } from "@/features/teams/access";
 import { useAccessibleTeams } from "@/features/teams/useAccessibleTeams";
 import { KeyToolPolicyPanel } from "@/features/tools/KeyToolPolicyPanel";
+import { ProposalQueuePanel } from "@/features/tools/ProposalQueuePanel";
 import {
   createMcpServer,
   declareToolEffect,
@@ -135,7 +136,11 @@ function Inventory({
  * so the select below is the authoritative value rather than the server's hint. */
 export function ToolsPage() {
   const queryClient = useQueryClient();
-  const teams = useAccessibleTeams(canManageTools);
+  // Every role, because the proposal queue below is for all of them. The server
+  // registry is then gated per selected team — asking for a member's servers would
+  // render a 403 as "couldn't load the tool servers", which reads as a bug rather
+  // than as a permission they never had.
+  const teams = useAccessibleTeams(canProposeTools);
   const [teamId, setTeamId] = useState("");
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
@@ -143,10 +148,13 @@ export function ToolsPage() {
   const [reattachId, setReattachId] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
 
+  const canManage = canManageTools(
+    teams.data?.find((team) => team.id === teamId)?.role ?? null,
+  );
   const servers = useQuery({
     queryKey: ["teams", teamId, "mcp-servers"],
     queryFn: () => listMcpServers(teamId),
-    enabled: teamId.length > 0,
+    enabled: teamId.length > 0 && canManage,
   });
 
   useEffect(() => {
@@ -252,7 +260,14 @@ export function ToolsPage() {
         </select>
       </div>
 
-      {servers.isError ? (
+      {teamId && !canManage ? (
+        // Not an error: this member never had `tools:read` here. Saying so is the
+        // difference between "you cannot see this" and "something broke".
+        <p className="mb-6 font-mono text-xs text-muted-foreground">
+          // only a team admin can see and register this team&apos;s tool servers — you can
+          propose one below.
+        </p>
+      ) : servers.isError ? (
         <p className="mb-6 font-mono text-xs text-destructive">
           ! couldn&apos;t load the tool servers — {toError(servers.error)?.message}
         </p>
@@ -341,6 +356,8 @@ export function ToolsPage() {
           the detach read as a deletion. A detached server is by definition absent
           from the list above, so the only handle left is its id — which the
           gateway still reports in the audit trail. */}
+      {canManage ? (
+        <>
       <div className="mb-6 flex flex-wrap items-end gap-3">
         <div className="grid gap-2">
           <Label htmlFor="tools-reattach">reattach a detached server (id)</Label>
@@ -402,6 +419,10 @@ export function ToolsPage() {
       </form>
 
       {teamId ? <KeyToolPolicyPanel teamId={teamId} /> : null}
+        </>
+      ) : null}
+
+      {teamId ? <ProposalQueuePanel teamId={teamId} /> : null}
     </div>
   );
 }

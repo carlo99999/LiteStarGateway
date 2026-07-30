@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,7 +26,9 @@ from litestar_gateway.domain.mcp import (
     ApiKeyToolPolicy,
     McpServer,
     McpServerGrant,
+    McpServerProposal,
     McpTool,
+    ProposalStatus,
     ToolEffect,
 )
 from litestar_gateway.infrastructure.keyring import Keyring
@@ -34,6 +36,7 @@ from litestar_gateway.infrastructure.persistence.orm import (
     ApiKeyToolPolicyModel,
     McpServerGrantModel,
     McpServerModel,
+    McpServerProposalModel,
     McpServerSuppressionModel,
     McpToolModel,
 )
@@ -97,6 +100,23 @@ class SQLAlchemyMcpServerRepository:
         return visible
 
     async def add(self, server: McpServer, *, auth: str | None = None) -> McpServer:
+        row = await self.stage_add(server, auth=auth)
+        await self._session.commit()
+        await self._session.refresh(row)
+        return row.to_entity()
+
+    async def stage_add(self, server: McpServer, *, auth: str | None = None) -> McpServerModel:
+        """Insert without committing, for a caller that owns the transaction.
+
+        The proposal flow needs the row to *exist* before it can claim a decision
+        that references it — an approval writing `server_id` for a server it has
+        not inserted yet fails the foreign key outright, which is how the wired
+        test found this. Staging puts both writes in one transaction, so the claim
+        and the server it produced land together or not at all.
+
+        Round 15's S12 is the precedent for the shape: a `stage_`-prefixed variant
+        wherever the caller, not the repository, decides when to commit.
+        """
         row = McpServerModel(
             id=server.id,
             team_id=server.team_id,
@@ -108,15 +128,14 @@ class SQLAlchemyMcpServerRepository:
         await self._apply_auth(row, auth)
         self._session.add(row)
         try:
-            await self._session.commit()
+            await self._session.flush()
         except IntegrityError as exc:
             # Check-then-write is not atomic: two concurrent creates with the
             # same name both pass the service's check and the loser hits the
             # unique constraint. Surfacing that as a 500 is ISSUE-049's mistake.
             await self._session.rollback()
             raise InvalidMcpServer(f"an MCP server named '{server.name}' already exists") from exc
-        await self._session.refresh(row)
-        return row.to_entity()
+        return row
 
     async def update(self, server: McpServer, *, auth: str | None = None) -> McpServer:
         row = await self._session.get(McpServerModel, server.id)
@@ -329,6 +348,113 @@ class SQLAlchemyMcpServerRepository:
         key_id, cipher = await self._require_keyring().active_credential_cipher()
         row.encrypted_auth = cipher.encrypt({_AUTH_FIELD: auth})
         row.auth_key_id = key_id
+
+
+class SQLAlchemyMcpServerProposalRepository:
+    """Proposals (Plan 20 S5). `decide` is the only method worth reading.
+
+    It is the invite's `mark_used` transplanted: one `UPDATE ... WHERE status =
+    'pending'`, whose `rowcount` *is* the decision. And like `mark_used` it does
+    not commit — the caller registers the server in the same transaction, so the
+    claim and the server it produced land together or not at all.
+    """
+
+    def __init__(self, session: AsyncSession, keyring: Keyring | None = None) -> None:
+        self._session = session
+        self._keyring = keyring
+
+    def _require_keyring(self) -> Keyring:
+        if self._keyring is None:
+            raise SaltKeyMissing("SALT_KEY is not configured")
+        return self._keyring
+
+    async def add(
+        self, proposal: McpServerProposal, *, auth: str | None = None
+    ) -> McpServerProposal:
+        row = McpServerProposalModel(
+            id=proposal.id,
+            team_id=proposal.team_id,
+            proposed_by=proposal.proposed_by,
+            name=proposal.name,
+            url=proposal.url,
+            tool_allowlist=list(proposal.tool_allowlist),
+            status=proposal.status.value,
+        )
+        if auth is not None:
+            key_id, cipher = await self._require_keyring().active_credential_cipher()
+            row.encrypted_auth = cipher.encrypt({_AUTH_FIELD: auth})
+            row.auth_key_id = key_id
+        self._session.add(row)
+        await self._session.commit()
+        await self._session.refresh(row)
+        return row.to_entity()
+
+    async def get(self, proposal_id: UUID) -> McpServerProposal | None:
+        row = await self._session.get(McpServerProposalModel, proposal_id)
+        return row.to_entity() if row else None
+
+    async def list_for_team(
+        self, team_id: UUID, *, status: ProposalStatus | None = None
+    ) -> list[McpServerProposal]:
+        query = select(McpServerProposalModel).where(McpServerProposalModel.team_id == team_id)
+        if status is not None:
+            query = query.where(McpServerProposalModel.status == status.value)
+        # Newest first: this is a queue, and the thing an approver wants is what
+        # just arrived rather than what has been sitting there longest.
+        rows = await self._session.scalars(query.order_by(McpServerProposalModel.created_at.desc()))
+        return [row.to_entity() for row in rows]
+
+    async def decide(
+        self,
+        proposal_id: UUID,
+        *,
+        status: ProposalStatus,
+        decided_by: UUID | None,
+        decided_at: datetime,
+        reason: str | None = None,
+        server_id: UUID | None = None,
+    ) -> bool:
+        """Claim the decision, atomically. False means somebody else already did.
+
+        `WHERE status = 'pending'` is the whole mechanism. A read-then-write would
+        pass every test written against one caller and create two servers under
+        two, which is the invite TOCTOU this shape exists to avoid.
+
+        The claim decides the transaction it shares with the caller: a granted one
+        commits, and a refused one **rolls back** — including whatever the caller
+        staged for a decision it turned out not to own. So a loser cannot leave a
+        server behind for an approval that was already made.
+        """
+        # Any: the async execute() is typed Result, but at runtime it is a
+        # CursorResult exposing rowcount.
+        result: Any = await self._session.execute(
+            update(McpServerProposalModel)
+            .where(
+                McpServerProposalModel.id == proposal_id,
+                McpServerProposalModel.status == ProposalStatus.PENDING.value,
+            )
+            .values(
+                status=status.value,
+                decided_by=decided_by,
+                decided_at=decided_at,
+                reason=reason,
+                server_id=server_id,
+            )
+        )
+        if result.rowcount == 1:
+            await self._session.commit()
+            return True
+        await self._session.rollback()
+        return False
+
+    async def auth_token(self, proposal_id: UUID) -> str | None:
+        row = await self._session.get(McpServerProposalModel, proposal_id)
+        if row is None or row.encrypted_auth is None or row.auth_key_id is None:
+            return None
+        cipher = await self._require_keyring().credential_cipher_for(row.auth_key_id)
+        if cipher is None:  # pragma: no cover - a missing key row is not expected
+            raise CredentialMisconfigured(f"encryption key for MCP proposal {row.id} is missing")
+        return cipher.decrypt(row.encrypted_auth)[_AUTH_FIELD]
 
 
 class SQLAlchemyApiKeyToolPolicyRepository:

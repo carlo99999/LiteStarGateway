@@ -66,8 +66,7 @@ inventory is not billing.
 
 `tools:propose` is held by every team role including `member`, so anyone can ask
 for a server to be registered. A proposal changes no policy until an admin
-approves it. (The proposal endpoints are a later slice; the permission exists
-now.)
+approves it — see [§8](#8-proposals-a-member-asks-an-admin-decides).
 
 ## 3. Discovery is explicit, and it is a manage-level action
 
@@ -172,3 +171,54 @@ Both refuse a **name collision**. A server is referenced by its name and has no
 alias, so a global `github` beside a team's own `github` would put two servers
 under one name in front of that team. Rename one and retry; the error names both
 sides.
+
+## 8. Proposals: a member asks, an admin decides
+
+Requiring `tools:manage` for every registration puts the person who knows which
+tool the application needs behind the person who holds the permission. So any team
+member may file a **proposal**, and a team admin (or a platform admin) decides.
+
+```http
+POST   /teams/{team_id}/mcp-server-proposals            # tools:propose
+GET    /teams/{team_id}/mcp-server-proposals            # tools:propose
+GET    /teams/{team_id}/mcp-server-proposals?pending=true
+POST   /teams/{team_id}/mcp-server-proposals/{id}/approve   # tools:manage
+POST   /teams/{team_id}/mcp-server-proposals/{id}/reject    # tools:manage
+```
+
+A proposal carries the same fields as a server, including the optional bearer
+token, which is encrypted on write and never returned — the approver sees the
+name, the url and the requested tools, never the secret. There is no *edit*: an
+approver takes it as filed or refuses it with a reason. An admin who wants
+different settings registers the server directly.
+
+Four behaviours are worth knowing before you rely on this.
+
+**Filing contacts nobody.** The url is validated offline — scheme, no userinfo,
+and membership of `MCP_ALLOWED_HOSTS`. The first `tools/list` runs at *approval*.
+Otherwise the lowest privilege in the system would hold a primitive for making the
+gateway connect somewhere, even inside the allowlist.
+
+**Approval re-checks the allowlist.** A host that was allowlisted when the
+proposal was filed and has since been removed is refused at approval with a `400`,
+and the proposal stays `pending`. Either re-add the entry and approve again, or
+refuse it with a reason. Nothing about a pending row reserves a host.
+
+**A rejection requires a reason**, and the person who filed it can read it: the
+queue is readable by every team role, which is why "it disappeared" is never the
+answer. A blank reason is a `400`.
+
+**A second decision is a `409`.** Two admins approving the same proposal at the
+same moment produce **one** server — the decision is claimed with a single
+conditional update, and the loser is told somebody got there first rather than
+creating a duplicate.
+
+If approval succeeds but the tool server is unreachable, the server is still
+registered: the approval is settled, and the inventory simply reads "no discovery
+has run yet". Run a discovery once the server is up.
+
+Both outcomes are audited (`mcp_server_proposal.approve` /
+`mcp_server_proposal.reject`), as is the filing.
+
+In the console, the **Tools** page carries the queue at the bottom. A member sees
+that page for the queue alone — the server registry above it stays admin-only.

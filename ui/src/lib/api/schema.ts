@@ -1153,6 +1153,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/mcp-server-proposals/{proposal_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a proposal and register the server
+         * @description Registers the server exactly as filed and runs the first tool discovery. `MCP_ALLOWED_HOSTS` is re-checked here: a proposal whose host has since left the allowlist is refused with a 400 and stays pending. Concurrent approvals produce one server — the loser gets 409.
+         */
+        post: operations["TeamsTeamIdMcpServerProposalsProposalIdApproveApproveProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/mcp-server-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The team's tool-server proposals
+         * @description Under `tools:propose`, which every team role holds: the member who filed a proposal has to be able to read the decision and, on a rejection, the reason. Bearer tokens are never returned.
+         */
+        get: operations["TeamsTeamIdMcpServerProposalsListProposals"];
+        put?: never;
+        /**
+         * Ask the team's admins to register an MCP server
+         * @description Files a request under `tools:propose`. It changes no policy and makes **no outbound request**: the url is validated offline, and the gateway only contacts the server once an admin approves. Nothing on the call path reads a pending proposal.
+         */
+        post: operations["TeamsTeamIdMcpServerProposalsFileProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/mcp-server-proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refuse a proposal, with a reason
+         * @description The reason is required and is what the member who filed it reads. There is no edit: an admin who wants different settings registers the server directly.
+         */
+        post: operations["TeamsTeamIdMcpServerProposalsProposalIdRejectRejectProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/platform/mcp-servers": {
         parameters: {
             query?: never;
@@ -2430,6 +2494,27 @@ export interface components {
             team_id: string;
             created_at?: string | null;
         };
+        /** McpServerProposalResponse */
+        McpServerProposalResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            team_id: string;
+            name: string;
+            url: string;
+            /** @description `pending`, `approved` or `rejected`. */
+            status: string;
+            has_auth: boolean;
+            proposed_by?: string | null;
+            tool_allowlist?: string[];
+            /** @description Why it was rejected. `null` unless rejected. */
+            reason?: string | null;
+            /** @description The server this approval created. `null` while pending or rejected, and also once that server has been deleted. */
+            server_id?: string | null;
+            decided_by?: string | null;
+            decided_at?: string | null;
+            created_at?: string | null;
+        };
         /** McpServerResponse */
         McpServerResponse: {
             /** Format: uuid */
@@ -2587,12 +2672,28 @@ export interface components {
             error: string | null;
             chosen_model?: string | null;
         };
+        /** ProposeMcpServerRequest */
+        ProposeMcpServerRequest: {
+            /** @description Operator-facing name for the server. */
+            name: string;
+            /** @description The server's https endpoint. Validated against `MCP_ALLOWED_HOSTS` here **and again at approval** — filing does not reserve a host that an operator later removes from the allowlist. */
+            url: string;
+            /** @description Bearer token the gateway should present. Stored envelope-encrypted and moved to the server on approval; the approver never sees it. */
+            auth?: string | null;
+            /** @description Restrict which advertised tools the server would expose. */
+            tool_allowlist?: string[] | null;
+        };
         /**
          * Provider
          * @description The LLM provider this credential connects to.
          * @enum {string}
          */
         Provider: "openai" | "anthropic" | "vertex_ai" | "azure_openai" | "bedrock" | "databricks" | "openai_compatible";
+        /** RejectMcpProposalRequest */
+        RejectMcpProposalRequest: {
+            /** @description Why this proposal was refused. */
+            reason: string;
+        };
         /** ResetPasswordRequest */
         ResetPasswordRequest: {
             reset_token: string;
@@ -6663,6 +6764,190 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["McpServerResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServerProposalsProposalIdApproveApproveProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document created, URL follows */
+            201: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServerProposalsListProposals: {
+        parameters: {
+            query?: {
+                pending?: boolean | null;
+            };
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerProposalResponse"][];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServerProposalsFileProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeMcpServerRequest"];
+            };
+        };
+        responses: {
+            /** @description Document created, URL follows */
+            201: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerProposalResponse"];
+                };
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServerProposalsProposalIdRejectRejectProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectMcpProposalRequest"];
+            };
+        };
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServerProposalResponse"];
                 };
             };
             /** @description Bad request syntax or unsupported method */

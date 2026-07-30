@@ -46,6 +46,56 @@ from litestar_gateway.domain.ports.mcp import (
 MAX_NAME_LENGTH = 64
 
 
+def validate_mcp_name(name: str) -> None:
+    if not name.strip():
+        raise InvalidMcpServer("name must not be empty")
+    if len(name) > MAX_NAME_LENGTH:
+        raise InvalidMcpServer(f"name must be at most {MAX_NAME_LENGTH} characters")
+
+
+async def validate_mcp_url(url: str, allowlist: EgressAllowlist) -> None:
+    """The platform's veto, in one function.
+
+    Module-level rather than a method because two services apply it: registering a
+    server, and approving a proposal to register one. A second copy is how the two
+    drift, and the copy that drifts is the one that stops refusing something.
+    """
+    parsed = urlsplit(url)
+    if parsed.scheme != "https":
+        # The payload carries tool arguments derived from user prompts, and a
+        # verdict comes back that the model will act on. Cleartext is not a
+        # configuration an operator makes by accident.
+        raise InvalidMcpServer(f"url must be https, got {url!r}")
+    if parsed.username is not None or parsed.password is not None:
+        # ISSUE-048's lesson: the endpoint is kept in the clear for logs and
+        # metric labels, so a password in the URL would be logged verbatim.
+        raise InvalidMcpServer(
+            "url must not carry userinfo (user:password@host); use the auth token instead"
+        )
+    try:
+        host, port = parsed.hostname, parsed.port
+    except ValueError as exc:
+        raise InvalidMcpServer(f"url is not usable: {exc}") from exc
+    if not host:
+        raise InvalidMcpServer(f"url has no host, got {url!r}")
+    try:
+        await resolve_allowlisted_addresses(host, port, allowlist)
+    except ValueError as exc:
+        # Not `str(exc)`: the shared resolver names the *provider* variable
+        # (`OPENAI_COMPATIBLE_ALLOWED_HOSTS`) in its message, and this surface
+        # is bounded by `MCP_ALLOWED_HOSTS`. Passing it through would send an
+        # operator to edit the wrong setting.
+        raise InvalidMcpServer(
+            f"host {host!r} (port {port}) is not permitted by MCP_ALLOWED_HOSTS"
+        ) from exc
+    except OSError as exc:
+        # `getaddrinfo` raises `gaierror` (an OSError), not ValueError, so a
+        # host that does not resolve would otherwise surface as a 500. An
+        # unresolvable target is a misconfiguration the operator can fix, so
+        # it gets the same 400 as a target outside the allowlist.
+        raise InvalidMcpServer(f"url host {host!r} could not be resolved: {exc}") from exc
+
+
 class McpServerService:
     def __init__(
         self,
@@ -412,46 +462,10 @@ class McpServerService:
         return server
 
     def _validate_name(self, name: str) -> None:
-        if not name.strip():
-            raise InvalidMcpServer("name must not be empty")
-        if len(name) > MAX_NAME_LENGTH:
-            raise InvalidMcpServer(f"name must be at most {MAX_NAME_LENGTH} characters")
+        validate_mcp_name(name)
 
     async def _validate_url(self, url: str) -> None:
-        parsed = urlsplit(url)
-        if parsed.scheme != "https":
-            # The payload carries tool arguments derived from user prompts, and a
-            # verdict comes back that the model will act on. Cleartext is not a
-            # configuration an operator makes by accident.
-            raise InvalidMcpServer(f"url must be https, got {url!r}")
-        if parsed.username is not None or parsed.password is not None:
-            # ISSUE-048's lesson: the endpoint is kept in the clear for logs and
-            # metric labels, so a password in the URL would be logged verbatim.
-            raise InvalidMcpServer(
-                "url must not carry userinfo (user:password@host); use the auth token instead"
-            )
-        try:
-            host, port = parsed.hostname, parsed.port
-        except ValueError as exc:
-            raise InvalidMcpServer(f"url is not usable: {exc}") from exc
-        if not host:
-            raise InvalidMcpServer(f"url has no host, got {url!r}")
-        try:
-            await resolve_allowlisted_addresses(host, port, self._allowlist)
-        except ValueError as exc:
-            # Not `str(exc)`: the shared resolver names the *provider* variable
-            # (`OPENAI_COMPATIBLE_ALLOWED_HOSTS`) in its message, and this surface
-            # is bounded by `MCP_ALLOWED_HOSTS`. Passing it through would send an
-            # operator to edit the wrong setting.
-            raise InvalidMcpServer(
-                f"host {host!r} (port {port}) is not permitted by MCP_ALLOWED_HOSTS"
-            ) from exc
-        except OSError as exc:
-            # `getaddrinfo` raises `gaierror` (an OSError), not ValueError, so a
-            # host that does not resolve would otherwise surface as a 500. An
-            # unresolvable target is a misconfiguration the operator can fix, so
-            # it gets the same 400 as a target outside the allowlist.
-            raise InvalidMcpServer(f"url host {host!r} could not be resolved: {exc}") from exc
+        await validate_mcp_url(url, self._allowlist)
 
 
 class ApiKeyToolPolicyService:

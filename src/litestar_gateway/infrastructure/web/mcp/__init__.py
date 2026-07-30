@@ -2,5 +2,6 @@ from litestar_gateway.infrastructure.web.mcp.controller import McpServerControll
 from litestar_gateway.infrastructure.web.mcp.platform_controller import (
     PlatformMcpServerController,
 )
+from litestar_gateway.infrastructure.web.mcp.proposals_controller import McpProposalController
 
-__all__ = ["McpServerController", "PlatformMcpServerController"]
+__all__ = ["McpProposalController", "McpServerController", "PlatformMcpServerController"]

@@ -14,6 +14,7 @@ the shape behind two findings in this codebase already.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -21,7 +22,9 @@ from litestar_gateway.domain.mcp import (
     ApiKeyToolPolicy,
     McpServer,
     McpServerGrant,
+    McpServerProposal,
     McpTool,
+    ProposalStatus,
     ToolEffect,
 )
 
@@ -41,6 +44,16 @@ class McpServerRepository(Protocol):
         ...
 
     async def add(self, server: McpServer, *, auth: str | None = None) -> McpServer: ...
+
+    async def stage_add(self, server: McpServer, *, auth: str | None = None) -> object:
+        """Insert without committing, for a caller that owns the transaction.
+
+        Returns the persistence row rather than an entity, because the only caller
+        needs it to have been written — not to read it back. Approving a proposal
+        stages the server, then claims the decision that references it, so the two
+        cannot diverge.
+        """
+        ...
 
     async def update(self, server: McpServer, *, auth: str | None = None) -> McpServer: ...
 
@@ -98,6 +111,59 @@ class McpDiscoveryPort(Protocol):
         hints. The caller stores them through `replace_tools`, which keeps
         whatever an operator declared — so a hint can never overwrite a
         classification."""
+        ...
+
+
+@runtime_checkable
+class McpServerProposalRepository(Protocol):
+    """Proposals, whose one interesting method is `decide`.
+
+    Everything else here is ordinary CRUD; `decide` is the concurrency contract
+    the whole slice rests on, and it is the invite's `mark_used` shape for the
+    same reason: two admins clicking approve at the same time must produce one
+    server, and a read-then-write cannot promise that however carefully it is
+    written.
+    """
+
+    async def add(
+        self, proposal: McpServerProposal, *, auth: str | None = None
+    ) -> McpServerProposal: ...
+
+    async def get(self, proposal_id: UUID) -> McpServerProposal | None:
+        """By id, regardless of team — callers check the team themselves, so a
+        proposal from another tenant is a 404 rather than a cross-team read."""
+        ...
+
+    async def list_for_team(
+        self, team_id: UUID, *, status: ProposalStatus | None = None
+    ) -> list[McpServerProposal]: ...
+
+    async def decide(
+        self,
+        proposal_id: UUID,
+        *,
+        status: ProposalStatus,
+        decided_by: UUID | None,
+        decided_at: datetime,
+        reason: str | None = None,
+        server_id: UUID | None = None,
+    ) -> bool:
+        """One conditional `UPDATE ... WHERE status = 'pending'`.
+
+        Returns False when the row was already decided, which is the *only*
+        reliable way to know: whatever a caller read a moment earlier may already
+        be stale.
+
+        It decides the shared transaction: a granted claim commits it, a refused
+        one rolls it back. So a caller may stage the server it is approving first —
+        and must, since the claim references it — knowing a lost race takes that
+        insert down with it.
+        """
+        ...
+
+    async def auth_token(self, proposal_id: UUID) -> str | None:
+        """The decrypted bearer token, read once at approval to hand it to the
+        server being created. Nothing else reads it, and no response carries it."""
         ...
 
 

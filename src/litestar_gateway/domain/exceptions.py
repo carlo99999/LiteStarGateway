@@ -294,6 +294,22 @@ class McpDiscoveryFailed(DomainError):
     """
 
 
+class McpProposalNotFound(DomainError):
+    """No proposal with that id belongs to this team (→ 404). One answer for
+    "does not exist" and "another team's", on `McpServerNotFound`'s reasoning."""
+
+
+class McpProposalAlreadyDecided(DomainError):
+    """The proposal was approved or rejected already (→ 409).
+
+    Raised when the conditional `UPDATE ... WHERE status = 'pending'` matches no
+    row, which is the *outcome* of losing a race rather than a check that
+    predicted it. A 409 rather than a 400: the request was well-formed, and the
+    caller's view of the world was merely out of date — the same answer the second
+    admin gets in every two-party flow.
+    """
+
+
 class McpServerNotFound(DomainError):
     """No MCP server with that id is visible to this team (→ 404). Deliberately
     the same answer for "does not exist" and "belongs to someone else": the

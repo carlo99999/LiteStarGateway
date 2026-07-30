@@ -124,6 +124,66 @@ class McpTool:
     discovered_at: datetime | None = None
 
 
+class ProposalStatus(StrEnum):
+    """`pending → approved | rejected`, and nothing else.
+
+    A two-state decision rather than a negotiation: an approver takes the
+    proposal as filed or rejects it with a reason. Editing it would make this a
+    three-party workflow whose intermediate states nobody has to model, and an
+    admin who wants different settings can register the server directly.
+    """
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+@dataclasses.dataclass(frozen=True)
+class McpServerProposal:
+    """A team member's request to register a server (design §2.4).
+
+    Two properties are the whole point of the type, and both are about what a
+    proposal is *not*:
+
+    **It is not a server.** Nothing reads it on the call path, so filing one
+    changes no policy — which is what makes `tools:propose` safe to hold in every
+    role, including `member`, the role that otherwise holds nothing.
+
+    **It is not a promise.** The allowlist membership recorded when it was filed
+    is not the allowlist that decides: approval re-checks. A host allowlisted on
+    Monday and removed on Tuesday must not become a live server on Wednesday
+    because a pending row still remembers it — ISSUE-034's lesson applied to a
+    time gap rather than to DNS.
+
+    `auth` is absent here for the same reason it is absent from `McpServer`: the
+    token lives encrypted in the persistence layer, so the approver sees the name,
+    the url and the requested tools, never the secret.
+    """
+
+    id: UUID
+    team_id: UUID
+    proposed_by: UUID | None
+    name: str
+    url: str
+    status: ProposalStatus = ProposalStatus.PENDING
+    tool_allowlist: tuple[str, ...] = ()
+    has_auth: bool = False
+    # Set on rejection only. "It disappeared" is not an answer for the member who
+    # filed it, so a refusal carries why.
+    reason: str | None = None
+    # The server approval created, when it did. `None` on a pending or rejected
+    # proposal — and also on an approved one whose server was later deleted,
+    # which is a fact about the server rather than about the decision.
+    server_id: UUID | None = None
+    decided_by: UUID | None = None
+    decided_at: datetime | None = None
+    created_at: datetime | None = None
+
+    @property
+    def is_pending(self) -> bool:
+        return self.status is ProposalStatus.PENDING
+
+
 @dataclasses.dataclass(frozen=True)
 class ApiKeyToolPolicy:
     """Per-key restriction, on the `api_key_budget` precedent: a policy row read
