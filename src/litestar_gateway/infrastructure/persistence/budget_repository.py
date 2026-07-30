@@ -56,16 +56,48 @@ class SQLAlchemyBudgetRepository:
             raise CredentialMisconfigured(f"encryption key for team {team_id} alert is missing")
         return cipher.decrypt(row.encrypted_alert_webhook_secret)[_SECRET_FIELD]
 
-    async def set(self, budget: Budget, *, alert_webhook_secret: str | None = None) -> Budget:
+    async def set(
+        self,
+        budget: Budget,
+        *,
+        alert_webhook_secret: str | None = None,
+        clear_alert_webhook_secret: bool = False,
+    ) -> Budget:
+        """`alert_webhook_secret=None` keeps whatever is stored; a value replaces
+        it; `clear_alert_webhook_secret` removes it.
+
+        Three intents need three spellings. With only the first two there was no
+        way back to the platform-wide secret short of deleting the budget, and an
+        empty string looked like a way to ask for it — it was stored, reported as
+        a configured secret, and then fell through to the platform one anyway
+        (ISSUE-047).
+        """
+        if alert_webhook_secret is not None:
+            if not alert_webhook_secret.strip():
+                raise ValueError(
+                    "alert_webhook_secret must not be empty: omit it to keep the stored "
+                    "one, or pass clear_alert_webhook_secret to sign with the "
+                    "platform-wide secret"
+                )
+            if clear_alert_webhook_secret:
+                raise ValueError(
+                    "alert_webhook_secret and clear_alert_webhook_secret are mutually "
+                    "exclusive: a write cannot both set and remove the secret"
+                )
         try:
-            return await self._upsert(budget, alert_webhook_secret)
+            return await self._upsert(budget, alert_webhook_secret, clear_alert_webhook_secret)
         except IntegrityError:
             # Concurrent insert for the same team lost the unique-constraint
             # race; retry once — the row now exists, so this becomes an update.
             await self._session.rollback()
-            return await self._upsert(budget, alert_webhook_secret)
+            return await self._upsert(budget, alert_webhook_secret, clear_alert_webhook_secret)
 
-    async def _upsert(self, budget: Budget, alert_webhook_secret: str | None = None) -> Budget:
+    async def _upsert(
+        self,
+        budget: Budget,
+        alert_webhook_secret: str | None = None,
+        clear_alert_webhook_secret: bool = False,
+    ) -> Budget:
         row = await self._session.scalar(
             select(TeamBudgetModel).where(TeamBudgetModel.team_id == budget.team_id)
         )
@@ -86,7 +118,10 @@ class SQLAlchemyBudgetRepository:
             row.thresholds = list(budget.thresholds)
             row.alert_webhook_url = budget.alert_webhook_url
             row.alert_email = budget.alert_email
-        if alert_webhook_secret is not None:
+        if clear_alert_webhook_secret:
+            row.encrypted_alert_webhook_secret = None
+            row.alert_webhook_secret_key_id = None
+        elif alert_webhook_secret is not None:
             key_id, cipher = await self._require_keyring().active_credential_cipher()
             row.encrypted_alert_webhook_secret = cipher.encrypt(
                 {_SECRET_FIELD: alert_webhook_secret}

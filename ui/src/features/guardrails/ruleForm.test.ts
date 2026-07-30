@@ -205,3 +205,27 @@ test("a model-scoped rule says so", () => {
     "response · one model · fail open · moderator",
   );
 });
+
+test("widening a scoped rule back to the whole team is asked for explicitly", () => {
+  // On a PATCH the backend reads a null scope as "leave it alone", so sending
+  // two nulls answered 200 and changed nothing: the operator believed a control
+  // now covered every model when it still covered one.
+  const widened = toPayload(webhookForm({ scope: "" }), { forUpdate: true });
+
+  assert.equal(widened.clear_scope, true);
+  assert.equal(widened.model_id, null);
+  assert.equal(widened.router_id, null);
+});
+
+test("a create never asks to clear the scope", () => {
+  // There is nothing to widen yet, and the create DTO has no such field.
+  assert.equal(toPayload(webhookForm({ scope: "" })).clear_scope, undefined);
+});
+
+test("scoping an update to a router does not also ask to clear it", () => {
+  const scoped = toPayload(webhookForm({ scope: "router:router-1" }), { forUpdate: true });
+
+  assert.equal(scoped.clear_scope, undefined);
+  assert.equal(scoped.router_id, "router-1");
+  assert.equal(scoped.model_id, null);
+});

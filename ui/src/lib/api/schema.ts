@@ -2383,6 +2383,7 @@ export interface components {
             alert_webhook_url?: string | null;
             alert_email?: string | null;
             alert_webhook_secret?: string | null;
+            clear_alert_webhook_secret?: boolean | null;
         };
         /** SetKeyBudgetRequest */
         SetKeyBudgetRequest: {
@@ -2537,10 +2538,12 @@ export interface components {
             fail_policy?: string | null;
             /** @description Order within the chain. */
             position?: number | null;
-            /** @description Scope to one model. */
+            /** @description Scope to one model; clears a router scope. */
             model_id?: string | null;
-            /** @description Scope to one router; outranks a model-scoped rule. */
+            /** @description Scope to one router; outranks and clears a model scope. */
             router_id?: string | null;
+            /** @description Widen the rule back to every model the team can call. */
+            clear_scope?: boolean | null;
             /** @description Enable or disable the rule. */
             enabled?: boolean | null;
             /** @description Rotate the HMAC secret. Omit to keep the current one. */

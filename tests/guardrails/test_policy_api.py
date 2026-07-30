@@ -260,3 +260,99 @@ async def test_rules_are_listed_in_chain_order(client: AsyncTestClient) -> None:
     listed = await client.get(f"/teams/{team}/guardrails", headers=_bearer(admin))
 
     assert [r["name"] for r in listed.json()] == ["first", "second"]
+
+
+# ── Changing a rule's scope (ISSUE-041) ───────────────────────────────────────
+
+
+async def test_a_scoped_rule_can_be_widened_back_to_the_whole_team(
+    client: AsyncTestClient,
+) -> None:
+    """`update_rule` dropped every `None` as "no change", so `model_id: null`
+    could not clear a scope: the console offered "all models (team-wide)",
+    submitted it, and got a 200 with the narrow scope still in place — a security
+    control the operator believed they had widened."""
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    cred = await _credential(client, admin)
+    model = (
+        await client.post(
+            f"/teams/{team}/models", json=_model_payload(cred), headers=_bearer(admin)
+        )
+    ).json()
+    created = await _create(client, admin, team, model_id=model["id"])
+    assert created.status_code == HTTP_201_CREATED, created.text
+    rule_id = created.json()["id"]
+
+    widened = await client.patch(
+        f"/teams/{team}/guardrails/{rule_id}",
+        json={"clear_scope": True},
+        headers=_bearer(admin),
+    )
+
+    assert widened.status_code == HTTP_200_OK, widened.text
+    assert widened.json()["model_id"] is None
+    assert widened.json()["router_id"] is None
+
+
+async def test_setting_a_router_scope_replaces_a_model_scope(client: AsyncTestClient) -> None:
+    """Switching model → router used to leave the old `model_id` in place, so the
+    rule ended up carrying both and the mutual-exclusion check refused a state
+    the operator never asked for. Naming one side now *is* naming the scope."""
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    cred = await _credential(client, admin)
+    model = (
+        await client.post(
+            f"/teams/{team}/models", json=_model_payload(cred), headers=_bearer(admin)
+        )
+    ).json()
+    router = (
+        await client.post(
+            f"/teams/{team}/routers",
+            json={
+                "name": "auto",
+                "strategy": "complexity",
+                "default_model": model["name"],
+                "candidates": [
+                    {
+                        "model_name": model["name"],
+                        "description": "only",
+                        "quality_tier": "SIMPLE",
+                    }
+                ],
+            },
+            headers=_bearer(admin),
+        )
+    ).json()
+    rule_id = (await _create(client, admin, team, model_id=model["id"])).json()["id"]
+
+    switched = await client.patch(
+        f"/teams/{team}/guardrails/{rule_id}",
+        json={"router_id": router["id"]},
+        headers=_bearer(admin),
+    )
+
+    assert switched.status_code == HTTP_200_OK, switched.text
+    assert switched.json()["router_id"] == router["id"]
+    assert switched.json()["model_id"] is None
+
+
+async def test_clearing_and_scoping_at_once_is_refused(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    cred = await _credential(client, admin)
+    model = (
+        await client.post(
+            f"/teams/{team}/models", json=_model_payload(cred), headers=_bearer(admin)
+        )
+    ).json()
+    rule_id = (await _create(client, admin, team)).json()["id"]
+
+    response = await client.patch(
+        f"/teams/{team}/guardrails/{rule_id}",
+        json={"clear_scope": True, "model_id": model["id"]},
+        headers=_bearer(admin),
+    )
+
+    assert response.status_code == HTTP_400_BAD_REQUEST, response.text

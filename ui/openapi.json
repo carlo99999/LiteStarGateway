@@ -15567,6 +15567,16 @@
                                 "type": "null"
                             }
                         ]
+                    },
+                    "clear_alert_webhook_secret": {
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",
@@ -16179,7 +16189,7 @@
                                 "type": "null"
                             }
                         ],
-                        "description": "Scope to one model."
+                        "description": "Scope to one model; clears a router scope."
                     },
                     "router_id": {
                         "oneOf": [
@@ -16191,7 +16201,18 @@
                                 "type": "null"
                             }
                         ],
-                        "description": "Scope to one router; outranks a model-scoped rule."
+                        "description": "Scope to one router; outranks and clears a model scope."
+                    },
+                    "clear_scope": {
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Widen the rule back to every model the team can call."
                     },
                     "enabled": {
                         "oneOf": [

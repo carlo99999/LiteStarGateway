@@ -38,7 +38,11 @@ class _FakeBudgets:
         return self._webhook_secret
 
     async def set(
-        self, budget: Budget, *, alert_webhook_secret: str | None = None
+        self,
+        budget: Budget,
+        *,
+        alert_webhook_secret: str | None = None,
+        clear_alert_webhook_secret: bool = False,
     ) -> Budget:  # pragma: no cover - unused
         raise NotImplementedError
 

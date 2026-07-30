@@ -79,6 +79,9 @@ export interface RulePayload {
   enabled: boolean;
   config: Record<string, unknown>;
   signing_secret?: string;
+  /** Only meaningful on an update: an omitted field means "unchanged", so a null
+   * scope cannot also mean "widen this back to the whole team". */
+  clear_scope?: boolean;
 }
 
 
@@ -111,8 +114,14 @@ function optionalInt(text: string, label: string, low: number, high: number): nu
   return value;
 }
 
-/** Build the POST/PATCH body, or throw with a message meant for the operator. */
-export function toPayload(form: RuleFormState): RulePayload {
+/** Build the POST/PATCH body, or throw with a message meant for the operator.
+ *
+ * `forUpdate` matters for one field. On a PATCH the backend reads an omitted or
+ * null scope as "leave it alone", so picking "all models" used to submit two
+ * nulls, answer 200, and change nothing — an operator would believe they had
+ * widened a content control that still covered one model. Widening is asked for
+ * explicitly instead. */
+export function toPayload(form: RuleFormState, { forUpdate = false } = {}): RulePayload {
   const name = form.name.trim();
   if (name === "") throw new Error("name is required");
   const position = Number(form.position.trim() === "" ? "0" : form.position);
@@ -149,6 +158,7 @@ export function toPayload(form: RuleFormState): RulePayload {
     enabled: form.enabled,
     config,
   };
+  if (forUpdate && form.scope === SCOPE_TEAM_WIDE) payload.clear_scope = true;
   const secret = form.signingSecret.trim();
   // Omitted rather than sent empty: on an edit, omission is what tells the
   // backend to keep the stored secret, and a secret nobody can read back

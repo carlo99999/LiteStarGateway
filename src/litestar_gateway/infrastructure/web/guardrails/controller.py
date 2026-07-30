@@ -152,6 +152,7 @@ class GuardrailController(Controller):
             position=data.position,
             model_id=data.model_id,
             router_id=data.router_id,
+            clear_scope=bool(data.clear_scope),
             enabled=data.enabled,
         )
         await record_audit(

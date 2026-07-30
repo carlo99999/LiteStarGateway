@@ -108,15 +108,38 @@ class GuardrailPolicyService:
         rule_id: UUID,
         *,
         secret: str | None = None,
+        clear_scope: bool = False,
         **changes: Any,
     ) -> GuardrailRule:
         """Apply the given non-None changes. `secret=None` keeps the stored
-        signing secret — it is never readable, so omission cannot mean "clear"."""
+        signing secret — it is never readable, so omission cannot mean "clear".
+
+        Scope is resolved separately from that rule, because "unchanged" and
+        "no scope" are both spelled `None` on the wire. Naming `model_id` or
+        `router_id` sets the scope and clears the other side, so a model → router
+        switch is one call rather than a state the mutual-exclusion check refuses;
+        `clear_scope` widens the rule back to the whole team.
+        """
         await self._teams.ensure_principal_team_permission(
             principal, team_id, Permission.GUARDRAILS_MANAGE
         )
         current = await self._require(team_id, rule_id)
+        model_id = changes.pop("model_id", None)
+        router_id = changes.pop("router_id", None)
         applied = {k: v for k, v in changes.items() if v is not None}
+        if clear_scope and (model_id is not None or router_id is not None):
+            raise InvalidGuardrailRule(
+                "clear_scope cannot be combined with model_id or router_id: a rule is "
+                "either team-wide or scoped, not both"
+            )
+        if model_id is not None and router_id is not None:
+            raise InvalidGuardrailRule("a rule is scoped to a model or a router, not both")
+        if clear_scope:
+            applied["model_id"] = applied["router_id"] = None
+        elif router_id is not None:
+            applied["model_id"], applied["router_id"] = None, router_id
+        elif model_id is not None:
+            applied["model_id"], applied["router_id"] = model_id, None
         updated = dataclasses.replace(current, **applied)
         await self._ensure_model_visible(team_id, updated.model_id)
         await self._ensure_router_visible(team_id, updated.router_id)

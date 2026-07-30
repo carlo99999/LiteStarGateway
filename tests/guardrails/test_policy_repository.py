@@ -17,6 +17,7 @@ from advanced_alchemy.extensions.litestar import base
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from litestar_gateway.domain.entities import GuardrailKind, GuardrailRule
+from litestar_gateway.domain.exceptions import InvalidGuardrailRule
 from litestar_gateway.domain.guardrails import Direction, FailPolicy
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.persistence.guardrail_repository import (
@@ -149,3 +150,17 @@ async def test_get_and_remove_are_team_scoped(repo: SQLAlchemyGuardrailRuleRepos
     assert await repo.remove(TEAM, stored.id) is True
     assert await repo.get(TEAM, stored.id) is None
     assert await repo.remove(TEAM, stored.id) is False
+
+
+async def test_a_duplicate_name_is_a_domain_error_not_a_database_one(
+    repo: SQLAlchemyGuardrailRuleRepository,
+) -> None:
+    """ISSUE-049. The service checks the name is free first, for a clear 400 —
+    but check-then-write is not atomic, so two concurrent creates both pass the
+    check and the loser hits `uq_guardrail_rule_team_id`. That surfaced as a 500,
+    the exact outcome the pre-check exists to avoid. Writing twice here reaches
+    the same path the race does, deterministically."""
+    await repo.add(_webhook("scanner"), secret=SIGNING_MATERIAL)
+
+    with pytest.raises(InvalidGuardrailRule, match="already exists"):
+        await repo.add(_webhook("scanner"), secret=SIGNING_MATERIAL)

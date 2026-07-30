@@ -14,13 +14,21 @@ class BudgetRepository(Protocol):
 
     async def get(self, team_id: UUID) -> Budget | None: ...
 
-    async def set(self, budget: Budget, *, alert_webhook_secret: str | None = None) -> Budget:
+    async def set(
+        self,
+        budget: Budget,
+        *,
+        alert_webhook_secret: str | None = None,
+        clear_alert_webhook_secret: bool = False,
+    ) -> Budget:
         """Create the team's budget, or replace it if one exists (upsert).
 
         `alert_webhook_secret=None` keeps the stored one: it is never readable,
         so an operator editing a threshold cannot resubmit it, and treating
         omission as "clear" would silently downgrade a signed endpoint to the
-        platform-wide key."""
+        platform-wide key. Removing it is therefore its own flag rather than a
+        value — with only "keep" and "replace" the platform-wide secret was
+        unreachable once a team secret had been set."""
         ...
 
     async def alert_webhook_secret(self, team_id: UUID) -> str | None:
