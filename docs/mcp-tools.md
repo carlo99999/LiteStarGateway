@@ -3,13 +3,14 @@
 The gateway can hold a registry of **MCP tool servers** — remote endpoints that
 advertise tools a model could call — and govern who may use them.
 
-!!! warning "Registry and inventory only, so far"
-    This page describes what ships today: registering servers, discovering what
-    they offer, classifying tools, and restricting them per API key. The gateway
-    does **not** yet execute tool calls, and no model request behaves differently
-    because a server is registered. Declaration injection and bounded execution
-    are separate, later slices of
-    [the design](next-steps/mcp-tool-gateway.md).
+!!! info "A registry, by design — the gateway does not execute tools"
+    The gateway holds the servers, discovers what they offer, governs who may see
+    what, and tells a client which servers **its key** may use. It does **not**
+    call a tool, does not proxy MCP traffic, and no model request behaves
+    differently because a server is registered — the request contract is untouched.
+    A client reads [the registry](#9-the-registry-endpoint) and connects to the
+    servers itself. Execution was designed and then dropped; §5 and §7 of
+    [the design](next-steps/mcp-tool-gateway.md) are non-goals.
 
 ## 1. Authorize where the gateway may connect (optional)
 
@@ -241,3 +242,95 @@ Both outcomes are audited (`mcp_server_proposal.approve` /
 
 In the console, the **Tools** page carries the queue at the bottom. A member sees
 that page for the queue alone — the server registry above it stays admin-only.
+
+## 9. The registry endpoint
+
+This is what a **client** reads. Everything above is administration; this is the one
+endpoint an application calls, and it is authenticated with a normal gateway API
+key — the same key used for inference.
+
+```http
+GET /v1/mcp/servers
+Authorization: Bearer sk-gw-live-...
+```
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "github",
+      "object": "mcp_server",
+      "url": "https://mcp.example.com/mcp",
+      "origin": "own",
+      "requires_auth": true,
+      "discovered": true,
+      "tools": [
+        {"name": "search_issues", "description": "Search issues",
+         "effect": "read", "input_schema": {"type": "object"}}
+      ]
+    }
+  ]
+}
+```
+
+**The answer depends on the key**, not only on the team. Four layers narrow it, and
+they are independent — no one of them can undo another:
+
+1. what the **team** can see: its own servers, those extended to it, and global
+   ones, minus any it detached;
+2. the server's `enabled` kill switch;
+3. the server's own `tool_allowlist` (§1 of an operator's narrowing, applies to
+   everyone);
+4. the **key's** tool policy (§5). A `destructive` tool appears only for a key that
+   enables them explicitly — and an unclassified tool counts as destructive, so it
+   is hidden from a permissive key too.
+
+Two consequences worth knowing before you build against it:
+
+- **a server this key may invoke nothing on is omitted.** It is not in "the MCPs
+  this key has access to";
+- **a server nobody has discovered is listed with `discovered: false` and an empty
+  `tools`.** There the inventory is *unknown*, not empty — hiding it would tell a
+  client the server does not exist when in fact nobody has asked it yet. Run a
+  discovery (§3).
+
+Listing the registry **never contacts a tool server**. Discovery is a separate,
+explicit, `tools:manage` action, so a client polling this endpoint cannot turn into
+outbound traffic to somebody's endpoint.
+
+### The bearer token is not returned
+
+`requires_auth` tells you the server expects one; the token itself is never in the
+response, on any path. It is envelope-encrypted and no read path decrypts it, so a
+client connecting directly needs its own copy, obtained out of band.
+
+That is deliberate rather than an oversight: returning it would make every
+inference key a way to read the credentials of every tool server its team can see.
+
+### With an MCP client
+
+The registry gives you the URLs; the connection is yours. With Pydantic AI:
+
+```python
+import httpx
+from pydantic_ai import Agent
+from pydantic_ai.mcp import MCPServerStreamableHTTP
+
+registry = httpx.get(
+    "https://gateway.internal/v1/mcp/servers",
+    headers={"Authorization": "Bearer sk-gw-live-..."},
+).json()
+
+toolsets = [
+    MCPServerStreamableHTTP(entry["url"])   # add your own auth header if requires_auth
+    for entry in registry["data"]
+    if entry["discovered"]
+]
+
+agent = Agent("openai:gpt-4o", toolsets=toolsets)
+```
+
+The gateway governed **which** servers that key learned about and which tools it
+was told it may call. It does not see the calls themselves — if you want the model
+call governed too, point the agent's model at this gateway as well.

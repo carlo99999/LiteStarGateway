@@ -77,6 +77,7 @@ from litestar_gateway.infrastructure.web.mcp.dependencies import (
     build_mcp_proposal_service_provider,
     build_mcp_server_service_provider,
     provide_api_key_tool_policy_service,
+    provide_mcp_registry,
 )
 from litestar_gateway.infrastructure.web.models import (
     ModelController,
@@ -340,6 +341,7 @@ def _build_dependencies(
         "api_key_tool_policy_service": Provide(
             provide_api_key_tool_policy_service, sync_to_thread=False
         ),
+        "mcp_registry": Provide(provide_mcp_registry, sync_to_thread=False),
         "callable_resolver": Provide(provide_callable_resolver, sync_to_thread=False),
         "credential_service": Provide(
             build_credential_service_provider(settings), sync_to_thread=False

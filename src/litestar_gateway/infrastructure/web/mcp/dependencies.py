@@ -13,6 +13,7 @@ from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.application.mcp_proposal_service import McpProposalService
+from litestar_gateway.application.mcp_registry import McpRegistry
 from litestar_gateway.application.mcp_service import ApiKeyToolPolicyService, McpServerService
 from litestar_gateway.application.service import APIKeyService
 from litestar_gateway.application.team_service import TeamService
@@ -77,6 +78,18 @@ def build_mcp_proposal_service_provider(
         )
 
     return provide_mcp_proposal_service
+
+
+def provide_mcp_registry(
+    db_session: NamedDependency[AsyncSession],
+) -> McpRegistry:
+    """No keyring and no discovery client: the registry reads names, urls and
+    inventories, so it cannot decrypt a token and cannot cause egress even by
+    mistake. That is a stronger guarantee than a code review promising it does not."""
+    return McpRegistry(
+        SQLAlchemyMcpServerRepository(db_session),
+        SQLAlchemyApiKeyToolPolicyRepository(db_session),
+    )
 
 
 def provide_api_key_tool_policy_service(

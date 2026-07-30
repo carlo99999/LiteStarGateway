@@ -72,6 +72,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/mcp/servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The MCP servers this API key may use, with their tools
+         * @description A **registry**: the gateway does not execute tools and does not proxy MCP traffic. It lists the servers this key may use — its team's own, those extended to it, and global ones, minus any the team detached — each with the tools this key is permitted to invoke.
+         *
+         *     A tool declared `destructive` appears only for a key whose policy enables them explicitly, and an unclassified tool counts as destructive. A server this key may invoke nothing on is omitted; one nobody has run discovery against is listed with `discovered: false` and an empty `tools`, because there the inventory is unknown rather than empty.
+         *
+         *     Bearer tokens are never returned — `requires_auth` says whether the server needs one.
+         */
+        get: operations["V1McpServersListMcpServers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/chat/completions": {
         parameters: {
             query?: never;
@@ -3216,6 +3240,34 @@ export interface operations {
         };
     };
     V1ModelsListModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    V1McpServersListMcpServers: {
         parameters: {
             query?: never;
             header?: never;

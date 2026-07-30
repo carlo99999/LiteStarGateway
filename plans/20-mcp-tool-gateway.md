@@ -6,9 +6,47 @@
 `post_to_approved_address`), the three-origin visibility machinery
 (`CallableOrigin`, `CallableAliasResolver`), the guardrail chain, the keyring's
 envelope encryption, `UsageMeter` and the audit trail.
-**Theme:** the gateway governs what a model call *says* and nothing it *does*.
-This brings tool execution inside the perimeter — egress, audit, spend — without
-becoming an agent framework.
+**Theme (original):** the gateway governs what a model call *says* and nothing it
+*does*. This brings tool execution inside the perimeter — egress, audit, spend —
+without becoming an agent framework.
+
+> ## Scope cut, by decision, after S5
+>
+> **The gateway will not execute tools.** This is an **MCP registry**: it holds the
+> servers, discovers what they offer, governs who may see what, and tells a client
+> which MCP servers *its key* may use — with their tools, the way LiteLLM does. The
+> client connects to those servers itself.
+>
+> **Cancelled: S6, S7, S8.** No declaration injection, no bounded execution loop, no
+> tool guardrails. `completion_service.py` and `usage_meter.py` are **not touched by
+> this plan at all**, which removes the entire serial bottleneck the schedule below
+> was built around — Track B and Track C no longer exist.
+>
+> **D6 falls with them.** There is no `"tool_execution": "gateway"` and no `tools:
+> [{"type": "mcp"}]` expansion. The request contract is untouched: no client learns
+> a new field, and no model request behaves differently because a server is
+> registered.
+>
+> **Added instead — S6′, the registry endpoint** (`GET /v1/mcp/servers`): the
+> servers one API key may use, each with the tools that key may invoke. Same
+> permission logic as everything else in the plan, applied in four layers — team
+> visibility, the server's kill switch, the server's own `tool_allowlist`, the key's
+> `ApiKeyToolPolicy`. Sibling of `GET /v1/models`, on the same API-key router.
+>
+> **What is kept and now load-bearing:** S0's domain and tables, S1's visibility
+> union, S2's RBAC, S3's discovery client (it fills the inventory the registry
+> serves), S4's console and its `last_discovered_at`, S5's proposals. None of it was
+> wasted — all of it *is* the registry.
+>
+> **The consequence to state plainly:** the gateway no longer sees tool execution,
+> so it cannot audit a tool call, meter its spend, re-check the egress allowlist at
+> call time, or guardrail a tool result. Those were S7/S8's reasons for existing.
+> What survives is governance of *who may know about and reach which server*, which
+> is a real control and a smaller one. §5 and §7 of the design doc are non-goals now.
+>
+> **The bearer token stays write-only.** A client connecting directly needs its own;
+> the registry reports `requires_auth` and never the secret. Returning it would turn
+> any inference key into a credential-exfiltration path.
 
 Ground rules (unchanged from Plans 17–19): one reviewable PR per slice; every PR
 carries a regression that **fails before the fix**; full gate before each
@@ -61,8 +99,9 @@ the executable summary.
   that spelling excludes globals and extended servers, and it has bitten this
   codebase twice (guardrail scope on global models, Round 12's ISSUE-020).
   Resolution goes through `CallableAliasResolver`/`CallableOrigin`.
-- **D6 — no execution by default.** `"tool_execution": "gateway"` opts in; absent
-  is byte-identical to today.
+- **D6 — ~~no execution by default~~ — WITHDRAWN.** There is no execution at all
+  (see the scope cut above), so there is no opt-in field. Absent *and* present are
+  byte-identical to today, because the field does not exist.
 - **D7 — one Alembic head in flight.** Two slices need migrations (S0, S5); they
   are never open at the same time.
 - **D8 — OpenAPI artifacts are regenerated once, at integration.** Four slices
@@ -300,9 +339,10 @@ chain stays sequential (the composition property from ISSUE-039).
 | S3 discovery client | A | no | 1 | 1 d |
 | S4 console | A | **yes** (added) | 1 | 1 d |
 | S5 proposals | A | **yes** | 1 | 1 d |
-| S6 declaration injection | B | no | 1 | 1 d |
-| S7 bounded execution | B | no | 2 | 3 d |
-| S8 guardrails on tools | C | no | 1 | 1,5 d |
+| ~~S6 declaration injection~~ | — | — | — | **cancelled** |
+| ~~S7 bounded execution~~ | — | — | — | **cancelled** |
+| ~~S8 guardrails on tools~~ | — | — | — | **cancelled** |
+| S6′ registry endpoint (`GET /v1/mcp/servers`) | A | no | 1 | 0,5 d |
 
 ~12 days of work. The critical path is Track B (S6 → S7 → S8, ~5,5 d) and
 nothing shortens it: those slices share two files and must be serial.
