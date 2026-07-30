@@ -20,33 +20,25 @@ def test_every_team_role_has_a_permission_set() -> None:
     assert set(ROLE_PERMISSIONS) == set(TeamRole)
 
 
-def test_admin_holds_every_permission_and_member_only_proposes() -> None:
+def test_admin_holds_every_permission_and_member_none() -> None:
     assert ROLE_PERMISSIONS[TeamRole.ADMIN] == frozenset(Permission)
-    # A member used to hold nothing. `tools:propose` is the single exception
-    # (Plan 20): filing a proposal changes no policy until someone with
-    # `tools:manage` approves it, so "a member manages nothing" still holds.
-    assert ROLE_PERMISSIONS[TeamRole.MEMBER] == frozenset({Permission.TOOLS_PROPOSE})
+    assert ROLE_PERMISSIONS[TeamRole.MEMBER] == frozenset()
 
 
 def test_new_roles_are_scoped_to_their_domain() -> None:
-    # Each extended role still grants exactly one capability domain, plus
-    # `tools:propose`, which every role holds because any member may ask for a
-    # tool server. Nothing else was widened: reading the tool inventory stayed
-    # with the admin, rather than being added to `model_manager` for convenience.
     assert ROLE_PERMISSIONS[TeamRole.MODEL_MANAGER] == frozenset(
         {
             Permission.MODELS_READ,
             Permission.MODELS_MANAGE,
             Permission.DECISIONS_READ,
             Permission.PLAYGROUND_EXECUTE,
-            Permission.TOOLS_PROPOSE,
         }
     )
     assert ROLE_PERMISSIONS[TeamRole.KEY_ISSUER] == frozenset(
-        {Permission.KEYS_READ, Permission.KEYS_ISSUE, Permission.TOOLS_PROPOSE}
+        {Permission.KEYS_READ, Permission.KEYS_ISSUE}
     )
     assert ROLE_PERMISSIONS[TeamRole.BILLING_VIEWER] == frozenset(
-        {Permission.USAGE_READ, Permission.BUDGET_READ, Permission.TOOLS_PROPOSE}
+        {Permission.USAGE_READ, Permission.BUDGET_READ}
     )
 
 

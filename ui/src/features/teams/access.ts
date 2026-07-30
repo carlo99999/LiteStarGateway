@@ -27,7 +27,6 @@ export type ConsoleSurface =
   | "users"
   | "service-principals"
   | "guardrails"
-  | "tools"
   | "usage"
   | "budgets"
   | "audit"
@@ -88,27 +87,6 @@ export function canManageGuardrails(role: TeamRole | null): boolean {
   return role === null || role === "admin";
 }
 
-/** MCP tool servers are team-admin (or platform-admin) only, on the guardrail
- * precedent: `tools:manage` is deliberately withheld from `model-manager`,
- * because attaching a tool server is an egress decision rather than a model one.
- * `tools:read` is the same set — reading a tool inventory is not the models
- * domain, and the backend's RBAC tests refuse the widening. */
-export function canManageTools(role: TeamRole | null): boolean {
-  return role === null || role === "admin";
-}
-
-/** `tools:propose` is the one permission every team role holds, including
- * `member` — the role that otherwise holds nothing.
- *
- * That is not a weakening of the member role: a proposal changes no policy, makes
- * no outbound request, and has no effect until someone with `tools:manage`
- * approves it. The console has to agree, because a member who cannot reach the
- * Tools page cannot read the reason their proposal was refused — and "it
- * disappeared" is exactly what the rejection reason exists to prevent. */
-export function canProposeTools(role: TeamRole | null): boolean {
-  return role === null || TEAM_ROLES.includes(role);
-}
-
 export function canReadDecisions(role: TeamRole | null): boolean {
   return role === null || role === "admin" || role === "model-manager";
 }
@@ -127,12 +105,6 @@ export function canAccessConsoleSurface(
   if (surface === "audit") return access.isAuditor;
   if (surface === "guardrails") {
     return access.teamRoles.some((role) => canManageGuardrails(role));
-  }
-  if (surface === "tools") {
-    // Every role, not just the admin: the page carries the proposal queue, which
-    // is the one part of this surface a member is meant to reach. What a member
-    // sees *on* it is narrowed by the page itself, not by the navigation.
-    return access.teamRoles.some((role) => canProposeTools(role));
   }
   if (MODEL_SURFACES.includes(surface)) {
     return access.teamRoles.some((role) => canReadModels(role));

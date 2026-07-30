@@ -29,8 +29,6 @@ from litestar_gateway.domain.entities import BudgetWindow
 from litestar_gateway.infrastructure.persistence.orm import (
     BudgetAlertStateModel,
     GuardrailRuleModel,
-    McpServerModel,
-    McpServerSuppressionModel,
     ModelGrantRecord,
     ModelRecord,
     PendingBudgetAlertModel,
@@ -73,11 +71,11 @@ async def raw_session(database_url: str) -> AsyncIterator[AsyncSession]:
 
     Foreign keys are enforced here on purpose. The application's engine turns the
     pragma on (`_create_engine_with_sqlite_fk`), but this fixture builds its own,
-    and aiosqlite ignores foreign keys unless asked *per connection*. Without it
-    a seeded row can reference a parent that does not exist, which SQLite accepts
-    and Postgres rejects — so the test passes locally and fails in CI fourteen
-    minutes later. That happened: a suppression row seeded with a fabricated
-    `server_id` reached main in Plan 20 S1 and only the Postgres job caught it.
+    and aiosqlite ignores foreign keys unless asked *per connection*. Without it a
+    seeded row can reference a parent that does not exist, which SQLite accepts and
+    Postgres rejects — so the test passes locally and fails in CI fourteen minutes
+    later. That has happened here: a row seeded with a fabricated parent id reached
+    main and only the Postgres job caught it.
     """
     engine = create_async_engine(database_url)
     if engine.dialect.name == "sqlite":
@@ -524,55 +522,3 @@ async def test_a_team_with_a_guardrail_rule_and_no_usage_is_still_hard_deleted(
 
     assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
     assert await raw_session.get(TeamModel, UUID(team_id)) is None
-
-
-async def _seed_mcp_server(session: AsyncSession, team_id: str) -> None:
-    """A team-owned MCP server, plus a suppression of someone else's global one.
-
-    Both carry this team's id, so both must go with the team — the ISSUE-040
-    shape, covered from the slice that introduces the tables rather than by a
-    later review.
-    """
-    session.add(
-        McpServerModel(
-            id=uuid4(),
-            team_id=UUID(team_id),
-            name="github",
-            url="https://tools.internal:8443/mcp",
-        )
-    )
-    # The suppressed server has to exist: `suppress()` is only ever reached after
-    # the server was resolved as visible, so a suppression pointing at nothing is
-    # a state the code cannot produce — and the FK says so.
-    somebody_elses_global = McpServerModel(
-        id=uuid4(),
-        team_id=None,
-        name="shared",
-        url="https://tools.internal:8443/shared",
-    )
-    session.add(somebody_elses_global)
-    await session.flush()
-    session.add(
-        McpServerSuppressionModel(
-            id=uuid4(), server_id=somebody_elses_global.id, team_id=UUID(team_id)
-        )
-    )
-    await session.commit()
-
-
-async def test_a_team_with_mcp_servers_can_still_be_purged(
-    client: AsyncTestClient, raw_session: AsyncSession
-) -> None:
-    admin = await _login(client, ADMIN_EMAIL, MASTER_KEY)
-    team_id = await _tombstoned_team(client, admin, raw_session)
-    await _seed_mcp_server(raw_session, team_id)
-
-    resp = await client.post(f"/teams/{team_id}/purge", headers=_bearer(admin))
-
-    assert resp.status_code == HTTP_204_NO_CONTENT, resp.text
-    assert await raw_session.get(TeamModel, UUID(team_id)) is None
-    for model in (McpServerModel, McpServerSuppressionModel):
-        rows = (
-            await raw_session.scalars(select(model).where(model.team_id == UUID(team_id)))
-        ).all()
-        assert rows == [], model.__name__

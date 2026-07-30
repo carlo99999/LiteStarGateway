@@ -14,7 +14,7 @@ così un riferimento incrociato resta univoco in tutto `issues/`.
 
 | ID | Titolo | Severity | File | Status |
 |---|---|---|---|---|
-| ISSUE-053 | Un `api_base` con host non risolvibile è un 500, non un 400 | MEDIUM | `application/credential_service.py` | Fixed in Plan 20 S1 |
+| ISSUE-053 | Un `api_base` con host non risolvibile è un 500, non un 400 | MEDIUM | `application/credential_service.py` | Fixed |
 | ISSUE-054 | `just migration-check` è ineseguibile in locale per policy di progetto | LOW | `justfile` | Open |
 
 ## Findings
@@ -40,14 +40,21 @@ correggere da sé, e il messaggio non dice cosa è andato storto. Tutti gli altr
 esiti di quella validazione sono 400 con un messaggio azionabile: questo era
 l'unico a rompere il contratto.
 
-**Impatto verificato.** **Confirmed.** Emerso implementando Plan 20 S1: il
-percorso MCP ha la stessa forma, e i suoi test hanno colpito `gaierror` invece
-dell'eccezione di dominio attesa (`tools.internal` non risolve su un portatile).
-Il percorso credenziali è identico riga per riga.
+**Impatto verificato.** **Confirmed.** Emerso costruendo una feature che aveva la
+stessa forma di validazione egress: i suoi test hanno colpito `gaierror` invece
+dell'eccezione di dominio attesa, perché usavano un nome che non risolve su un
+portatile. Il percorso credenziali era identico riga per riga.
 
-**Correzione.** Aggiunto `except OSError` in entrambi i percorsi (credenziali e
-MCP), che mappa il fallimento di risoluzione allo stesso 400 di un target fuori
-allowlist, con il nome dell'host nel messaggio. Spedito con Plan 20 S1.
+**Correzione.** Aggiunto `except OSError`, che mappa il fallimento di risoluzione
+allo stesso 400 di un target fuori allowlist, con il nome dell'host nel messaggio.
+
+**Nota.** La feature durante la quale il difetto è emerso è stata poi rimossa; la
+correzione **no**, perché il difetto era sul percorso credenziali e non su quello.
+Il test di regressione qui sotto è stato aggiunto in quel momento, per non lasciare
+la correzione sopravvissuta senza copertura.
+
+**Regressione.** `tests/credentials/test_credential_egress.py::`
+`test_an_unresolvable_api_base_host_is_a_bad_request_not_a_server_error`.
 
 **Nota di metodo.** Nessuna lente della review del Round 15 ha guardato questo
 caso, e non è una mancanza delle lenti: si vede solo eseguendo il codice in un
@@ -71,8 +78,9 @@ eseguire** senza infrangere una regola o migrare un DB che non va toccato. Un
 gate che si impara a saltare smette di essere un gate, e le sue eventuali
 segnalazioni vere si perdono nel rumore.
 
-**Impatto verificato.** **Confirmed** su Plan 20 S0: la ricetta è fallita con
-`Target database is not up to date` mentre la migrazione era corretta. La stessa
+**Impatto verificato.** **Confirmed** mentre si aggiungeva una migrazione: la
+ricetta è fallita con `Target database is not up to date` mentre la migrazione
+era corretta. La stessa
 proprietà è stata verificata a mano contro un SQLite usa-e-getta (catena
 applicata dall'head precedente al nuovo, `database check` → *"No new upgrade
 operations detected"*, downgrade che rimuove le sole tabelle nuove).

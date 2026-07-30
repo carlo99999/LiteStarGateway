@@ -78,8 +78,13 @@ class CredentialService:
         except ValueError as exc:
             raise CredentialMisconfigured(str(exc)) from exc
         except OSError as exc:
-            # Same reason as the MCP path: `getaddrinfo` raises `gaierror`, an
-            # OSError, so an unresolvable host was a 500 rather than a 400.
+            # ISSUE-053. `getaddrinfo` raises `gaierror`, which subclasses
+            # **OSError**, not ValueError — so a host authorized by *name* in the
+            # allowlist that does not resolve right now escaped as an unmapped
+            # error and became a 500. It is reachable without anything exotic: a
+            # self-hosted server that is down, a DNS record not yet propagated, a
+            # typo. Every other outcome of this validation is an actionable 400,
+            # and this was the only one breaking that contract.
             raise CredentialMisconfigured(
                 f"api_base host {parsed.hostname!r} could not be resolved: {exc}"
             ) from exc
