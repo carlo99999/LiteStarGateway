@@ -11,18 +11,37 @@ advertise tools a model could call — and govern who may use them.
     are separate, later slices of
     [the design](next-steps/mcp-tool-gateway.md).
 
-## 1. Authorize where the gateway may connect (required)
+## 1. Authorize where the gateway may connect (optional)
 
-A tool server is a **team** resource — its admins register and remove it — but
-the platform keeps one veto over where any of them may point:
+A tool server is a **team** resource — its admins register and remove it — and the
+platform can keep a veto over where any of them may point:
 
 ```bash
 MCP_ALLOWED_HOSTS=tools.internal:8443,10.9.0.0/24
 ```
 
-Empty is the default, and it refuses everything. A deployment that upgrades
-gains no new egress reach until an operator opts in, so no team can register a
-server until this is set.
+**You do not need to set this to use the feature.** With no allowlist the gateway
+applies its SSRF deny-list instead, which is the same check the webhook channels
+use: any **public** https endpoint is reachable, and anything else is refused.
+
+| `MCP_ALLOWED_HOSTS` | public endpoint | private / loopback / metadata |
+|---|---|---|
+| unset (default) | ✅ reachable | ❌ refused |
+| set | ✅ only if listed | ✅ only if listed |
+
+So the two things an entry does are: **authorize an internal target**, which is the
+only thing the deny-list would otherwise refuse, and — once the list is non-empty —
+**make it exhaustive**, refusing public endpoints that are not on it. If you want
+the gateway locked to a known set of tool servers, set it; that is the platform's
+one veto over a team-owned resource, and it applies to platform admins too.
+
+!!! warning "What an empty allowlist does *not* permit"
+    `169.254.169.254` and friends stay refused with no configuration at all. The
+    check is on what the host **resolves to**, not on its name, so a respectable
+    name pointing at a metadata address is refused the same way — and it is
+    re-resolved on every call, not only at registration. A private target
+    (`tools.internal`, `localhost`, `10.x`) therefore needs an explicit entry, and
+    the refusal says so rather than only saying "not permitted".
 
 The grammar is the same as
 [`OPENAI_COMPATIBLE_ALLOWED_HOSTS`](self-hosted-models.md#1-authorize-the-endpoint-required)

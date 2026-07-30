@@ -26,8 +26,11 @@ def _settings(**overrides: object) -> Settings:
 
 
 def test_defaults_to_an_empty_allowlist() -> None:
-    # Upgrade safety: a deployment that upgrades gains no new egress reach until
-    # an operator opts in, so no team can register a server yet.
+    # Empty, but *not* fail-closed: unlike the provider list, an empty MCP
+    # allowlist falls through to the SSRF deny-list, so public tool servers work
+    # with no configuration and private ones need an entry. What that means for
+    # each kind of target is pinned in `test_mcp_egress_default.py`; this only
+    # pins that the default is still "nothing configured".
     assert _settings().mcp_allowlist().is_empty
 
 
