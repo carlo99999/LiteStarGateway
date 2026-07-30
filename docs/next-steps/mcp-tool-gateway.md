@@ -94,6 +94,22 @@ deletion cascading onto other teams. Resolution therefore goes through the
 `CallableAliasResolver`/`CallableOrigin` machinery, never a hand-written
 comparison in the tool service.
 
+**Decided while implementing S2 — a server has no alias, and a name collision is
+refused.** Models solve cross-origin name clashes by suffixing an alias on the
+grant, because a team may legitimately want the same model under its own label. A
+server is different: it is referenced by name in the request (`{"type": "mcp",
+"server": "github"}`), and there is exactly one sensible name for it. So instead
+of inventing renaming-on-extend, the operations that would create the ambiguity
+refuse it: `make-global` fails when any team already owns that name, and
+`/extend` fails when the target team already sees it. The error names both sides
+so the operator can rename one and retry.
+
+The alternative — resolving the clash silently at request time by origin
+precedence — would mean a team's own `github` shadowing a global `github` it can
+also see, with no signal that two servers answer to one name. That is the kind of
+implicit precedence rule this codebase has spent several rounds removing, not
+adding.
+
 ### 2.2 "Remove" is one verb with two effects
 
 `DELETE /teams/{team_id}/mcp-servers/{id}` does what the origin implies:

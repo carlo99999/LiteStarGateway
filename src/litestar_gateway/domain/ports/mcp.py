@@ -17,7 +17,13 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
-from litestar_gateway.domain.mcp import ApiKeyToolPolicy, McpServer, McpTool, ToolEffect
+from litestar_gateway.domain.mcp import (
+    ApiKeyToolPolicy,
+    McpServer,
+    McpServerGrant,
+    McpTool,
+    ToolEffect,
+)
 
 
 @runtime_checkable
@@ -28,6 +34,10 @@ class McpServerRepository(Protocol):
 
     async def visible_to(self, team_id: UUID) -> list[McpServer]:
         """Own + extended + global, minus this team's detaches."""
+        ...
+
+    async def list_global(self) -> list[McpServer]:
+        """Global servers only — the platform admin's inventory, not a team's."""
         ...
 
     async def add(self, server: McpServer, *, auth: str | None = None) -> McpServer: ...
@@ -48,6 +58,15 @@ class McpServerRepository(Protocol):
     async def grant(self, server_id: UUID, team_id: UUID) -> None: ...
 
     async def revoke_grant(self, server_id: UUID, team_id: UUID) -> bool: ...
+
+    async def others_named(self, name: str, exclude_id: UUID) -> list[McpServer]:
+        """Other servers carrying this name — a server has no alias, so an
+        extension or promotion that would duplicate one is refused."""
+        ...
+
+    async def list_grants(self, server_id: UUID) -> list[McpServerGrant]: ...
+
+    async def revoke_grant_by_id(self, grant_id: UUID) -> bool: ...
 
     async def make_global(self, server_id: UUID) -> McpServer | None: ...
 
