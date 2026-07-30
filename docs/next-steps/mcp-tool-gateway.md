@@ -45,30 +45,167 @@ is how to call them", already spoken by a growing set of servers.
 > belongs in a client library instead. What makes this safe to add is precisely
 > that it stays a request-scoped, auditable, bounded expansion of one call.
 
-## 2. An MCP server is a governed resource, not a plugin
+## 2. An MCP server is a team resource, with the platform holding one veto
 
-The shape already exists twice in this codebase. A `Credential` is
-platform-admin-owned because it carries egress and a secret; a team `Model`
-*references* one without being able to read or redirect it
-(`domain/entities/model.py` records exactly this reasoning). An MCP server is
-the same class of object: an endpoint plus a secret, pointed at by teams.
+A server belongs to the **team**, created and removed by its own admins. That is
+the opposite of a `Credential`, and deliberately: a credential is
+platform-admin-owned because it carries *the platform's* secret, while an MCP
+server carries the team's own. What a team admin must still not decide is where
+the gateway is allowed to connect, so the split is:
 
-So: a new `mcp_server` resource, **platform-admin-owned**, with a per-team grant
-model mirroring `model_grant`/`router_grant`. A team admin can use a server and
-see its tools; only a platform admin can say where it lives.
+> **The platform decides *where* the gateway may connect; the team decides
+> *what* to connect to inside that boundary.**
+
+Concretely, `MCP_ALLOWED_HOSTS` at platform level — same shape as
+`OPENAI_COMPATIBLE_ALLOWED_HOSTS`, checked on write **and re-resolved on every
+call** (§6). Inside it, team admins add and remove servers freely, with no
+platform-admin round trip.
 
 | field | notes |
 |---|---|
-| `name` | operator-facing identifier, unique platform-wide |
-| `url` | remote HTTP endpoint; validated against the egress allowlist on write **and** on every call (§6) |
+| `name` | unique per team (or platform-wide for a global server) |
+| `url` | remote HTTP endpoint, inside `MCP_ALLOWED_HOSTS` |
 | `auth` | optional bearer token, envelope-encrypted like `guardrail_rule.encrypted_secret` + `key_id`, never returned by any endpoint |
-| `enabled` | kill switch, same semantics as `service_principal.enabled` — disabling it stops every team at once |
-| `tool_allowlist` | optional: expose only these tool names from the server |
+| `enabled` | kill switch, `service_principal.enabled` semantics |
+| `tool_allowlist` | optional: expose only these tool names |
+| `effects` | per tool: `read` \| `write` \| `destructive`, declared by the operator (§2.5) |
 
-RBAC follows the guardrail precedent (`guardrails:read` / `guardrails:manage`):
-`tools:read` and `tools:manage`, held by team admins and platform admins, and
-deliberately **not** by `model-manager` — a tool a model manager can attach
-unilaterally is an egress decision made by the wrong role.
+### 2.1 Three visibilities, mirroring models exactly
+
+`Model` already has all three, and they are the values of `CallableOrigin`, so
+this adds a resource rather than a concept:
+
+| origin | created by | visible to |
+|---|---|---|
+| `OWN` | team admin | that team |
+| `EXTENDED` | platform admin (`/extend`, revocable grant) | the chosen teams |
+| `GLOBAL` | platform admin (`/make-global`, or direct creation) | every team |
+
+The surface mirrors `web/models/platform_controller.py` — `POST
+/platform/mcp-servers`, `/{id}/make-global`, `/{id}/extend`, `GET /{id}/grants`,
+`DELETE /grants/{id}` — so promotion *and* selective sharing come for free.
+
+**Visibility is resolved in one place.** Any check written as
+`server.team_id == team_id` silently excludes globals and extended servers, and
+this codebase has been bitten by that shape twice already: guardrail rules
+cannot be scoped to a global model or router for exactly that reason (recorded as
+deferred in `issues/round-15.md`), and Round 12's ISSUE-020 was a shared-resource
+deletion cascading onto other teams. Resolution therefore goes through the
+`CallableAliasResolver`/`CallableOrigin` machinery, never a hand-written
+comparison in the tool service.
+
+### 2.2 "Remove" is one verb with two effects
+
+`DELETE /teams/{team_id}/mcp-servers/{id}` does what the origin implies:
+
+- `OWN` → deletes the server;
+- `GLOBAL` or `EXTENDED` → **detaches it for that team only**, reversibly, and
+  never touches the resource other teams are using.
+
+Only `DELETE /platform/mcp-servers/{id}` removes a global server for everyone.
+Collapsing these into one handler would let a team admin revoke a capability from
+every other tenant — the ISSUE-020 mistake, re-made. The audit trail
+distinguishes `mcp_server.delete` from `mcp_server.detach`, because a `204` that
+means two different things is a trap for whoever reads the log later. A detach is
+a suppression row, so it flows through the same central resolution as everything
+else in §2.1.
+
+A team cannot *refuse* a global server in advance, and does not need to: removing
+it is the same action it already uses for its own.
+
+### 2.3 Permissions
+
+| | `tools:propose` | `tools:read` | `tools:manage` |
+|---|---|---|---|
+| team **admin** | ✅ | ✅ | ✅ servers, detach, per-key policy, approvals |
+| **model_manager** | ✅ | ✅ inventory | ❌ |
+| member · key_issuer · billing_viewer | ✅ | ❌ | ❌ |
+| platform admin | ✅ | bypasses every check (existing behaviour) | bypasses |
+| platform auditor | ❌ | inventory only — **not** the call feed | ❌ |
+
+Three deliberate choices. `tools:manage` is withheld from `model_manager` on the
+guardrail precedent: attaching a tool is an egress decision, and
+`GUARDRAILS_MANAGE` is withheld from the same role for the same reason. The
+auditor sees configuration but not the call feed, mirroring how `decisions:read`
+was split from `usage:read` because decision exports carry end-user content.
+
+And `tools:propose` is the first permission held by **every** team role,
+including `member` — which `authorization.py` states holds nothing on purpose,
+*"a member exists to receive personal keys and run inference, not to manage the
+team"*. That principle is not being weakened: a proposal changes no policy and
+has no effect until someone with `tools:manage` approves it (§2.4). Note that
+`ROLE_PERMISSIONS` does not inherit — each role's set is exact — so this
+permission has to be added to every role explicitly, which is the intended
+reading of "any member of the team may ask".
+
+Per-key tool policy lives under `tools:manage`/`tools:read` and **not** under
+`keys:issue`. Round 15's ISSUE-042 was precisely that asymmetry on per-key spend
+caps: a key issuer could `PUT` a cap and then get a 403 on the `GET` of the same
+object, because write and read had landed on different permission domains.
+
+### 2.4 Proposals: a member asks, an admin decides
+
+Requiring a team admin for every registration puts the person who knows *which
+tool the application needs* behind the person who holds the permission. So any
+team member may file a **proposal**, and either a team admin or a platform admin
+approves or rejects it.
+
+There is no approval workflow in this codebase yet, so this mirrors the one
+two-party flow that exists — **invites**. Same properties, same reasons:
+
+- a `pending` record with an explicit lifecycle, `pending → approved | rejected`;
+- **approval is a single atomic conditional update** (`... WHERE status =
+  'pending'`), the same shape as the invite's `WHERE used_at IS NULL`. Two admins
+  clicking approve concurrently must create one server, not two — the invite
+  TOCTOU fix is the precedent for not discovering this later;
+- both outcomes are audited with the actor, and a rejection carries a reason,
+  because "it disappeared" is not an answer for the member who filed it.
+
+Two rules make the flow safe rather than a hole in §2:
+
+**Approval re-validates; it never trusts the proposal.** `MCP_ALLOWED_HOSTS` is
+checked again at approval time, not only when the proposal was filed. A host that
+was allowlisted on Monday and removed on Tuesday must not become a live server on
+Wednesday because a pending record still remembers it. This is the ISSUE-034
+lesson applied to a time gap instead of to DNS: state validated when it was
+*written* has to be re-validated when it becomes *effective*.
+
+**No member action causes gateway egress.** Filing a proposal validates the URL's
+shape and its membership of the allowlist — both offline. `tools/list` discovery
+runs at **approval**, when a privileged actor has decided the target is
+legitimate. Otherwise the lowest-privilege role would hold a primitive for making
+the gateway connect somewhere, even inside the allowlist.
+
+A proposal carries the same fields as a server, including the optional bearer
+token, which is envelope-encrypted on write and never returned — the approver
+sees the name, URL and requested tools, never the secret. Approvers cannot edit a
+proposal: they approve it as filed or reject it with a reason, which keeps this a
+two-state machine instead of a negotiation. An admin who wants different settings
+registers the server directly, which they can already do.
+
+### 2.5 Per-key tool policy
+
+The precedent is `api_key_budget`: a per-key policy row read on the call path,
+for **both** personal keys and service-principal keys. Absent means
+*unrestricted* — the same permissive polarity a missing spend cap has, so the
+feature works the moment a server is registered.
+
+One exception, which is where the permissive default would otherwise bite:
+`destructive` tools require **explicit per-key enablement**, default off. A team
+admin turns it on for the key that needs it, once, in the console. The request
+contract stays untouched, so no client learns a new field, and a key issued for a
+low-trust application cannot delete a repository because a prompt asked it to.
+
+The residual risk is stated rather than hidden: on a key where destructive is
+enabled, injected text can still steer *which* destructive call happens. The
+per-key tool allowlist narrows that surface, and `TOOL_CALL` guardrails (§7) are
+what inspect it.
+
+Personal keys are inference-only by design and their policy is configured by the
+team admin, not the key's owner — otherwise the holder of a key would grant
+themselves its permissions. Both key kinds already have working kill switches:
+deactivating a user stops their personal keys (`authenticate` checks the owner is
+active), and `service_principal.enabled` stops all of an SP's keys at once.
 
 ## 3. Transport: remote HTTP only, and why stdio is refused
 
@@ -218,10 +355,16 @@ even though it is not billed separately.
 Each phase is independently shippable and useful on its own — the test of a
 sound decomposition.
 
-- **Phase 0 — registry, discovery, console.** The resource, grants, RBAC,
-  envelope-encrypted auth, allowlist validation on write, `tools/list` with
-  caching, console inventory. No execution and no request-path change at all.
-  Already worth shipping: an inventory of what tools exist and who may use them.
+- **Phase 0 — registry, visibility, console.** The team-owned resource, the three
+  origins with centralized resolution, detach-vs-delete, RBAC, envelope-encrypted
+  auth, `MCP_ALLOWED_HOSTS` validation on write, `tools/list` with caching,
+  console inventory. No execution and no request-path change at all. Already
+  worth shipping: an inventory of what tools exist and who may use them.
+- **Phase 0b — proposals.** The `pending → approved | rejected` record, the
+  atomic single-approval update, re-validation at approval, discovery deferred to
+  approval, and the console queue. Split from Phase 0 because it is the only part
+  that needs a workflow rather than CRUD, and Phase 0 is useful without it — a
+  team whose admins register their own servers never files a proposal.
 - **Phase 1 — declaration injection.** `tools: [{type: mcp}]` expansion in
   `_prepare`, validated by `chat_tool_policy`. The client still executes. Teams
   stop hardcoding schemas; the request path gains one expansion step and no new
