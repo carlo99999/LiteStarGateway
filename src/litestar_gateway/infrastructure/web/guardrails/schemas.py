@@ -94,10 +94,21 @@ class UpdateGuardrailRuleRequest:
     ] = None
     fail_policy: Annotated[str | None, Parameter(description="`open` or `closed`.")] = None
     position: Annotated[int | None, Parameter(description="Order within the chain.")] = None
-    model_id: Annotated[UUID | None, Parameter(description="Scope to one model.")] = None
+    # Naming one side sets *the* scope: the other is cleared, so switching a rule
+    # from a model to a router is one call. Widening back to the whole team has
+    # its own flag — an omitted field means "unchanged", so a null cannot also
+    # mean "remove the scope" (ISSUE-041).
+    model_id: Annotated[
+        UUID | None,
+        Parameter(description="Scope to one model; clears a router scope."),
+    ] = None
     router_id: Annotated[
         UUID | None,
-        Parameter(description="Scope to one router; outranks a model-scoped rule."),
+        Parameter(description="Scope to one router; outranks and clears a model scope."),
+    ] = None
+    clear_scope: Annotated[
+        bool | None,
+        Parameter(description="Widen the rule back to every model the team can call."),
     ] = None
     enabled: Annotated[bool | None, Parameter(description="Enable or disable the rule.")] = None
     signing_secret: Annotated[

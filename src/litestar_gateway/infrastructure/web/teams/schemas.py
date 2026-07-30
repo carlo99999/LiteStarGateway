@@ -42,10 +42,15 @@ class SetBudgetRequest:
     thresholds: list[int] | None = None
     alert_webhook_url: str | None = None
     alert_email: str | None = None
-    # Per-team HMAC secret for the team's alert webhook. Omit to keep the stored
-    # one (it is never returned); leave unset entirely to sign with the
-    # platform-wide secret.
+    # Per-team HMAC secret for the team's alert webhook. Omitting it keeps the
+    # stored one — it is never returned, so an operator editing a threshold
+    # cannot resubmit it. Removing it needs the explicit flag below: omission
+    # cannot mean both "keep" and "go back to the platform-wide secret".
     alert_webhook_secret: str | None = None
+    # `bool | None` rather than `bool = False`: a plain default still lands in the
+    # OpenAPI `required` list, which tells every generated client that a field it
+    # has never sent is mandatory. Absent and false mean the same thing here.
+    clear_alert_webhook_secret: bool | None = None
 
 
 @dataclass(frozen=True)

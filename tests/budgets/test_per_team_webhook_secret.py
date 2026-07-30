@@ -180,3 +180,37 @@ async def test_the_webhook_is_still_signed_when_neither_is_set(
     channels = await resolve(_alert())
 
     assert [c._signing_secret for c in channels] == [None]  # type: ignore[attr-defined]
+
+
+async def test_a_stored_secret_can_be_cleared(repo: SQLAlchemyBudgetRepository) -> None:
+    """ISSUE-047: omission and `None` both meant "keep", so there was no way back
+    to signing with the platform-wide secret short of deleting the whole budget.
+    The schema comment claimed both "omit to keep the stored one" and "leave
+    unset entirely to sign with the platform-wide secret" — two intents for one
+    wire value, so one of them was unreachable."""
+    await repo.set(_budget(), alert_webhook_secret=TEAM_MATERIAL)
+
+    cleared = await repo.set(_budget(), clear_alert_webhook_secret=True)
+
+    assert cleared.has_alert_webhook_secret is False
+    assert await repo.alert_webhook_secret(TEAM) is None
+
+
+async def test_clearing_and_setting_at_once_is_refused(
+    repo: SQLAlchemyBudgetRepository,
+) -> None:
+    # A write that says both "use this secret" and "use none" has no correct
+    # answer, so it is not a write we accept.
+    with pytest.raises(ValueError, match="clear"):
+        await repo.set(
+            _budget(), alert_webhook_secret=TEAM_MATERIAL, clear_alert_webhook_secret=True
+        )
+
+
+async def test_an_empty_secret_is_refused(repo: SQLAlchemyBudgetRepository) -> None:
+    """An empty string was encrypted and stored, so `has_alert_webhook_secret`
+    reported `True` while the resolver's `or` fell through to the platform
+    secret — the API said one thing and the signature said another."""
+    for blank in ("", "   "):
+        with pytest.raises(ValueError, match="empty"):
+            await repo.set(_budget(), alert_webhook_secret=blank)

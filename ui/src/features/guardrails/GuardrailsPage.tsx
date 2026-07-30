@@ -132,7 +132,7 @@ export function GuardrailsPage() {
 
   const save = useMutation({
     mutationFn: (state: RuleFormState) => {
-      const payload = toPayload(state);
+      const payload = toPayload(state, { forUpdate: Boolean(editing) });
       return editing
         ? updateGuardrailRule(teamId, editing.id, payload)
         : createGuardrailRule(teamId, payload);
@@ -270,6 +270,10 @@ export function GuardrailsPage() {
               className={SELECT_CLASS}
               value={form.kind}
               onChange={(event) => set("kind", event.target.value as GuardrailKind)}
+              // A rule's kind is fixed once created: the update endpoint has no
+              // field for it, so offering the choice here only produced a
+              // confusing 400 about the other kind's config keys.
+              disabled={Boolean(editing)}
             >
               {GUARDRAIL_KINDS.map((kind) => (
                 <option key={kind} value={kind}>

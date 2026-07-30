@@ -698,8 +698,25 @@ class TeamController(Controller):
         await team_service.ensure_team_permission(
             current_admin, team_id, Permission.BUDGET_READ
         )  # team must exist
+        if data.alert_webhook_secret is not None:
+            if not data.alert_webhook_secret.strip():
+                # An empty string used to be stored and then reported as a
+                # configured secret, while the signer fell through to the
+                # platform-wide one — the API said one thing and the signature
+                # another (ISSUE-047).
+                raise InvalidBudget(
+                    "alert_webhook_secret must not be empty: omit it to keep the stored "
+                    "one, or set clear_alert_webhook_secret to sign with the "
+                    "platform-wide secret"
+                )
+            if data.clear_alert_webhook_secret:
+                raise InvalidBudget(
+                    "alert_webhook_secret and clear_alert_webhook_secret are mutually exclusive"
+                )
         budget = await budget_repository.set(
-            _parse_budget(data, team_id), alert_webhook_secret=data.alert_webhook_secret
+            _parse_budget(data, team_id),
+            alert_webhook_secret=data.alert_webhook_secret,
+            clear_alert_webhook_secret=bool(data.clear_alert_webhook_secret),
         )
         await record_audit(
             audit_log,

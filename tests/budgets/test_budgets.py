@@ -384,3 +384,42 @@ async def test_budget_alerts_requires_team_read_permission(client: AsyncTestClie
 
     resp = await client.get(f"/teams/{team}/budget/alerts", headers=_bearer(outsider))
     assert resp.status_code == HTTP_403_FORBIDDEN
+
+
+async def test_the_team_webhook_secret_can_be_cleared_but_not_blanked(
+    client: AsyncTestClient,
+) -> None:
+    """ISSUE-047, at the boundary. An empty string was accepted and stored, so
+    the API reported a configured secret while the signer fell back to the
+    platform-wide one; and there was no spelling at all for "go back to the
+    platform-wide secret"."""
+    _, team, admin = await _setup_team(client)
+    url = f"/teams/{team}/budget"
+    base = {"limit_cost": 5.0, "window": "daily"}
+
+    stored = await client.put(
+        url, json={**base, "alert_webhook_secret": "team-material"}, headers=_bearer(admin)
+    )
+    assert stored.status_code == HTTP_200_OK, stored.text
+    assert stored.json()["has_alert_webhook_secret"] is True
+
+    blank = await client.put(
+        url, json={**base, "alert_webhook_secret": "   "}, headers=_bearer(admin)
+    )
+    assert blank.status_code == HTTP_400_BAD_REQUEST
+    assert "empty" in blank.text
+    # ...and the stored secret was not touched by the refused write.
+    assert (await client.get(url, headers=_bearer(admin))).json()["has_alert_webhook_secret"]
+
+    both = await client.put(
+        url,
+        json={**base, "alert_webhook_secret": "x", "clear_alert_webhook_secret": True},
+        headers=_bearer(admin),
+    )
+    assert both.status_code == HTTP_400_BAD_REQUEST
+
+    cleared = await client.put(
+        url, json={**base, "clear_alert_webhook_secret": True}, headers=_bearer(admin)
+    )
+    assert cleared.status_code == HTTP_200_OK, cleared.text
+    assert cleared.json()["has_alert_webhook_secret"] is False

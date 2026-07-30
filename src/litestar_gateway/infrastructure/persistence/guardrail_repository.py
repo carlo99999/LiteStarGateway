@@ -12,10 +12,15 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from litestar_gateway.domain.entities import ActiveGuardrailRule, GuardrailRule, resolve_chain
-from litestar_gateway.domain.exceptions import CredentialMisconfigured, SaltKeyMissing
+from litestar_gateway.domain.exceptions import (
+    CredentialMisconfigured,
+    InvalidGuardrailRule,
+    SaltKeyMissing,
+)
 from litestar_gateway.domain.guardrails import Direction
 from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.persistence.orm import GuardrailRuleModel
@@ -64,7 +69,18 @@ class SQLAlchemyGuardrailRuleRepository:
         )
         await self._apply_secret(row, secret)
         self._session.add(row)
-        await self._session.commit()
+        try:
+            await self._session.commit()
+        except IntegrityError as exc:
+            # `_ensure_name_free` checks first for a clear 400, but check-then-write
+            # is not atomic: two concurrent creates with the same name both pass it
+            # and the loser hits `uq_guardrail_rule_team_id`. Without this it
+            # surfaced as a 500 — the very outcome that check exists to avoid
+            # (ISSUE-049). The sibling budget repositories already anticipate it.
+            await self._session.rollback()
+            raise InvalidGuardrailRule(
+                f"a guardrail rule named '{rule.name}' already exists"
+            ) from exc
         await self._session.refresh(row)
         return row.to_entity()
 
