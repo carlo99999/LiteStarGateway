@@ -6,6 +6,12 @@ the codebase grows. Each round is a separate reviewer pass, one file per round b
 and a suggested fix, and is cross-checked against prior rounds so nothing already tracked is
 re-reported. Severity reflects verified exploitability/impact, not the raw finder claim.
 
+## Fuori dai round
+
+| File | Cosa contiene | Findings |
+|---|---|---|
+| [Finding incidentali](incidental-findings.md) | Difetti emersi costruendo una feature o eseguendo un gate, non in un round di review. ID nello stesso spazio numerico dei round. | ISSUE-053 (fixed), ISSUE-054 (open) |
+
 ## Rounds
 
 | Round | Focus | New findings (C·H·M·L) | Status |

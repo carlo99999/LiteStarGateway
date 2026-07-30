@@ -275,6 +275,17 @@ class GuardrailBlocked(DomainError):
     than solve it."""
 
 
+class InvalidMcpServer(DomainError):
+    """An MCP server could not be registered as written: a url outside
+    `MCP_ALLOWED_HOSTS`, a non-https target, a duplicate name (→ 400)."""
+
+
+class McpServerNotFound(DomainError):
+    """No MCP server with that id is visible to this team (→ 404). Deliberately
+    the same answer for "does not exist" and "belongs to someone else": the
+    difference would confirm the existence of another team's resource."""
+
+
 class InvalidGuardrailRule(DomainError):
     """A guardrail rule could not run, or could run differently than written:
     an unknown config key, a cleartext webhook url, a missing signing secret, a

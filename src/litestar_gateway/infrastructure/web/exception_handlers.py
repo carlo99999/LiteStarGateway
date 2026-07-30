@@ -36,6 +36,7 @@ from litestar_gateway.domain.exceptions import (
     InvalidCredentials,
     InvalidGuardrailRule,
     InvalidInvite,
+    InvalidMcpServer,
     InvalidModelPricing,
     InvalidPasswordReset,
     InvalidPlaygroundRequest,
@@ -46,6 +47,7 @@ from litestar_gateway.domain.exceptions import (
     InvalidUsageQuery,
     LastTeamAdmin,
     ManagementScopeRequiresServicePrincipal,
+    McpServerNotFound,
     MembershipNotFound,
     ModelDisabled,
     ModelNameExists,
@@ -136,6 +138,8 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     # operator's policy declined. 422 keeps the two distinguishable in a
     # caller's metrics and in ours.
     (GuardrailBlocked, HTTP_422_UNPROCESSABLE_ENTITY),
+    (InvalidMcpServer, HTTP_400_BAD_REQUEST),
+    (McpServerNotFound, HTTP_404_NOT_FOUND),
     (ManagementScopeRequiresServicePrincipal, HTTP_400_BAD_REQUEST),
     (InvalidServicePrincipal, HTTP_400_BAD_REQUEST),
     (InvalidRouterConfig, HTTP_400_BAD_REQUEST),
