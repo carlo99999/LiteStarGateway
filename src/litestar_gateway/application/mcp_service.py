@@ -20,7 +20,7 @@ other tenant, which is Round 12's ISSUE-020 re-made.
 from __future__ import annotations
 
 import dataclasses
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
@@ -37,7 +37,11 @@ from litestar_gateway.domain.mcp import (
     McpTool,
     ToolEffect,
 )
-from litestar_gateway.domain.ports.mcp import ApiKeyToolPolicyRepository, McpServerRepository
+from litestar_gateway.domain.ports.mcp import (
+    ApiKeyToolPolicyRepository,
+    McpDiscoveryPort,
+    McpServerRepository,
+)
 
 MAX_NAME_LENGTH = 64
 
@@ -48,6 +52,8 @@ class McpServerService:
         servers: McpServerRepository,
         teams,
         allowlist: EgressAllowlist | None = None,
+        discovery: McpDiscoveryPort | None = None,
+        inventory_ttl_seconds: int = 3600,
     ) -> None:
         self._servers = servers
         self._teams = teams
@@ -55,6 +61,10 @@ class McpServerService:
         # ships with: a deployment that upgrades gains no egress reach until an
         # operator opts in, so no team can register a server yet.
         self._allowlist = allowlist or EgressAllowlist(entries=())
+        # Absent means this service instance cannot cause egress at all — which is
+        # what the management paths that never discover should be built with.
+        self._discovery = discovery
+        self._inventory_ttl = timedelta(seconds=inventory_ttl_seconds)
 
     # ── reads ────────────────────────────────────────────────────────────────
 
@@ -188,6 +198,57 @@ class McpServerService:
         await self._require_owned(team_id, server_id)
         if not await self._servers.set_effect(server_id, tool_name, effect):
             raise McpServerNotFound(f"{server_id}/{tool_name}")
+
+    async def refresh_inventory(
+        self,
+        principal: Principal,
+        team_id: UUID,
+        server_id: UUID,
+        *,
+        force: bool = False,
+    ) -> list[McpTool]:
+        """Ask the server what it offers, and store the answer.
+
+        Under `TOOLS_MANAGE` rather than `TOOLS_READ`, even though the caller is
+        "reading" an inventory: this makes the gateway open a connection to an
+        operator-supplied endpoint, and causing egress is a manage-level act. It
+        is the same reason §2.4 defers discovery of a proposed server to its
+        approval — the lowest-privilege role must not hold a primitive for making
+        the gateway connect somewhere, even inside the allowlist.
+
+        Within the TTL the stored inventory is returned untouched, so a console
+        that refreshes on page load does not turn every visit into a request to
+        somebody's tool server. `force` is for the operator who knows it changed.
+        """
+        await self._teams.ensure_principal_team_permission(
+            principal, team_id, Permission.TOOLS_MANAGE
+        )
+        server = await self._require_visible(team_id, server_id)
+        if self._discovery is None:  # pragma: no cover - wiring guarantees one
+            raise InvalidMcpServer("tool discovery is not configured on this deployment")
+        stored = await self._servers.tools(server_id)
+        if not force and self._is_fresh(stored):
+            return stored
+        # The token is read here and nowhere else on this path: the repository
+        # hands it over only for the call, and no entity a response is built from
+        # carries it.
+        auth = await self._servers.auth_token(server_id)
+        discovered = await self._discovery.list_tools(server, auth=auth)
+        # `replace_tools` preserves each tool's declared effect, which is what
+        # makes re-running discovery safe: a server cannot relabel a tool an
+        # operator already classified by changing its own hints.
+        return await self._servers.replace_tools(server_id, discovered)
+
+    def _is_fresh(self, tools: list[McpTool]) -> bool:
+        """An empty inventory is never fresh: "we asked and it offers nothing" and
+        "we never asked" are indistinguishable in storage, and treating the second
+        as fresh would mean the first discovery never happens."""
+        if not tools:
+            return False
+        stamps = [tool.discovered_at for tool in tools if tool.discovered_at is not None]
+        if not stamps:
+            return False
+        return datetime.now(UTC) - max(stamps) < self._inventory_ttl
 
     # ── platform admin ───────────────────────────────────────────────────────
     #

@@ -1071,6 +1071,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/mcp-servers/{server_id}/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh the server's tool inventory
+         * @description Asks the server what it offers and stores the answer. Under `tools:manage`, not `tools:read`: this makes the gateway connect to an operator-supplied endpoint, and causing egress is a manage-level act. Within the inventory TTL the stored answer is returned without a request — pass `force=true` when you know the server changed. Effects an operator declared are preserved; only new tools are seeded from the server's own hints.
+         */
+        post: operations["TeamsTeamIdMcpServersServerIdDiscoverDiscoverTools"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams/{team_id}/mcp-servers/{server_id}": {
         parameters: {
             query?: never;
@@ -6373,6 +6393,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Bad request syntax or unsupported method */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status_code: number;
+                        detail: string;
+                        extra?: null | {
+                            [key: string]: unknown;
+                        } | unknown[];
+                    };
+                };
+            };
+        };
+    };
+    TeamsTeamIdMcpServersServerIdDiscoverDiscoverTools: {
+        parameters: {
+            query?: {
+                force?: boolean | null;
+            };
+            header?: never;
+            path: {
+                team_id: string;
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request fulfilled, document follows */
+            200: {
+                headers: {
+                    /** @description Referrer */
+                    "Referrer-Policy"?: string;
+                    /** @description MIME sniffing */
+                    "X-Content-Type-Options"?: string;
+                    /** @description Clickjacking */
+                    "X-Frame-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpToolResponse"][];
+                };
             };
             /** @description Bad request syntax or unsupported method */
             400: {

@@ -253,6 +253,12 @@ class Settings:
     # is the platform's one veto over a team-owned resource — a team admin
     # registers servers freely, but only inside this list.
     mcp_allowed_hosts: tuple[str, ...] = ()
+    # How long a discovered tool inventory stays fresh (Plan 20). A refresh
+    # inside this window returns the stored inventory instead of calling the
+    # server again, so a console that refreshes on page load does not turn each
+    # visit into outbound traffic. `force` overrides it for the operator who
+    # knows the server changed.
+    mcp_inventory_ttl_seconds: int = 3600
     # SSO via OIDC. No discovery URL ⇒ disabled. `oidc_admin_groups` (comma-sep)
     # maps IdP groups to platform admin.
     oidc_discovery_url: str | None = None

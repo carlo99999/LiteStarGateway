@@ -245,6 +245,25 @@ gives for a self-hosted model server.
 Refusing stdio is also what keeps §6 true: every tool call is an outbound HTTP
 request to an allowlisted address, checked by machinery that already exists.
 
+**Learned while implementing S3 — the transport is a handshake, not one POST.**
+Streamable HTTP requires `initialize`, then `notifications/initialized`, then the
+method call, with an `Mcp-Session-Id` echoed on every request after the first when
+the server issues one; and the response to any of them may be a JSON body *or* an
+SSE stream, both of which a client MUST handle. A client that POSTs `tools/list`
+alone works against stateless servers and gets a 400 from stateful ones, so this
+is not an optimisation to defer — it is the protocol.
+
+**And the allowlist's strength depends on the entry form.** Re-resolving the host
+per call constrains *addresses* only when the entry is an address or a CIDR
+(`MCP_ALLOWED_HOSTS=10.9.0.0/24:8443`). A **name** entry authorizes the hostname
+and deliberately leaves its resolution unconstrained — `domain/egress_policy.py`
+states that the operator is vouching for that name's DNS. Re-resolution still
+matters for a name entry, because it is what makes *removing* an entry take effect
+on servers already registered, but it is not a rebinding defence there. An
+operator who wants rebinding refused has to name the network. This belongs in the
+operator-facing page that lands with the console (S4), where the feature is first
+usable end to end.
+
 ## 4. Declarations: discovered, cached, and validated by the policy we already have
 
 A request opts in by referencing a server instead of inlining schemas:

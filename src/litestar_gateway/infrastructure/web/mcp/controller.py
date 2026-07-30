@@ -22,7 +22,7 @@ from uuid import UUID
 
 from litestar import Controller, Request, delete, get, patch, post, put
 from litestar.di import NamedDependency, Provide
-from litestar.params import FromPath
+from litestar.params import FromPath, FromQuery
 
 from litestar_gateway.application.mcp_service import ApiKeyToolPolicyService, McpServerService
 from litestar_gateway.domain.entities import Principal
@@ -100,6 +100,46 @@ class McpServerController(Controller):
         mcp_server_service: NamedDependency[McpServerService],
     ) -> list[McpToolResponse]:
         tools = await mcp_server_service.list_tools(principal, team_id, server_id)
+        return [McpToolResponse.from_entity(tool) for tool in tools]
+
+    @post(
+        "/{team_id:uuid}/mcp-servers/{server_id:uuid}/discover",
+        summary="Refresh the server's tool inventory",
+        description=(
+            "Asks the server what it offers and stores the answer. Under "
+            "`tools:manage`, not `tools:read`: this makes the gateway connect to "
+            "an operator-supplied endpoint, and causing egress is a manage-level "
+            "act. Within the inventory TTL the stored answer is returned without "
+            "a request — pass `force=true` when you know the server changed. "
+            "Effects an operator declared are preserved; only new tools are "
+            "seeded from the server's own hints."
+        ),
+        status_code=200,
+    )
+    async def discover_tools(
+        self,
+        request: Request,
+        team_id: FromPath[UUID],
+        server_id: FromPath[UUID],
+        principal: NamedDependency[Principal],
+        mcp_server_service: NamedDependency[McpServerService],
+        audit_log: NamedDependency[AuditLog],
+        force: FromQuery[bool | None] = None,
+    ) -> list[McpToolResponse]:
+        tools = await mcp_server_service.refresh_inventory(
+            principal, team_id, server_id, force=bool(force)
+        )
+        # Audited because it is outbound traffic the gateway made on someone's
+        # behalf, which is the thing an operator later needs attributed.
+        await record_audit(
+            audit_log,
+            request,
+            principal.user,
+            "mcp_server.discover",
+            target_type="mcp_server",
+            target_id=server_id,
+            detail=f"{len(tools)} tool(s)",
+        )
         return [McpToolResponse.from_entity(tool) for tool in tools]
 
     @post(

@@ -85,6 +85,23 @@ class McpServerRepository(Protocol):
 
 
 @runtime_checkable
+class McpDiscoveryPort(Protocol):
+    """Asking a server what it offers.
+
+    A port because the application layer must be able to run without it: a
+    service built with no discovery cannot cause egress at all, which is a
+    stronger statement than "it happens not to call it".
+    """
+
+    async def list_tools(self, server: McpServer, *, auth: str | None = None) -> list[McpTool]:
+        """The server's advertised tools, with effects **seeded** from its own
+        hints. The caller stores them through `replace_tools`, which keeps
+        whatever an operator declared — so a hint can never overwrite a
+        classification."""
+        ...
+
+
+@runtime_checkable
 class ApiKeyToolPolicyRepository(Protocol):
     """Per-key tool policy, on the `api_key_budget` precedent: one row per key,
     read on the call path, absent meaning unrestricted."""

@@ -280,6 +280,20 @@ class InvalidMcpServer(DomainError):
     `MCP_ALLOWED_HOSTS`, a non-https target, a duplicate name (→ 400)."""
 
 
+class McpDiscoveryFailed(DomainError):
+    """A registered MCP server could not be asked what it offers (→ 502).
+
+    Its own class rather than `UpstreamUnavailable` because an operator has to
+    tell the two apart: that one means the model provider is down and the request
+    failed, this one means a *tool server* is unreachable or answered
+    off-contract, and the inventory an operator is looking at is stale.
+
+    Raised for every off-contract outcome, including a malformed `tools/list`.
+    A partially-parsed inventory would be worse than none: an operator would see
+    a shorter tool list with no indication that anything was dropped.
+    """
+
+
 class McpServerNotFound(DomainError):
     """No MCP server with that id is visible to this team (→ 404). Deliberately
     the same answer for "does not exist" and "belongs to someone else": the
