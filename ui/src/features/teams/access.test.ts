@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  TEAM_ROLES,
   canAccessConsoleSurface,
+  canManageTools,
+  canProposeTools,
   canReadDecisions,
   canReadUsage,
   canManageModels,
@@ -80,10 +83,15 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
   // guardrails surface is not theirs — matching `guardrails:manage` on the
   // backend, which `model-manager` deliberately does not hold.
   assert.equal(canAccessConsoleSurface("guardrails", modelManager), false);
-  // Same argument for tool servers: attaching one is an egress decision, and an
-  // earlier draft of the design gave `model-manager` `tools:read` purely for
-  // convenience. The backend's RBAC tests refused it, so the console matches.
-  assert.equal(canAccessConsoleSurface("tools", modelManager), false);
+  // Tool *servers* are still not theirs — attaching one is an egress decision, and
+  // an earlier draft of the design gave `model-manager` `tools:read` purely for
+  // convenience, which the backend's RBAC tests refused. The surface opened in
+  // Plan 20 S5 anyway, for a different permission: `tools:propose`, which every
+  // team role holds. The page shows this role the proposal queue and none of the
+  // registry, so navigation opening is not the widening it looks like.
+  assert.equal(canAccessConsoleSurface("tools", modelManager), true);
+  assert.equal(canManageTools("model-manager"), false);
+  assert.equal(canProposeTools("model-manager"), true);
 
   assert.equal(canAccessConsoleSurface("models", teamAdmin), true);
   assert.equal(canAccessConsoleSurface("routing", teamAdmin), true);
@@ -99,7 +107,10 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
   assert.equal(canAccessConsoleSurface("usage", billingViewer), true);
   assert.equal(canAccessConsoleSurface("budgets", billingViewer), true);
   assert.equal(canAccessConsoleSurface("guardrails", billingViewer), false);
-  assert.equal(canAccessConsoleSurface("tools", billingViewer), false);
+  // Same as `model-manager` above: reachable for the proposal queue, not the
+  // registry. `tools:propose` is the one permission with no role exceptions.
+  assert.equal(canAccessConsoleSurface("tools", billingViewer), true);
+  assert.equal(canManageTools("billing-viewer"), false);
   assert.equal(canAccessConsoleSurface("models", billingViewer), false);
   assert.equal(canAccessConsoleSurface("routing", billingViewer), false);
 
@@ -116,6 +127,37 @@ test("non-admin navigation exposes only surfaces backed by caller capabilities",
   // Nor to the tool inventory: an inventory is not billing, which is why the
   // corrected permission table gives the auditor no `tools:read` either.
   assert.equal(canAccessConsoleSurface("tools", auditor), false);
+});
+
+test("every team role may propose a tool server, and only the admin may register one", () => {
+  // `ROLE_PERMISSIONS` does not inherit on the backend, so "any member of the team
+  // may ask" has to be spelled out per role there. The console has to agree, or a
+  // member holding the permission cannot reach the page that uses it — and so
+  // cannot read why their proposal was refused.
+  for (const role of TEAM_ROLES) {
+    assert.equal(canProposeTools(role), true, `${role} could not propose`);
+    assert.equal(
+      canAccessConsoleSurface("tools", {
+        isPlatformAdmin: false,
+        isAuditor: false,
+        teamRoles: [role],
+      }),
+      true,
+      `${role} could not reach the Tools page`,
+    );
+  }
+  assert.equal(canManageTools("member"), false);
+  // A platform admin has no role in the team and both hold.
+  assert.equal(canProposeTools(null), true);
+  assert.equal(canManageTools(null), true);
+});
+
+test("a caller with no team membership reaches no tool surface at all", () => {
+  // Including the platform auditor: its cross-team grant is read-only billing
+  // visibility, and filing a proposal is a write an admin may act on.
+  const outsider = { isPlatformAdmin: false, isAuditor: true, teamRoles: [] };
+
+  assert.equal(canAccessConsoleSurface("tools", outsider), false);
 });
 
 test("platform admins retain every console surface", () => {

@@ -12,6 +12,7 @@ from collections.abc import Callable
 from litestar.di import NamedDependency
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from litestar_gateway.application.mcp_proposal_service import McpProposalService
 from litestar_gateway.application.mcp_service import ApiKeyToolPolicyService, McpServerService
 from litestar_gateway.application.service import APIKeyService
 from litestar_gateway.application.team_service import TeamService
@@ -20,6 +21,7 @@ from litestar_gateway.infrastructure.keyring import Keyring
 from litestar_gateway.infrastructure.mcp.client import McpDiscoveryClient
 from litestar_gateway.infrastructure.persistence.mcp_repository import (
     SQLAlchemyApiKeyToolPolicyRepository,
+    SQLAlchemyMcpServerProposalRepository,
     SQLAlchemyMcpServerRepository,
 )
 
@@ -47,6 +49,34 @@ def build_mcp_server_service_provider(
         )
 
     return provide_mcp_server_service
+
+
+def build_mcp_proposal_service_provider(
+    settings: Settings,
+) -> Callable[[AsyncSession, Keyring, TeamService], McpProposalService]:
+    """The proposal service gets a discovery client for the same reason the server
+    service does — it runs the first `tools/list` at approval, which is the one
+    moment §2.4 permits egress on this path. Filing never reaches it."""
+    allowlist = settings.mcp_allowlist()
+    discovery = McpDiscoveryClient(allowlist=allowlist)
+
+    def provide_mcp_proposal_service(
+        db_session: NamedDependency[AsyncSession],
+        keyring: NamedDependency[Keyring],
+        team_service: NamedDependency[TeamService],
+    ) -> McpProposalService:
+        # Both repositories share the one session on purpose: approval claims the
+        # proposal and inserts the server in a single transaction, so a failed
+        # registration cannot leave a claimed proposal behind.
+        return McpProposalService(
+            SQLAlchemyMcpServerProposalRepository(db_session, keyring),
+            SQLAlchemyMcpServerRepository(db_session, keyring),
+            team_service,
+            allowlist=allowlist,
+            discovery=discovery,
+        )
+
+    return provide_mcp_proposal_service
 
 
 def provide_api_key_tool_policy_service(

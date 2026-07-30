@@ -18,7 +18,13 @@ from uuid import UUID
 
 from litestar.params import Parameter
 
-from litestar_gateway.domain.mcp import ApiKeyToolPolicy, McpServer, McpServerGrant, McpTool
+from litestar_gateway.domain.mcp import (
+    ApiKeyToolPolicy,
+    McpServer,
+    McpServerGrant,
+    McpServerProposal,
+    McpTool,
+)
 
 
 @dataclass(frozen=True)
@@ -112,6 +118,93 @@ class SetKeyToolPolicyRequest:
             )
         ),
     ] = None
+
+
+@dataclass(frozen=True)
+class ProposeMcpServerRequest:
+    """Ask the team's admins to register a server. Same fields as registering one,
+    because an approver takes it as filed or rejects it — there is no edit."""
+
+    name: Annotated[str, Parameter(description="Operator-facing name for the server.")]
+    url: Annotated[
+        str,
+        Parameter(
+            description=(
+                "The server's https endpoint. Validated against `MCP_ALLOWED_HOSTS` "
+                "here **and again at approval** — filing does not reserve a host that "
+                "an operator later removes from the allowlist."
+            )
+        ),
+    ]
+    auth: Annotated[
+        str | None,
+        Parameter(
+            description=(
+                "Bearer token the gateway should present. Stored envelope-encrypted "
+                "and moved to the server on approval; the approver never sees it."
+            )
+        ),
+    ] = None
+    tool_allowlist: Annotated[
+        list[str] | None,
+        Parameter(description="Restrict which advertised tools the server would expose."),
+    ] = None
+
+
+@dataclass(frozen=True)
+class RejectMcpProposalRequest:
+    """A refusal carries why: the member who filed it cannot be told only that it
+    is gone, and an approver cannot edit the proposal into something acceptable."""
+
+    reason: Annotated[str, Parameter(description="Why this proposal was refused.")]
+
+
+@dataclass(frozen=True)
+class McpServerProposalResponse:
+    """A queued proposal. Never the token — only `has_auth`, the same asymmetry
+    every MCP response keeps."""
+
+    id: UUID
+    team_id: UUID
+    name: str
+    url: str
+    status: Annotated[str, Parameter(description="`pending`, `approved` or `rejected`.")]
+    has_auth: bool
+    proposed_by: UUID | None = None
+    tool_allowlist: list[str] = field(default_factory=list)
+    reason: Annotated[
+        str | None, Parameter(description="Why it was rejected. `null` unless rejected.")
+    ] = None
+    server_id: Annotated[
+        UUID | None,
+        Parameter(
+            description=(
+                "The server this approval created. `null` while pending or rejected, "
+                "and also once that server has been deleted."
+            )
+        ),
+    ] = None
+    decided_by: UUID | None = None
+    decided_at: datetime | None = None
+    created_at: datetime | None = None
+
+    @classmethod
+    def from_entity(cls, proposal: McpServerProposal) -> McpServerProposalResponse:
+        return cls(
+            id=proposal.id,
+            team_id=proposal.team_id,
+            name=proposal.name,
+            url=proposal.url,
+            status=proposal.status.value,
+            has_auth=proposal.has_auth,
+            proposed_by=proposal.proposed_by,
+            tool_allowlist=list(proposal.tool_allowlist),
+            reason=proposal.reason,
+            server_id=proposal.server_id,
+            decided_by=proposal.decided_by,
+            decided_at=proposal.decided_at,
+            created_at=proposal.created_at,
+        )
 
 
 @dataclass(frozen=True)

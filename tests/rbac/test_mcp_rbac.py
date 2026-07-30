@@ -223,6 +223,100 @@ async def test_the_key_policy_read_and_write_share_one_permission_domain(
     assert write.status_code == HTTP_403_FORBIDDEN
 
 
+# ── the proposal surface (Plan 20 S5) ────────────────────────────────────────
+#
+# The one place in this table where a non-admin role is *supposed* to reach
+# something. `tools:propose` is held by every team role, which `ROLE_PERMISSIONS`
+# cannot express by inheritance — each role's set is exact — so the matrix below is
+# the only thing that would catch a role quietly missing it.
+
+
+def _propose_endpoints(team: str, proposal: str) -> list[tuple[str, str, str, dict | None]]:
+    return [
+        ("list proposals [tools:propose]", "GET", f"/teams/{team}/mcp-server-proposals", None),
+        (
+            "file proposal [tools:propose]",
+            "POST",
+            f"/teams/{team}/mcp-server-proposals",
+            {"name": "probe", "url": SERVER_URL},
+        ),
+    ]
+
+
+def _decide_endpoints(team: str, proposal: str) -> list[tuple[str, str, str, dict | None]]:
+    return [
+        (
+            "approve [tools:manage]",
+            "POST",
+            f"/teams/{team}/mcp-server-proposals/{proposal}/approve",
+            None,
+        ),
+        (
+            "reject [tools:manage]",
+            "POST",
+            f"/teams/{team}/mcp-server-proposals/{proposal}/reject",
+            {"reason": "no"},
+        ),
+    ]
+
+
+@pytest.mark.parametrize("role", ["member", "model-manager", "key-issuer", "billing-viewer"])
+async def test_every_team_role_may_ask_and_none_may_decide(
+    client: AsyncTestClient, role: str
+) -> None:
+    """The asymmetry the slice exists for, as a matrix row.
+
+    A role that could decide its own proposal would make the flow an escalation
+    with extra steps; a role that could not ask would put the person who knows
+    which tool the application needs behind the person who holds the permission.
+    """
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    token = await _member_token(client, admin, team, f"{role}-p@corp.com", role)
+
+    for label, method, path, body in _propose_endpoints(team, str(uuid4())):
+        status = await _call(client, method, path, body, token)
+        assert status != HTTP_403_FORBIDDEN, f"{role} was refused {label}: got {status}"
+    # A random proposal id on purpose: the permission must be decided before the
+    # lookup, so a 403 here cannot double as an existence check.
+    for label, method, path, body in _decide_endpoints(team, str(uuid4())):
+        status = await _call(client, method, path, body, token)
+        assert status == HTTP_403_FORBIDDEN, f"{role} reached {label}: got {status}"
+
+
+async def test_the_platform_auditor_cannot_even_propose(client: AsyncTestClient) -> None:
+    """The auditor's cross-team bypass is billing visibility, and it is read-only.
+    Filing a proposal is a write, and one an admin may act on."""
+    admin = await _admin(client)
+    team = await _team(client, admin)
+    user_id = await _signup(client, admin, "aud-prop@corp.com")
+    await client.patch(
+        f"/users/{user_id}/auditor", json={"is_auditor": True}, headers=_bearer(admin)
+    )
+    token = await _login(client, "aud-prop@corp.com", "Sup3r-Secret!")
+
+    for label, method, path, body in _propose_endpoints(team, str(uuid4())) + _decide_endpoints(
+        team, str(uuid4())
+    ):
+        status = await _call(client, method, path, body, token)
+        assert status == HTTP_403_FORBIDDEN, f"auditor was not refused {label}: got {status}"
+
+
+async def test_an_anonymous_caller_cannot_propose(client: AsyncTestClient) -> None:
+    admin = await _admin(client)
+    team = await _team(client, admin)
+
+    for method, path, body in (
+        ("GET", f"/teams/{team}/mcp-server-proposals", None),
+        ("POST", f"/teams/{team}/mcp-server-proposals", {"name": "x", "url": SERVER_URL}),
+        ("POST", f"/teams/{team}/mcp-server-proposals/{uuid4()}/approve", None),
+    ):
+        response = await client.request(method, path, json=body)
+        assert response.status_code in (401, 403), (
+            f"{method} {path} was open: {response.status_code}"
+        )
+
+
 # ── tenancy ──────────────────────────────────────────────────────────────────
 
 

@@ -4,6 +4,7 @@ import type { components } from "@/lib/api/schema";
 export type McpServer = components["schemas"]["McpServerResponse"];
 export type McpTool = components["schemas"]["McpToolResponse"];
 export type KeyToolPolicy = components["schemas"]["KeyToolPolicyResponse"];
+export type McpServerProposal = components["schemas"]["McpServerProposalResponse"];
 
 function fail(error: unknown, fallback: string): Error {
   if (error && typeof error === "object") {
@@ -121,6 +122,65 @@ export async function declareToolEffect(
     },
   );
   if (error) throw fail(error, "Failed to declare the effect");
+}
+
+// ── proposals (design §2.4) ─────────────────────────────────────────────────
+
+/** GET /teams/{id}/mcp-server-proposals — readable by every team role, because
+ * the member who filed one has to be able to read the decision and the reason. */
+export async function listMcpProposals(teamId: string): Promise<McpServerProposal[]> {
+  const { data, error } = await api.GET("/teams/{team_id}/mcp-server-proposals", {
+    params: { path: { team_id: teamId } },
+  });
+  if (error || !data) throw fail(error, "Failed to load the proposal queue");
+  return data;
+}
+
+/** POST /teams/{id}/mcp-server-proposals — asks the team's admins to register a
+ * server. Changes no policy and causes no outbound request. */
+export async function proposeMcpServer(
+  teamId: string,
+  payload: { name: string; url: string; auth?: string | null; tool_allowlist?: string[] | null },
+): Promise<McpServerProposal> {
+  const { data, error } = await api.POST("/teams/{team_id}/mcp-server-proposals", {
+    params: { path: { team_id: teamId } },
+    body: payload as never,
+  });
+  if (error || !data) throw fail(error, "Failed to file the proposal");
+  return data;
+}
+
+/** POST .../{proposal}/approve — registers the server and runs the first
+ * discovery. The allowlist is re-checked here, so this can fail for a proposal
+ * that was valid when it was filed; a second approval is a 409. */
+export async function approveMcpProposal(
+  teamId: string,
+  proposalId: string,
+): Promise<McpServer> {
+  const { data, error } = await api.POST(
+    "/teams/{team_id}/mcp-server-proposals/{proposal_id}/approve",
+    { params: { path: { team_id: teamId, proposal_id: proposalId } } },
+  );
+  if (error || !data) throw fail(error, "Failed to approve the proposal");
+  return data;
+}
+
+/** POST .../{proposal}/reject — the reason is required and is what the member who
+ * filed it reads. */
+export async function rejectMcpProposal(
+  teamId: string,
+  proposalId: string,
+  reason: string,
+): Promise<McpServerProposal> {
+  const { data, error } = await api.POST(
+    "/teams/{team_id}/mcp-server-proposals/{proposal_id}/reject",
+    {
+      params: { path: { team_id: teamId, proposal_id: proposalId } },
+      body: { reason } as never,
+    },
+  );
+  if (error || !data) throw fail(error, "Failed to reject the proposal");
+  return data;
 }
 
 /** GET /teams/{id}/keys/{key}/tool-policy — `restricted: false` is the default

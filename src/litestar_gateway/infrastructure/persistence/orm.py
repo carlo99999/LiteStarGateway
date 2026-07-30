@@ -50,7 +50,9 @@ from litestar_gateway.domain.mcp import (
     ApiKeyToolPolicy,
     McpServer,
     McpServerGrant,
+    McpServerProposal,
     McpTool,
+    ProposalStatus,
     ToolEffect,
 )
 from litestar_gateway.domain.money import ZERO
@@ -1289,5 +1291,70 @@ class ApiKeyToolPolicyModel(base.UUIDAuditBase):
             team_id=self.team_id,
             allowed_tools=tuple(self.allowed_tools or ()),
             destructive_enabled=self.destructive_enabled,
+            created_at=self.created_at,
+        )
+
+
+class McpServerProposalModel(base.UUIDAuditBase):
+    """A member's request to register a tool server (Plan 20 S5, design §2.4).
+
+    Deliberately **not** a variant of `McpServerModel` with a status column. A
+    pending row must be unreachable from every read on the call path, and the way
+    to guarantee that is for it to live in a table nothing on that path queries —
+    rather than for every such query to remember a `WHERE status = 'approved'`.
+
+    There is no unique constraint on `(team_id, name)`. Two members may propose
+    the same name and one gets refused at approval, because the name that has to
+    be free is the one free *when the server is created*: a constraint here would
+    instead refuse the second member at filing time for a name the first one's
+    proposal may never claim.
+
+    The token is envelope-encrypted on the `mcp_server` pattern and moved to the
+    server on approval. `to_entity` never carries it, so no queue response can
+    show an approver the secret they are approving.
+    """
+
+    __tablename__ = "mcp_server_proposal"
+
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("team.id"), index=True)
+    # SET NULL rather than CASCADE: a decision outliving the account that made it
+    # is the audit-shaped answer, and deleting the record of who asked for a live
+    # server would be worse than losing the link.
+    proposed_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL"), default=None, index=True
+    )
+    name: Mapped[str] = mapped_column()
+    url: Mapped[str] = mapped_column()
+    tool_allowlist: Mapped[list[str]] = mapped_column(JSON, default=list)
+    encrypted_auth: Mapped[str | None] = mapped_column(default=None)
+    auth_key_id: Mapped[UUID | None] = mapped_column(ForeignKey("secret_key.id"), default=None)
+    # Indexed with `team_id`: the console's queue is "pending ones for this team",
+    # which is the only query this table serves.
+    status: Mapped[str] = mapped_column(default=ProposalStatus.PENDING.value, index=True)
+    reason: Mapped[str | None] = mapped_column(default=None)
+    # SET NULL so deleting the server an approval created does not delete the
+    # record that it was approved.
+    server_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("mcp_server.id", ondelete="SET NULL"), default=None
+    )
+    decided_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL"), default=None
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(default=None)
+
+    def to_entity(self) -> McpServerProposal:
+        return McpServerProposal(
+            id=self.id,
+            team_id=self.team_id,
+            proposed_by=self.proposed_by,
+            name=self.name,
+            url=self.url,
+            status=ProposalStatus(self.status),
+            tool_allowlist=tuple(self.tool_allowlist or ()),
+            has_auth=self.encrypted_auth is not None,
+            reason=self.reason,
+            server_id=self.server_id,
+            decided_by=self.decided_by,
+            decided_at=self.decided_at,
             created_at=self.created_at,
         )

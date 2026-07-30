@@ -69,10 +69,12 @@ from litestar_gateway.infrastructure.web.guardrails.dependencies import (
     provide_guardrail_policy_service,
 )
 from litestar_gateway.infrastructure.web.mcp import (
+    McpProposalController,
     McpServerController,
     PlatformMcpServerController,
 )
 from litestar_gateway.infrastructure.web.mcp.dependencies import (
+    build_mcp_proposal_service_provider,
     build_mcp_server_service_provider,
     provide_api_key_tool_policy_service,
 )
@@ -280,6 +282,7 @@ def _build_route_handlers(database: Database, settings: Settings) -> list:
         ModelController,  # team-admin: team-scoped model deployments
         GuardrailController,  # team-admin: the team's guardrail chain
         McpServerController,  # team-admin: the team's MCP tool servers + per-key policy
+        McpProposalController,  # any member: propose a tool server; admins decide
         PlatformMcpServerController,  # platform-admin: global MCP servers + grants
         PlatformModelController,  # platform-admin: global models + extension grants
         ModelPricesController,  # default per-token pricing lookup (console prefill)
@@ -330,6 +333,9 @@ def _build_dependencies(
         "guardrail_policy_service": Provide(provide_guardrail_policy_service, sync_to_thread=False),
         "mcp_server_service": Provide(
             build_mcp_server_service_provider(settings), sync_to_thread=False
+        ),
+        "mcp_proposal_service": Provide(
+            build_mcp_proposal_service_provider(settings), sync_to_thread=False
         ),
         "api_key_tool_policy_service": Provide(
             provide_api_key_tool_policy_service, sync_to_thread=False

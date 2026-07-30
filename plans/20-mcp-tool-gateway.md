@@ -202,7 +202,35 @@ left the allowlist after filing is refused at approval; filing a proposal makes
 **no** outbound request (asserted by a resolver double that fails the test if
 called).
 
-## S6 — Declaration injection (1 PR, ~1 d) · Track B
+**Two things this slice learned the hard way, both worth carrying forward.**
+
+*The obvious concurrency test proves nothing.* The first draft simulated the race
+with two sessions — one reading the proposal as `pending`, the other approving —
+and a deliberate read-then-write mutation passed it. SQLAlchemy's identity map
+holds rows **weakly**: the "stale" session had dropped the object and silently
+re-read the truth. The property is only testable with a live reference to the
+loaded row, and the test that pins it says so, because the next person to touch it
+will otherwise delete the reference as dead code. Every control in this slice was
+verified by mutating the implementation first; four of the five mutations were
+caught only by one test each, and the first one was caught by none.
+
+*Approval could not be ordered the way the plan assumed.* "Claim the row, then
+create the server" fails the foreign key outright — the claim records `server_id`,
+and the server does not exist yet. Found by the wired REST test rather than the
+service tests, whose fixture does not enforce SQLite FKs — exactly the gap PR
+`#462` was about. The order is therefore: re-validate, **stage** the server
+uncommitted (`stage_add`, the Round 15 S12 shape), then claim — with the claim
+committing the staged insert or rolling it back. That also moved the name-clash
+case earlier and made it cleaner: a name taken while the proposal sat pending now
+fails before any decision is claimed, rather than needing a rollback to undo one.
+
+*A console decision the table did not predict.* The Tools surface was
+admin-gated, so the member half of §2.4 — reading why your proposal was refused —
+was unreachable in the console. Navigation now opens the page for `tools:propose`
+(every role) while the server registry inside it stays `tools:manage`. Two
+pre-existing UI assertions changed and carry the reason.
+
+### S6 — Declaration injection (1 PR, ~1 d) · Track B
 
 **Deliverables.** `tools: [{"type": "mcp", "server": …}]` expanded in `_prepare`
 from the cached inventory, before the guardrail hook and before `_meter.admit`,
@@ -214,7 +242,7 @@ what the provider receives; a request without an `mcp` reference is
 byte-identical to today; a server the team cannot see is a 404 at expansion, not
 a leak of its existence.
 
-## S7 — Bounded execution (2 PRs, ~3 d) · Track B, one owner
+### S7 — Bounded execution (2 PRs, ~3 d) · Track B, one owner
 
 **PR 1 — the loop.** Round loop with `max_rounds` (default 3, ceiling 10);
 per-round `admit`/settle on the `guardrail.judge` precedent
@@ -238,7 +266,7 @@ gated it (ISSUE-037's shape); rebuilding a retry from a pre-guardrail body
 (ISSUE-035's shape); a `finally` that turns a settled success into a 500
 (ISSUE-045's shape).
 
-## S8 — Guardrails on tools (1 PR, ~1,5 d) · Track C
+### S8 — Guardrails on tools (1 PR, ~1,5 d) · Track C
 
 **Deliverables.** `Direction.TOOL_CALL` and `Direction.TOOL_RESULT`; payload
 extraction/re-insertion for both; `resolve_chain` and the fail policies unchanged;
@@ -250,7 +278,7 @@ chain stays sequential (the composition property from ISSUE-039).
 
 ---
 
-## Sequence
+### Sequence
 
 | Slice | Track | Migration | PRs | Estimate |
 |---|---|---|---|---|
@@ -267,7 +295,7 @@ chain stays sequential (the composition property from ISSUE-039).
 ~12 days of work. The critical path is Track B (S6 → S7 → S8, ~5,5 d) and
 nothing shortens it: those slices share two files and must be serial.
 
-## What parallelism can and cannot compress
+### What parallelism can and cannot compress
 
 Track A's five slices after S0 are file-disjoint and can run wide. Track B cannot
 be compressed at all, and attempting it produces conflicting hunks in
