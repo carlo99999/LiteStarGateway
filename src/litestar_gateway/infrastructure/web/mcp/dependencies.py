@@ -17,6 +17,7 @@ from litestar_gateway.application.service import APIKeyService
 from litestar_gateway.application.team_service import TeamService
 from litestar_gateway.config import Settings
 from litestar_gateway.infrastructure.keyring import Keyring
+from litestar_gateway.infrastructure.mcp.client import McpDiscoveryClient
 from litestar_gateway.infrastructure.persistence.mcp_repository import (
     SQLAlchemyApiKeyToolPolicyRepository,
     SQLAlchemyMcpServerRepository,
@@ -27,6 +28,10 @@ def build_mcp_server_service_provider(
     settings: Settings,
 ) -> Callable[[AsyncSession, Keyring, TeamService], McpServerService]:
     allowlist = settings.mcp_allowlist()
+    # One client for the app's lifetime: it holds no connection, only the
+    # allowlist and the timeout, and it opens a fresh session per discovery.
+    discovery = McpDiscoveryClient(allowlist=allowlist)
+    ttl_seconds = settings.mcp_inventory_ttl_seconds
 
     def provide_mcp_server_service(
         db_session: NamedDependency[AsyncSession],
@@ -37,6 +42,8 @@ def build_mcp_server_service_provider(
             SQLAlchemyMcpServerRepository(db_session, keyring),
             team_service,
             allowlist=allowlist,
+            discovery=discovery,
+            inventory_ttl_seconds=ttl_seconds,
         )
 
     return provide_mcp_server_service

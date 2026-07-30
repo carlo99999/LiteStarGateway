@@ -47,6 +47,7 @@ from litestar_gateway.domain.exceptions import (
     InvalidUsageQuery,
     LastTeamAdmin,
     ManagementScopeRequiresServicePrincipal,
+    McpDiscoveryFailed,
     McpServerNotFound,
     MembershipNotFound,
     ModelDisabled,
@@ -140,6 +141,9 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     (GuardrailBlocked, HTTP_422_UNPROCESSABLE_ENTITY),
     (InvalidMcpServer, HTTP_400_BAD_REQUEST),
     (McpServerNotFound, HTTP_404_NOT_FOUND),
+    # The tool server is unreachable or answered off-contract. 502 rather than
+    # 400: nothing about the operator's request was wrong.
+    (McpDiscoveryFailed, HTTP_502_BAD_GATEWAY),
     (ManagementScopeRequiresServicePrincipal, HTTP_400_BAD_REQUEST),
     (InvalidServicePrincipal, HTTP_400_BAD_REQUEST),
     (InvalidRouterConfig, HTTP_400_BAD_REQUEST),
