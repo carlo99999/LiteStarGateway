@@ -268,6 +268,12 @@ class SQLAlchemyMcpServerRepository:
         operator state. Re-reading it from the server on every refresh would make
         it a value the server controls, which is exactly what "declared, never
         detected" forbids.
+
+        This is also the one moment that means "discovery succeeded", so it
+        stamps the server — including when `tools` is empty. Without that stamp a
+        server offering nothing is indistinguishable from one nobody ever
+        queried, and the console would keep telling an operator to run a
+        discovery that already ran.
         """
         existing = {
             row.name: row
@@ -299,6 +305,9 @@ class SQLAlchemyMcpServerRepository:
         for name, row in existing.items():
             if name not in seen:
                 await self._session.delete(row)
+        server = await self._session.get(McpServerModel, server_id)
+        if server is not None:
+            server.last_discovered_at = now
         await self._session.commit()
         return await self.tools(server_id)
 

@@ -2407,7 +2407,7 @@ export interface components {
             api_key_id: string;
             restricted: boolean;
             destructive_enabled: boolean;
-            allowed_tools?: string[];
+            allowed_tools: string[];
             created_at?: string | null;
         };
         /** LoginRequest */
@@ -2442,6 +2442,7 @@ export interface components {
             origin: string;
             tool_allowlist?: string[];
             created_at?: string | null;
+            last_discovered_at?: string | null;
         };
         /** McpToolResponse */
         McpToolResponse: {

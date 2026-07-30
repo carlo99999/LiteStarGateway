@@ -22,9 +22,14 @@ function fail(error: unknown, fallback: string): Error {
   return new Error(fallback);
 }
 
-async function requestTeamKeys(teamId: string, request: PageRequest): Promise<ApiKey[]> {
+async function requestTeamKeys(
+  teamId: string,
+  request: PageRequest,
+  signal?: AbortSignal,
+): Promise<ApiKey[]> {
   const { data, error } = await api.GET("/teams/{team_id}/keys", {
     params: { path: { team_id: teamId }, query: request },
+    signal,
   });
   if (error || !data) throw fail(error, "Failed to load API keys");
   return data;
@@ -90,6 +95,14 @@ async function requestServicePrincipals(
   });
   if (error || !data) throw fail(error, "Failed to load service principals");
   return data;
+}
+
+/** Every key in the team, for a selector rather than a table — the per-key tool
+ * policy editor needs the whole list, not one page of it. */
+export async function listAllTeamKeys(teamId: string, signal?: AbortSignal): Promise<ApiKey[]> {
+  return fetchAllPages((request) => requestTeamKeys(teamId, request, signal), {
+    keyOf: (key) => key.id,
+  });
 }
 
 /** Complete team-scoped collection for the issue-key selector. */

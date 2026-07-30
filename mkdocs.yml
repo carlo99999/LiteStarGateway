@@ -81,6 +81,7 @@ nav:
       - Usage and cost: docs/usage-cost.md
       - Parameter allowlist: docs/param-allowlist.md
       - Guardrails: docs/guardrails.md
+      - MCP tool servers: docs/mcp-tools.md
       - Enterprise SSO: docs/enterprise-sso.md
       - Account recovery: docs/account-recovery.md
   - Routing:

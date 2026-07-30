@@ -1162,6 +1162,12 @@ class McpServerModel(base.UUIDAuditBase):
     tool_allowlist: Mapped[list[str]] = mapped_column(JSON, default=list)
     encrypted_auth: Mapped[str | None] = mapped_column(default=None)
     auth_key_id: Mapped[UUID | None] = mapped_column(ForeignKey("secret_key.id"), default=None)
+    # When discovery last succeeded. NULL means it never ran, which is a
+    # different fact from "it ran and the server offers nothing" — and without
+    # this column the two are the same empty tool list, so the console cannot
+    # tell a server nobody has queried from one that genuinely has no tools.
+    # It is also the "last discovery" the console shows as a health signal.
+    last_discovered_at: Mapped[datetime | None] = mapped_column(default=None)
 
     def to_entity(self) -> McpServer:
         return McpServer(
@@ -1173,6 +1179,7 @@ class McpServerModel(base.UUIDAuditBase):
             created_at=self.created_at,
             has_auth=self.encrypted_auth is not None,
             tool_allowlist=tuple(self.tool_allowlist or ()),
+            last_discovered_at=self.last_discovered_at,
             # `global` is the one origin readable from the row alone — a NULL
             # `team_id` is global to every viewer. `own` vs `extended` depends on
             # who is asking, so `visible_to` decides those. Defaulting this to

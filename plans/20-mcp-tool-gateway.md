@@ -174,6 +174,21 @@ inventory — the console defect this project has found in three separate rounds
 the `destructive` toggle is visibly off by default and its label says what
 enabling it permits.
 
+**Carried a migration, which this table did not predict.** Building the page
+surfaced a gap the API had: "discovery never ran" and "the server advertises
+nothing" were both an empty tool list, so the console could not tell a server
+nobody had queried from one that genuinely has no tools — and it would keep
+telling an operator to run a discovery that already ran. `mcp_server`
+`last_discovered_at` (nullable, additive) makes the two expressible, and it is
+also the "last discovery" this slice was already asked to show. It has the side
+effect of fixing the inventory TTL for a server that offers nothing, which used to
+be re-queried on every refresh. D7 still holds: it landed before S5's migration,
+never concurrently.
+
+The operator-facing page (`docs/mcp-tools.md`) landed here rather than earlier,
+because until the console existed there was no usable feature to document. It is
+where the name-vs-CIDR allowlist distinction is stated for an operator.
+
 ## S5 — Proposals (1 PR, ~1 d)
 
 **Deliverables.** `mcp_server_proposal` (`pending → approved | rejected`) with the
@@ -243,7 +258,7 @@ chain stays sequential (the composition property from ISSUE-039).
 | S1 repository/service/visibility | A | no | 1 | 1,5 d |
 | S2 REST + RBAC | A | no | 1 | 1 d |
 | S3 discovery client | A | no | 1 | 1 d |
-| S4 console | A | no | 1 | 1 d |
+| S4 console | A | **yes** (added) | 1 | 1 d |
 | S5 proposals | A | **yes** | 1 | 1 d |
 | S6 declaration injection | B | no | 1 | 1 d |
 | S7 bounded execution | B | no | 2 | 3 d |
