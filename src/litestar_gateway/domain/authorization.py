@@ -35,6 +35,15 @@ class Permission(StrEnum):
     # control. Team admins and platform admins only.
     GUARDRAILS_READ = "guardrails:read"
     GUARDRAILS_MANAGE = "guardrails:manage"
+    # MCP tool servers (Plan 20). `TOOLS_MANAGE` is withheld from
+    # `model_manager` on the guardrail precedent: attaching a tool server is an
+    # egress decision, so it belongs to the team admin. `TOOLS_PROPOSE` is the
+    # one permission every role holds, `member` included — a proposal changes no
+    # policy until someone with `TOOLS_MANAGE` approves it, so the "a member
+    # manages nothing" principle survives.
+    TOOLS_READ = "tools:read"
+    TOOLS_MANAGE = "tools:manage"
+    TOOLS_PROPOSE = "tools:propose"
 
 
 # The single source of truth for what each team role may do. `admin` holds
@@ -43,17 +52,22 @@ class Permission(StrEnum):
 # grant exactly one capability domain on top of member.
 ROLE_PERMISSIONS: dict[TeamRole, frozenset[Permission]] = {
     TeamRole.ADMIN: frozenset(Permission),
-    TeamRole.MEMBER: frozenset(),
+    TeamRole.MEMBER: frozenset({Permission.TOOLS_PROPOSE}),
     TeamRole.MODEL_MANAGER: frozenset(
         {
             Permission.MODELS_READ,
             Permission.MODELS_MANAGE,
             Permission.PLAYGROUND_EXECUTE,
             Permission.DECISIONS_READ,
+            Permission.TOOLS_PROPOSE,
         }
     ),
-    TeamRole.KEY_ISSUER: frozenset({Permission.KEYS_READ, Permission.KEYS_ISSUE}),
-    TeamRole.BILLING_VIEWER: frozenset({Permission.USAGE_READ, Permission.BUDGET_READ}),
+    TeamRole.KEY_ISSUER: frozenset(
+        {Permission.KEYS_READ, Permission.KEYS_ISSUE, Permission.TOOLS_PROPOSE}
+    ),
+    TeamRole.BILLING_VIEWER: frozenset(
+        {Permission.USAGE_READ, Permission.BUDGET_READ, Permission.TOOLS_PROPOSE}
+    ),
 }
 
 # What a platform auditor (User.is_auditor) may do in ANY team without being a

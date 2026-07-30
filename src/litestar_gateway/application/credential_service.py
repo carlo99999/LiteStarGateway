@@ -77,6 +77,12 @@ class CredentialService:
             )
         except ValueError as exc:
             raise CredentialMisconfigured(str(exc)) from exc
+        except OSError as exc:
+            # Same reason as the MCP path: `getaddrinfo` raises `gaierror`, an
+            # OSError, so an unresolvable host was a 500 rather than a 400.
+            raise CredentialMisconfigured(
+                f"api_base host {parsed.hostname!r} could not be resolved: {exc}"
+            ) from exc
 
     async def create(
         self, actor: User, name: str, provider: Provider, values: dict[str, str]

@@ -118,16 +118,23 @@ it is the same action it already uses for its own.
 | | `tools:propose` | `tools:read` | `tools:manage` |
 |---|---|---|---|
 | team **admin** | ✅ | ✅ | ✅ servers, detach, per-key policy, approvals |
-| **model_manager** | ✅ | ✅ inventory | ❌ |
-| member · key_issuer · billing_viewer | ✅ | ❌ | ❌ |
+| member · model_manager · key_issuer · billing_viewer | ✅ | ❌ | ❌ |
 | platform admin | ✅ | bypasses every check (existing behaviour) | bypasses |
-| platform auditor | ❌ | inventory only — **not** the call feed | ❌ |
+| platform auditor | ❌ | ❌ | ❌ |
 
-Three deliberate choices. `tools:manage` is withheld from `model_manager` on the
-guardrail precedent: attaching a tool is an egress decision, and
-`GUARDRAILS_MANAGE` is withheld from the same role for the same reason. The
-auditor sees configuration but not the call feed, mirroring how `decisions:read`
-was split from `usage:read` because decision exports carry end-user content.
+`tools:manage` is withheld from `model_manager` on the guardrail precedent:
+attaching a tool is an egress decision, and `GUARDRAILS_MANAGE` is withheld from
+the same role for the same reason.
+
+**Corrected while implementing S1.** An earlier draft of this table also gave
+`model_manager` `tools:read` and the platform auditor an inventory-only view.
+Both were widenings I invented for convenience, and the RBAC tests said so: one
+pins that *each extended role grants exactly one capability domain*, and reading
+a tool inventory is not the models domain; the other pins the auditor's
+cross-team bypass to *"strictly read-only billing visibility"*, and an inventory
+is not billing. Reading the inventory therefore stays with the team admin. If
+either widening is ever wanted, it deserves its own argument rather than arriving
+inside a feature.
 
 And `tools:propose` is the first permission held by **every** team role,
 including `member` — which `authorization.py` states holds nothing on purpose,
