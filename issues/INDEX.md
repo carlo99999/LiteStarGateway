@@ -10,7 +10,7 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 | Round | Focus | New findings (C·H·M·L) | Status |
 |---|---|---|---|
-| [Round 15](round-15.md) — 2026-07-29 | Delta dopo `5469464`: provider openai_compatible + egress allowlist, guardrail (chain/webhook/judge/policy/router-scope), prenotazioni budget distribuite + Decimal/NUMERIC, budget per-chiave, segreto webhook per-team, capability dichiarate, reliability view | 0·7·6·6 | Open |
+| [Round 15](round-15.md) — 2026-07-29 | Delta dopo `5469464`: provider openai_compatible + egress allowlist, guardrail (chain/webhook/judge/policy/router-scope), prenotazioni budget distribuite + Decimal/NUMERIC, budget per-chiave, segreto webhook per-team, capability dichiarate, reliability view | 0·7·6·6 | Fully remediated (#442–#453) |
 | [Round 14](round-14.md) — 2026-07-28 | Regression review of the Round 13 remediation (#392–#401): pricing, cache equivalence, client lifecycle, outbox, deadline, SSO, breaker, purge | 0·0·3·0 | Fully remediated (#403–#405) |
 | [Round 13](round-13.md) — 2026-07-27 | Post-R12 delta (response cache exact+semantic, failover/breaker, budget alerts, non-token pricing, client registry, DB-backed SSO, retention/purge) | 0·2·7·0 | Fully remediated (#392–#401) |
 | [Round 12](round-12.md) — 2026-07-22 | Post-R11 delta (verification of remediation PRs #313–#321: alias registry, router revisions, playground governance, downgrade contract) | 0·0·2·0 | Fully remediated |
@@ -28,7 +28,8 @@ re-reported. Severity reflects verified exploitability/impact, not the raw finde
 
 ## Overall
 
-**As of Round 15: 6.8/10 at review time — 0C·7H·6M·6L, all Open.** See
+**As of Round 15: 6.8/10 at review time, all nineteen findings since remediated
+(#442–#453).** See
 [round-15.md](round-15.md#category-scores). Il delta aggiunge il provider
 openai_compatible con egress allowlist, i guardrail (con scope per-router), le
 prenotazioni di budget distribuite, il denaro Decimal/NUMERIC e i budget
