@@ -45,9 +45,9 @@ are already registered.
 
 If you are pointing at infrastructure you control, prefer the CIDR form.
 
-The URL must also be `https`, and must not carry userinfo
-(`https://user:pass@host/`) — the endpoint is kept in the clear for logs and
-metric labels, so a password in the URL would be logged verbatim. Use the bearer
+The URL must also be `https`, and must not carry userinfo — the
+`name:secret@host` form. The endpoint is kept in the clear for logs and metric
+labels, so a password embedded in the URL would be logged verbatim. Use the bearer
 token instead, which is envelope-encrypted and never returned by any endpoint.
 
 ## 2. Who may do what
