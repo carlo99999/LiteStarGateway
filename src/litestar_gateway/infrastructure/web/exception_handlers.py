@@ -36,7 +36,6 @@ from litestar_gateway.domain.exceptions import (
     InvalidCredentials,
     InvalidGuardrailRule,
     InvalidInvite,
-    InvalidMcpServer,
     InvalidModelPricing,
     InvalidPasswordReset,
     InvalidPlaygroundRequest,
@@ -47,10 +46,6 @@ from litestar_gateway.domain.exceptions import (
     InvalidUsageQuery,
     LastTeamAdmin,
     ManagementScopeRequiresServicePrincipal,
-    McpDiscoveryFailed,
-    McpProposalAlreadyDecided,
-    McpProposalNotFound,
-    McpServerNotFound,
     MembershipNotFound,
     ModelDisabled,
     ModelNameExists,
@@ -141,15 +136,6 @@ _STATUS: list[tuple[type[DomainError], int]] = [
     # operator's policy declined. 422 keeps the two distinguishable in a
     # caller's metrics and in ours.
     (GuardrailBlocked, HTTP_422_UNPROCESSABLE_ENTITY),
-    (InvalidMcpServer, HTTP_400_BAD_REQUEST),
-    (McpServerNotFound, HTTP_404_NOT_FOUND),
-    (McpProposalNotFound, HTTP_404_NOT_FOUND),
-    # Losing the approval race is a conflict, not a bad request: the call was
-    # well-formed and the caller's view of the proposal was merely stale.
-    (McpProposalAlreadyDecided, HTTP_409_CONFLICT),
-    # The tool server is unreachable or answered off-contract. 502 rather than
-    # 400: nothing about the operator's request was wrong.
-    (McpDiscoveryFailed, HTTP_502_BAD_GATEWAY),
     (ManagementScopeRequiresServicePrincipal, HTTP_400_BAD_REQUEST),
     (InvalidServicePrincipal, HTTP_400_BAD_REQUEST),
     (InvalidRouterConfig, HTTP_400_BAD_REQUEST),

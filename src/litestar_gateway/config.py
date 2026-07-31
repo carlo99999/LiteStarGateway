@@ -246,25 +246,6 @@ class Settings:
     # Empty ⇒ the provider is unusable, so a deployment that upgrades gains no
     # new egress reach until an operator opts in.
     openai_compatible_allowed_hosts: tuple[str, ...] = ()
-    # Egress allowlist for MCP tool servers (Plan 20). Same grammar and parser as
-    # the provider allowlist above, and deliberately a *separate* list: a host
-    # authorized to serve a self-hosted model is not thereby authorized to
-    # receive tool arguments, which is different data leaving the gateway.
-    #
-    # Unlike the provider list, empty does **not** mean unusable. This surface
-    # falls back to the SSRF deny-list, so any public https endpoint is reachable
-    # with no configuration and the feature works out of the box. An entry here is
-    # how an operator authorizes an *internal* tool server — the only thing the
-    # deny-list would otherwise refuse — and, once set, the list becomes the
-    # platform's one veto over a team-owned resource: nothing outside it is
-    # reachable, public or not.
-    mcp_allowed_hosts: tuple[str, ...] = ()
-    # How long a discovered tool inventory stays fresh (Plan 20). A refresh
-    # inside this window returns the stored inventory instead of calling the
-    # server again, so a console that refreshes on page load does not turn each
-    # visit into outbound traffic. `force` overrides it for the operator who
-    # knows the server changed.
-    mcp_inventory_ttl_seconds: int = 3600
     # SSO via OIDC. No discovery URL ⇒ disabled. `oidc_admin_groups` (comma-sep)
     # maps IdP groups to platform admin.
     oidc_discovery_url: str | None = None
@@ -369,21 +350,12 @@ class Settings:
         unless an operator opted in, which makes that provider unusable."""
         return parse_allowlist(self.openai_compatible_allowed_hosts)
 
-    def mcp_allowlist(self) -> EgressAllowlist:
-        """The parsed MCP tool-server allowlist (Plan 20).
-
-        Empty by default, which for this surface means "deny-list only": public
-        endpoints reachable, private ones refused until an entry authorizes them.
-        """
-        return parse_allowlist(self.mcp_allowed_hosts)
-
     def __post_init__(self) -> None:
         # Before the local-env shortcut below: a malformed allowlist entry is a
         # typo, not an insecurity, and the environment most likely to catch it
         # is the developer's. Silently dropping it would leave an operator
         # believing a target is authorized when it is not.
         self.egress_allowlist()
-        self.mcp_allowlist()
         # Fail fast on insecure secrets everywhere except explicitly-local envs, so a
         # staging or misspelled environment cannot silently run on the public default
         # or a brute-forceable short key.

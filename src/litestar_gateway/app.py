@@ -68,17 +68,6 @@ from litestar_gateway.infrastructure.web.guardrails import GuardrailController
 from litestar_gateway.infrastructure.web.guardrails.dependencies import (
     provide_guardrail_policy_service,
 )
-from litestar_gateway.infrastructure.web.mcp import (
-    McpProposalController,
-    McpServerController,
-    PlatformMcpServerController,
-)
-from litestar_gateway.infrastructure.web.mcp.dependencies import (
-    build_mcp_proposal_service_provider,
-    build_mcp_server_service_provider,
-    provide_api_key_tool_policy_service,
-    provide_mcp_registry,
-)
 from litestar_gateway.infrastructure.web.models import (
     ModelController,
     ModelPricesController,
@@ -282,9 +271,6 @@ def _build_route_handlers(database: Database, settings: Settings) -> list:
         requeue_budget_alert,  # platform-admin: replay one of them
         ModelController,  # team-admin: team-scoped model deployments
         GuardrailController,  # team-admin: the team's guardrail chain
-        McpServerController,  # team-admin: the team's MCP tool servers + per-key policy
-        McpProposalController,  # any member: propose a tool server; admins decide
-        PlatformMcpServerController,  # platform-admin: global MCP servers + grants
         PlatformModelController,  # platform-admin: global models + extension grants
         ModelPricesController,  # default per-token pricing lookup (console prefill)
         PlaygroundController,  # compare a prompt across a team's models
@@ -332,16 +318,6 @@ def _build_dependencies(
         "team_service": Provide(provide_team_service, sync_to_thread=False),
         "model_service": Provide(provide_model_service, sync_to_thread=False),
         "guardrail_policy_service": Provide(provide_guardrail_policy_service, sync_to_thread=False),
-        "mcp_server_service": Provide(
-            build_mcp_server_service_provider(settings), sync_to_thread=False
-        ),
-        "mcp_proposal_service": Provide(
-            build_mcp_proposal_service_provider(settings), sync_to_thread=False
-        ),
-        "api_key_tool_policy_service": Provide(
-            provide_api_key_tool_policy_service, sync_to_thread=False
-        ),
-        "mcp_registry": Provide(provide_mcp_registry, sync_to_thread=False),
         "callable_resolver": Provide(provide_callable_resolver, sync_to_thread=False),
         "credential_service": Provide(
             build_credential_service_provider(settings), sync_to_thread=False
